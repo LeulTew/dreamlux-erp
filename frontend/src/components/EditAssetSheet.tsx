@@ -7,13 +7,13 @@ import { updateItem, getStores, rotateImage, deleteItem, reconcileItems } from "
 import { Item, Store } from "@/lib/types";
 import toast from "react-hot-toast";
 import {
-  HiXMark,
   HiCamera,
   HiArrowPath,
   HiTrash,
   HiCheckCircle,
 } from "react-icons/hi2";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 
 interface Props {
   item: Item;
@@ -146,56 +146,13 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
 
   return (
     <>
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/40 z-40 md:backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Mobile: bottom drawer | Desktop: centered modal */}
-      <motion.div
-        initial={{ 
-          opacity: 0,
-          scale: (typeof window !== 'undefined' && window.innerWidth >= 768) ? 0.95 : 1,
-          x: "-50%",
-          y: (typeof window !== 'undefined' && window.innerWidth >= 768) ? "calc(-50% + 40px)" : "100%"
-        }}
-        animate={{ 
-          opacity: 1, 
-          scale: 1,
-          x: "-50%",
-          y: (typeof window !== 'undefined' && window.innerWidth >= 768) ? "-50%" : 0
-        }}
-        exit={{ 
-          opacity: 0,
-          scale: (typeof window !== 'undefined' && window.innerWidth >= 768) ? 0.95 : 1,
-          x: "-50%",
-          y: (typeof window !== 'undefined' && window.innerWidth >= 768) ? "-40%" : "100%"
-        }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="fixed z-50 bottom-0 md:bottom-auto left-1/2 md:top-1/2 w-full md:max-w-5xl bg-card rounded-t-[2.5rem] md:rounded-5xl max-h-[95vh] md:max-h-[min(90vh,900px)] overflow-y-auto border border-border/60 shadow-massive pb-10 md:pb-0"
+      <ResponsiveDrawer
+        isOpen={true}
+        onClose={onClose}
+        title="Edit Asset"
+        subtitle={`Updating ${item.name}`}
       >
-        {/* Handle — mobile only */}
-        <div className="flex justify-center pt-4 pb-2 md:hidden">
-          <div className="w-12 h-1.5 rounded-full bg-border/60" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 md:px-8 py-6 border-b border-border/50">
-          <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">Edit Asset</h2>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-card-alt flex items-center justify-center hover:bg-border transition-all"
-          >
-            <HiXMark className="w-6 h-6 text-muted" />
-          </button>
-        </div>
-
-        <div className="px-6 md:px-8 py-8">
-          <div className="md:grid md:grid-cols-2 md:gap-12 items-start">
+        <div className="md:grid md:grid-cols-2 md:gap-12 items-start">
             {/* Left: Image & Quick Stats */}
             <div className="space-y-6">
               <div
@@ -423,8 +380,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               </div>
             </form>
           </div>
-        </div>
-      </motion.div>
+      </ResponsiveDrawer>
       <DeleteConfirmModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}

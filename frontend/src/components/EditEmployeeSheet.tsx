@@ -2,14 +2,15 @@
 import { useState } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+
 import Image from "next/image";
 import { updateEmployee, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import { Employee, SalaryLevel, EventType, EmployeesResponse } from "@/lib/types";
 import toast from "react-hot-toast";
-import { HiCamera, HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification } from "react-icons/hi2";
+import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import { z } from "zod";
 
 const employeeValidationSchema = z.object({
@@ -260,62 +261,12 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
   return (
     <>
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" 
-        onClick={onClose} 
-      />
-      <motion.div 
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={{
-          initial: { 
-            opacity: 0,
-            y: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : "100%",
-            x: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : "0",
-            scale: typeof window !== "undefined" && window.innerWidth > 768 ? 0.95 : 1
-          },
-          animate: { 
-            opacity: 1, 
-            y: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : 0,
-            x: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : 0,
-            scale: 1
-          },
-          exit: { 
-            opacity: 0,
-            y: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : "100%",
-            x: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : 0,
-            scale: typeof window !== "undefined" && window.innerWidth > 768 ? 0.95 : 1
-          }
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 35 }}
-        className="fixed z-60 inset-x-0 bottom-0 md:inset-auto md:left-1/2 md:top-1/2 w-full md:max-w-2xl bg-card border border-border shadow-2xl p-6 pt-10 overflow-y-auto max-h-[95vh] md:max-h-[min(90vh,800px)] rounded-t-[2.5rem] md:rounded-[2.5rem]"
+      <ResponsiveDrawer
+        isOpen={true}
+        onClose={onClose}
+        title="Edit Employee"
+        subtitle={`Updating ${employee.full_name}`}
       >
-        {/* Handle for mobile */}
-        <div className="md:hidden absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-border/60 rounded-full" />
-
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-[1.25rem] bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-sm hover:bg-primary/20 transition-all">
-               <HiCamera className="w-6 h-6" />
-             </div>
-             <div>
-               <h2 className="text-xl font-black text-foreground tracking-tight">Edit Employee</h2>
-               <p className="text-[10px] text-muted uppercase tracking-widest font-black">Updating {employee.full_name}</p>
-             </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 rounded-xl bg-card-alt border border-border flex items-center justify-center text-muted hover:text-foreground hover:bg-border transition-all shadow-sm"
-          >
-            <HiXMark className="w-6 h-6" />
-          </button>
-        </div>
-
-
         <form onSubmit={handleSubmit} className="space-y-8 pb-12">
           {/* Profile Photo */}
           <div className="flex flex-col items-center gap-3 bg-card-alt/30 p-4 rounded-3xl border border-border/50">
@@ -603,7 +554,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             </button>
           </div>
         </form>
-      </motion.div>
+      </ResponsiveDrawer>
 
       <DeleteConfirmModal
         isOpen={showDeleteModal}

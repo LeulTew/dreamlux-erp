@@ -2,13 +2,14 @@
 import { useState, useEffect } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { createEvent, updateEvent, deleteEvent, getEventTypes } from "@/lib/api";
 import { Event, EventType } from "@/lib/types";
 import toast from "react-hot-toast";
-import { HiCalendar, HiExclamationCircle, HiTrash, HiXMark, HiCurrencyDollar, HiMapPin, HiUser } from "react-icons/hi2";
+import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import { z } from "zod";
 
 const eventValidationSchema = z.object({
@@ -47,8 +48,9 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     if (userStr) {
       try {
         const parsed = JSON.parse(userStr);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUserRole(parsed.role_name || parsed.role || "");
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -99,13 +101,13 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       if (onSuccess) onSuccess();
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ error?: string }>) => {
       toast.error(err.response?.data?.error || "Failed to delete event");
     },
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data: Record<string, any>) => {
+    mutationFn: (data: Record<string, unknown>) => {
       if (event) {
         return updateEvent(event.id, data);
       } else {
@@ -119,7 +121,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       if (onSuccess) onSuccess();
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: AxiosError<{ error?: string }>) => {
       toast.error(err.response?.data?.error || "Failed to save event");
     },
   });
@@ -165,55 +167,12 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
   return (
     <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
-
-      {/* Sheet Container */}
-      <motion.div
-        initial={{ opacity: 0, y: "100%" }}
-        animate={{ 
-          opacity: 1, 
-          y: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : 0,
-          x: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : 0,
-          scale: 1
-        }}
-        exit={{ 
-          opacity: 0,
-          y: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : "100%",
-          scale: typeof window !== "undefined" && window.innerWidth > 768 ? 0.95 : 1
-        }}
-        transition={{ type: "spring", stiffness: 400, damping: 35 }}
-        className="fixed z-60 inset-x-0 bottom-0 md:inset-auto md:left-1/2 md:top-1/2 w-full md:max-w-2xl bg-card border border-border shadow-2xl p-6 pt-10 overflow-y-auto max-h-[95vh] md:max-h-[min(90vh,800px)] rounded-t-[2.5rem] md:rounded-[2.5rem]"
+      <ResponsiveDrawer
+        isOpen={true}
+        onClose={onClose}
+        title={event ? "Edit Event" : "Create Event"}
+        subtitle={event ? `Managing event details` : "Register a new event schedule"}
       >
-        {/* Handle for mobile */}
-        <div className="md:hidden absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-border/60 rounded-full" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-[1.25rem] bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-sm">
-               <HiCalendar className="w-6 h-6" />
-             </div>
-             <div>
-               <h2 className="text-xl font-black text-foreground tracking-tight">
-                 {event ? "Edit Event" : "Create Event"}
-               </h2>
-               <p className="text-[10px] text-muted uppercase tracking-widest font-black">
-                 {event ? `Managing event details` : "Register a new event schedule"}
-               </p>
-             </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 rounded-xl bg-card-alt border border-border flex items-center justify-center text-muted hover:text-foreground hover:bg-border transition-all shadow-sm"
-          >
-            <HiXMark className="w-6 h-6" />
-          </button>
-        </div>
-
         {/* Warning Banner for Completed Event Locks */}
         {isCompleted && (
           <div className={`mb-6 p-4 rounded-2xl border flex items-start gap-3 text-xs leading-relaxed ${isReadOnly ? "bg-red-500/10 border-red-500/20 text-red-500 font-semibold" : "bg-warning/10 border-warning/20 text-warning font-semibold"}`}>
@@ -435,7 +394,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
             </div>
           )}
         </form>
-      </motion.div>
+      </ResponsiveDrawer>
 
       {/* Delete Confirmation Modal */}
       {event && (

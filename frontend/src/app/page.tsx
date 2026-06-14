@@ -707,8 +707,7 @@ function EmployeesPageContent() {
         </>
       )}
 
-      <AnimatePresence>
-        {editingEmployee && (
+      {editingEmployee && (
           <EditEmployeeSheet 
             employee={editingEmployee} 
             onClose={() => {
@@ -719,7 +718,6 @@ function EmployeesPageContent() {
             }} 
           />
         )}
-      </AnimatePresence>
 
       <DeleteConfirmModal 
         isOpen={!!employeeToDelete}

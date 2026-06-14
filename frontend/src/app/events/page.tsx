@@ -1,16 +1,17 @@
 "use client";
-import { useState, useMemo, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useMemo, Suspense } from "react";
+
 import { useQuery } from "@tanstack/react-query";
-import { getEvents, getEventTypes } from "@/lib/api";
-import { Event, EventsResponse, EventType } from "@/lib/types";
+import { getEvents } from "@/lib/api";
+import { Event, EventsResponse } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import { HiCalendar, HiPlus, HiMagnifyingGlass, HiPencilSquare, HiArrowTopRightOnSquare } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import EditEventSheet from "@/components/EditEventSheet";
 import PaginationControls from "@/components/PaginationControls";
-import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import { useLanguage } from "@/hooks/use-language";
+import { AnimatePresence } from "framer-motion";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -61,27 +62,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   }
 };
 
-function useLanguage() {
-  const [lang, setLang] = useState("en");
-  useEffect(() => {
-    const stored = localStorage.getItem("lang");
-    if (stored) setLang(stored);
-
-    const handleStorage = () => {
-      const updated = localStorage.getItem("lang");
-      if (updated) setLang(updated);
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-  return lang;
-}
-
 function EventsPageContent() {
-  const lang = useLanguage();
+  const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
-  const searchParams = useSearchParams();
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");

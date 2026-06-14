@@ -30,10 +30,10 @@ The current demo UI is generic and uses standard colors/borders. We need a moder
 
 ## Sub-Tasks
 
-- [ ] Modify `frontend/src/app/globals.css` with the gold/slate design system tokens.
-- [ ] Refactor `frontend/src/components/NavBar.tsx` to match the new contrast and typography layout.
-- [ ] Clean up pages to remove generic placeholders and align visual styling.
-- [ ] Implement bilingual support (Amharic & English) toggle in navigation.
+- [x] Modify `frontend/src/app/globals.css` with the gold/slate design system tokens.
+- [x] Refactor `frontend/src/components/NavBar.tsx` to match the new contrast and typography layout.
+- [x] Clean up pages to remove generic placeholders and align visual styling.
+- [x] Implement bilingual support (Amharic & English) toggle in navigation.
 
 ## Verification Plan
 
