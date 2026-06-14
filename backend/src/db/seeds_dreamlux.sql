@@ -60,15 +60,18 @@ INSERT INTO stores (name, is_active) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- 5. Seed Item Categories
-INSERT INTO categories (name) VALUES
-  ('Fabrics / Runners'),
-  ('Flowers / Decoratives'),
-  ('Lighting & Electrical'),
-  ('Boards & Frames'),
-  ('Setup Items'),
-  ('Machines & Tools'),
-  ('Cleaning & Packing')
-ON CONFLICT (name) DO NOTHING;
+INSERT INTO categories (name)
+SELECT val.name FROM (
+  VALUES 
+    ('Fabrics / Runners'),
+    ('Flowers / Decoratives'),
+    ('Lighting & Electrical'),
+    ('Boards & Frames'),
+    ('Setup Items'),
+    ('Machines & Tools'),
+    ('Cleaning & Packing')
+) val(name)
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE categories.name = val.name);
 
 -- 6. Seed Salary Grade Levels
 INSERT INTO salary_levels (code, amount_etb, description, sort_order, is_active) VALUES
@@ -85,10 +88,13 @@ INSERT INTO employees (full_name, employee_id, department, position, phone, emai
 ON CONFLICT (employee_id) DO NOTHING;
 
 -- 8. Seed Sample Inventory Items
-INSERT INTO items (name, quantity, description, store_id, category_id, created_at, updated_at) VALUES
-  ('White Rose', 540, 'Premium fresh cut decorative rose', (SELECT id FROM stores WHERE name = 'Addis Ababa Central Store'), (SELECT id FROM categories WHERE name = 'Flowers / Decoratives'), NOW(), NOW()),
-  ('Peach Runner', 120, 'Golden peach runner fabric for guest tables', (SELECT id FROM stores WHERE name = 'Addis Ababa Central Store'), (SELECT id FROM categories WHERE name = 'Fabrics / Runners'), NOW(), NOW())
-ON CONFLICT DO NOTHING;
+INSERT INTO items (name, quantity, description, store_id, category_id, created_at, updated_at)
+SELECT 'White Rose', 540, 'Premium fresh cut decorative rose', (SELECT id FROM stores WHERE name = 'Addis Ababa Central Store'), (SELECT id FROM categories WHERE name = 'Flowers / Decoratives'), NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM items WHERE name = 'White Rose');
+
+INSERT INTO items (name, quantity, description, store_id, category_id, created_at, updated_at)
+SELECT 'Peach Runner', 120, 'Golden peach runner fabric for guest tables', (SELECT id FROM stores WHERE name = 'Addis Ababa Central Store'), (SELECT id FROM categories WHERE name = 'Fabrics / Runners'), NOW(), NOW()
+WHERE NOT EXISTS (SELECT 1 FROM items WHERE name = 'Peach Runner');
 
 -- 9. Seed Event Types
 INSERT INTO event_types (name, default_price_etb, description, is_active) VALUES
