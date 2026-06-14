@@ -98,13 +98,6 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
     if (rows.length === 0) {
       // Legacy fallback
       const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-      console.log("DEBUG AUTH FALLBACK:", {
-        queryUsername,
-        queryPassword,
-        adminPassword,
-        envAdminPassword: process.env.ADMIN_PASSWORD,
-        isEqual: queryPassword === adminPassword
-      });
       if (queryUsername === 'admin' && queryPassword === adminPassword) {
         try {
           const adminUser = await ensureBootstrapAdmin(adminPassword);

@@ -80,10 +80,7 @@ mock.module("../db/supabase", () => ({
   },
 }));
 
-mock.module("../lib/env", () => ({
-  getEnv: (key: string, def?: string) => (key === "JWT_SECRET" ? JWT_SECRET : def),
-  getEnvList: (key: string, def?: string) => (def ? [def] : []),
-}));
+
 
 let app: any;
 
