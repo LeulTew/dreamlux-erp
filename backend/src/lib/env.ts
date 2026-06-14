@@ -19,6 +19,12 @@ function normalizeRawValue(rawValue?: string): string {
 }
 
 export function getEnv(name: string, fallback = ""): string {
+  if (name === "ADMIN_PASSWORD") {
+    console.log("DEBUG GETENV ADMIN_PASSWORD:", {
+      processEnvVal: process.env[name],
+      fallback
+    });
+  }
   const normalized = normalizeRawValue(process.env[name]);
   if (!normalized) {
     return fallback;
