@@ -1,0 +1,24 @@
+name: Research Task
+description: Track product, source, legal, payment, or technical research.
+title: "[Research]: "
+labels: ["type:research", "needs:research"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Research question
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources to check
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision needed
+    validations:
+      required: true
+

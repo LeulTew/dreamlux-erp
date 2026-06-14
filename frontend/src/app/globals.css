@@ -1,0 +1,258 @@
+@import "tailwindcss";
+
+:root {
+  /* EL ERP — Violet/Indigo Professional Palette */
+  --background: #fafafa;
+  --foreground: #0f0e17;
+  --primary: #4f46e5;
+  --primary-light: #ede9fe;
+  --primary-dark: #3730a3;
+  --accent: #7c3aed;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --muted: #6b7280;
+  --border: rgba(15, 14, 23, 0.08);
+  --card: #ffffff;
+  --card-alt: #f9fafb;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+}
+
+.dark {
+  /* EL ERP — Dark Violet/Indigo Palette */
+  --background: #0a0914;
+  --foreground: #f3f4f6;
+  --primary: #818cf8;
+  --primary-light: #1e1b4b;
+  --primary-dark: #a5b4fc;
+  --accent: #a78bfa;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --muted: #9ca3af;
+  --border: rgba(243, 244, 246, 0.08);
+  --card: #12101e;
+  --card-alt: #0f0d1c;
+}
+
+/* Tailwind CSS v4 Theme - IDEs may flag @theme as unknown */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-alt: var(--card-alt);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --shadow: none;
+  --shadow-premium: none;
+  --shadow-premium-sm: none;
+  --shadow-soft: none;
+  --shadow-massive: none;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 3px;
+}
+
+/* Bottom sheet animation */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+/* Edit panel: slide up on mobile, scale in on desktop */
+.edit-panel-mobile {
+  animation: slideUp 0.3s ease-out forwards;
+}
+@media (min-width: 768px) {
+  .edit-panel-mobile {
+    animation: none;
+  }
+  .edit-panel-desktop {
+    animation: scaleIn 0.2s ease-out forwards;
+  }
+}
+
+.glass-card {
+  @apply bg-card border border-border shadow-premium;
+}
+
+.input-premium {
+  @apply bg-card-alt border-none focus:ring-1 focus:ring-muted/30 transition-all rounded-2xl px-4 py-3 outline-none;
+}
+
+.button-premium {
+  @apply px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-premium;
+}
+
+.text-on-primary {
+  @apply text-white dark:text-background;
+}
+
+/* Print Styles */
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+
+  /* Force white background and black text regardless of dark mode */
+  :root,
+  .dark {
+    --background: white !important;
+    --foreground: black !important;
+    --card: white !important;
+    --card-alt: #f8fafc !important;
+    --border: #e2e8f0 !important;
+    --primary: #4f46e5 !important;
+    --muted: #64748b !important;
+  }
+
+  html,
+  body {
+    background: white !important;
+    color: black !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Force background colors and colors found in design */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 11px !important;
+    background: transparent !important;
+  }
+
+  .print-table th {
+    background: #f8fafc !important;
+    border: 1.5px solid #000 !important;
+    padding: 8px 10px !important;
+    text-align: left !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.1em !important;
+    font-weight: 800 !important;
+    color: black !important;
+  }
+
+  .print-table td {
+    border: 1px solid #e2e8f0 !important;
+    padding: 8px 10px !important;
+    vertical-align: middle !important;
+    background: white !important;
+    height: 70px !important; /* Fixed height for consistency */
+  }
+
+  .print-img-lg {
+    width: 60px !important;
+    height: 60px !important;
+    object-fit: cover !important;
+    border-radius: 6px !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .print-container-2col {
+    display: flex !important;
+    gap: 30px !important;
+    align-items: flex-start !important;
+  }
+
+  .print-col {
+    flex: 1 !important;
+  }
+
+  /* Force headers to repeat on pages if possible */
+  thead {
+    display: table-header-group !important;
+  }
+  tfoot {
+    display: table-footer-group !important;
+  }
+  tr {
+    break-inside: avoid !important;
+  }
+}

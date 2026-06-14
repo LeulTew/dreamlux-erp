@@ -1,0 +1,806 @@
+
+DREAM LUX PLC
+Event Decoration & Management Company
+SYSTEM REQUIREMENTS DOCUMENT
+Integrated HR, Inventory & Event Management System
+
+
+Document Version
+1.0
+Date
+June 2026
+Client
+Dream Lux PLC
+Industry
+Event Decoration & Management
+Location
+Addis Ababa, Ethiopia
+Status
+DRAFT — Pending Client Approval
+
+Prepared for Development Handover
+
+1. Business Overview
+
+1.1 Company Profile
+Field
+Details
+Company Name
+Dream Lux PLC
+Industry
+Event Decoration & Management
+Location
+Addis Ababa, Ethiopia
+Services
+Weddings, Ceremonies, Graduations, Corporate Events
+Team Size
+Full-time Office Staff + Part-time Event Workers
+System Users
+Owner/CEO, Operations Manager, Accountant, Event Manager, Inventory Officer
+
+1.2 Current Problems
+The following pain points were identified through direct interviews with the business owner:
+
+HR and payroll managed manually — errors in commission and base salary calculation
+No centralized inventory tracking — items go missing, no count history
+Events planned via WhatsApp and paper checklists — no accountability trail
+Employee assignment to events is ad-hoc with no system enforcement
+Vehicle and fuel usage not properly tracked or linked to event costs
+Financial reports require manual compilation from scattered records
+No role-based access — sensitive financial data visible to all
+
+1.3 Goals of the System
+Centralize HR management: hiring records, paygrade levels, base and commission salary
+Track store inventory with images, recount support, and Excel/PDF exports
+Manage the full event lifecycle from creation to post-event profit reporting
+Assign employees and vehicles to specific events with conflict detection
+Track all event expenses automatically including fuel, labor, and rentals
+Provide role-based dashboards so each user sees only what they need
+
+2. System Architecture
+
+The system is divided into three integrated pillars. Each pillar operates independently but shares data across the platform.
+
+PILLAR 1
+PILLAR 2
+PILLAR 3
+HR Management
+Inventory / Store
+Event Management
+Employee records
+Pay grade levels
+Base salary
+Commission tracking
+Attendance
+Item records + photos
+Stock recount
+Export Excel / PDF
+Category management
+Low stock alerts
+Event creation & lifecycle
+Employee assignment
+Vehicle & fuel tracking
+Expense management
+Profitability reports
+
+2.1 Platform
+Web Application (accessible from desktop and mobile browser)
+Language support: Amharic + English (bilingual interface)
+Role-based login system
+Cloud-hosted with database backup
+
+3. User Roles & Permissions
+
+
+Permission
+Owner / CEO
+Ops Manager
+Accountant
+Event Manager
+Inventory Officer
+Dashboard (Financial)
+✅
+❌
+✅
+❌
+❌
+Dashboard (Operational)
+✅
+✅
+❌
+✅
+✅
+Add / Edit Employees
+✅
+✅
+❌
+❌
+❌
+View Employee Records
+✅
+✅
+✅
+✅
+❌
+Set Pay Grades
+✅
+❌
+✅
+❌
+❌
+Run Payroll
+✅
+❌
+✅
+❌
+❌
+View Payroll Reports
+✅
+❌
+✅
+❌
+❌
+Add / Edit Inventory
+✅
+✅
+❌
+❌
+✅
+View Inventory
+✅
+✅
+❌
+✅
+✅
+Export Inventory
+✅
+✅
+✅
+❌
+✅
+Create Events
+✅
+✅
+❌
+✅
+❌
+Assign Employees to Events
+✅
+✅
+❌
+✅
+❌
+Assign Vehicles to Events
+✅
+✅
+❌
+✅
+❌
+Enter Event Expenses
+✅
+✅
+✅
+✅
+❌
+Approve Expenses
+✅
+❌
+✅
+❌
+❌
+Edit Completed Events
+✅
+❌
+✅
+❌
+❌
+View Profit Reports
+✅
+❌
+✅
+❌
+❌
+Manage User Accounts
+✅
+❌
+❌
+❌
+❌
+System Settings
+✅
+❌
+❌
+❌
+❌
+
+4. Feature Specifications
+
+4.1 Pillar 1: HR Management
+4.1.1 Employee Records
+Each employee profile stores:
+Full name, phone number, gender, employment type (full-time / part-time / event-based)
+Role: General Manager, Operations Manager, Planner, Accountant, Graphics Designer, Content Creator, Team Leader, Décor Professional, Assistant, Store Keeper, Guard, Cleaner, Driver, Maintenance Worker
+Group / Team assignment (Redat, Supervisor, Balemoya, or Office)
+Bank account details for payroll transfers
+Hire date and contract status
+Photo upload
+
+4.1.2 Pay Grade Levels
+The system supports a configurable pay grade ladder with multiple levels:
+Each position has a minimum salary, up to 3 increment steps, and a ceiling
+Grade levels are set by Owner or Accountant
+Employee advances through levels based on tenure or performance review
+Example structure:
+
+Position
+Starting Salary
+Level 1
+Level 2
+Level 3
+Ceiling
+General Manager
+70,000 ETB
+—
+—
+—
+—
+Operations Manager
+35,000 ETB
+—
+—
+—
+—
+Planner
+14,500 ETB
+—
+—
+—
+—
+Store Keeper
+10,000 ETB
+—
+—
+—
+—
+Guard / Loader
+7,000 ETB
+—
+—
+—
+—
+Note: Level increments and ceilings to be finalized with client and populated by Accountant.
+
+4.1.3 Commission & Event Pay
+Part-time and event workers receive per-event pay
+Team Leaders: 2,000 ETB per event + 500 ETB training attendance bonus
+Décor Professionals and Assistants: configurable per-event rate
+Drivers: base day rate + night shift premium
+System calculates total event pay = base rate × events + bonuses
+Commission payments triggered after event marked as Completed
+
+4.1.4 Attendance
+Attendance recorded per event for event-based workers
+Office staff attendance tracked by working day
+System generates monthly attendance summary per employee
+
+4.2 Pillar 2: Inventory / Store Management
+4.2.1 Item Records
+Each inventory item stores:
+Item name, category, type, color, size/description
+Quantity in stock
+Photo upload (one or multiple images)
+Unit of measurement
+Purchase date and cost (optional)
+Condition status: Good / Damaged / Under Repair
+
+4.2.2 Item Categories (from existing inventory)
+Category
+Examples
+Fabrics / Runners
+Peach Runner, Golden Runner, Blue Tuwill, White Cherk, Nuud Cherk, Tiras, Napkins
+Flowers / Decoratives
+White Rose (540), Nude Rose (118), Purple Rose (109), Golden Ketal, Pink Orchid
+Lighting & Electrical
+Chandeliers, Sham New (Big/Small), Vase Lights, Kichin Shama, Golden Chandler
+Boards & Frames
+Welcome Boards, Nikah Board, Dancee Flower, Stage, Background Brat, Frames
+Setup Items
+Sofas, Mirrors, Mize Tables, Mestawet, Ashangulit, Sefed
+Machines & Tools
+Compressor, Washing Machine, Glue Gun, Balloon Pump, Cutter, Scissors
+Cleaning & Packing
+Water containers, Mop, Broom, Steel Boxes, Plastic Boxes
+
+4.2.3 Recount / Stock Taking
+Inventory officer can initiate a recount session
+Each item shows current system quantity vs. physical count field
+Discrepancies highlighted in red
+Recount session saves a timestamped log for audit
+Adjustments require manager or owner approval
+
+4.2.4 Export Options
+Export full inventory list as Excel (.xlsx)
+Export filtered view (by category, type, or date) as PDF
+Export includes: item name, type, color, description, quantity, condition
+Branded with Dream Lux logo and document number
+
+4.3 Pillar 3: Event Management
+4.3.1 Event Creation
+Required fields when creating a new event:
+Field
+Details
+Event Name
+Free text — e.g. "Abebe & Sara Wedding"
+Client Name
+Linked to client record (one client can have multiple events)
+Event Type
+Wedding (Sereg), Traditional (Shigla), Graduation, Nikah, Corporate, Other
+Event Date(s)
+Start date and end date — supports multi-day events
+Event Time
+Start time and end time
+Event Location
+Venue name and address
+Status
+Planned → Ongoing → Completed
+Package / Design
+Linked to design order and estimated cost
+Revenue (Contract Price)
+Total amount agreed with client
+
+4.3.2 Employee Assignment
+Employees assigned per event with a specific role for that event
+One employee cannot be assigned to two events on the same day (system enforces conflict check)
+Roles per event: Event Manager, Supervisor (up to 2), Team Leader, Décor Professional, Assistant, Driver, Store Keeper
+Assignment triggers automatic commission calculation upon event completion
+Attendance checked off during or after the event
+
+4.3.3 Vehicle Management
+Vehicle records store:
+Plate number, vehicle type, fuel type, fuel consumption rate (liters/km)
+Driver license details stored per driver
+Vehicle assignment per event:
+Multiple vehicles can be assigned to one event
+One vehicle can serve multiple events if schedules do not conflict
+Driver assigned per vehicle — one driver per vehicle per event
+Night shift triggers additional driver payment
+
+4.3.4 Fuel Tracking
+Fuel tracked by distance traveled (km) per trip — system calculates liters used
+Driver reports destination; system calculates km and fuel cost
+Fuel expenses automatically added to event expense total
+Reports available per event (preferred) and per vehicle
+
+4.3.5 Expense Tracking
+Expense categories for each event:
+Category
+Description
+Fuel
+Auto-calculated from vehicle trips linked to the event
+Labor
+Auto-calculated from employee assignments and event pay rates
+Transportation
+External vehicle hire or logistics costs
+Equipment Rental
+Items rented from third parties for the event
+Consumables
+Water, cleaning materials, daily event materials, printing
+Other / Ad hoc
+Any unplanned expense entered manually with a description
+Expenses can be entered during the event (real-time) or after
+Expenses require approval from Accountant or Owner before being finalized
+
+4.3.6 Profitability
+System auto-calculates: Profit = Revenue − Total Expenses
+Profit available per event, per month, and per year
+Financial dashboard visible to CEO/Owner only
+Reports include: revenue, expense breakdown, profit margin, trend over time
+
+5. User Stories
+
+
+ID
+As a...
+I want to...
+So that...
+US-01
+Owner
+View the full financial dashboard
+I can monitor revenue, expenses, and profit at a glance
+US-02
+Owner
+Approve or reject expenses
+I maintain control over all spending
+US-03
+Owner
+Set pay grade levels for each role
+Salaries are standardized and transparent
+US-04
+Ops Manager
+Create a new event and fill all required fields
+The event is fully documented before work begins
+US-05
+Ops Manager
+Assign specific employees to an event by role
+Each team member knows their job and payment is auto-calculated
+US-06
+Ops Manager
+Check for employee conflicts on a date
+No employee is double-booked on the same day
+US-07
+Ops Manager
+Assign one or more vehicles to an event
+Transportation is planned and fuel tracking is linked
+US-08
+Event Manager
+Update event status (Planned → Ongoing → Completed)
+The lifecycle of each event is tracked accurately
+US-09
+Event Manager
+Add ad-hoc expenses during an event
+Real costs are captured even if unplanned
+US-10
+Event Manager
+View the employee list assigned to my event
+I know who is on my team on event day
+US-11
+Accountant
+View all event expenses and approve them
+Financial records are accurate and controlled
+US-12
+Accountant
+Run monthly and yearly profit reports
+I can prepare financial statements for management
+US-13
+Accountant
+Process payroll using system-calculated amounts
+Base salary + commission is paid correctly and on time
+US-14
+Accountant
+Edit a completed event's financial records
+Errors can be corrected after the event is closed
+US-15
+Inventory Officer
+Add a new inventory item with photos and quantity
+The store is accurately represented in the system
+US-16
+Inventory Officer
+Start a recount session and record physical counts
+Stock discrepancies are identified and logged
+US-17
+Inventory Officer
+Export the inventory list to Excel or PDF
+Reports can be printed or shared with management
+US-18
+Driver
+Log the destination of each trip
+Fuel usage is calculated and charged to the correct event
+US-19
+All Users
+Log in with a personal username and password
+My access is secure and limited to my permitted areas
+
+6. Acceptance Criteria
+
+Login / Authentication
+User enters username and password on the login screen
+Correct credentials grant access and redirect to the role-specific dashboard
+Incorrect credentials display an error message without revealing which field is wrong
+Password is masked by default with a show/hide toggle
+Failed login attempts (5+) temporarily lock the account
+Each user sees only the modules their role is permitted to access
+
+Employee Management
+Admin or Ops Manager can add, edit, or deactivate an employee record
+All required fields (name, role, employment type, bank account) must be filled to save
+Employee photo upload is optional but supported
+Pay grade for each role can be set with a starting salary and up to 3 increment levels
+System prevents duplicate employee entries (same name + phone number combination)
+
+Inventory Management
+Inventory officer can add items with name, category, type, color, quantity, and at least one photo
+Items are searchable and filterable by category, type, and color
+Recount session allows physical count to be entered next to system quantity
+Discrepancies are highlighted and logged with timestamp and officer name
+Export to Excel includes all visible columns; Export to PDF uses branded Dream Lux format
+
+Event Creation
+Event Manager or Ops Manager can create an event with all required fields
+Client name is selected from an existing client list or a new client can be added inline
+Multi-day events are supported with start and end dates
+Event status defaults to Planned and can be manually advanced to Ongoing, then Completed
+Only Owner and Accountant can edit an event after it is marked Completed
+
+Employee Assignment to Events
+System shows available employees for the selected event date (no conflicts)
+Each assigned employee gets a role for that event
+Attempting to assign an already-booked employee shows a clear warning and blocks the action
+Attendance can be marked per assigned employee after the event
+
+Expense Tracking
+Fuel expenses are auto-populated from vehicle trip logs linked to the event
+Labor costs are auto-calculated from employee assignments and pay rates
+Any user with permission can add an ad-hoc expense with a category and description
+Expenses are flagged as Pending until approved by Accountant or Owner
+Approved expenses are locked and cannot be edited without Owner authorization
+
+Profitability Reports
+System calculates Profit = Contract Price − All Approved Expenses
+Per-event report shows revenue, expense breakdown by category, and net profit
+Monthly and yearly summary reports are available
+Financial reports are visible only to Owner/CEO
+
+
+7. Core Workflows
+
+Event Lifecycle
+1. Client inquiry received →
+2. Event created in system (name, date, type, location, contract price) →
+3. Design order and cost estimate prepared →
+4. Employees assigned by role (conflict check runs) →
+5. Vehicles assigned and fuel tracking activated →
+6. Inventory items allocated from store →
+7. Event status → Ongoing on event day →
+8. Expenses entered during event →
+9. Event status → Completed →
+10. Expenses approved by Accountant →
+11. Employee commissions calculated and released for payroll →
+12. Profit report generated ✅
+
+Payroll Process
+1. Accountant opens payroll for selected month →
+2. System pulls base salaries for all full-time staff →
+3. System pulls event commissions for part-time and event workers from completed events →
+4. Attendance deductions applied if any →
+5. Accountant reviews and confirms payroll →
+6. Owner/CEO approves →
+7. Bank transfer letter generated (format matching existing Zemen Bank template) →
+8. Payments marked as Disbursed ✅
+
+Inventory Recount
+1. Inventory officer initiates a recount session →
+2. System lists all items with current system quantity →
+3. Officer enters physical count for each item →
+4. System flags items where counts differ →
+5. Officer adds notes for discrepancies (damaged, lost, miscounted) →
+6. Ops Manager or Owner reviews and approves adjustments →
+7. System updates quantities and logs the recount session ✅
+
+Expense Approval
+1. Event Manager or worker enters expense with amount, category, and description →
+2. Expense appears in Pending queue for Accountant →
+3. Accountant reviews and approves or rejects with comment →
+4. If rejected, submitter is notified with reason →
+5. Approved expenses update the event's total cost and profit calculation ✅
+
+
+8. Sample Data
+
+8.1 Sample Employee
+Full Name
+Abebe Girma
+Phone
+0912345678
+Role
+Team Leader
+Employment Type
+Part-time (Event-based)
+Group
+Redat
+Per-event Pay
+2,000 ETB
+Training Bonus
+500 ETB (per attended session)
+Bank
+CBE – 1000301109559
+
+8.2 Sample Event
+Event Name
+Hana & Daniel Wedding
+Client Name
+Hana Mohammed
+Event Type
+Wedding (Sereg)
+Event Date
+15 July 2026 (single day)
+Time
+10:00 AM – 06:00 PM
+Location
+Friendship International Hotel, Addis Ababa
+Contract Price
+85,000 ETB
+Status
+Planned
+
+8.3 Sample Inventory Item
+Item Name
+White Rose
+Category
+Flowers / Decoratives
+Type
+Flower
+Color
+White
+Quantity in Stock
+540
+Condition
+Good
+Photo
+[Image upload supported]
+
+8.4 Sample Event Expense
+Category
+Amount (ETB)
+Fuel (3 vehicles × 2 trips)
+3,200
+Labor (8 workers)
+18,000
+Equipment Rental
+5,000
+Consumables
+1,500
+Transportation (extra)
+2,000
+Total Expenses
+29,700 ETB
+Contract Price
+85,000 ETB
+Net Profit
+55,300 ETB
+
+9. Screens / Pages Required
+
+
+ID
+Screen Name
+Accessible By
+Key Elements
+SC-01
+Login
+All users
+Username, password, remember me, forgot password
+SC-02
+Role Dashboard
+All users
+Summary cards based on role (financial, operational, inventory)
+SC-03
+Employee List
+Owner, Ops Mgr, Accountant
+Searchable table with filters, Add/Edit button
+SC-04
+Employee Profile
+Owner, Ops Mgr, Accountant
+Full employee details, pay history, event assignment history
+SC-05
+Pay Grade Settings
+Owner, Accountant
+Table of roles with salary levels and ceiling inputs
+SC-06
+Payroll Run
+Accountant
+Monthly payroll list with base + commission, approve button, export
+SC-07
+Inventory List
+Owner, Ops Mgr, Inventory Officer
+Category tabs, search, photo thumbnails, quantity badges
+SC-08
+Add / Edit Item
+Inventory Officer
+Form with photo upload, all item fields
+SC-09
+Recount Session
+Inventory Officer
+Side-by-side system vs physical count, discrepancy highlight
+SC-10
+Inventory Export
+Owner, Ops Mgr, Inventory Officer, Accountant
+Filter options, Export to Excel / PDF buttons
+SC-11
+Event List
+Event Mgr, Ops Mgr, Owner
+Status-colored cards, filter by status and date
+SC-12
+Event Detail
+Event Mgr, Ops Mgr, Owner, Accountant
+All event info, tabs for team, vehicles, expenses, profit
+SC-13
+Create / Edit Event
+Event Mgr, Ops Mgr
+Multi-step form: info → team → vehicles → expenses
+SC-14
+Employee Assignment
+Event Mgr, Ops Mgr
+Available staff grid with conflict indicator, role selector
+SC-15
+Vehicle Management
+Ops Mgr, Owner
+Vehicle list, assignment to event, trip log entry
+SC-16
+Fuel / Trip Log
+Driver, Ops Mgr
+Destination input, km auto/manual, fuel auto-calculated
+SC-17
+Expense Entry
+Event Mgr, Accountant
+Category dropdown, amount, description, file attachment
+SC-18
+Expense Approval Queue
+Accountant, Owner
+Pending expenses list, approve/reject with comment
+SC-19
+Profit Report (Event)
+Owner, Accountant
+Revenue, expense breakdown chart, net profit
+SC-20
+Monthly / Yearly Report
+Owner, Accountant
+Date range selector, summary table and trend chart
+SC-21
+User Management
+Owner
+Create, edit, deactivate system user accounts
+SC-22
+System Settings
+Owner
+Company info, pay rates, fuel rates, bank details
+
+10. Technical Requirements
+
+10.1 Platform
+Web application — accessible from any modern browser (Chrome, Firefox, Safari, Edge)
+Responsive design — must work on mobile browser (for event managers on-site)
+No desktop install required
+
+10.2 Language
+Primary interface language: Amharic (Ethiopic script)
+Secondary language: English
+All input fields and reports should support both languages
+
+10.3 Data & Security
+All user data protected with role-based access control (RBAC)
+Passwords stored encrypted — no plain text
+Session timeout after 30 minutes of inactivity
+All financial data visible only to Owner and Accountant roles
+Database backup — minimum daily automated backup
+Audit log: all data changes record who changed what and when
+
+10.4 Export & Integration
+Excel export (.xlsx) for inventory and payroll reports
+PDF export for inventory, payroll letters, and event profit reports
+Bank transfer letter format should match existing Zemen Bank letter template
+No third-party accounting software integration required at this stage
+
+10.5 Hosting
+Cloud-hosted (recommended: AWS, Azure, or DigitalOcean)
+Domain and SSL certificate required
+Minimum 99.5% uptime SLA
+
+11. Out of Scope (Phase 1)
+
+The following items are explicitly excluded from this initial build and may be considered for future phases:
+
+Mobile native app (iOS / Android) — Phase 2
+Client-facing portal for booking events online
+Integration with external accounting software (QuickBooks, Xero)
+Automated SMS or email notifications to clients
+GPS vehicle tracking (real-time)
+E-signature for contracts
+Point-of-sale (POS) for on-site payments
+
+12. Open Questions for Client
+
+The following items require clarification from the client before development begins:
+
+What are the exact pay grade increment amounts and ceilings for each role? (Salary scale document to be completed by Accountant)
+Should the system support sending payroll transfer letters directly by email to the bank, or only export as PDF for manual submission?
+What is the exact commission structure for Décor Professionals and Assistants? (per event flat rate or tiered by event size?)
+Should the inventory system track items that are rented out to events (allocation), or only track overall stock counts?
+Is a driver also tracked as an employee for payroll, or are some drivers external contractors?
+Should the system support multiple branches or office locations, or is this single-location for now?
+What is the preferred cloud provider, or does the client have an existing hosting arrangement?
+Does the system need an Amharic-only mode, or bilingual toggle per user?
+
+
+
+END OF DOCUMENT
+Dream Lux PLC — System Requirements Document v1.0 — June 2026

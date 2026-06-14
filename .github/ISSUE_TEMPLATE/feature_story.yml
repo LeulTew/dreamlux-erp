@@ -1,0 +1,36 @@
+name: Feature Story
+description: Plan a user-facing vertical slice.
+title: "[Story]: "
+labels: ["type:story", "status:ready"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      description: As a..., I want..., so that...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Product, technical, or research background.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable outcomes.
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: Tests, screenshots, migrations, or manual QA.
+    validations:
+      required: true
+

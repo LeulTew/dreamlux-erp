@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.next/
+.env
+.env.local
+bun.lockb
+*.log
+.DS_Store
+backups/

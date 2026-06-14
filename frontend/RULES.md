@@ -1,0 +1,1 @@
+- CRITICAL: NEVER use \`git reset --hard\` or destructive \`git checkout --\` commands that overwrite the user's uncommitted work. No reset git ever!!

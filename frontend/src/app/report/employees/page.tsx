@@ -1,0 +1,284 @@
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { getEmployees, getEventTypes, getSalaryLevels } from "@/lib/api";
+import { Employee } from "@/lib/types";
+import { HiPhone, HiEnvelope, HiIdentification, HiUsers } from "react-icons/hi2";
+
+// Card component for each employee - Redesigned for Premium A4 Professionalism
+function EmployeeReportCard({
+  employee,
+  includeImages,
+  includeEvents,
+  eventTypeNameById,
+  salaryByLevelName,
+}: {
+  employee: Employee;
+  includeImages: boolean;
+  includeEvents: boolean;
+  eventTypeNameById: Record<string, string>;
+  salaryByLevelName: Record<string, number>;
+}) {
+  const salaryAmount = employee.base_salary != null && employee.base_salary > 0 
+    ? employee.base_salary 
+    : (employee.salary_level ? salaryByLevelName[employee.salary_level] : null);
+
+  const eventEntries = includeEvents
+    ? Object.entries(employee.event_prices || {})
+        .map(([eventId, rawPrice]) => {
+          const normalizedPrice = Number(rawPrice);
+          return {
+            eventId,
+            name: eventTypeNameById[eventId] || eventId,
+            price: Number.isFinite(normalizedPrice) ? normalizedPrice : 0,
+          };
+        })
+        .filter((entry) => entry.price >= 0)
+        .sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+
+  return (
+    <div className="bg-white border-b-2 border-gray-200 p-6 flex flex-col gap-5 break-inside-avoid h-full min-h-40 relative">
+      {/* Structural accent only */}
+      <div className="absolute top-0 right-0 w-12 h-12 border-t-2 border-r-2 border-gray-100 pointer-events-none"></div>
+
+      <div className="flex justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+             <span className="text-[8px] font-black text-black uppercase tracking-[0.2em]">{employee.employee_id}</span>
+             <span className="text-gray-300 font-light mx-1">|</span>
+             <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">{employee.office || "Main Branch"}</span>
+          </div>
+          <h3 className="text-base font-black text-black uppercase tracking-tight leading-none mb-3">
+            {employee.full_name}
+          </h3>
+          
+          <div className="flex flex-wrap gap-4 mt-1 mb-3">
+            {employee.department && (
+              <span className="text-gray-900 text-[8px] font-black uppercase tracking-[0.2em] border-l-2 border-gray-200 pl-2">
+                {employee.department}
+              </span>
+            )}
+            {employee.phone && (
+              <div className="flex items-center gap-1 text-[8px] font-bold font-mono text-gray-500">
+                <HiPhone className="w-2.5 h-2.5 opacity-40" />
+                {employee.phone}
+              </div>
+            )}
+            {employee.email && (
+              <div className="flex items-center gap-1 text-[8px] font-bold text-gray-500">
+                <HiEnvelope className="w-2.5 h-2.5 opacity-40" />
+                {employee.email}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {includeImages && (
+          <div className="w-20 h-24 bg-white border-2 border-black shrink-0 overflow-hidden flex items-center justify-center p-0.5 mt-2">
+            <div className="w-full h-full border border-gray-100 overflow-hidden flex items-center justify-center">
+              {employee.profile_photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={employee.profile_photo_url || ""}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <HiIdentification className="w-10 h-10 text-gray-200" />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Core Data Section: Unified Flex Wrap Flow */}
+      <div className="flex flex-wrap gap-x-12 gap-y-8 pt-4 border-t-2 border-black mt-2 items-start">
+        {/* Base Salary Section - Anchored Left */}
+        {(employee.salary_level || salaryAmount != null) && (
+          <div className="min-w-[150px] border-r border-gray-100 pr-8 pb-2">
+            <span className="text-[7px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-3 block">Base Salary</span>
+            <div className="text-[10px] font-black text-black uppercase mb-1">
+              {employee.salary_level || "LEVEL NOT SET"}
+            </div>
+            {salaryAmount != null && (
+              <span className="text-[12px] font-black text-black font-mono">
+                ETB {Number(salaryAmount).toLocaleString()}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Individual Event Entries - Starting Right and Wrapping Below */}
+        {includeEvents && eventEntries.map((entry) => (
+          <div key={entry.eventId} className="min-w-[110px] border-b border-gray-100 pb-2">
+            <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-2 block truncate max-w-[110px]">
+              {entry.name}
+            </span>
+            <div className="text-[10px] font-bold text-black font-mono">
+              ETB {entry.price.toLocaleString()}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReportContent() {
+  const searchParams = useSearchParams();
+  const search = searchParams.get("search") || "";
+  const officeId = searchParams.get("office_id") || "all";
+  const includeImages = searchParams.get("images") !== "false";
+  const includeEvents = searchParams.get("events") === "true";
+  const sortBy = searchParams.get("sortBy") || "salary";
+  const sortOrder = searchParams.get("sortOrder") || "desc";
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [eventTypeNameById, setEventTypeNameById] = useState<Record<string, string>>({});
+  const [salaryByLevelName, setSalaryByLevelName] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [employeesRes, eventTypesRes, salaryLevelsRes] = await Promise.all([
+          getEmployees(1, 1000, search, "active", officeId, undefined, sortBy, sortOrder),
+          getEventTypes(),
+          getSalaryLevels().catch(() => []),
+        ]);
+
+        setEmployees(employeesRes.employees);
+        
+        const eventMap: Record<string, string> = {};
+        for (const eventType of (eventTypesRes || []) as Array<{ id?: string; event_name?: string }>) {
+          if (eventType.id) {
+            eventMap[eventType.id] = eventType.event_name || eventType.id;
+          }
+        }
+        setEventTypeNameById(eventMap);
+
+        const salaryMap: Record<string, number> = {};
+        for (const level of (salaryLevelsRes || [])) {
+          if (level.level_name) {
+            salaryMap[level.level_name] = Number(level.base_salary || level.amount_etb || 0);
+          }
+        }
+        setSalaryByLevelName(salaryMap);
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to fetch report data:", error);
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [search, officeId, sortBy, sortOrder]);
+
+  const officeName = officeId !== "all" && employees.length > 0 ? employees[0].office : null;
+
+  useEffect(() => {
+    if (!loading && employees.length > 0) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, employees.length]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white text-black font-mono uppercase tracking-widest text-[10px]">
+        Loading Personnel Directory...
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white text-black min-h-screen p-12 font-sans print:p-0 w-full max-w-210 mx-auto overflow-hidden">
+      {/* Professional Corporate Header */}
+      <div className="flex justify-between items-start mb-12 border-b-4 border-black pb-8 relative">
+        <div className="absolute top-0 left-0 w-full h-px bg-gray-100 -mt-2"></div>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-black flex items-center justify-center text-white">
+              <HiUsers className="w-7 h-7" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black tracking-tighter text-black uppercase leading-none">
+                Personnel Directory
+              </h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 mt-2">
+                EL ERP Personnel Assets
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-1">
+             <div className="flex items-center gap-2">
+               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target :</span>
+               <span className="text-[10px] font-black text-black uppercase tracking-widest">{officeName || "All Global Offices"}</span>
+             </div>
+             <div className="flex items-center gap-2">
+               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Generated :</span>
+               <span className="text-[10px] font-black text-black uppercase tracking-widest">{new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
+             </div>
+          </div>
+        </div>
+        
+        <div className="text-right flex flex-col items-end">
+          <div className="px-4 py-2 border-2 border-black flex flex-col items-center justify-center min-w-25">
+             <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Record Count</span>
+             <span className="text-2xl font-black">{employees.length}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-5 pb-20">
+        {employees.map((emp) => (
+          <EmployeeReportCard
+            key={emp.id}
+            employee={emp}
+            includeImages={includeImages}
+            includeEvents={includeEvents}
+            eventTypeNameById={eventTypeNameById}
+            salaryByLevelName={salaryByLevelName}
+          />
+        ))}
+      </div>
+
+      <div className="fixed bottom-8 left-8 right-8 flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-gray-500 border-t border-gray-100 pt-4 print:absolute">
+        <div>GENERATED BY EL ERP SYSTEM v2.0</div>
+        <div>PAGE 01 / 01</div>
+        <div>COPYRIGHT &copy; {new Date().getFullYear()} ALL RIGHTS RESERVED</div>
+      </div>
+
+      <style jsx global>{`
+        @media print {
+          @page {
+            margin: 1.5cm;
+            size: A4;
+          }
+          body {
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .break-inside-avoid {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+export default function EmployeeReportPage() {
+  return (
+    <Suspense>
+      <ReportContent />
+    </Suspense>
+  );
+}
