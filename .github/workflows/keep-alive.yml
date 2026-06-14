@@ -2,20 +2,21 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    # Run every day at 00:00 UTC
-    - cron: '0 0 * * *'
+    # Run twice a week (Monday and Thursday) at 00:00 UTC
+    - cron: '0 0 * * 1,4'
   workflow_dispatch: # Allow manual triggering
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Health Endpoint
+      - name: Ping Supabase Database
+        env:
+          ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvbmduYWF0cm15anBtdXFhb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NjA3NTAsImV4cCI6MjA5NzAzNjc1MH0.FTxRIE_MCza5XL4a0Q9MXJvISFTGTQkZz0i1FYuhCYI' }}
         run: |
-          response=$(curl -s -w "%{http_code}" https://backend-blush-mu-42.vercel.app/health)
-          http_code=${response: -3}
-          if [ "$http_code" -ne 200 ]; then
-            echo "Keep-alive ping failed with status $http_code"
+          response=$(curl -s -o /dev/null -w "%{http_code}" -H "apikey: $ANON_KEY" "https://vongnaatrmyjpmuqaonp.supabase.co/rest/v1/roles?select=id")
+          if [ "$response" -ne 200 ]; then
+            echo "Keep-alive ping failed with status $response"
             exit 1
           else
             echo "Keep-alive ping successful (Status 200)"
