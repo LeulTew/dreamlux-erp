@@ -83,6 +83,9 @@ describe("Auth", () => {
       .post("/auth/login")
       .send({ password: "test-password" });
 
+    if (res.status !== 200) {
+      console.log("LOGIN FAIL:", res.status, res.body, "ADMIN_PASSWORD env:", process.env.ADMIN_PASSWORD);
+    }
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("token");
     expect(typeof res.body.token).toBe("string");
