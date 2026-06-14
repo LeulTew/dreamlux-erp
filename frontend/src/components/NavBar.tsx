@@ -167,12 +167,36 @@ function useTheme() {
   return { dark, toggle };
 }
 
+function useLanguage() {
+  const lang = useSyncExternalStore(
+    (cb) => {
+      window.addEventListener("storage", cb);
+      return () => window.removeEventListener("storage", cb);
+    },
+    (globalThis as any)._storedLangHook || (() => {
+      const stored = localStorage.getItem("lang");
+      return stored || "en";
+    }),
+    () => "en",
+  );
+
+  const toggle = () => {
+    const next = lang === "en" ? "am" : "en";
+    localStorage.setItem("lang", next);
+    window.dispatchEvent(new StorageEvent("storage"));
+  };
+
+  return { lang, toggle };
+}
+
 function ActionsMenu({
   onClose,
   mode,
   switchMode,
   dark,
   toggleTheme,
+  lang,
+  toggleLang,
   onLogout,
   currentUser,
 }: {
@@ -181,6 +205,8 @@ function ActionsMenu({
   switchMode: (m: AppMode) => void;
   dark: boolean;
   toggleTheme: () => void;
+  lang: string;
+  toggleLang: () => void;
   onLogout: () => void;
   currentUser: {
     role: string;
@@ -256,30 +282,48 @@ function ActionsMenu({
               </div>
             </Link>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {/* Settings */}
-              {canAccessSettings && (
+              {canAccessSettings ? (
                 <Link
                   href="/settings"
                   onClick={onClose}
-                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card-alt border border-border active:scale-95 transition-all text-center"
+                  className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-card-alt border border-border active:scale-95 transition-all text-center"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-muted/10 flex items-center justify-center text-muted">
+                  <div className="w-9 h-9 rounded-xl bg-muted/10 flex items-center justify-center text-muted">
                     <HiCog6Tooth className="w-5 h-5" />
                   </div>
-                  <span className="text-[12px] font-bold text-foreground">Settings</span>
+                  <span className="text-[11px] font-bold text-foreground">Settings</span>
                 </Link>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-card-alt/50 border border-border/50 text-center opacity-40">
+                  <div className="w-9 h-9 rounded-xl bg-muted/10 flex items-center justify-center text-muted">
+                    <HiCog6Tooth className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-bold text-foreground">Settings</span>
+                </div>
               )}
 
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card-alt border border-border active:scale-95 transition-all text-center"
+                className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-card-alt border border-border active:scale-95 transition-all text-center"
               >
-                <div className="w-10 h-10 rounded-xl bg-muted/10 flex items-center justify-center text-muted">
+                <div className="w-9 h-9 rounded-xl bg-muted/10 flex items-center justify-center text-muted">
                   {dark ? <HiSun className="w-5 h-5" /> : <HiMoon className="w-5 h-5" />}
                 </div>
-                <span className="text-[12px] font-bold text-foreground">{dark ? "Light Mode" : "Dark Mode"}</span>
+                <span className="text-[11px] font-bold text-foreground">{dark ? "Light" : "Dark"}</span>
+              </button>
+
+              {/* Language Toggle */}
+              <button
+                onClick={toggleLang}
+                className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-card-alt border border-border active:scale-95 transition-all text-center"
+              >
+                <div className="w-9 h-9 rounded-xl bg-muted/10 flex items-center justify-center text-muted font-bold text-xs">
+                  {lang === "en" ? "EN" : "አማ"}
+                </div>
+                <span className="text-[11px] font-bold text-foreground">{lang === "en" ? "English" : "አማርኛ"}</span>
               </button>
             </div>
           </div>
@@ -343,6 +387,7 @@ export default function NavBar() {
 
   const mode = inferModeFromPath(pathname);
   const { dark, toggle: toggleTheme } = useTheme();
+  const { lang, toggle: toggleLang } = useLanguage();
   const userRole = currentUser.role;
 
   // RBAC Gating: filter links based on user's active role from session
@@ -406,7 +451,7 @@ export default function NavBar() {
                 textClassName="text-[10px] font-black text-muted"
               />
               <span className="font-black text-xl text-foreground tracking-tighter">
-                EL ERP
+                DREAM LUX
               </span>
             </Link>
 
@@ -472,6 +517,15 @@ export default function NavBar() {
                 ) : (
                   <HiMoon className="w-4.5 h-4.5" />
                 )}
+              </button>
+
+              {/* Language toggle — desktop */}
+              <button
+                onClick={toggleLang}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black text-muted hover:text-foreground hover:bg-card-alt transition-all ml-1"
+                aria-label="Toggle language"
+              >
+                {lang === "en" ? "EN" : "አማ"}
               </button>
 
               <button
@@ -556,6 +610,8 @@ export default function NavBar() {
             switchMode={switchMode}
             dark={dark}
             toggleTheme={toggleTheme}
+            lang={lang}
+            toggleLang={toggleLang}
             onLogout={() => setShowLogout(true)}
             currentUser={currentUser}
           />

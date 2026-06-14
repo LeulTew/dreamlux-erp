@@ -1,39 +1,39 @@
 @import "tailwindcss";
 
 :root {
-  /* EL ERP — Violet/Indigo Professional Palette */
-  --background: #fafafa;
-  --foreground: #0f0e17;
-  --primary: #4f46e5;
-  --primary-light: #ede9fe;
-  --primary-dark: #3730a3;
-  --accent: #7c3aed;
-  --success: #059669;
-  --warning: #d97706;
-  --danger: #dc2626;
-  --muted: #6b7280;
-  --border: rgba(15, 14, 23, 0.08);
+  /* Dream Lux ERP — Elegant Gold & Light Slate Palette */
+  --background: #fcfbfa;
+  --foreground: #141312;
+  --primary: #a8842c;
+  --primary-light: #f7f4e9;
+  --primary-dark: #7a5e1c;
+  --accent: #d4af37;
+  --success: #0b8043;
+  --warning: #c26a00;
+  --danger: #b31414;
+  --muted: #706b65;
+  --border: #e6e3df;
   --card: #ffffff;
-  --card-alt: #f9fafb;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2rem;
+  --card-alt: #f5f2ed;
+  --radius-xl: 8px;
+  --radius-2xl: 8px;
 }
 
 .dark {
-  /* EL ERP — Dark Violet/Indigo Palette */
-  --background: #0a0914;
-  --foreground: #f3f4f6;
-  --primary: #818cf8;
-  --primary-light: #1e1b4b;
-  --primary-dark: #a5b4fc;
-  --accent: #a78bfa;
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
-  --muted: #9ca3af;
-  --border: rgba(243, 244, 246, 0.08);
-  --card: #12101e;
-  --card-alt: #0f0d1c;
+  /* Dream Lux ERP — Elegant Gold & Deep Dark Slate Palette */
+  --background: #11100f;
+  --foreground: #fcfbfa;
+  --primary: #d4af37;
+  --primary-light: #262215;
+  --primary-dark: #f0d575;
+  --accent: #a8842c;
+  --success: #34c759;
+  --warning: #ff9f0a;
+  --danger: #ff453a;
+  --muted: #a39e97;
+  --border: #2e2c29;
+  --card: #1c1a17;
+  --card-alt: #24221e;
 }
 
 /* Tailwind CSS v4 Theme - IDEs may flag @theme as unknown */
