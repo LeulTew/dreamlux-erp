@@ -11,6 +11,7 @@ import departmentsRouter from "./routes/departments";
 import salaryLevelsRouter from "./routes/salary-levels";
 import eventTypesRouter from "./routes/event-types";
 import payrollRouter from "./routes/payroll";
+import eventsRouter from "./routes/events";
 import { requireAdmin, requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
 import { runStartupMigrations } from "./db/startup-migration";
@@ -110,6 +111,7 @@ app.use("/departments", requireAdmin, departmentsRouter);
 app.use("/salary-levels", requireAdmin, salaryLevelsRouter);
 app.use("/event-types", requireAdmin, eventTypesRouter);
 app.use("/payroll", requireAdmin, payrollRouter);
+app.use("/events", requireAdmin, eventsRouter);
 
 // Error handler
 app.use(

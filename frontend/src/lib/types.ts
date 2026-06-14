@@ -233,3 +233,48 @@ export interface PayrollGenerateRequest {
     }[];
   }[];
 }
+
+// ====================================================
+// EVENT LIFE CYCLE MODULE TYPES
+// ====================================================
+
+export interface EventLog {
+  id: string;
+  event_id: string;
+  user_id: string | null;
+  field_changed: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_at: string;
+  user_username?: string;
+  user_full_name?: string;
+}
+
+export interface Event {
+  id: string;
+  name: string;
+  client_name: string;
+  client_phone: string | null;
+  event_type_id: string | null;
+  event_type_name?: string | null;
+  start_date: string;
+  end_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  venue_location: string;
+  contract_price: number;
+  status: "Planned" | "Ongoing" | "Completed";
+  created_by: string | null;
+  created_by_name?: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface EventsResponse {
+  events: Event[];
+  total: number;
+  page: number;
+  limit: number;
+}
+

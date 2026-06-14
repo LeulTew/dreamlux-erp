@@ -1,0 +1,454 @@
+"use client";
+import { useState, useEffect } from "react";
+import { AxiosError } from "axios";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import { createEvent, updateEvent, deleteEvent, getEventTypes } from "@/lib/api";
+import { Event, EventType } from "@/lib/types";
+import toast from "react-hot-toast";
+import { HiCalendar, HiExclamationCircle, HiTrash, HiXMark, HiCurrencyDollar, HiMapPin, HiUser } from "react-icons/hi2";
+import Select from "./ui/Select";
+import DeleteConfirmModal from "./DeleteConfirmModal";
+import { z } from "zod";
+
+const eventValidationSchema = z.object({
+  name: z.string().min(1, "Event name is required"),
+  client_name: z.string().min(1, "Client name is required"),
+  client_phone: z.string().optional().refine((val) => {
+    if (!val) return true;
+    const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
+    return ethioRegex.test(val.replace(/\s+/g, ""));
+  }, "Invalid Ethiopian phone number. Use +251... or 09.../07...").or(z.literal("")),
+  start_date: z.string().min(1, "Start date is required"),
+  end_date: z.string().min(1, "End date is required"),
+  venue_location: z.string().min(1, "Venue location is required"),
+  contract_price: z.coerce.number().min(0, "Contract price cannot be negative"),
+}).refine((data) => {
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "End date must be on or after start date",
+  path: ["end_date"],
+});
+
+interface EditEventSheetProps {
+  event?: Event; // If undefined, we are creating a new event
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+export default function EditEventSheet({ event, onClose, onSuccess }: EditEventSheetProps) {
+  const queryClient = useQueryClient();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Parse current user role
+  const [userRole, setUserRole] = useState("");
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const parsed = JSON.parse(userStr);
+        setUserRole(parsed.role_name || parsed.role || "");
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
+
+  const isOverrideAllowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"].includes(userRole.toUpperCase());
+  const isCompleted = event?.status === "Completed";
+  const isReadOnly = isCompleted && !isOverrideAllowed;
+
+  // Helper to format date string for input type="date"
+  const formatDateForInput = (dateStr?: string) => {
+    if (!dateStr) return "";
+    return dateStr.split("T")[0];
+  };
+
+  // Helper to format time string for input type="time"
+  const formatTimeForInput = (timeStr?: string | null) => {
+    if (!timeStr) return "";
+    return timeStr.slice(0, 5); // HH:MM:SS -> HH:MM
+  };
+
+  const [formData, setFormData] = useState({
+    name: event?.name || "",
+    client_name: event?.client_name || "",
+    client_phone: event?.client_phone || "",
+    event_type_id: event?.event_type_id || "",
+    start_date: formatDateForInput(event?.start_date),
+    end_date: formatDateForInput(event?.end_date),
+    start_time: formatTimeForInput(event?.start_time),
+    end_time: formatTimeForInput(event?.end_time),
+    venue_location: event?.venue_location || "",
+    contract_price: event?.contract_price || 0,
+    status: event?.status || "Planned",
+  });
+
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const { data: eventTypes = [] } = useQuery<EventType[]>({
+    queryKey: ["event-types"],
+    queryFn: getEventTypes,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteEvent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      toast.success("Event deleted successfully");
+      if (onSuccess) onSuccess();
+      onClose();
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || "Failed to delete event");
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (data: Record<string, any>) => {
+      if (event) {
+        return updateEvent(event.id, data);
+      } else {
+        return createEvent(data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event", event?.id] });
+      toast.success(event ? "Event updated successfully" : "Event created successfully");
+      if (onSuccess) onSuccess();
+      onClose();
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || "Failed to save event");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isReadOnly) return;
+
+    // Validate
+    const validation = eventValidationSchema.safeParse(formData);
+    if (!validation.success) {
+      const errors: Record<string, string> = {};
+      validation.error.issues.forEach((issue) => {
+        const field = issue.path[0] as string;
+        errors[field] = issue.message;
+      });
+      setFormErrors(errors);
+      toast.error(validation.error.issues[0].message);
+      return;
+    }
+
+    setFormErrors({});
+
+    // Status transition validation rules client side
+    if (event && formData.status !== event.status) {
+      if (event.status === "Ongoing" && formData.status === "Planned" && !isOverrideAllowed) {
+        toast.error("Cannot transition status from Ongoing back to Planned");
+        return;
+      }
+    }
+
+    // Call API
+    const payload = {
+      ...formData,
+      event_type_id: formData.event_type_id || null,
+      client_phone: formData.client_phone || null,
+      start_time: formData.start_time || null,
+      end_time: formData.end_time || null,
+    };
+
+    saveMutation.mutate(payload);
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      />
+
+      {/* Sheet Container */}
+      <motion.div
+        initial={{ opacity: 0, y: "100%" }}
+        animate={{ 
+          opacity: 1, 
+          y: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : 0,
+          x: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : 0,
+          scale: 1
+        }}
+        exit={{ 
+          opacity: 0,
+          y: typeof window !== "undefined" && window.innerWidth > 768 ? "-50%" : "100%",
+          scale: typeof window !== "undefined" && window.innerWidth > 768 ? 0.95 : 1
+        }}
+        transition={{ type: "spring", stiffness: 400, damping: 35 }}
+        className="fixed z-60 inset-x-0 bottom-0 md:inset-auto md:left-1/2 md:top-1/2 w-full md:max-w-2xl bg-card border border-border shadow-2xl p-6 pt-10 overflow-y-auto max-h-[95vh] md:max-h-[min(90vh,800px)] rounded-t-[2.5rem] md:rounded-[2.5rem]"
+      >
+        {/* Handle for mobile */}
+        <div className="md:hidden absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-border/60 rounded-full" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+             <div className="w-12 h-12 rounded-[1.25rem] bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-sm">
+               <HiCalendar className="w-6 h-6" />
+             </div>
+             <div>
+               <h2 className="text-xl font-black text-foreground tracking-tight">
+                 {event ? "Edit Event" : "Create Event"}
+               </h2>
+               <p className="text-[10px] text-muted uppercase tracking-widest font-black">
+                 {event ? `Managing event details` : "Register a new event schedule"}
+               </p>
+             </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-xl bg-card-alt border border-border flex items-center justify-center text-muted hover:text-foreground hover:bg-border transition-all shadow-sm"
+          >
+            <HiXMark className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Warning Banner for Completed Event Locks */}
+        {isCompleted && (
+          <div className={`mb-6 p-4 rounded-2xl border flex items-start gap-3 text-xs leading-relaxed ${isReadOnly ? "bg-red-500/10 border-red-500/20 text-red-500 font-semibold" : "bg-warning/10 border-warning/20 text-warning font-semibold"}`}>
+            <HiExclamationCircle className="w-5 h-5 shrink-0" />
+            <div>
+              {isReadOnly ? (
+                <span>This event is Completed and locked. You do not have permissions to modify it. Only administrators and accountants can make changes.</span>
+              ) : (
+                <span>This event is Completed. You are editing with administrator/accountant override privileges.</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6 pb-6">
+          
+          {/* Section 1: Client & General Info */}
+          <div className="bg-card-alt/30 p-5 rounded-3xl border border-border/50 space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-primary">General Information</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Title</label>
+                <input
+                  type="text"
+                  disabled={isReadOnly}
+                  placeholder="e.g. Betty's Wedding"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                    formErrors.name ? "border-red-500" : "border-border"
+                  }`}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Type</label>
+                <Select
+                  options={eventTypes.map((et) => ({
+                    id: et.id,
+                    label: et.event_name,
+                  }))}
+                  value={formData.event_type_id}
+                  onChange={(val) => setFormData({ ...formData, event_type_id: val })}
+                  placeholder="Select Type"
+                  className={isReadOnly ? "pointer-events-none opacity-60" : ""}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
+                  <HiUser className="w-3.5 h-3.5" /> Client Name
+                </label>
+                <input
+                  type="text"
+                  disabled={isReadOnly}
+                  placeholder="e.g. Betty Hailu"
+                  value={formData.client_name}
+                  onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                    formErrors.client_name ? "border-red-500" : "border-border"
+                  }`}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1">Client Phone</label>
+                <input
+                  type="tel"
+                  disabled={isReadOnly}
+                  placeholder="e.g. 0911223344"
+                  value={formData.client_phone}
+                  onChange={(e) => setFormData({ ...formData, client_phone: e.target.value.replace(/[^\d+]/g, "") })}
+                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                    formErrors.client_phone ? "border-red-500" : "border-border"
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Venue & Schedule */}
+          <div className="bg-card-alt/30 p-5 rounded-3xl border border-border/50 space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-primary">Schedule & Location</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1">Start Date</label>
+                <input
+                  type="date"
+                  disabled={isReadOnly}
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                    formErrors.start_date ? "border-red-500" : "border-border"
+                  }`}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1">End Date</label>
+                <input
+                  type="date"
+                  disabled={isReadOnly}
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                    formErrors.end_date ? "border-red-500" : "border-border"
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1">Start Time</label>
+                <input
+                  type="time"
+                  disabled={isReadOnly}
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1">End Time</label>
+                <input
+                  type="time"
+                  disabled={isReadOnly}
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
+                <HiMapPin className="w-3.5 h-3.5" /> Venue Location
+              </label>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                placeholder="e.g. Sheraton Ballroom / CMC Residence"
+                value={formData.venue_location}
+                onChange={(e) => setFormData({ ...formData, venue_location: e.target.value })}
+                className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                  formErrors.venue_location ? "border-red-500" : "border-border"
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Section 3: Finance & Status */}
+          <div className="bg-card-alt/30 p-5 rounded-3xl border border-border/50 space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-primary">Status & Budget</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
+                  <HiCurrencyDollar className="w-3.5 h-3.5" /> Contract Price (ETB)
+                </label>
+                <input
+                  type="number"
+                  disabled={isReadOnly}
+                  placeholder="0.00"
+                  value={formData.contract_price || ""}
+                  onChange={(e) => setFormData({ ...formData, contract_price: Number(e.target.value) })}
+                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                    formErrors.contract_price ? "border-red-500" : "border-border"
+                  }`}
+                />
+              </div>
+
+              {event && (
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Status</label>
+                  <Select
+                    options={[
+                      { id: "Planned", label: "Planned (ቀጠሮ)" },
+                      { id: "Ongoing", label: "Ongoing (በሂደት ላይ)" },
+                      { id: "Completed", label: "Completed (የተጠናቀቀ)" },
+                    ]}
+                    value={formData.status}
+                    onChange={(val) => setFormData({ ...formData, status: val as "Planned" | "Ongoing" | "Completed" })}
+                    placeholder="Select Status"
+                    className={isReadOnly ? "pointer-events-none opacity-60" : ""}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          {!isReadOnly && (
+            <div className="flex gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={saveMutation.isPending}
+                className="flex-1 py-4 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-xs"
+              >
+                {saveMutation.isPending ? "Saving..." : event ? "Save Changes" : "Create Event"}
+              </button>
+              {event && (
+                <button
+                  type="button"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => setShowDeleteModal(true)}
+                  className="w-14 h-14 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-premium group"
+                  title="Delete Event"
+                >
+                  <HiTrash className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                </button>
+              )}
+            </div>
+          )}
+        </form>
+      </motion.div>
+
+      {/* Delete Confirmation Modal */}
+      {event && (
+        <DeleteConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={() => deleteMutation.mutate(event.id)}
+          isDeleting={deleteMutation.isPending}
+          title="Delete Event"
+          message="Are you sure you want to delete this event? This action is permanent."
+          itemName={event.name}
+        />
+      )}
+    </>
+  );
+}

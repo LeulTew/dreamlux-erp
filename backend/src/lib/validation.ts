@@ -130,3 +130,49 @@ export const savePayrollDraftSchema = generatePayrollPreviewSchema.extend({
   created_by_user_id: z.string().uuid().optional().nullable(),
 });
 
+const eventBaseSchema = z.object({
+  name: z.string().min(1, "Event name is required").max(500, "Event name too long"),
+  client_name: z.string().min(1, "Client name is required").max(500, "Client name too long"),
+  client_phone: z
+    .string()
+    .max(50, "Phone too long")
+    .optional()
+    .nullable()
+    .or(z.literal(""))
+    .refine((val) => {
+      if (!val) return true;
+      const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
+      return ethioRegex.test(val.replace(/\s+/g, ""));
+    }, "Invalid Ethiopian phone number. Use +251... or 09.../07..."),
+  event_type_id: z.string().uuid("Invalid event type ID").optional().nullable(),
+  start_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid start date"),
+  end_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid end date"),
+  start_time: z.string().optional().nullable().or(z.literal("")),
+  end_time: z.string().optional().nullable().or(z.literal("")),
+  venue_location: z.string().min(1, "Venue location is required").max(1000, "Venue location too long"),
+  contract_price: z.coerce.number().min(0, "Contract price cannot be negative"),
+});
+
+export const createEventSchema = eventBaseSchema.refine((data) => {
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "End date must be on or after start date",
+  path: ["end_date"],
+});
+
+export const updateEventSchema = eventBaseSchema.partial().extend({
+  status: z.enum(["Planned", "Ongoing", "Completed"]).optional(),
+}).refine((data) => {
+  if (data.start_date && data.end_date) {
+    return new Date(data.start_date) <= new Date(data.end_date);
+  }
+  return true;
+}, {
+  message: "End date must be on or after start date",
+  path: ["end_date"],
+});
+
+export type CreateEventInput = z.infer<typeof createEventSchema>;
+export type UpdateEventInput = z.infer<typeof updateEventSchema>;
+
+

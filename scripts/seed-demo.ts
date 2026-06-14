@@ -7,9 +7,11 @@
 import { Client } from "pg";
 import * as bcrypt from "bcryptjs";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres:ZC9P8nU5gIJ07fTA@db.xnaxogbxodbflalubzcj.supabase.co:5432/postgres";
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error("DATABASE_URL is not set in environment variables");
+  process.exit(1);
+}
 
 const client = new Client({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 

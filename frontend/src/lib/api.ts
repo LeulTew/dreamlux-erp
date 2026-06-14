@@ -1147,3 +1147,33 @@ export const restoreSalaryLevel = (id: string) => api.post(`/salary-levels/${id}
 
 export const getEventTypesTrash = () => api.get("/event-types/trash/list").then(res => res.data);
 export const restoreEventType = (id: string) => api.post(`/event-types/${id}/restore`).then(res => res.data);
+
+// ====================================================
+// EVENTS LIFE CYCLE API
+// ====================================================
+export const getEvents = (
+  page = 1,
+  limit = 20,
+  search?: string,
+  status?: string,
+  start_date?: string,
+  end_date?: string
+) =>
+  api
+    .get("/events", {
+      params: { page, limit, search, status, start_date, end_date },
+    })
+    .then((r) => r.data);
+
+export const getEvent = (id: string) =>
+  api.get(`/events/${id}`).then((r) => r.data);
+
+export const createEvent = (data: Record<string, unknown>) =>
+  api.post("/events", data).then((r) => r.data);
+
+export const updateEvent = (id: string, data: Record<string, unknown>) =>
+  api.put(`/events/${id}`, data).then((r) => r.data);
+
+export const deleteEvent = (id: string) =>
+  api.delete(`/events/${id}`).then((r) => r.data);
+

@@ -8,14 +8,60 @@ import UserAvatar from "@/components/UserAvatar";
 
 type AppMode = "hr" | "inventory";
 
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    Employees: "Employees",
+    Payroll: "Payroll",
+    Salary: "Salary",
+    "Event Types": "Event Types",
+    "Add Employee": "Add Employee",
+    Dashboard: "Dashboard",
+    Inventory: "Inventory",
+    Reconcile: "Reconcile",
+    "Audit Log": "Audit Log",
+    Reports: "Reports",
+    "Add Item": "Add Item",
+    Admin: "Admin",
+    Events: "Events",
+    "HR Mode": "HR Mode",
+    "Sign Out": "Sign Out",
+    Cancel: "Cancel",
+    "Are you sure you want to sign out?": "Are you sure you want to sign out?",
+    More: "More",
+    Logout: "Logout",
+  },
+  am: {
+    Employees: "ሰራተኞች",
+    Payroll: "ደመወዝ",
+    Salary: "ደረጃዎች",
+    "Event Types": "የዝግጅት አይነቶች",
+    "Add Employee": "ሰራተኛ መዝግብ",
+    Dashboard: "ዋና ገጽ",
+    Inventory: "ዕቃዎች",
+    Reconcile: "ቆጠራ ማመሳከሪያ",
+    "Audit Log": "የቆጠራ ታሪክ",
+    Reports: "ሪፖርቶች",
+    "Add Item": "ዕቃ መዝግብ",
+    Admin: "አስተዳዳሪ",
+    Events: "ዝግጅቶች",
+    "HR Mode": "የሰራተኞች ገጽ",
+    "Sign Out": "ውጣ",
+    Cancel: "ተመለስ",
+    "Are you sure you want to sign out?": "በእርግጥ መውጣት ይፈልጋሉ?",
+    More: "ተጨማሪ",
+    Logout: "ውጣ",
+  }
+};
+
 const MODE_STORAGE_KEY = "erp_mode";
 
 const HR_LINKS = [
-  { href: "/", label: "Employees", icon: HiUsers, roles: ["SUPER_ADMIN", "HR_ADMIN", "admin"] },
-  { href: "/hr/payments", label: "Payroll", icon: HiOutlineBanknotes, roles: ["SUPER_ADMIN", "HR_ADMIN", "admin"] },
-  { href: "/hr/salary-levels", label: "Salary", icon: HiOutlineCurrencyDollar, roles: ["SUPER_ADMIN", "HR_ADMIN", "admin"] },
-  { href: "/hr/event-types", label: "Events", icon: HiOutlineCalendar, roles: ["SUPER_ADMIN", "HR_ADMIN", "admin"] },
-  { href: "/insert", label: "Add Employee", icon: HiUserPlus, roles: ["SUPER_ADMIN", "HR_ADMIN", "admin"] },
+  { href: "/", label: "Employees", icon: HiUsers, roles: ["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"] },
+  { href: "/events", label: "Events", icon: HiOutlineCalendar, roles: ["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "EVENT_MANAGER", "event_manager", "OWNER", "owner", "OPS_MANAGER", "ops_manager", "ACCOUNTANT", "accountant"] },
+  { href: "/hr/payments", label: "Payroll", icon: HiOutlineBanknotes, roles: ["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN", "ACCOUNTANT", "accountant"] },
+  { href: "/hr/salary-levels", label: "Salary", icon: HiOutlineCurrencyDollar, roles: ["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"] },
+  { href: "/hr/event-types", label: "Event Types", icon: HiOutlineCalendar, roles: ["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"] },
+  { href: "/insert", label: "Add Employee", icon: HiUserPlus, roles: ["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"] },
 ];
 
 const INVENTORY_LINKS = [
@@ -47,10 +93,13 @@ function isLinkActive(pathname: string, href: string): boolean {
 function LogoutConfirm({
   onConfirm,
   onCancel,
+  lang,
 }: {
   onConfirm: () => void;
   onCancel: () => void;
+  lang: string;
 }) {
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   return (
     <>
       <motion.div
@@ -74,9 +123,9 @@ function LogoutConfirm({
             <div className="w-16 h-16 rounded-2xl bg-card-alt flex items-center justify-center mx-auto shadow-sm">
               <HiArrowRightOnRectangle className="w-8 h-8 text-danger" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">Sign Out</h3>
+            <h3 className="text-lg font-bold text-foreground">{t("Sign Out")}</h3>
             <p className="text-sm text-muted leading-relaxed">
-              Are you sure you want to sign out?
+              {t("Are you sure you want to sign out?")}
             </p>
           </div>
           <div className="flex gap-3 mt-8">
@@ -84,13 +133,13 @@ function LogoutConfirm({
               onClick={onCancel}
               className="flex-1 py-3 rounded-2xl bg-card-alt text-foreground font-bold hover:bg-border transition-all text-sm active:scale-95"
             >
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               onClick={onConfirm}
               className="flex-1 py-3 rounded-2xl bg-danger text-white font-bold hover:opacity-90 transition-all text-sm active:scale-95 shadow-premium"
             >
-              Sign Out
+              {t("Sign Out")}
             </button>
           </div>
         </div>
@@ -112,9 +161,9 @@ function LogoutConfirm({
             <div className="w-16 h-16 rounded-2xl bg-card-alt flex items-center justify-center mx-auto shadow-sm">
               <HiArrowRightOnRectangle className="w-8 h-8 text-danger" />
             </div>
-            <h3 className="text-lg font-bold text-foreground">Sign Out</h3>
+            <h3 className="text-lg font-bold text-foreground">{t("Sign Out")}</h3>
             <p className="text-sm text-muted">
-              Are you sure you want to sign out?
+              {t("Are you sure you want to sign out?")}
             </p>
           </div>
           <div className="space-y-2.5">
@@ -122,13 +171,13 @@ function LogoutConfirm({
               onClick={onConfirm}
               className="w-full py-3.5 rounded-2xl bg-danger text-white font-semibold hover:bg-red-600 transition-all text-[15px]"
             >
-              Sign Out
+              {t("Sign Out")}
             </button>
             <button
               onClick={onCancel}
               className="w-full py-3.5 rounded-2xl bg-card-alt text-foreground font-medium hover:bg-border transition-all text-[15px]"
             >
-              Cancel
+              {t("Cancel")}
             </button>
           </div>
         </div>
@@ -481,11 +530,12 @@ export default function NavBar() {
 
               {links.map((link) => {
                 const isActive = isLinkActive(pathname, link.href);
+                const translatedLabel = TRANSLATIONS[lang]?.[link.label] || link.label;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    title={link.label}
+                    title={translatedLabel}
                     className={`group/navlink flex items-center justify-start overflow-hidden h-10 rounded-2xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${
                       isActive
                         ? "w-44 bg-primary text-background shadow-premium px-3"
@@ -500,7 +550,7 @@ export default function NavBar() {
                           : "max-w-0 opacity-0 group-hover/navlink:max-w-28 group-hover/navlink:opacity-100"
                       }`}
                     >
-                      {link.label}
+                      {translatedLabel}
                     </span>
                   </Link>
                 );
@@ -533,7 +583,7 @@ export default function NavBar() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-muted hover:text-danger hover:bg-red-50 dark:hover:bg-red-950/20 transition-all ml-1"
               >
                 <HiArrowRightOnRectangle className="w-4 h-4" />
-                <span>Logout</span>
+                <span>{TRANSLATIONS[lang]?.["Logout"] || "Logout"}</span>
               </button>
             </div>
           </div>
@@ -566,13 +616,15 @@ export default function NavBar() {
                 <span
                   className={`text-[10px] font-semibold tracking-wide ${isActive ? "opacity-100" : "opacity-60"}`}
                 >
-                  {link.label === "Dashboard"
-                    ? "Home"
-                    : link.label === "Inventory"
-                      ? "Items"
-                      : link.label === "Audit Log"
-                        ? "History"
-                        : link.label}
+                  {TRANSLATIONS[lang]?.[
+                    link.label === "Dashboard"
+                      ? "Dashboard"
+                      : link.label === "Inventory"
+                        ? "Inventory"
+                        : link.label === "Audit Log"
+                          ? "Audit Log"
+                          : link.label
+                  ] || link.label}
                 </span>
               </Link>
             );
@@ -585,7 +637,7 @@ export default function NavBar() {
               <HiBars3BottomRight className={`w-6 h-6 transition-transform duration-200 ${showActionsMenu ? "scale-105" : ""}`} />
             </div>
             <span className={`text-[10px] font-semibold tracking-wide ${showActionsMenu ? "opacity-100" : "opacity-60"}`}>
-              More
+              {TRANSLATIONS[lang]?.["More"] || "More"}
             </span>
           </button>
         </div>
@@ -598,6 +650,7 @@ export default function NavBar() {
           <LogoutConfirm
             onConfirm={handleLogout}
             onCancel={() => setShowLogout(false)}
+            lang={lang}
           />
         )}
       </AnimatePresence>
