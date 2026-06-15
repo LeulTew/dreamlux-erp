@@ -10,6 +10,92 @@ import { HiXMark, HiUserPlus, HiIdentification, HiPlus, HiExclamationCircle } fr
 import { z } from "zod";
 import { SalaryLevel, EventType } from "@/lib/types";
 import Select from "@/components/ui/Select";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Add Employee": "Add Employee",
+    "Create a new employee record": "Create a new employee record",
+    "Take Photo": "Take Photo",
+    "Upload File": "Upload File",
+    "Employee Photo (Optional)": "Employee Photo (Optional)",
+    "ID Card Front *": "ID Card Front *",
+    "Front View": "Front View",
+    "Take Pic": "Take Pic",
+    "Upload": "Upload",
+    "ID Card Back *": "ID Card Back *",
+    "Back View": "Back View",
+    "Full Name *": "Full Name *",
+    "Employee ID *": "Employee ID *",
+    "Department (Optional)": "Department (Optional)",
+    "Select Department": "Select Department",
+    "Office / Branch (Optional)": "Office / Branch (Optional)",
+    "Select Office": "Select Office",
+    "Phone *": "Phone *",
+    "Email (Optional)": "Email (Optional)",
+    "Base Salary": "Base Salary",
+    "Select Level": "Select Level",
+    "Base Salary Amount": "Base Salary Amount",
+    "Select a salary level to view the amount": "Select a salary level to view the amount.",
+    "Event Rates": "Event Rates",
+    "Rates Description": "Define the specific rates for each event type for this employee. These will be used for automated payroll calculations.",
+    "Create Employee Record": "Create Employee Record",
+    "Saving...": "Saving...",
+    "Please fix the errors in the form": "Please fix the errors in the form",
+    "New department": "New department",
+    "Add": "Add",
+    "Employee created successfully!": "Employee created successfully!",
+    "Failed to create employee": "Failed to create employee",
+    "Failed to add department": "Failed to add department",
+    "Department added!": "Department added!",
+    "Take Picture": "Take Picture",
+    "Phone Error Hint": "Invalid phone number",
+    "Phone Hint": "e.g. 0911...",
+    "Full Name Placeholder": "e.g. John Doe",
+    "Employee ID Placeholder": "e.g. EMP-001"
+  },
+  am: {
+    "Add Employee": "ሰራተኛ መዝግብ",
+    "Create a new employee record": "አዲስ የሰራተኛ መዝገብ ይፍጠሩ",
+    "Take Photo": "ፎቶ አንሳ",
+    "Upload File": "ፋይል ጫን",
+    "Employee Photo (Optional)": "የሰራተኛው ፎቶ (ከተፈለገ)",
+    "ID Card Front *": "የመታወቂያው የፊት ገጽ *",
+    "Front View": "የፊት ገጽታ",
+    "Take Pic": "ፎቶ አንሳ",
+    "Upload": "ጫን",
+    "ID Card Back *": "የመታወቂያው የጀርባ ገጽ *",
+    "Back View": "የጀርባ ገጽታ",
+    "Full Name *": "ሙሉ ስም *",
+    "Employee ID *": "የሰራተኛው መለያ ቁጥር *",
+    "Department (Optional)": "የስራ ክፍል (ከተፈለገ)",
+    "Select Department": "ክፍል ይምረጡ",
+    "Office / Branch (Optional)": "ቢሮ / ቅርንጫፍ (ከተፈለገ)",
+    "Select Office": "ቢሮ ይምረጡ",
+    "Phone *": "ስልክ ቁጥር *",
+    "Email (Optional)": "ኢሜይል (ከተፈለገ)",
+    "Base Salary": "መሰረታዊ ደመወዝ",
+    "Select Level": "ደረጃ ይምረጡ",
+    "Base Salary Amount": "የመሰረታዊ ደመወዝ መጠን",
+    "Select a salary level to view the amount": "መጠኑን ለማየት እባክዎ የደመወዝ ደረጃ ይምረጡ።",
+    "Event Rates": "የዝግጅት ተመኖች",
+    "Rates Description": "ለዚህ ሰራተኛ ለእያንዳንዱ የዝግጅት አይነት ተመን ይወስኑ። እነዚህ ዋጋዎች በደመወዝ ክፍያ ጊዜ በራስ-ሰር ጥቅም ላይ ይውላሉ።",
+    "Create Employee Record": "የሰራተኛ መዝገብ ፍጠር",
+    "Saving...": "በማስቀመጥ ላይ...",
+    "Please fix the errors in the form": "እባክዎ በቅጹ ላይ ያሉትን ስህተቶች ያስተካክሉ",
+    "New department": "አዲስ የስራ ክፍል",
+    "Add": "ጨምር",
+    "Employee created successfully!": "የሰራተኛው መዝገብ በተሳካ ሁኔታ ተፈጥሯል!",
+    "Failed to create employee": "የሰራተኛውን መዝገብ መፍጠር አልተሳካም",
+    "Failed to add department": "ስራ ክፍል ማከል አልተሳካም",
+    "Department added!": "ስራ ክፍል ታክሏል!",
+    "Take Picture": "ፎቶ አንሳ",
+    "Phone Error Hint": "የስልክ ቁጥሩ ትክክል አይደለም",
+    "Phone Hint": "ምሳሌ 0911...",
+    "Full Name Placeholder": "ምሳሌ፡ ዮሐንስ አበበ",
+    "Employee ID Placeholder": "ምሳሌ፡ EMP-001"
+  }
+};
 
 const employeeValidationSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
@@ -23,6 +109,8 @@ const employeeValidationSchema = z.object({
 
 export default function InsertEmployeePage() {
   const queryClient = useQueryClient();
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
@@ -50,7 +138,6 @@ export default function InsertEmployeePage() {
     queryFn: () => getDepartments(),
   });
 
-
   const { data: stores } = useQuery({
     queryKey: ["stores"],
     queryFn: () => getStores(),
@@ -76,8 +163,6 @@ export default function InsertEmployeePage() {
   // Synchronize next employee ID to form state once fetched
   useEffect(() => {
     if (nextIdData?.nextId && !formData.employee_id) {
-      // Use queueMicrotask to avoid synchronous setState inside the effect body,
-      // which satisfies the react-hooks/set-state-in-effect rule.
       queueMicrotask(() => {
         setFormData((prev) => ({ ...prev, employee_id: nextIdData.nextId }));
       });
@@ -87,12 +172,12 @@ export default function InsertEmployeePage() {
   const createMutation = useMutation({
     mutationFn: (fd: FormData) => createEmployee(fd),
     onSuccess: () => {
-      toast.success("Employee created successfully!");
+      toast.success(t("Employee created successfully!"));
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       resetForm();
     },
     onError: (err: AxiosError<{ error: string }>) => {
-      toast.error(err.response?.data?.error || "Failed to create employee");
+      toast.error(err.response?.data?.error || t("Failed to create employee"));
     },
   });
 
@@ -124,7 +209,6 @@ export default function InsertEmployeePage() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return reject("Could not get context");
 
-        // Fixed max width/height for compression
         let width = img.width;
         let height = img.height;
         const MAX_SIZE = 1200;
@@ -185,13 +269,11 @@ export default function InsertEmployeePage() {
         };
         reader.readAsDataURL(compressed);
       } catch {
-        toast.error("Failed to process image");
+        toast.error(t("Failed to process image"));
       }
     },
-    [],
+    [t],
   );
-
-
 
   const handleAddDepartment = async () => {
     if (!newDepartment.trim()) return;
@@ -201,25 +283,23 @@ export default function InsertEmployeePage() {
       setFormData(prev => ({ ...prev, department_id: res.id }));
       setNewDepartment("");
       setIsAddingDepartment(false);
-      toast.success("Department added!");
+      toast.success(t("Department added!"));
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.error || "Failed to add department");
+        toast.error(err.response?.data?.error || t("Failed to add department"));
       } else {
-        toast.error("Failed to add department");
+        toast.error(t("Failed to add department"));
       }
     }
   };
 
   const handlePhoneChange = (val: string) => {
-    // Keep only digits and plus
     const clean = val.replace(/[^\d+]/g, "");
     setFormData({ ...formData, phone: clean });
     
-    // Quick validation
     const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
     if (clean && !ethioRegex.test(clean.replace(/\s+/g, ""))) {
-      setFormErrors(prev => ({ ...prev, phone: "Invalid phone number" }));
+      setFormErrors(prev => ({ ...prev, phone: t("Phone Error Hint") }));
     } else {
       setFormErrors(prev => {
         const next = { ...prev };
@@ -232,7 +312,6 @@ export default function InsertEmployeePage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Frontend validation
     const result = employeeValidationSchema.safeParse(formData);
     if (!result.success) {
       const errors: Record<string, string> = {};
@@ -241,13 +320,12 @@ export default function InsertEmployeePage() {
         errors[field] = issue.message;
       });
       setFormErrors(errors);
-      toast.error("Please fix the errors in the form");
+      toast.error(t("Please fix the errors in the form"));
       return;
     }
     setFormErrors({});
 
     const fd = new FormData();
-    // Compress BEFORE appending to reduce size (413 Content Too Large)
     if (frontFile) fd.append("id_card_front", frontFile);
     if (backFile) fd.append("id_card_back", backFile);
     if (profileFile) fd.append("profile_photo", profileFile);
@@ -272,13 +350,11 @@ export default function InsertEmployeePage() {
                <HiUserPlus className="w-6 h-6" />
              </div>
              <div>
-               <h1 className="text-2xl font-black text-foreground tracking-tight">Add Employee</h1>
-               <p className="text-sm text-muted font-medium">Create a new employee record</p>
+               <h1 className="text-2xl font-black text-foreground tracking-tight">{t("Add Employee")}</h1>
+               <p className="text-sm text-muted font-medium">{t("Create a new employee record")}</p>
              </div>
            </div>
-           
         </header>
-
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Profile Photo */}
@@ -320,7 +396,7 @@ export default function InsertEmployeePage() {
                   }}
                   className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all"
                 >
-                  Take Photo
+                  {t("Take Photo")}
                 </button>
                 <button
                   type="button"
@@ -333,10 +409,10 @@ export default function InsertEmployeePage() {
                   }}
                   className="px-3 py-1.5 rounded-lg bg-card-alt border border-border text-muted text-xs font-bold hover:bg-border transition-all"
                 >
-                  Upload File
+                  {t("Upload File")}
                 </button>
              </div>
-             <p className="text-[10px] uppercase font-bold text-muted tracking-widest">Employee Photo (Optional)</p>
+             <p className="text-[10px] uppercase font-bold text-muted tracking-widest">{t("Employee Photo (Optional)")}</p>
           </div>
 
           {/* ID Card Images */}
@@ -344,7 +420,7 @@ export default function InsertEmployeePage() {
             {/* Front */}
             <div className="space-y-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted px-1 flex justify-between">
-                 <span>ID Card Front *</span>
+                 <span>{t("ID Card Front *")}</span>
               </label>
               <div
                 className={`relative aspect-[1.6/1] rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden bg-card-alt ${
@@ -365,7 +441,7 @@ export default function InsertEmployeePage() {
                 ) : (
                   <div className="text-center p-4">
                     <HiIdentification className="w-10 h-10 text-muted mx-auto mb-2 opacity-30" />
-                    <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">Front View</p>
+                    <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">{t("Front View")}</p>
                   </div>
                 )}
               </div>
@@ -383,7 +459,7 @@ export default function InsertEmployeePage() {
                    }}
                    className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
                  >
-                   Take Pic
+                   {t("Take Pic")}
                  </button>
                  <button
                    type="button"
@@ -396,7 +472,7 @@ export default function InsertEmployeePage() {
                    }}
                    className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
                  >
-                   Upload
+                   {t("Upload")}
                  </button>
               </div>
             </div>
@@ -404,7 +480,7 @@ export default function InsertEmployeePage() {
             {/* Back */}
             <div className="space-y-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted px-1 flex justify-between">
-                 <span>ID Card Back *</span>
+                 <span>{t("ID Card Back *")}</span>
               </label>
               <div
                 className={`relative aspect-[1.6/1] rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden bg-card-alt ${
@@ -425,7 +501,7 @@ export default function InsertEmployeePage() {
                 ) : (
                   <div className="text-center p-4">
                     <HiIdentification className="w-10 h-10 text-muted mx-auto mb-2 opacity-30" />
-                    <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">Back View</p>
+                    <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">{t("Back View")}</p>
                   </div>
                 )}
               </div>
@@ -443,7 +519,7 @@ export default function InsertEmployeePage() {
                    }}
                    className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
                  >
-                   Take Pic
+                   {t("Take Pic")}
                  </button>
                  <button
                    type="button"
@@ -456,7 +532,7 @@ export default function InsertEmployeePage() {
                    }}
                    className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
                  >
-                   Upload
+                   {t("Upload")}
                  </button>
               </div>
             </div>
@@ -466,13 +542,13 @@ export default function InsertEmployeePage() {
           <div className="bg-card rounded-3xl border border-border p-6 shadow-sm space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">Full Name *</label>
+                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Full Name *")}</label>
                 <input
                   type="text"
                   required
                   value={formData.full_name}
                   onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                  placeholder="e.g. John Doe"
+                  placeholder={t("Full Name Placeholder")}
                   className={`w-full px-4 py-3 rounded-xl border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                     formErrors.full_name ? "border-red-500" : "border-border"
                   }`}
@@ -481,13 +557,13 @@ export default function InsertEmployeePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">Employee ID *</label>
+                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Employee ID *")}</label>
                 <input
                   type="text"
                   required
                   value={formData.employee_id}
                   onChange={(e) => setFormData({...formData, employee_id: e.target.value})}
-                  placeholder="e.g. EMP-001"
+                  placeholder={t("Employee ID Placeholder")}
                   className="w-full px-4 py-3 rounded-xl border border-border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
                 />
               </div>
@@ -495,7 +571,7 @@ export default function InsertEmployeePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">Department (Optional)</label>
+                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Department (Optional)")}</label>
                 <div className="flex gap-2">
                   {isAddingDepartment ? (
                     <div className="flex-1 flex gap-2">
@@ -504,7 +580,7 @@ export default function InsertEmployeePage() {
                         autoFocus
                         value={newDepartment}
                         onChange={(e) => setNewDepartment(e.target.value)}
-                        placeholder="New department"
+                        placeholder={t("New department")}
                         className="flex-1 px-4 py-3 rounded-xl border border-primary bg-card-alt text-foreground outline-none transition-all"
                       />
                       <button
@@ -512,7 +588,7 @@ export default function InsertEmployeePage() {
                         onClick={handleAddDepartment}
                         className="px-4 py-3 rounded-xl bg-primary text-on-primary hover:bg-primary-dark transition-all"
                       >
-                        Add
+                        {t("Add")}
                       </button>
                       <button
                         type="button"
@@ -528,7 +604,7 @@ export default function InsertEmployeePage() {
                         options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
                         value={formData.department_id}
                         onChange={(val) => setFormData({...formData, department_id: val})}
-                        placeholder="Select Department"
+                        placeholder={t("Select Department")}
                         className="flex-1"
                       />
                       <button
@@ -547,19 +623,19 @@ export default function InsertEmployeePage() {
  
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">Office / Branch (Optional)</label>
+                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Office / Branch (Optional)")}</label>
                 <Select
                   options={stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []}
                   value={formData.office_id}
                   onChange={(val) => setFormData({...formData, office_id: val})}
-                  placeholder="Select Office"
+                  placeholder={t("Select Office")}
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted tracking-tight px-1 flex justify-between">
-                  <span>Phone *</span>
-                  <span className="text-[10px] normal-case opacity-60">e.g. 0911...</span>
+                  <span>{t("Phone *")}</span>
+                  <span className="text-[10px] normal-case opacity-60">{t("Phone Hint")}</span>
                 </label>
                 <div className="relative">
                   <input
@@ -578,7 +654,7 @@ export default function InsertEmployeePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-tight px-1 text-muted opacity-60 italic">Email (Optional)</label>
+                <label className="text-xs font-bold uppercase tracking-tight px-1 text-muted opacity-60 italic">{t("Email (Optional)")}</label>
                 <input
                   type="email"
                   value={formData.email}
@@ -594,7 +670,7 @@ export default function InsertEmployeePage() {
  
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">Base Salary</label>
+                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Base Salary")}</label>
                 <Select
                   options={salaryLevels.map((level) => ({
                     id: level.level_name,
@@ -602,12 +678,12 @@ export default function InsertEmployeePage() {
                   }))}
                   value={formData.salary_level}
                   onChange={(val) => setFormData({...formData, salary_level: val})}
-                  placeholder="Select Level"
+                  placeholder={t("Select Level")}
                 />
                 <p className="text-[10px] font-bold text-muted px-1">
                   {selectedSalaryLevel
-                    ? `Base Salary Amount: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
-                    : "Select a salary level to view the amount."}
+                    ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
+                    : t("Select a salary level to view the amount")}
                 </p>
               </div>
             </div>
@@ -616,10 +692,10 @@ export default function InsertEmployeePage() {
           <div className="bg-card rounded-3xl border border-border p-6 shadow-sm space-y-6">
             <div className="flex items-center gap-2 px-1">
               <HiPlus className="w-5 h-5 text-primary" />
-              <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Event Rates</h3>
+              <h3 className="text-sm font-black uppercase tracking-widest text-foreground">{t("Event Rates")}</h3>
             </div>
             <p className="text-[10px] text-muted px-1 font-medium leading-relaxed">
-              Define the specific rates for each event type for this employee. These will be used for automated payroll calculations.
+              {t("Rates Description")}
             </p>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -657,7 +733,7 @@ export default function InsertEmployeePage() {
             disabled={createMutation.isPending}
             className="w-full py-4 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {createMutation.isPending ? "Saving..." : "Create Employee Record"}
+            {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
           </button>
         </form>
       </div>

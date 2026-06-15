@@ -46,6 +46,116 @@ import { useAuth } from "@/hooks/useAuth";
 import { fuzzySearch } from "@/lib/fuzzy-search";
 import toast from "react-hot-toast";
 import { findRunForPeriod } from "@/utils/payroll-period";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Salary & Event Disbursement": "Salary & Event Disbursement",
+    "Paginated cards with persistent totals": "Paginated cards with persistent totals",
+    "Print": "Print",
+    "Saving...": "Saving...",
+    "Save Draft": "Save Draft",
+    "Previewing...": "Previewing...",
+    "Preview": "Preview",
+    "Finalizing...": "Finalizing...",
+    "Finalize Run": "Finalize Run",
+    "Saving draft...": "Saving draft...",
+    "Unsaved changes": "Unsaved changes",
+    "Saved": "Saved",
+    "Not saved yet": "Not saved yet",
+    "Summary Report": "Summary Report",
+    "Generate a detailed HTML report for this draft run.": "Generate a detailed HTML report for this draft run.",
+    "Period (Month)": "Period (Month)",
+    "Search & Drafts": "Search & Drafts",
+    "Name, code, department": "Name, code, department",
+    "Load Draft": "Load Draft",
+    "Open Finalized Run": "Open Finalized Run",
+    "Office": "Office",
+    "All offices": "All offices",
+    "Sort: Name": "Sort: Name",
+    "Sort: Dept": "Sort: Dept",
+    "Sort: Pay": "Sort: Pay",
+    "Manage Event Types": "Manage Event Types",
+    "Base Salary": "Base Salary",
+    "Events / Commissions": "Events / Commissions",
+    "No events added for this employee yet.": "No events added for this employee yet.",
+    "Select event": "Select event",
+    "Decrease": "Decrease",
+    "Increase": "Increase",
+    "Remove Event": "Remove Event",
+    "Add Event": "Add Event",
+    "Total Earnings": "Total Earnings",
+    "Base Salary Total": "Base Salary Total",
+    "Commission Total": "Commission Total",
+    "Grand Total Disbursement": "Grand Total Disbursement",
+    "Loading payroll run...": "Loading payroll run...",
+    "Existing draft loaded!": "Existing draft loaded!",
+    "Draft saved": "Draft saved",
+    "Failed to generate preview": "Failed to generate preview",
+    "Failed to save draft": "Failed to save draft",
+    "Failed to finalize payroll run": "Failed to finalize payroll run",
+    "Payroll history is still loading. Please try finalizing again in a moment.": "Payroll history is still loading. Please try finalizing again in a moment.",
+    "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.": "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.",
+    "A finalized payroll run already exists for": "A finalized payroll run already exists for",
+    "Open the existing run instead of creating a duplicate.": "Open the existing run instead of creating a duplicate.",
+    "1st-15th": "1st-15th",
+    "16th-End": "16th-End",
+    "NO LEVEL": "NO LEVEL"
+  },
+  am: {
+    "Salary & Event Disbursement": "የደመወዝ እና ክስተት ክፍያ ማስተላለፊያ",
+    "Paginated cards with persistent totals": "የቀጠሉ ካርዶች ከማይለወጥ አጠቃላይ ድምር ጋር",
+    "Print": "አትም",
+    "Saving...": "በማስቀመጥ ላይ...",
+    "Save Draft": "ረቂቅ አስቀምጥ",
+    "Previewing...": "ቅድመ-ዕይታ በማዘጋጀት ላይ...",
+    "Preview": "ቅድመ-ዕይታ",
+    "Finalizing...": "በማጠናቀቅ ላይ...",
+    "Finalize Run": "ክፍያውን አጠናቅ",
+    "Saving draft...": "ረቂቅ በመቀመጥ ላይ...",
+    "Unsaved changes": "ያልተቀመጡ ለውጦች",
+    "Saved": "ተቀምጧል",
+    "Not saved yet": "እስካሁን አልተቀመጠም",
+    "Summary Report": "አጠቃላይ ሪፖርት",
+    "Generate a detailed HTML report for this draft run.": "ለዚህ የረቂቅ ክፍያ ዝርዝር የኤችቲኤምኤል ሪፖርት ያመንጩ።",
+    "Period (Month)": "የክፍያ ጊዜ (ወር)",
+    "Search & Drafts": "ፈልግ እና ረቂቆች",
+    "Name, code, department": "ስም፣ ኮድ፣ የሥራ ክፍል",
+    "Load Draft": "ረቂቅ ጫን",
+    "Open Finalized Run": "የተጠናቀቀ ክፍያ ክፈት",
+    "Office": "ቢሮ",
+    "All offices": "ሁሉም ቢሮዎች",
+    "Sort: Name": "በስም ደርድር",
+    "Sort: Dept": "በክፍል ደርድር",
+    "Sort: Pay": "በክፍያ ደርድር",
+    "Manage Event Types": "የክስተት ዓይነቶችን ያስተዳድሩ",
+    "Base Salary": "መሠረታዊ ደመወዝ",
+    "Events / Commissions": "ክስተቶች / ኮሚሽኖች",
+    "No events added for this employee yet.": "ለዚህ ሠራተኛ እስካሁን የተጨመረ ክስተት የለም።",
+    "Select event": "ክስተት ይምረጡ",
+    "Decrease": "ቀንስ",
+    "Increase": "ጨምር",
+    "Remove Event": "ክስተት አስወግድ",
+    "Add Event": "ክስተት ጨምር",
+    "Total Earnings": "አጠቃላይ ገቢ",
+    "Base Salary Total": "አጠቃላይ መሠረታዊ ደመወዝ",
+    "Commission Total": "አጠቃላይ ኮሚሽን",
+    "Grand Total Disbursement": "አጠቃላይ የተከፈለ ክፍያ",
+    "Loading payroll run...": "የክፍያ መዝገብ በመጫን ላይ...",
+    "Existing draft loaded!": "ያለው ረቂቅ ተጭኗል!",
+    "Draft saved": "ረቂቅ ተቀምጧል",
+    "Failed to generate preview": "ቅድመ-ዕይታ ማመንጨት አልተቻለም",
+    "Failed to save draft": "ረቂቅ ማስቀመጥ አልተቻለም",
+    "Failed to finalize payroll run": "የክፍያ መዝገብ ማጠናቀቅ አልተቻለም",
+    "Payroll history is still loading. Please try finalizing again in a moment.": "የክፍያ ታሪክ ገና በመጫን ላይ ነው። እባክዎ ከጥቂት ቆይታ በኋላ እንደገና ይሞክሩ።",
+    "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.": "ለዚህ የክፍያ ጊዜ ቀደም ሲል የተጠናቀቀ የክፍያ መዝገብ አለ። እንደገና ከማጠናቀቅዎ በፊት ያለውን መዝገብ ወደ መጣያ ይውሰዱት።",
+    "A finalized payroll run already exists for": "የተጠናቀቀ የክፍያ መዝገብ ቀደም ሲል ለ",
+    "Open the existing run instead of creating a duplicate.": "የተባዛ ከመፍጠር ይልቅ ያለውን መዝገብ ይክፈቱ።",
+    "1st-15th": "ከ1ኛ-15ኛ",
+    "16th-End": "ከ16ኛ-መጨረሻ",
+    "NO LEVEL": "ደረጃ የለውም"
+  }
+};
 
 type EventLine = {
   event_type_id: string;
@@ -112,6 +222,8 @@ function parseMonth(monthValue: string): { month: number; year: number } {
 }
 
 function PaymentRunProcessPageContent() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const searchParams = useSearchParams();
   const router = useRouter();
   const hasAutoLoaded = useRef<string | null>(null);
@@ -229,7 +341,7 @@ function PaymentRunProcessPageContent() {
       setIsDraftDirty(false);
       setLastSavedAt(data.updated_at ?? null);
       setDraftPeriodKey(`${selectedMonth}:${periodType}`);
-      toast.success("Existing draft loaded!");
+      toast.success(t("Existing draft loaded!"));
     }
   });
 
@@ -357,7 +469,7 @@ function PaymentRunProcessPageContent() {
     mutationFn: (payload: PayrollGenerateRequest) =>
       previewPayrollRun(payload as unknown as Record<string, unknown>) as Promise<PreviewResponse>,
     onError: (error: Error) => {
-      setErrorMsg(error.message || "Failed to generate preview");
+      setErrorMsg(error.message || t("Failed to generate preview"));
     },
   });
 
@@ -374,7 +486,7 @@ function PaymentRunProcessPageContent() {
       }
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       if (lastSaveSourceRef.current === "manual") {
-        toast.success("Draft saved");
+        toast.success(t("Draft saved"));
       }
     },
     onError: (error: unknown) => {
@@ -386,11 +498,11 @@ function PaymentRunProcessPageContent() {
       }
 
       if (error instanceof Error) {
-        setErrorMsg(error.message || "Failed to save draft");
+        setErrorMsg(error.message || t("Failed to save draft"));
         return;
       }
 
-      setErrorMsg("Failed to save draft");
+      setErrorMsg(t("Failed to save draft"));
     },
   });
 
@@ -406,7 +518,7 @@ function PaymentRunProcessPageContent() {
       if (status === 409) {
         setErrorMsg(
           message ||
-            "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again."
+            t("A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.")
         );
         return;
       }
@@ -417,11 +529,11 @@ function PaymentRunProcessPageContent() {
       }
 
       if (error instanceof Error) {
-        setErrorMsg(error.message || "Failed to finalize payroll run");
+        setErrorMsg(error.message || t("Failed to finalize payroll run"));
         return;
       }
 
-      setErrorMsg("Failed to finalize payroll run");
+      setErrorMsg(t("Failed to finalize payroll run"));
     },
   });
 

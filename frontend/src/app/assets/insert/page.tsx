@@ -9,12 +9,68 @@ import AuthLayout from "@/components/AuthLayout";
 import toast from "react-hot-toast";
 import { HiCamera, HiXMark, HiPhoto, HiChevronLeft } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Record Stock Entry": "Record Stock Entry",
+    "New Inventory Item": "New Inventory Item",
+    "Photo": "Photo",
+    "Tap to take a photo": "Tap to take a photo",
+    "or choose from gallery - JPEG/PNG - Max 10MB": "or choose from gallery - JPEG/PNG - Max 10MB",
+    "Item Name": "Item Name",
+    "Select Office Location": "Select Office Location",
+    "Quantity": "Quantity",
+    "Description": "Description",
+    "optional": "(optional)",
+    "Confirm Entry": "Confirm Entry",
+    "Reset": "Reset",
+    "Saving...": "Saving...",
+    "Processing & Syncing...": "Processing & Syncing...",
+    "e.g. Printer Ink Cartridge": "e.g. Printer Ink Cartridge",
+    "Add a brief description...": "Add a brief description...",
+    "Item created successfully!": "Item created successfully!",
+    "Failed to create item": "Failed to create item",
+    "Only JPEG and PNG images are allowed": "Only JPEG and PNG images are allowed",
+    "Image must be under 10MB": "Image must be under 10MB",
+    "Image is required": "Image is required",
+    "Asset name is required": "Asset name is required",
+    "Please select an office": "Please select an office",
+  },
+  am: {
+    "Record Stock Entry": "የክምችት መግቢያ መዝግብ",
+    "New Inventory Item": "አዲስ የንብረት ማስገቢያ ፎርም",
+    "Photo": "ፎቶ",
+    "Tap to take a photo": "ፎቶ ለማንሳት ይህንን ይጫኑ",
+    "or choose from gallery - JPEG/PNG - Max 10MB": "ወይም ከማዕከለ-ስዕላት ይምረጡ - JPEG/PNG - ከፍተኛ 10MB",
+    "Item Name": "የንብረት ስም",
+    "Select Office Location": "የቢሮ ቦታ ይምረጡ",
+    "Quantity": "ብዛት",
+    "Description": "መግለጫ",
+    "optional": "(ከተፈለገ)",
+    "Confirm Entry": "መግቢያውን አረጋግጥ",
+    "Reset": "እንደገና አስጀምር",
+    "Saving...": "በማስቀመጥ ላይ...",
+    "Processing & Syncing...": "በማቀነባበር እና በማመሳሰል ላይ...",
+    "e.g. Printer Ink Cartridge": "ምሳሌ፡ የፕሪንተር ቀለም ካርቶን",
+    "Add a brief description...": "አጭር መግለጫ ያክሉ...",
+    "Item created successfully!": "እቃው በተሳካ ሁኔታ ተመዝግቧል!",
+    "Failed to create item": "እቃውን መመዝገብ አልተቻለም",
+    "Only JPEG and PNG images are allowed": "JPEG እና PNG ምስሎች ብቻ ይፈቀዳሉ",
+    "Image must be under 10MB": "የምስሉ መጠን ከ 10MB በታች መሆን አለበት",
+    "Image is required": "ምስል ያስፈልጋል",
+    "Asset name is required": "የንብረት ስም ያስፈልጋል",
+    "Please select an office": "እባክዎን ቢሮ ይምረጡ",
+  }
+};
 
 export default function InsertAssetPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -31,12 +87,12 @@ export default function InsertAssetPage() {
   const createMutation = useMutation({
     mutationFn: (formData: FormData) => createItem(formData),
     onSuccess: () => {
-      toast.success("Item created successfully!");
+      toast.success(t("Item created successfully!"));
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       resetForm();
     },
     onError: () => {
-      toast.error("Failed to create item");
+      toast.error(t("Failed to create item"));
     },
   });
 
@@ -55,12 +111,12 @@ export default function InsertAssetPage() {
       if (!file) return;
 
       if (!["image/jpeg", "image/png"].includes(file.type)) {
-        toast.error("Only JPEG and PNG images are allowed");
+        toast.error(t("Only JPEG and PNG images are allowed"));
         return;
       }
 
       if (file.size > 10 * 1024 * 1024) {
-        toast.error("Image must be under 10MB");
+        toast.error(t("Image must be under 10MB"));
         return;
       }
 
@@ -75,22 +131,22 @@ export default function InsertAssetPage() {
       };
       reader.readAsDataURL(file);
     },
-    [],
+    [t],
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!imageFile) {
-      toast.error("Image is required");
+      toast.error(t("Image is required"));
       return;
     }
     if (!name.trim()) {
-      toast.error("Asset name is required");
+      toast.error(t("Asset name is required"));
       return;
     }
     if (!officeId) {
-      toast.error("Please select an office");
+      toast.error(t("Please select an office"));
       return;
     }
 
@@ -118,15 +174,15 @@ export default function InsertAssetPage() {
             <HiChevronLeft className="w-5 h-5 text-foreground" />
           </button>
           <div>
-            <h1 className="text-3xl font-black text-foreground tracking-tight">Record Stock Entry</h1>
-            <p className="text-sm text-muted font-black uppercase tracking-widest mt-1">New Inventory Item</p>
+            <h1 className="text-3xl font-black text-foreground tracking-tight">{t("Record Stock Entry")}</h1>
+            <p className="text-sm text-muted font-black uppercase tracking-widest mt-1">{t("New Inventory Item")}</p>
           </div>
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Photo <span className="text-danger">*</span>
+              {t("Photo")} <span className="text-danger">*</span>
             </label>
             {imagePreview ? (
               <div className="relative w-full aspect-4/3 rounded-2xl overflow-hidden border-2 border-primary/20 bg-card">
@@ -158,7 +214,7 @@ export default function InsertAssetPage() {
                         <span className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
                       </motion.div>
                       <p className="text-white font-black text-[10px] uppercase tracking-[0.2em] drop-shadow-md">
-                        Processing & Syncing...
+                        {t("Processing & Syncing...")}
                       </p>
                       <div className="mt-4 w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
                         <motion.div 
@@ -193,9 +249,9 @@ export default function InsertAssetPage() {
                   <HiCamera className="w-7 h-7 text-primary" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">Tap to take a photo</p>
+                  <p className="text-sm font-medium text-foreground">{t("Tap to take a photo")}</p>
                   <p className="text-xs text-muted mt-0.5">
-                    or choose from gallery - JPEG/PNG - Max 10MB
+                    {t("or choose from gallery - JPEG/PNG - Max 10MB")}
                   </p>
                 </div>
               </button>
@@ -212,21 +268,21 @@ export default function InsertAssetPage() {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Item Name <span className="text-danger">*</span>
+              {t("Item Name")} <span className="text-danger">*</span>
             </label>
             <input
               ref={nameInputRef}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Printer Ink Cartridge"
+              placeholder={t("e.g. Printer Ink Cartridge")}
               className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
             />
           </div>
 
           <div>
             <label className="block text-[10px] uppercase font-black text-muted tracking-widest mb-3 px-1">
-              Select Office Location <span className="text-danger">*</span>
+              {t("Select Office Location")} <span className="text-danger">*</span>
             </label>
             <div className="flex flex-wrap gap-2">
               {offices.map((office) => (
@@ -248,7 +304,7 @@ export default function InsertAssetPage() {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Quantity <span className="text-danger">*</span>
+              {t("Quantity")} <span className="text-danger">*</span>
             </label>
             <div className="flex items-center gap-3">
               <button
@@ -279,12 +335,12 @@ export default function InsertAssetPage() {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Description <span className="text-muted font-normal">(optional)</span>
+              {t("Description")} <span className="text-muted font-normal">{t("optional")}</span>
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add a brief description..."
+              placeholder={t("Add a brief description...")}
               rows={3}
               className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
             />
@@ -299,12 +355,12 @@ export default function InsertAssetPage() {
               {createMutation.isPending ? (
                 <>
                   <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving...
+                  {t("Saving...")}
                 </>
               ) : (
                 <>
                   <HiPhoto className="w-5 h-5" />
-                  Confirm Entry
+                  {t("Confirm Entry")}
                 </>
               )}
             </button>
@@ -313,7 +369,7 @@ export default function InsertAssetPage() {
                onClick={resetForm}
                className="flex-1 py-5 rounded-3xl bg-card-alt text-foreground font-black uppercase tracking-widest hover:bg-border transition-all text-xs"
              >
-               Reset
+               {t("Reset")}
              </button>
           </div>
         </form>
