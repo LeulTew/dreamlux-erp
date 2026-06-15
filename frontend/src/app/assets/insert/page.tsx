@@ -350,7 +350,7 @@ export default function InsertAssetPage() {
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="flex-3 py-5 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-widest shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-3"
+              className="flex-[3] py-5 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-widest shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-3"
             >
               {createMutation.isPending ? (
                 <>
@@ -365,12 +365,12 @@ export default function InsertAssetPage() {
               )}
             </button>
             <button
-               type="button"
-               onClick={resetForm}
-               className="flex-1 py-5 rounded-3xl bg-card-alt text-foreground font-black uppercase tracking-widest hover:bg-border transition-all text-xs"
-             >
-               {t("Reset")}
-             </button>
+              type="button"
+              onClick={resetForm}
+              className="flex-[1] py-5 rounded-3xl bg-card-alt text-foreground font-black uppercase tracking-widest hover:bg-border transition-all text-xs"
+            >
+              {t("Reset")}
+            </button>
           </div>
         </form>
       </div>
