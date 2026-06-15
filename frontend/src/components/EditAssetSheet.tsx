@@ -272,8 +272,8 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                 className="hidden"
               />
 
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+              <div className="space-y-1.5">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Reference Name
                 </label>
                 <input
@@ -281,19 +281,19 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Asset Name"
-                  className="w-full px-5 py-3 rounded-xl border border-border bg-card-alt text-foreground font-black focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                  className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+              <div className="space-y-1.5">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Adjust Stock Count
                 </label>
                 <div className="flex items-center gap-2 md:gap-3">
                   <button
                     type="button"
                     onClick={() => setQuantity(String(Math.max(0, parseInt(quantity) - 1)))}
-                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary hover:text-background transition-all active:scale-95"
+                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-semibold hover:bg-primary hover:text-background transition-all active:scale-95"
                   >
                     −
                   </button>
@@ -302,20 +302,20 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     min="0"
-                    className="flex-1 min-w-0 text-center px-2 py-2.5 rounded-xl border border-border bg-card-alt text-foreground font-black text-lg focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                    className="flex-1 min-w-0 text-center h-11 px-2 rounded-xl border border-border bg-card-alt text-foreground font-semibold text-base focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setQuantity(String(parseInt(quantity || "0") + 1))}
-                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary hover:text-background transition-all active:scale-95"
+                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-semibold hover:bg-primary hover:text-background transition-all active:scale-95"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+              <div className="space-y-1.5">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Assigned Location
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -324,9 +324,9 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                       key={office.id}
                       type="button"
                       onClick={() => setOfficeId(office.id)}
-                      className={`px-3 py-2 rounded-xl text-[9px] md:text-[10px] font-black tracking-widest uppercase transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold tracking-wider uppercase transition-all ${
                         officeId === office.id
-                          ? "bg-primary text-background shadow-premium"
+                          ? "bg-primary text-background shadow-sm"
                           : "bg-card-alt text-muted border border-border hover:border-primary/30"
                       }`}
                     >
@@ -336,8 +336,8 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+              <div className="space-y-1.5">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Internal Notes
                 </label>
                 <textarea
@@ -345,7 +345,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
                   placeholder="Categorize or add condition notes..."
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-card-alt text-foreground font-medium focus:ring-2 focus:ring-primary/20 transition-all resize-none outline-none leading-relaxed text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-card-alt text-foreground font-medium focus:ring-2 focus:ring-primary/20 transition-all resize-none outline-none leading-relaxed text-sm"
                 />
               </div>
 
@@ -354,7 +354,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   <button
                     type="submit"
                     disabled={updateMutation.isPending}
-                    className="flex-4 py-3.5 rounded-xl bg-primary text-background font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
+                    className="flex-4 h-11 rounded-xl bg-primary text-background font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
                   >
                     {updateMutation.isPending ? "Syncing..." : "Update Asset"}
                   </button>
@@ -362,10 +362,10 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     type="button"
                     onClick={handleDelete}
                     disabled={deleteMutation.isPending}
-                    className="flex-1 h-12 rounded-xl bg-red-50 text-danger flex items-center justify-center hover:bg-danger hover:text-background transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                    className="flex-1 h-11 rounded-xl bg-red-50 text-danger flex items-center justify-center hover:bg-danger hover:text-background transition-all active:scale-95 disabled:opacity-50"
                     aria-label="Delete asset"
                   >
-                    <HiTrash className="w-5 h-5" />
+                    <HiTrash className="w-4.5 h-4.5" />
                   </button>
                 </div>
                 
@@ -373,9 +373,9 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   type="button"
                   onClick={handleReconcile}
                   disabled={reconcileMutation.isPending || updateMutation.isPending}
-                  className="w-full py-3.5 rounded-xl bg-card border border-border text-foreground font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full h-11 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <HiCheckCircle className="w-4 h-4 text-primary" />
+                  <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
                   {reconcileMutation.isPending ? "Applying Audit..." : "Mark as Physically Verified"}
                 </button>
               </div>

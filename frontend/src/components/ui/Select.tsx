@@ -38,7 +38,7 @@ export default function Select({ options, value, onChange, placeholder = "Select
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-card-alt border border-border/50 text-sm font-bold text-foreground hover:bg-border/30 transition-all outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+        className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-card-alt border border-border/50 text-sm font-semibold text-foreground hover:bg-border/30 transition-all outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
       >
         <span className={selectedOption ? "text-foreground" : "text-muted"}>
           {selectedOption ? selectedOption.label : placeholder}
@@ -53,7 +53,7 @@ export default function Select({ options, value, onChange, placeholder = "Select
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute z-[100] w-full mt-2 bg-card border border-border shadow-2xl rounded-2xl overflow-hidden py-1.5"
+            className="absolute z-[100] w-full mt-2 bg-card border border-border shadow-2xl rounded-xl overflow-hidden py-1.5"
           >
             <div className="max-h-60 overflow-y-auto custom-scrollbar">
               {options.length === 0 ? (

@@ -169,7 +169,7 @@ function buildColumns(
                   value={currentCount}
                   min={0}
                   onChange={(e) => setReconcileCount(row.original.id, parseInt(e.target.value) || 0)}
-                  className="w-16 px-1 py-1.5 rounded-lg border-2 border-accent bg-accent/5 text-foreground text-center font-black focus:outline-none focus:ring-4 focus:ring-accent/10 transition-all text-sm appearance-none"
+                  className="w-16 px-1 py-1.5 rounded-lg border-2 border-accent bg-accent/5 text-foreground text-center font-semibold focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all text-sm appearance-none"
                 />
                 <button
                   onClick={() => setReconcileCount(row.original.id, currentCount + 1)}
@@ -179,7 +179,7 @@ function buildColumns(
                 </button>
               </div>
               {diff !== 0 && (
-                <span className={`text-[10px] font-black uppercase ${diff > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
+                <span className={`text-[10px] font-semibold uppercase ${diff > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
                   {diff > 0 ? `+${diff}` : diff} Delta
                 </span>
               )}
@@ -235,7 +235,7 @@ function buildColumns(
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
           {!canManageAssets ? (
-            <span className="text-[10px] font-black text-muted/40 uppercase tracking-widest px-2">View Only</span>
+            <span className="text-[10px] font-semibold text-muted/50 uppercase tracking-wider px-2">View Only</span>
           ) : (
             <div className="flex items-center gap-1">
               <button
@@ -652,11 +652,11 @@ function AssetsContent() {
     <div className="pt-4 md:py-8">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-primary rounded-2xl text-background shadow-premium">
-            <HiTableCells className="w-7 h-7" />
+          <div className="p-2.5 bg-primary rounded-xl text-background shadow-sm">
+            <HiTableCells className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-foreground tracking-tight">Inventory</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Inventory</h1>
             <p className="text-sm text-muted font-medium">{total} Assets Total</p>
           </div>
         </div>
@@ -664,10 +664,10 @@ function AssetsContent() {
             <>
               <button
                 onClick={() => router.push("/assets/insert")}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-2xl text-sm font-black bg-primary text-background shadow-premium hover:opacity-90 active:scale-[0.98] transition-all"
+                className="flex items-center gap-1.5 h-11 px-5 rounded-xl text-sm font-semibold bg-primary text-background shadow-sm hover:opacity-90 active:scale-[0.98] transition-all"
               >
-                <HiPlus className="w-5 h-5" />
-                ADD ITEM
+                <HiPlus className="w-4.5 h-4.5" />
+                Add Item
               </button>
               <div className="w-px h-6 bg-border hidden sm:block mx-1" />
             </>
@@ -675,25 +675,25 @@ function AssetsContent() {
         <div className="flex flex-wrap items-center gap-2">
             <button
                onClick={handleExportPDF}
-               className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-black bg-card text-foreground shadow-premium hover:bg-card-alt transition-all disabled:opacity-50"
+               className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
              >
-               <HiDocumentText className="w-4 h-4 text-danger" />
+               <HiDocumentText className="w-4.5 h-4.5 text-danger" />
                PDF
              </button>
              <button
                onClick={handleExportExcel}
                disabled={exportingXlsx}
-               className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-black bg-card text-foreground shadow-premium hover:bg-card-alt transition-all disabled:opacity-50"
+               className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
              >
-               <HiTableCells className="w-4 h-4 text-success" />
+               <HiTableCells className="w-4.5 h-4.5 text-success" />
                XLSX
              </button>
              <button
                onClick={handleExportCSV}
                disabled={exportingCSV}
-               className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-black bg-card text-foreground shadow-premium hover:bg-card-alt transition-all disabled:opacity-50"
+               className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
              >
-               <HiDocumentArrowDown className="w-4 h-4 text-accent" />
+               <HiDocumentArrowDown className="w-4.5 h-4.5 text-accent" />
                CSV
              </button>
  
@@ -782,10 +782,10 @@ function AssetsContent() {
       )}
 
       {reconcileMode && (
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-accent shadow-premium rounded-2xl p-4 text-white">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-accent shadow-md rounded-xl p-4 text-white">
           <div className="flex items-center gap-2">
             <HiCheckCircle className="w-5 h-5" />
-            <span className="text-sm font-black">
+            <span className="text-sm font-semibold">
               TRACKED COUNT MODE: Update physical quantities with audit trail
             </span>
           </div>
@@ -795,14 +795,14 @@ function AssetsContent() {
                 setReconcileMode(false);
                 setReconcileCounts(new Map());
               }}
-              className="px-4 py-2 rounded-xl text-sm font-black bg-white/20 hover:bg-white/30 transition-all"
+              className="h-10 px-4 rounded-xl text-sm font-semibold bg-white/10 hover:bg-white/20 transition-all"
             >
               Cancel
             </button>
             <button
               onClick={handleApplyReconciliation}
               disabled={reconcileMutation.isPending}
-              className="px-6 py-2 rounded-xl text-sm font-black bg-white text-accent hover:bg-white/90 disabled:opacity-50 transition-all shadow-lg"
+              className="h-10 px-5 rounded-xl text-sm font-semibold bg-white text-accent hover:bg-white/90 disabled:opacity-50 transition-all shadow-sm"
             >
               {reconcileMutation.isPending ? "Applying..." : "Apply All Counts"}
             </button>
@@ -818,19 +818,19 @@ function AssetsContent() {
         onChange={(s: string) => { setOfficeFilter(s); setPage(1); }}
       />
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-3xl p-4 shadow-sm">
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl p-4 shadow-sm">
         <div className="lg:col-span-3">
-          <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Filter Method</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">Filter Method</label>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => {
                 setStockFilter("all");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
                 stockFilter === "all"
-                  ? "bg-primary text-on-primary shadow-premium"
-                  : "bg-card-alt text-foreground border border-border"
+                  ? "bg-primary text-on-primary shadow-sm"
+                  : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
               All Items
@@ -840,10 +840,10 @@ function AssetsContent() {
                 setStockFilter("low-stock");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
                 stockFilter === "low-stock"
-                  ? "bg-danger text-white shadow-premium"
-                  : "bg-card-alt text-foreground border border-border"
+                  ? "bg-danger text-white shadow-sm"
+                  : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
               Low Stock
@@ -854,7 +854,7 @@ function AssetsContent() {
                 setSelectedIds(new Set());
                 router.push("/assets/trash");
               }}
-              className="px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all bg-card-alt text-foreground border border-border"
+              className="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all bg-card-alt text-foreground border border-border hover:bg-border/50"
             >
               Trash
             </button>
@@ -862,18 +862,18 @@ function AssetsContent() {
         </div>
 
         <div className="lg:col-span-3">
-          <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Search</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">Search</label>
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search by item, description, or office..."
-            className="w-full px-4 py-2.5 rounded-2xl border border-border bg-card-alt text-foreground text-sm font-semibold placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
 
         <div className="lg:col-span-2">
-          <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">From</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">From</label>
           <input
             type="datetime-local"
             value={fromDateTime}
@@ -881,12 +881,12 @@ function AssetsContent() {
               setFromDateTime(e.target.value);
               setPage(1);
             }}
-            className="w-full px-3 py-2.5 rounded-2xl border border-border bg-card-alt text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
 
         <div className="lg:col-span-2">
-          <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">To</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">To</label>
           <input
             type="datetime-local"
             value={toDateTime}
@@ -894,7 +894,7 @@ function AssetsContent() {
               setToDateTime(e.target.value);
               setPage(1);
             }}
-            className="w-full px-3 py-2.5 rounded-2xl border border-border bg-card-alt text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
 
@@ -911,7 +911,7 @@ function AssetsContent() {
               setAdvancedFilters([]);
               setPage(1);
             }}
-            className="w-full px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card-alt text-foreground border border-border hover:bg-border transition-all"
+            className="w-full h-11 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider bg-card-alt text-foreground border border-border hover:bg-border transition-all"
           >
             Clear Filters
           </button>
@@ -934,7 +934,7 @@ function AssetsContent() {
       <div className="mt-8 overflow-hidden glass-card rounded-4xl hidden md:block">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-card-alt/30 border-b border-border/50 text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+            <tr className="bg-card-alt/30 border-b border-border/50 text-[10px] uppercase tracking-wider text-muted-foreground/85 font-semibold">
               {table.getHeaderGroups()[0].headers.map((header) => (
                 <th key={header.id} className="px-6 py-5" style={{ width: header.getSize() }}>
                   {flexRender(header.column.columnDef.header, header.getContext())}

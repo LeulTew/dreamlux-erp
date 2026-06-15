@@ -61,10 +61,10 @@ export default function DeleteConfirmModal({
               </div>
 
               <div>
-                <h3 className="text-xl font-black text-foreground tracking-tight">{title}</h3>
-                <p className="mt-2 text-sm text-muted leading-relaxed font-bold">
+                <h3 className="text-xl font-bold text-foreground tracking-tight">{title}</h3>
+                <p className="mt-2 text-sm text-muted leading-relaxed font-medium">
                   {message} <br/>
-                  <span className="text-foreground font-black italic">&quot;{itemName}&quot;</span>
+                  <span className="text-foreground font-semibold">&quot;{itemName}&quot;</span>
                 </p>
               </div>
 
@@ -72,14 +72,14 @@ export default function DeleteConfirmModal({
                 <button
                   onClick={onConfirm}
                   disabled={isDeleting}
-                  className={`w-full py-4 text-white rounded-xl font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
+                  className={`w-full h-11 text-white rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
                 >
                   {isDeleting ? (isDanger ? "Deleting..." : "Restoring...") : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
                 </button>
                 <button
                   onClick={onClose}
                   disabled={isDeleting}
-                  className="w-full py-4 bg-card-alt text-foreground border border-border rounded-xl font-black uppercase tracking-[0.2em] shadow-sm hover:bg-border active:scale-95 transition-all disabled:opacity-50"
+                  className="w-full h-11 bg-card-alt text-foreground border border-border rounded-xl font-semibold text-sm hover:bg-border active:scale-[0.98] transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>

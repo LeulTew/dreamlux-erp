@@ -50,17 +50,17 @@ export default function PrintOptionsModal({
                 >
                   <HiXMark className="w-6 h-6" />
                 </button>
-                <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center mb-6">
+                <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                   <HiPrinter className="w-8 h-8 text-primary" />
                 </div>
-                <h2 className="text-2xl font-black text-foreground mb-2">{title}</h2>
+                <h2 className="text-xl font-bold text-foreground mb-2">{title}</h2>
                 <p className="text-muted-foreground font-medium text-sm">{description}</p>
               </div>
 
               <div className="p-8 flex flex-col gap-6">
-                <label className="flex items-center justify-between cursor-pointer p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors group">
+                <label className="flex items-center justify-between cursor-pointer p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors group">
                   <div className="flex flex-col gap-1">
-                    <span className="font-bold text-foreground text-sm">Include Images</span>
+                    <span className="font-semibold text-foreground text-sm">Include Images</span>
                     <span className="text-xs font-medium text-muted-foreground text-balance">Show item thumbnails in the document</span>
                   </div>
                   <div className={`w-14 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${includeImages ? "bg-primary" : "bg-muted"}`}>
@@ -75,9 +75,9 @@ export default function PrintOptionsModal({
                 </label>
 
                 {showIncludeEvents && (
-                  <label className="flex items-center justify-between cursor-pointer p-4 rounded-2xl border border-border hover:bg-muted/50 transition-colors group">
+                  <label className="flex items-center justify-between cursor-pointer p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors group">
                     <div className="flex flex-col gap-1">
-                      <span className="font-bold text-foreground text-sm">Include Event Prices</span>
+                      <span className="font-semibold text-foreground text-sm">Include Event Prices</span>
                       <span className="text-xs font-medium text-muted-foreground text-balance">Print each employee&apos;s configured event pricing on the card</span>
                     </div>
                     <div className={`w-14 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${includeEvents ? "bg-primary" : "bg-muted"}`}>
@@ -96,7 +96,7 @@ export default function PrintOptionsModal({
               <div className="p-6 bg-card-alt border-t border-border/50 flex justify-end gap-3 px-8">
                 <button
                   onClick={onClose}
-                  className="px-6 py-3 rounded-2xl font-bold text-sm bg-card border border-border text-foreground hover:bg-muted transition-all active:scale-95"
+                  className="h-11 px-5 rounded-xl font-semibold text-sm bg-card border border-border text-foreground hover:bg-muted transition-all active:scale-[0.98]"
                 >
                   Cancel
                 </button>
@@ -105,7 +105,7 @@ export default function PrintOptionsModal({
                     onPrint({ includeImages, includeEvents });
                     onClose();
                   }}
-                  className="px-8 py-3 rounded-2xl font-black text-sm bg-primary text-on-primary shadow-premium hover:opacity-90 active:scale-95 transition-all flex items-center gap-2 group"
+                  className="h-11 px-6 rounded-xl font-semibold text-sm bg-primary text-on-primary shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 group"
                 >
                   <HiPrinter className="w-5 h-5 opacity-90 group-hover:opacity-100" />
                   <span>Generate PDF</span>

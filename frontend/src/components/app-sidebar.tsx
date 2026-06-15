@@ -360,7 +360,7 @@ export function AppSidebar() {
         {isCollapsed ? (
           <button
             onClick={toggleSidebar}
-            className="w-10 h-10 rounded-2xl bg-foreground flex items-center justify-center text-background font-black text-lg shrink-0 hover:opacity-90 transition-all cursor-pointer active:scale-95 shadow-md border border-border/10"
+            className="w-10 h-10 rounded-xl bg-foreground flex items-center justify-center text-background font-bold text-lg shrink-0 hover:opacity-90 transition-all cursor-pointer active:scale-95 shadow-md border border-border/10"
             title="Expand Sidebar"
           >
             D
@@ -370,13 +370,13 @@ export function AppSidebar() {
             <div className="flex items-center gap-3 truncate">
               <button
                 onClick={toggleSidebar}
-                className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center text-background font-black text-base shrink-0 hover:opacity-90 transition-all cursor-pointer active:scale-95 shadow-md border border-border/10"
+                className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center text-background font-bold text-base shrink-0 hover:opacity-90 transition-all cursor-pointer active:scale-95 shadow-md border border-border/10"
                 title="Collapse Sidebar"
               >
                 D
               </button>
               <div className="flex flex-col truncate">
-                <span className="font-black tracking-tight text-foreground text-sm leading-tight">
+                <span className="font-bold tracking-tight text-foreground text-sm leading-tight">
                   Dream Lux
                 </span>
                 <span className="text-[9px] text-muted font-medium tracking-widest uppercase leading-none mt-0.5">
@@ -706,7 +706,7 @@ export function AppSidebar() {
             imageUrl={currentUser.profile_image_url}
             sizeClassName="w-9 h-9"
             className="shadow-none border border-border shrink-0"
-            textClassName="text-[10px] font-black text-muted"
+            textClassName="text-[10px] font-semibold text-muted-foreground"
           />
           <div className="flex flex-col truncate text-left group-data-[collapsible=icon]:hidden animate-fade-in">
             <span className="font-semibold text-foreground text-xs leading-tight">

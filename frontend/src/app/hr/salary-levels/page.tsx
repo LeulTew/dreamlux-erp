@@ -92,22 +92,22 @@ export default function SalaryLevelsPage() {
           
           <form onSubmit={handleSubmit} className="relative z-10 flex gap-6 items-end flex-wrap">
             <div className="flex-1 min-w-50">
-              <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">Level Identity</label>
+              <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">Level Name</label>
               <input 
                 type="text" required value={form.level_name} 
                 onChange={e => setForm({...form, level_name: e.target.value})} 
-                className="w-full px-5 py-3.5 bg-card-alt border border-border/80 rounded-2xl text-sm font-black uppercase placeholder:text-muted-foreground/40 outline-none focus:ring-4 focus:ring-primary/10 transition-all focus:border-primary/50 text-foreground" 
+                className="w-full h-11 px-4 bg-card-alt border border-border/80 rounded-xl font-mono text-sm font-semibold uppercase placeholder:text-muted-foreground/30 outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground" 
                 placeholder="e.g. L1" 
               />
             </div>
             <div className="flex-1 min-w-50">
-              <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">Base Rate (ETB)</label>
+              <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">Base Rate (ETB)</label>
               <div className="relative">
-                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-xs font-black text-muted-foreground">ETB</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">ETB</span>
                 <input 
                   type="number" min="0" required value={form.base_salary} 
                   onChange={e => setForm({...form, base_salary: e.target.value})} 
-                  className="w-full pl-14 pr-5 py-3.5 bg-card-alt border border-border/80 rounded-2xl font-mono text-sm font-black outline-none focus:ring-4 focus:ring-primary/10 transition-all focus:border-primary/50 text-foreground" 
+                  className="w-full pl-12 pr-4 h-11 bg-card-alt border border-border/80 rounded-xl font-mono text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground" 
                   placeholder="5000" 
                 />
               </div>
@@ -116,17 +116,20 @@ export default function SalaryLevelsPage() {
               <button
                 type="submit"
                 disabled={createMut.isPending || updateMut.isPending}
-                className={`transition-all disabled:opacity-50 flex justify-center items-center shadow-lg active:scale-95 ${
-                  form.id
-                    ? "px-8 py-3.5 h-12 rounded-3xl bg-primary text-on-primary text-xs font-black uppercase tracking-[0.2em] hover:bg-primary-dark shadow-primary/20"
-                    : "w-12 h-12 rounded-2xl bg-primary text-on-primary hover:bg-primary-dark shadow-primary/20"
-                }`}
+                className="h-11 px-5 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:bg-primary-dark transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
               >
-                {form.id ? "UPDATE SETTINGS" : <HiPlus className="w-6 h-6" />}
+                {form.id ? (
+                  <span>Update Level</span>
+                ) : (
+                  <>
+                    <HiPlus className="w-4 h-4" />
+                    <span>Add Level</span>
+                  </>
+                )}
               </button>
               {form.id && (
-                <button type="button" onClick={() => setForm({ level_name: "", base_salary: "" })} className="px-6 h-12 bg-muted/50 text-foreground font-black text-[10px] uppercase tracking-widest rounded-3xl hover:bg-muted transition-all active:scale-95 border border-border/50">
-                  CANCEL
+                <button type="button" onClick={() => setForm({ level_name: "", base_salary: "" })} className="px-4 h-11 bg-muted/50 text-foreground font-semibold text-sm rounded-xl hover:bg-muted transition-all active:scale-95 border border-border/50">
+                  Cancel
                 </button>
               )}
             </div>
