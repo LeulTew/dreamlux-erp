@@ -6,9 +6,43 @@ import { useSearchParams } from "next/navigation";
 import { getItems, getStores } from "@/lib/api";
 import { Item, Store } from "@/lib/types";
 import { HiArrowLeft } from "react-icons/hi2";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "No Image": "No Image",
+    "Quantity": "Quantity",
+    "Units": "Units",
+    "Office": "Office",
+    "Index Loading...": "Index Loading...",
+    "Organization Record": "Organization Record",
+    "Office Record": "Office Record",
+    "Back": "Back",
+    "Asset Assignment Report": "Asset Assignment Report",
+    "Total Assets Indexed": "Total Assets Indexed",
+    "Asset": "Asset",
+    "Information": "Information"
+  },
+  am: {
+    "No Image": "ምስል የለም",
+    "Quantity": "ብዛት",
+    "Units": "ዩኒቶች",
+    "Office": "ቢሮ",
+    "Index Loading...": "ሪፖርት በመጫን ላይ...",
+    "Organization Record": "የድርጅት መዝገብ",
+    "Office Record": "የቢሮ መዝገብ",
+    "Back": "ተመለስ",
+    "Asset Assignment Report": "የንብረት ምደባ ሪፖርት",
+    "Total Assets Indexed": "አጠቃላይ የተመዘገቡ ንብረቶች",
+    "Asset": "ንብረት",
+    "Information": "መረጃ"
+  }
+};
 
 // Sub-component for each row to handle aspect ratio detection
 function ReportRow({ item, storeFilter, includeImages }: { item: Item; storeFilter: string; includeImages: boolean }) {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const [isLandscape, setIsLandscape] = useState(false);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -35,7 +69,7 @@ function ReportRow({ item, storeFilter, includeImages }: { item: Item; storeFilt
                 />
               ) : (
                 <span className="text-[8px] font-bold text-gray-300 uppercase">
-                  No Image
+                  {t("No Image")}
                 </span>
               )}
             </div>
@@ -46,16 +80,16 @@ function ReportRow({ item, storeFilter, includeImages }: { item: Item; storeFilt
               <div className="flex items-center gap-6">
                 <div className="flex flex-col">
                   <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                    Quantity
+                    {t("Quantity")}
                   </span>
                   <span className="text-xs font-black text-black mt-1">
-                    {item.quantity} Units
+                    {item.quantity} {t("Units")}
                   </span>
                 </div>
                 {storeFilter === "all" && item.store?.name && (
                   <div className="flex flex-col border-l border-gray-100 pl-6">
                     <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                      Office
+                      {t("Office")}
                     </span>
                     <span className="text-[10px] font-bold text-black mt-1 uppercase">
                       {item.store.name}
@@ -86,7 +120,7 @@ function ReportRow({ item, storeFilter, includeImages }: { item: Item; storeFilt
               />
             ) : (
               <span className="text-[8px] font-bold text-gray-300 uppercase p-2 text-center leading-tight">
-                No Image
+                {t("No Image")}
               </span>
             )}
           </div>
@@ -99,16 +133,16 @@ function ReportRow({ item, storeFilter, includeImages }: { item: Item; storeFilt
         <div className="flex flex-col gap-3">
           <div className="flex flex-col">
             <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-              Quantity
+              {t("Quantity")}
             </span>
             <span className="text-xs font-black text-black mt-1 font-mono">
-              {item.quantity} Units
+              {item.quantity} {t("Units")}
             </span>
           </div>
           {storeFilter === "all" && item.store?.name && (
             <div className="flex flex-col pt-1 border-t border-gray-50">
               <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                Office
+                {t("Office")}
               </span>
               <span className="text-[9px] font-bold text-black mt-1 uppercase tracking-tight">
                 {item.store.name}
@@ -122,6 +156,8 @@ function ReportRow({ item, storeFilter, includeImages }: { item: Item; storeFilt
 }
 
 function ReportContent() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const searchParams = useSearchParams();
   const storeFilter = searchParams.get("store") || "all";
   const includeImages = searchParams.get("images") !== "false";
@@ -160,15 +196,15 @@ function ReportContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white text-black font-mono uppercase tracking-widest text-[10px]">
-        Index Loading...
+        {t("Index Loading...")}
       </div>
     );
   }
 
   const selectedStoreName =
     storeFilter === "all"
-      ? "Organization Record"
-      : stores.find((s) => s.id === storeFilter)?.name || "Office Record";
+      ? t("Organization Record")
+      : stores.find((s) => s.id === storeFilter)?.name || t("Office Record");
 
   const splitItems = [
     items.slice(0, Math.ceil(items.length / 2)),
@@ -183,7 +219,7 @@ function ReportContent() {
           className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-gray-300 text-sm font-semibold uppercase tracking-wider"
         >
           <HiArrowLeft className="w-4 h-4" />
-          Back
+          {t("Back")}
         </Link>
       </div>
 
@@ -191,11 +227,11 @@ function ReportContent() {
       <div className="flex justify-between items-start mb-10 border-b-4 border-black pb-8">
         <div>
           <h1 className="text-4xl font-black tracking-tighter text-black uppercase leading-none">
-            Asset Assignment Report
+            {t("Asset Assignment Report")}
           </h1>
           <div className="mt-4 flex items-center gap-6">
             <div className="px-3 py-1 bg-black text-white text-[10px] font-bold uppercase tracking-[0.2em]">
-              {new Date().toLocaleDateString("en-US", {
+              {new Date().toLocaleDateString(lang === "am" ? "am-ET" : "en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
@@ -211,7 +247,7 @@ function ReportContent() {
             {items.length}
           </p>
           <p className="text-[9px] font-bold uppercase tracking-[0.3em] mt-2 text-gray-500">
-            Total Assets Indexed
+            {t("Total Assets Indexed")}
           </p>
         </div>
       </div>
@@ -223,10 +259,10 @@ function ReportContent() {
               <thead>
                 <tr className="border-b-2 border-black">
                   <th className="text-left py-2 px-1 text-[9px] font-black uppercase tracking-widest w-22.5">
-                    Asset
+                    {t("Asset")}
                   </th>
                   <th className="text-left py-2 px-1 text-[9px] font-black uppercase tracking-widest">
-                    Information
+                    {t("Information")}
                   </th>
                 </tr>
               </thead>

@@ -4,8 +4,30 @@ import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 import toast from "react-hot-toast";
 import { HiLockClosed, HiUser, HiEye, HiEyeSlash } from "react-icons/hi2";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Username": "Username",
+    "Password": "Password",
+    "Signing in...": "Signing in...",
+    "Access System": "Access System",
+    "Invalid username or password": "Invalid username or password",
+    "Welcome back": "Welcome back"
+  },
+  am: {
+    "Username": "የተጠቃሚ ስም",
+    "Password": "የይለፍ ቃል",
+    "Signing in...": "በመግባት ላይ...",
+    "Access System": "ወደ ስርዓቱ ግባ",
+    "Invalid username or password": "የተሳሳተ የተጠቃሚ ስም ወይም የይለፍ ቃል",
+    "Welcome back": "እንኳን ደህና መጡ"
+  }
+};
 
 export default function LoginPage() {
+  const { lang, toggle: toggleLanguage } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,10 +43,10 @@ export default function LoginPage() {
       const response = await login(username, password);
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
-      toast.success(`Welcome back, ${response.user.full_name || response.user.username}!`);
+      toast.success(`${t("Welcome back")}, ${response.user.full_name || response.user.username}!`);
       router.push("/");
     } catch {
-      toast.error("Invalid username or password");
+      toast.error(t("Invalid username or password"));
     } finally {
       setLoading(false);
     }
@@ -32,6 +54,17 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Floating Language Toggle */}
+      <div className="absolute top-4 right-4 z-50">
+        <button
+          type="button"
+          onClick={toggleLanguage}
+          className="px-3 py-1.5 rounded-lg border border-border bg-card-alt text-xs font-bold uppercase tracking-wider hover:bg-muted transition-all text-foreground"
+        >
+          {lang === "en" ? "AM" : "EN"}
+        </button>
+      </div>
+
       {/* Subtle Abstract Background Elements */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] aspect-square bg-primary/5 rounded-full blur-[120px]" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] aspect-square bg-accent/5 rounded-full blur-[120px]" />
@@ -54,7 +87,7 @@ export default function LoginPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
-                Username
+                {t("Username")}
               </label>
               <div className="relative">
                 <HiUser className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted/50" />
@@ -71,7 +104,7 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
-                Password
+                {t("Password")}
               </label>
               <div className="relative">
                 <HiLockClosed className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted/50" />
@@ -101,10 +134,10 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Signing in...
+                {t("Signing in...")}
               </>
             ) : (
-              "Access System"
+              t("Access System")
             )}
           </button>
         </form>

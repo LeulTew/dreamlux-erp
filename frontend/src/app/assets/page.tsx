@@ -33,6 +33,82 @@ import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBu
 import { useAuth } from "@/hooks/useAuth";
 import toast from "react-hot-toast";
 import { fuzzySearch } from "@/lib/fuzzy-search";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Assets": "Assets",
+    "Asset Catalog": "Managing asset catalog",
+    "Total Records": "Total Records",
+    "Search": "Search...",
+    "All Offices": "All Offices",
+    "Low Stock": "Low Stock",
+    "Active Catalog": "Active Catalog",
+    "Add Asset": "Add Asset",
+    "Quick Edit": "Quick Edit",
+    "Reconcile": "Reconcile",
+    "Done": "Done",
+    "Select": "Select",
+    "Export": "Export",
+    "Choose Format": "Choose Format",
+    "CSV Spreadsheet": "CSV Spreadsheet",
+    "Excel Workbook": "Excel Workbook",
+    "Image": "Image",
+    "Asset Name": "Asset Name",
+    "Qty": "Qty",
+    "Office": "Office",
+    "Actions": "Actions",
+    "Selected": "Selected",
+    "Delete": "Delete",
+    "Save Changes": "Save Changes",
+    "Cancel": "Cancel",
+    "No assets found": "No assets found",
+    "Delete Record": "Delete Record",
+    "Delete Warning": "Are you sure you want to delete this asset?",
+    "Delta": "Delta",
+    "View Only": "View Only",
+    "Counted": "Counted",
+    "by": "by",
+    "Edit": "Edit",
+    "Recover": "Recover"
+  },
+  am: {
+    "Assets": "ንብረቶች",
+    "Asset Catalog": "የንብረት መዝገብ መቆጣጠሪያ",
+    "Total Records": "ጠቅላላ መዝገቦች",
+    "Search": "ፈልግ...",
+    "All Offices": "ሁሉም ቢሮዎች",
+    "Low Stock": "ያለቀባቸው ንብረቶች",
+    "Active Catalog": "ንቁ መዝገብ",
+    "Add Asset": "ንብረት መዝግብ",
+    "Quick Edit": "ፈጣን ማስተካከያ",
+    "Reconcile": "ማስታረቅ",
+    "Done": "አጠናቅቅ",
+    "Select": "ምረጥ",
+    "Export": "ላክ",
+    "Choose Format": "ቅርጸት ይምረጡ",
+    "CSV Spreadsheet": "CSV ሰንጠረዥ",
+    "Excel Workbook": "Excel ሰንጠረዥ",
+    "Image": "ምስል",
+    "Asset Name": "የንብረት ስም",
+    "Qty": "ብዛት",
+    "Office": "ቢሮ",
+    "Actions": "ክንውኖች",
+    "Selected": "ተመርጧል",
+    "Delete": "ሰርዝ",
+    "Save Changes": "ለውጦችን አስቀምጥ",
+    "Cancel": "ሰርዝ",
+    "No assets found": "ምንም ንብረት አልተገኘም",
+    "Delete Record": "ንብረት ሰርዝ",
+    "Delete Warning": "ይህንን ንብረት መሰረዝ እርግጠኛ ነዎት?",
+    "Delta": "ልዩነት",
+    "View Only": "ለማየት ብቻ",
+    "Counted": "የተቆጠረው",
+    "by": "በ",
+    "Edit": "አስተካክል",
+    "Recover": "መልስ"
+  }
+};
 import {
   HiPlus,
   HiMiniArrowUturnLeft,
@@ -93,6 +169,7 @@ function buildColumns(
   reconcileCounts: Map<string, number>,
   setReconcileCount: (id: string, qty: number) => void,
   setItemToRecover: (item: Item) => void,
+  t: (key: string) => string,
 ) {
   return [
     ...(selectMode
@@ -121,14 +198,14 @@ function buildColumns(
       : []),
     columnHelper.display({
       id: "image",
-      header: "Image",
+      header: t("Image"),
       cell: ({ row }) => (
         <ImageCell src={row.original.image_url} alt={row.original.name} />
       ),
       size: 80,
     }),
     columnHelper.accessor("name", {
-      header: "Asset Name",
+      header: t("Asset Name"),
       cell: ({ row, getValue }) =>
         editMode ? (
           <div className="flex-1">
@@ -150,7 +227,7 @@ function buildColumns(
         ),
     }),
     columnHelper.accessor("quantity", {
-      header: "Qty",
+      header: t("Qty"),
       cell: ({ row, getValue }) => {
         if (reconcileMode) {
           const currentCount = reconcileCounts.get(row.original.id) ?? getValue();
@@ -180,7 +257,7 @@ function buildColumns(
               </div>
               {diff !== 0 && (
                 <span className={`text-[10px] font-semibold uppercase ${diff > 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
-                  {diff > 0 ? `+${diff}` : diff} Delta
+                  {diff > 0 ? `+${diff}` : diff} {t("Delta")}
                 </span>
               )}
             </div>
@@ -205,8 +282,8 @@ function buildColumns(
             <span className="font-semibold text-foreground">{getValue()}</span>
             {row.original.last_counted_at && (
               <span className="text-[10px] text-muted font-medium">
-                Counted: {new Date(row.original.last_counted_at).toLocaleDateString()}
-                {row.original.last_counted_by && ` by ${row.original.last_counted_by.full_name}`}
+                {t("Counted")}: {new Date(row.original.last_counted_at).toLocaleDateString()}
+                {row.original.last_counted_by && ` ${t("by")} ${row.original.last_counted_by.full_name}`}
               </span>
             )}
           </div>
@@ -215,7 +292,7 @@ function buildColumns(
       size: 80,
     }),
     columnHelper.accessor("store.name", {
-      header: "Office",
+      header: t("Office"),
       cell: ({ row, getValue }) =>
         editMode ? (
           <Select
@@ -231,17 +308,17 @@ function buildColumns(
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: t("Actions"),
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
           {!canManageAssets ? (
-            <span className="text-[10px] font-semibold text-muted/50 uppercase tracking-wider px-2">View Only</span>
+            <span className="text-[10px] font-semibold text-muted/50 uppercase tracking-wider px-2">{t("View Only")}</span>
           ) : (
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setEditingItem(row.original)}
                 className="p-2 rounded-lg hover:bg-primary-light text-muted hover:text-primary transition-all"
-                title="Edit"
+                title={t("Edit")}
               >
                 <HiPencilSquare className="w-4 h-4" />
               </button>
@@ -249,7 +326,7 @@ function buildColumns(
                 <button
                   onClick={() => setItemToRecover(row.original)}
                   className="p-2 rounded-lg hover:bg-green-50 text-muted hover:text-success transition-all"
-                  title="Recover"
+                  title={t("Recover")}
                 >
                   <HiMiniArrowUturnLeft className="w-4 h-4" />
                 </button>
@@ -257,7 +334,7 @@ function buildColumns(
                 <button
                   onClick={() => setItemToDelete(row.original)}
                   className="p-2 rounded-lg hover:bg-red-50 text-muted hover:text-danger transition-all"
-                  title="Delete"
+                  title={t("Delete")}
                 >
                   <HiTrash className="w-4 h-4" />
                 </button>
@@ -275,6 +352,8 @@ const ITEMS_PER_PAGE = 10;
 type StockFilterMode = "all" | "low-stock";
 
 function AssetsContent() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -640,6 +719,7 @@ function AssetsContent() {
     reconcileCounts,
     setReconcileCount,
     setItemToRecover,
+    t,
   );
 
   const table = useAssetsTable(filteredItems, columns);
@@ -649,17 +729,15 @@ function AssetsContent() {
   };
 
   return (
-    <div className="pt-4 md:py-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-primary rounded-xl text-background shadow-sm">
-            <HiTableCells className="w-6 h-6" />
+    <div className="page-container pb-12">
+        {/* Header */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/40">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">{t("Assets")}</h1>
+              <p className="text-sm text-muted font-medium">{total} {t("Total Records")}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Inventory</h1>
-            <p className="text-sm text-muted font-medium">{total} Assets Total</p>
-          </div>
-        </div>
           {!authLoading && canManageAssets && (
             <>
               <button
@@ -667,7 +745,7 @@ function AssetsContent() {
                 className="flex items-center gap-1.5 h-11 px-5 rounded-xl text-sm font-semibold bg-primary text-background shadow-sm hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 <HiPlus className="w-4.5 h-4.5" />
-                Add Item
+                {t("Add Asset")}
               </button>
               <div className="w-px h-6 bg-border hidden sm:block mx-1" />
             </>
@@ -678,7 +756,7 @@ function AssetsContent() {
                className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
              >
                <HiDocumentText className="w-4.5 h-4.5 text-danger" />
-               PDF
+               {t("PDF")}
              </button>
              <button
                onClick={handleExportExcel}
@@ -686,7 +764,7 @@ function AssetsContent() {
                className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
              >
                <HiTableCells className="w-4.5 h-4.5 text-success" />
-               XLSX
+               {t("XLSX")}
              </button>
              <button
                onClick={handleExportCSV}
@@ -694,7 +772,7 @@ function AssetsContent() {
                className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
              >
                <HiDocumentArrowDown className="w-4.5 h-4.5 text-accent" />
-               CSV
+               {t("CSV")}
              </button>
  
              <div className="w-px h-6 bg-border hidden sm:block mx-1" />
@@ -715,9 +793,9 @@ function AssetsContent() {
               }`}
             >
               <HiCheckCircle className="w-4 h-4" />
-              {reconcileMode ? "Cancel Count" : "Tracked Count"}
+              {reconcileMode ? t("Cancel Count") : t("Reconcile")}
             </button>
-
+ 
             <button
               onClick={() => {
                 setSelectMode(false);
@@ -728,7 +806,7 @@ function AssetsContent() {
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all bg-card-alt text-foreground border border-border"
             >
               <HiTrash className="w-4 h-4" />
-              Trash
+              {t("Trash")}
             </button>
             <button
               onClick={() => {
@@ -740,7 +818,7 @@ function AssetsContent() {
               }`}
             >
               <HiPencilSquare className="w-4 h-4" />
-              {editMode ? "Done" : "Quick Edit"}
+              {editMode ? t("Done") : t("Quick Edit")}
             </button>
             <button
               onClick={() => {
@@ -753,7 +831,7 @@ function AssetsContent() {
               }`}
             >
               <HiTableCells className="w-4 h-4" />
-              {selectMode ? "Cancel Selection" : "Select"}
+              {selectMode ? t("Cancel Selection") : t("Select")}
             </button>
         </div>
       </header>
@@ -820,7 +898,7 @@ function AssetsContent() {
 
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl p-4 shadow-sm">
         <div className="lg:col-span-3">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">Filter Method</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Filter Method")}</label>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => {
@@ -833,7 +911,7 @@ function AssetsContent() {
                   : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
-              All Items
+              {t("Active Catalog")}
             </button>
             <button
               onClick={() => {
@@ -846,7 +924,7 @@ function AssetsContent() {
                   : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
-              Low Stock
+              {t("Low Stock")}
             </button>
             <button
               onClick={() => {
@@ -856,24 +934,24 @@ function AssetsContent() {
               }}
               className="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all bg-card-alt text-foreground border border-border hover:bg-border/50"
             >
-              Trash
+              {t("Trash")}
             </button>
           </div>
         </div>
 
         <div className="lg:col-span-3">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">Search</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Search")}</label>
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by item, description, or office..."
+            placeholder={t("Search Placeholder")}
             className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
 
         <div className="lg:col-span-2">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">From</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("From")}</label>
           <input
             type="datetime-local"
             value={fromDateTime}
@@ -886,7 +964,7 @@ function AssetsContent() {
         </div>
 
         <div className="lg:col-span-2">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">To</label>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("To")}</label>
           <input
             type="datetime-local"
             value={toDateTime}
@@ -913,7 +991,7 @@ function AssetsContent() {
             }}
             className="w-full h-11 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider bg-card-alt text-foreground border border-border hover:bg-border transition-all"
           >
-            Clear Filters
+            {t("Clear Filters")}
           </button>
         </div>
       </div>
@@ -968,7 +1046,7 @@ function AssetsContent() {
       {/* Mobile View */}
       <div className="md:hidden mt-6 space-y-3">
         {isLoading ? (
-          <div className="py-20 text-center text-muted animate-pulse">Loading assets...</div>
+          <div className="py-20 text-center text-muted animate-pulse">Loading assets... / በመጫን ላይ...</div>
         ) : filteredItems.length > 0 ? (
           filteredItems.map((item) => (
             <div key={item.id} className="flex items-center gap-3">
@@ -1000,7 +1078,7 @@ function AssetsContent() {
           ))
         ) : (
           <div className="py-20 text-center bg-card rounded-2xl border border-dashed border-border text-muted">
-            No assets found.
+            {t("No assets found")}
           </div>
         )}
       </div>
@@ -1020,8 +1098,8 @@ function AssetsContent() {
         onClose={() => setItemToDelete(null)}
         onConfirm={() => itemToDelete && deleteMutation.mutate(itemToDelete.id)}
         isDeleting={deleteMutation.isPending}
-        title="Delete Asset"
-        message="Are you sure you want to move this asset to trash?"
+        title={t("Delete Record")}
+        message={t("Delete Warning")}
         itemName={itemToDelete?.name || ""}
       />
 
@@ -1030,8 +1108,8 @@ function AssetsContent() {
         onClose={() => setShowBulkDeleteModal(false)}
         onConfirm={handleBulkDelete}
         isDeleting={bulkDeleteMutation.isPending}
-        title="Delete Selected Assets"
-        message="Are you sure you want to move these assets to trash?"
+        title={t("Delete Selected Assets")}
+        message={t("Delete Warning")}
         itemName={`${selectedIds.size} selected`}
       />
 

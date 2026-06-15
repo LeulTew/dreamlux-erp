@@ -12,6 +12,74 @@ import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import { z } from "zod";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Edit Employee": "Edit Employee",
+    "Updating": "Updating",
+    "New Photo": "New Photo",
+    "Upload": "Upload",
+    "ID Front": "ID Front",
+    "Upload Front": "Upload Front",
+    "ID Back": "ID Back",
+    "Upload Back": "Upload Back",
+    "Full Name *": "Full Name *",
+    "Employee ID *": "Employee ID *",
+    "Phone": "Phone",
+    "Email": "Email",
+    "Department": "Department",
+    "Select Department": "Select Department",
+    "Office / Branch": "Office / Branch",
+    "Select Office": "Select Office",
+    "Base Salary": "Base Salary",
+    "Select Level": "Select Level",
+    "Base Salary Amount": "Base Salary Amount",
+    "Select a salary level to view the amount": "Select a salary level to view the amount.",
+    "Event Rates": "Event Rates",
+    "Rates Description": "Set custom rates for this employee. These prices will be used during payroll calculation.",
+    "Save Changes": "Save Changes",
+    "Updating...": "Updating...",
+    "Delete Record": "Delete Record",
+    "Delete Warning": "This action will move the record to trash. Are you sure?",
+    "Failed to process image": "Failed to process image",
+    "Department added!": "Department added!",
+    "Failed to add department": "Failed to add department",
+    "Please fix the mistakes in the form": "Please fix the mistakes in the form"
+  },
+  am: {
+    "Edit Employee": "የሰራተኛ መረጃ ማስተካከያ",
+    "Updating": "በማስተካከል ላይ",
+    "New Photo": "አዲስ ፎቶ",
+    "Upload": "ጫን",
+    "ID Front": "የመታወቂያ ፊት",
+    "Upload Front": "የፊት ክፍል ጫን",
+    "ID Back": "የመታወቂያ ጀርባ",
+    "Upload Back": "የጀርባ ክፍል ጫን",
+    "Full Name *": "ሙሉ ስም *",
+    "Employee ID *": "የሰራተኛ መታወቂያ *",
+    "Phone": "ስልክ",
+    "Email": "ኢሜይል",
+    "Department": "ክፍል",
+    "Select Department": "ክፍል ይምረጡ",
+    "Office / Branch": "ቢሮ / ቅርንጫፍ",
+    "Select Office": "ቢሮ ይምረጡ",
+    "Base Salary": "መሰረታዊ ደመወዝ",
+    "Select Level": "ደረጃ ይምረጡ",
+    "Base Salary Amount": "የመሰረታዊ ደመወዝ መጠን",
+    "Select a salary level to view the amount": "መጠኑን ለማየት እባክዎ የደመወዝ ደረጃ ይምረጡ።",
+    "Event Rates": "የዝግጅት ተመኖች",
+    "Rates Description": "ለዚህ ሰራተኛ ብጁ ተመኖችን ይወስኑ። እነዚህ ዋጋዎች በደመወዝ ስሌት ወቅት ጥቅም ላይ ይውላሉ።",
+    "Save Changes": "ለውጦችን አስቀምጥ",
+    "Updating...": "በማዘመን ላይ...",
+    "Delete Record": "መዝገብ ሰርዝ",
+    "Delete Warning": "ይህ ተግባር መዝገቡን ወደ ቆሻሻ መጣያ ያዛውረዋል። እርግጠኛ ነዎት?",
+    "Failed to process image": "ፎቶውን ለማዘጋጀት አልተሳካም",
+    "Department added!": "ክፍል በተሳካ ሁኔታ ታክሏል!",
+    "Failed to add department": "ክፍል ማከል አልተሳካም",
+    "Please fix the mistakes in the form": "እባክዎ በቅጹ ውስጥ ያሉትን ስህተቶች ያስተካክሉ"
+  }
+};
 
 const employeeValidationSchema = z.object({
   full_name: z.string().min(1, "Full name is required"),
@@ -34,6 +102,8 @@ type UpdateEmployeeResponse = Employee & {
 };
 
 export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeSheetProps) {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
 
   const [frontPreview, setFrontPreview] = useState<string | null>(employee.id_card_front_url);
@@ -202,7 +272,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       };
       reader.readAsDataURL(compressed);
     } catch {
-      toast.error("Failed to process image");
+      toast.error(t("Failed to process image"));
     }
   };
 
@@ -216,12 +286,12 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       setFormData(prev => ({ ...prev, department_id: res.id }));
       setNewDepartment("");
       setIsAddingDepartment(false);
-      toast.success("Department added!");
+      toast.success(t("Department added!"));
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.error || "Failed to add department");
+        toast.error(err.response?.data?.error || t("Failed to add department"));
       } else {
-        toast.error("Failed to add department");
+        toast.error(t("Failed to add department"));
       }
     }
   };
@@ -238,7 +308,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         errors[field] = issue.message;
       });
       setFormErrors(errors);
-      toast.error("Please fix the mistakes in the form");
+      toast.error(t("Please fix the mistakes in the form"));
       return;
     }
     setFormErrors({});
@@ -264,8 +334,8 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       <ResponsiveDrawer
         isOpen={true}
         onClose={onClose}
-        title="Edit Employee"
-        subtitle={`Updating ${employee.full_name}`}
+        title={t("Edit Employee")}
+        subtitle={`${t("Updating")} ${employee.full_name}`}
       >
         <form onSubmit={handleSubmit} className="space-y-6 pb-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -312,7 +382,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       }}
                       className="px-2.5 py-1 bg-primary/10 text-primary text-[10px] font-semibold rounded-lg hover:bg-primary/20 transition-all whitespace-nowrap"
                     >
-                      New Photo
+                      {t("New Photo")}
                     </button>
                     <button
                       type="button"
@@ -325,7 +395,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       }}
                       className="px-2.5 py-1 bg-card-alt border border-border text-muted text-[10px] font-semibold rounded-lg hover:bg-border transition-all whitespace-nowrap"
                     >
-                      Upload
+                      {t("Upload")}
                     </button>
                   </div>
                 </div>
@@ -333,7 +403,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 {/* ID Cards */}
                 <div className="sm:col-span-2 grid grid-cols-2 gap-4 bg-card-alt/30 p-4 rounded-xl border border-border/50">
                   <div className="space-y-2 flex flex-col justify-between">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 px-1">ID Front</label>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 px-1">{t("ID Front")}</label>
                     <div
                       onClick={() => {
                         const input = document.createElement('input');
@@ -349,14 +419,14 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-1.5 opacity-30 text-center">
                           <HiIdentification className="w-6 h-6 text-muted" />
-                          <span className="text-[9px] font-semibold">Upload Front</span>
+                          <span className="text-[9px] font-semibold">{t("Upload Front")}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-2 flex flex-col justify-between">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 px-1">ID Back</label>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 px-1">{t("ID Back")}</label>
                     <div
                       onClick={() => {
                         const input = document.createElement('input');
@@ -372,7 +442,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-1.5 opacity-30 text-center">
                           <HiIdentification className="w-6 h-6 text-muted" />
-                          <span className="text-[9px] font-semibold">Upload Back</span>
+                          <span className="text-[9px] font-semibold">{t("Upload Back")}</span>
                         </div>
                       )}
                     </div>
@@ -383,7 +453,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               {/* Name & ID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Full Name *</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Full Name *")}</label>
                   <input
                     type="text"
                     value={formData.full_name}
@@ -396,7 +466,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Employee ID *</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Employee ID *")}</label>
                   <input
                     type="text"
                     value={formData.employee_id}
@@ -412,7 +482,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               {/* Phone & Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Phone</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Phone")}</label>
                   <div className="relative">
                     <input
                       type="tel"
@@ -428,7 +498,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Email</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Email")}</label>
                   <input
                     type="email"
                     value={formData.email}
@@ -447,7 +517,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Department */}
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Department</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Department")}</label>
                   <div className="flex gap-2">
                     {isAddingDepartment ? (
                       <div className="flex-1 flex gap-2">
@@ -468,7 +538,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                           options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
                           value={formData.department_id}
                           onChange={(val) => setFormData({...formData, department_id: val})}
-                          placeholder="Select Department"
+                          placeholder={t("Select Department")}
                           className="flex-1"
                         />
                         <button type="button" onClick={() => setIsAddingDepartment(true)} className="w-11 h-11 rounded-xl bg-primary text-on-primary hover:bg-primary-dark transition-all flex items-center justify-center shrink-0 shadow-sm" title="Add Department">
@@ -481,19 +551,19 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
                 {/* Office / Branch */}
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Office / Branch</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Office / Branch")}</label>
                   <Select
                     options={stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []}
                     value={formData.office_id}
                     onChange={(val) => setFormData({...formData, office_id: val})}
-                    placeholder="Select Office"
+                    placeholder={t("Select Office")}
                   />
                 </div>
               </div>
 
               {/* Base Salary */}
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Base Salary</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Base Salary")}</label>
                 <Select
                   options={salaryLevels.map((level) => ({
                     id: level.level_name,
@@ -501,12 +571,12 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                   }))}
                   value={formData.salary_level}
                   onChange={(val) => setFormData({...formData, salary_level: val})}
-                  placeholder="Select Level"
+                  placeholder={t("Select Level")}
                 />
                 <p className="text-[10px] font-semibold text-muted-foreground/80 px-1 mt-1">
                   {selectedSalaryLevel
-                    ? `Base Salary Amount: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
-                    : "Select a salary level to view the amount."}
+                    ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
+                    : t("Select a salary level to view the amount")}
                 </p>
               </div>
 
@@ -514,10 +584,10 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               <div className="pt-2 space-y-4">
                 <div className="flex items-center gap-2 px-1">
                   <HiPlus className="w-4.5 h-4.5 text-primary/75" />
-                  <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">Event Rates</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">{t("Event Rates")}</h3>
                 </div>
                 <p className="text-[10px] text-muted px-1 font-medium leading-relaxed">
-                  Set custom rates for this employee. These prices will be used during payroll calculation.
+                  {t("Rates Description")}
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -559,7 +629,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               disabled={updateMutation.isPending}
               className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {updateMutation.isPending ? "Updating..." : "Save Changes"}
+              {updateMutation.isPending ? t("Updating...") : t("Save Changes")}
             </button>
             <button
               type="button"
@@ -579,8 +649,8 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         onClose={() => setShowDeleteModal(false)}
         onConfirm={() => deleteMutation.mutate(employee.id)}
         isDeleting={deleteMutation.isPending}
-        title="Delete Record"
-        message="This action will move the record to trash. Are you sure?"
+        title={t("Delete Record")}
+        message={t("Delete Warning")}
         itemName={employee.full_name}
       />
     </>

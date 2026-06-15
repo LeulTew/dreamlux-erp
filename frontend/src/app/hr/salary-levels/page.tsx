@@ -10,8 +10,52 @@ import { getSalaryLevels, createSalaryLevel, updateSalaryLevel, deleteSalaryLeve
 import { SalaryLevel } from "@/lib/types";
 import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Salary Settings": "Salary Settings",
+    "Manage corporate base salary levels": "Manage corporate base salary levels",
+    "Level Name": "Level Name",
+    "Base Rate (ETB)": "Base Rate (ETB)",
+    "Update Level": "Update Level",
+    "Add Level": "Add Level",
+    "Cancel": "Cancel",
+    "Monthly Base (ETB)": "Monthly Base (ETB)",
+    "Actions": "Actions",
+    "Initializing data structure...": "Initializing data structure...",
+    "No salary levels config detected": "No salary levels config detected",
+    "Gross Base Monthly": "Gross Base Monthly",
+    "Edit": "Edit",
+    "Delete": "Delete",
+    "Delete Salary Level": "Delete Salary Level",
+    "Checking employee usage for this salary level...": "Checking employee usage for this salary level...",
+    "TRASH": "TRASH"
+  },
+  am: {
+    "Salary Settings": "የደሞዝ ቅንጅቶች",
+    "Manage corporate base salary levels": "የድርጅቱን መሠረታዊ የደሞዝ እርከኖች ያስተዳድሩ",
+    "Level Name": "የደረጃ ስም",
+    "Base Rate (ETB)": "መሠረታዊ መጠን (ብር)",
+    "Update Level": "ደረጃውን አዘምን",
+    "Add Level": "ደረጃ ጨምር",
+    "Cancel": "ሰርዝ",
+    "Monthly Base (ETB)": "ወርሃዊ መሠረታዊ ደሞዝ (ብር)",
+    "Actions": "ድርጊቶች",
+    "Initializing data structure...": "መረጃዎችን በማዘጋጀት ላይ...",
+    "No salary levels config detected": "ምንም የደሞዝ ደረጃ አልተገኘም",
+    "Gross Base Monthly": "ጠቅላላ ወርሃዊ መሠረታዊ",
+    "Edit": "አስተካክል",
+    "Delete": "ሰርዝ",
+    "Delete Salary Level": "የደሞዝ ደረጃ ሰርዝ",
+    "Checking employee usage for this salary level...": "ይህ የደሞዝ ደረጃ በጥቅም ላይ መሆኑን በማጣራት ላይ...",
+    "TRASH": "ቆሻሻ መጣያ"
+  }
+};
 
 function SalaryLevelsContent() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const { data: levels, isLoading } = useQuery<SalaryLevel[]>({
@@ -88,21 +132,25 @@ function SalaryLevelsContent() {
   const activeDeleteLevel = levels?.find(l => l.id === deleteId);
   const impactedEmployees = deleteImpact?.active_employee_count ?? 0;
   const deleteMessage = isDeleteImpactLoading
-    ? "Checking employee usage for this salary level..."
+    ? t("Checking employee usage for this salary level...")
     : impactedEmployees > 0
-      ? `Warning: ${impactedEmployees} active employee${impactedEmployees === 1 ? "" : "s"} currently use this level. Deleting it keeps employees but removes this mapping.`
-      : "Are you sure you want to remove this salary level? No active employees are currently using it.";
+      ? lang === "am"
+        ? `ማስጠንቀቂያ: ${impactedEmployees} ንቁ ሠራተኛ(ች) በአሁኑ ጊዜ ይህንን ደረጃ ይጠቀማሉ። ደረጃውን መሰረዝ ሠራተኞቹን አያጠፋም ነገር ግን ይህንን ትስስር ያስወግዳል።`
+        : `Warning: ${impactedEmployees} active employee${impactedEmployees === 1 ? "" : "s"} currently use this level. Deleting it keeps employees but removes this mapping.`
+      : lang === "am"
+        ? "ይህንን የደሞዝ ደረጃ መሰረዝ እርግጠኛ ነዎት? በአሁኑ ጊዜ ምንም ንቁ ሠራተኞች እየተጠቀሙበት አይደለም።"
+        : "Are you sure you want to remove this salary level? No active employees are currently using it.";
 
   return (
     <AuthLayout>
       <div className="page-container-sm pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
           <div>
-            <h1 className="text-2xl font-bold uppercase tracking-tight text-foreground">Salary Settings</h1>
-            <p className="text-xs font-semibold text-muted-foreground mt-1">Manage corporate base salary levels</p>
+            <h1 className="text-2xl font-bold uppercase tracking-tight text-foreground">{t("Salary Settings")}</h1>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">{t("Manage corporate base salary levels")}</p>
           </div>
           <Link href="/hr/salary-levels/trash" className="flex items-center gap-2 h-10 px-4 bg-danger/10 text-danger rounded-lg font-semibold text-xs transition-all active:scale-[0.98] shadow-sm border border-danger/20">
-            <HiOutlineTrash className="w-4 h-4" /> TRASH
+            <HiOutlineTrash className="w-4 h-4" /> {t("TRASH")}
           </Link>
         </header>
         
@@ -111,7 +159,7 @@ function SalaryLevelsContent() {
           
           <form onSubmit={handleSubmit} className="relative z-10 flex gap-6 items-end flex-wrap">
             <div className="flex-1 min-w-50">
-              <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">Level Name</label>
+              <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">{t("Level Name")}</label>
               <input 
                 type="text" required value={form.level_name} 
                 onChange={e => setForm({...form, level_name: e.target.value})} 
@@ -120,7 +168,7 @@ function SalaryLevelsContent() {
               />
             </div>
             <div className="flex-1 min-w-50">
-              <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">Base Rate (ETB)</label>
+              <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">{t("Base Rate (ETB)")}</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">ETB</span>
                 <input 
@@ -138,17 +186,17 @@ function SalaryLevelsContent() {
                 className="h-11 px-5 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:bg-primary-dark transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
               >
                 {form.id ? (
-                  <span>Update Level</span>
+                  <span>{t("Update Level")}</span>
                 ) : (
                   <>
                     <HiPlus className="w-4 h-4" />
-                    <span>Add Level</span>
+                    <span>{t("Add Level")}</span>
                   </>
                 )}
               </button>
               {form.id && (
                 <button type="button" onClick={() => setForm({ level_name: "", base_salary: "" })} className="px-4 h-11 bg-muted/50 text-foreground font-semibold text-sm rounded-xl hover:bg-muted transition-all active:scale-95 border border-border/50">
-                  Cancel
+                  {t("Cancel")}
                 </button>
               )}
             </div>
@@ -159,16 +207,16 @@ function SalaryLevelsContent() {
           <table className="w-full text-left text-sm border-separate border-spacing-0">
             <thead>
               <tr className="bg-muted/30">
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">Level Name</th>
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">Monthly Base (ETB)</th>
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-right text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">Actions</th>
+                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Level Name")}</th>
+                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Monthly Base (ETB)")}</th>
+                <th className="px-4 sm:px-8 py-4 sm:py-5 text-right text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
               {isLoading ? (
-                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground animate-pulse">Initializing data structure...</td></tr>
+                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground animate-pulse">{t("Initializing data structure...")}</td></tr>
               ) : levels?.length === 0 ? (
-                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-card-alt">No salary levels config detected</td></tr>
+                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-card-alt">{t("No salary levels config detected")}</td></tr>
               ) : (
                 levels?.map(lvl => (
                   <tr
@@ -195,15 +243,15 @@ function SalaryLevelsContent() {
                         <span className="text-base sm:text-lg font-bold tracking-tight text-foreground">
                           ETB {Number(lvl.base_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
-                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-widest mt-0.5 opacity-60">Gross Base Monthly</span>
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-widest mt-0.5 opacity-60">{t("Gross Base Monthly")}</span>
                       </div>
                     </td>
                     <td className="px-4 sm:px-8 py-4 sm:py-6 text-right space-x-2 sm:space-x-4 opacity-100 md:opacity-20 group-hover:opacity-100 transition-all duration-300">
                       <button onClick={() => {
                         setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }} className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">Edit</button>
-                      <button onClick={() => setDeleteId(lvl.id)} className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">Delete</button>
+                      }} className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">{t("Edit")}</button>
+                      <button onClick={() => setDeleteId(lvl.id)} className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">{t("Delete")}</button>
                     </td>
                   </tr>
                 ))
@@ -217,7 +265,7 @@ function SalaryLevelsContent() {
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={() => deleteId && deleteMut.mutate(deleteId)}
-        title="Delete Salary Level"
+        title={t("Delete Salary Level")}
         message={deleteMessage}
         itemName={activeDeleteLevel?.level_name ?? ""}
         isDeleting={deleteMut.isPending}
