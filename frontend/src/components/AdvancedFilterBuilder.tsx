@@ -47,10 +47,10 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
         <div className="flex gap-3 items-center flex-wrap">
           <HiAdjustmentsHorizontal className="w-5 h-5 text-primary/40" />
           {rules.length === 0 ? (
-            <span className="text-muted-foreground font-bold text-[10px] uppercase tracking-[0.15em] opacity-60">No filters active</span>
+            <span className="text-muted-foreground font-semibold text-xs tracking-wider opacity-60">No filters active</span>
           ) : (
             <div className="flex gap-2 items-center">
-              <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
                 {rules.length} Rules Applied
               </span>
             </div>
@@ -58,7 +58,7 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
         </div>
         <button
           onClick={() => (rules.length === 0 ? addRule() : setIsOpen(!isOpen))}
-          className="text-[10px] font-black uppercase tracking-[0.2em] text-primary bg-primary/10 hover:bg-primary/20 hover:scale-105 active:scale-95 px-5 py-2.5 rounded-xl transition-all shadow-premium-sm border border-primary/10"
+          className="h-10 px-4 text-xs font-semibold uppercase tracking-wider text-primary bg-primary/10 hover:bg-primary/20 hover:scale-105 active:scale-[0.98] rounded-lg transition-all shadow-sm border border-primary/10"
         >
           {isOpen ? "Close Filters" : rules.length === 0 ? "Filter List" : "Edit Filters"}
         </button>
@@ -102,7 +102,7 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
                 <div className="absolute inset-0 bg-primary/1 pointer-events-none rounded-xl" />
                 
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-xs font-black uppercase text-primary tracking-widest">Filter System</h2>
+                  <h2 className="text-sm font-bold uppercase text-primary tracking-wider">Filter System</h2>
                   <button 
                     onClick={() => setIsOpen(false)}
                     className="p-2 rounded-xl bg-card-alt text-muted hover:text-foreground transition-all"
@@ -113,8 +113,8 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
 
                 {rules.length === 0 && (
                   <div className="py-10 text-center flex flex-col items-center gap-3">
-                     <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center text-muted-foreground/30 font-black text-xs">0</div>
-                     <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-relaxed">No logic rules defined yet.<br/>Use the button below to start.</p>
+                     <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center text-muted-foreground/30 font-bold text-xs">0</div>
+                     <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wider leading-relaxed">No logic rules defined yet.<br/>Use the button below to start.</p>
                   </div>
                 )}
 
@@ -125,7 +125,7 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 10 }}
                     key={rule.id} 
-                    className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full bg-card-alt p-3 rounded-2xl border border-border/50 group hover:border-primary/30 transition-all"
+                    className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full bg-card-alt p-3 rounded-xl border border-border/50 group hover:border-primary/30 transition-all"
                   >
                     <Select
                       options={fields.map((f) => ({ id: f.key, label: f.label }))}
@@ -152,12 +152,12 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
                       value={rule.value}
                       onChange={(e) => updateRule(rule.id, { value: e.target.value })}
                       placeholder="Search query..."
-                      className="flex-2 px-4 py-3 rounded-xl text-xs font-bold border border-border/50 bg-card text-foreground shadow-sm focus:ring-4 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground/30 placeholder:uppercase placeholder:text-[9px] placeholder:tracking-widest"
+                      className="flex-2 px-4 h-11 rounded-xl text-sm font-semibold border border-border/50 bg-card text-foreground shadow-sm focus:ring-4 focus:ring-primary/10 transition-all outline-none placeholder:text-muted-foreground/30 placeholder:uppercase placeholder:text-[9px] placeholder:tracking-widest"
                     />
 
                     <button
                       onClick={() => removeRule(rule.id)}
-                      className="w-11 h-11 flex items-center justify-center shrink-0 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-on-danger transition-all self-end sm:self-auto shadow-sm active:scale-90"
+                      className="w-11 h-11 flex items-center justify-center shrink-0 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-on-danger transition-all self-end sm:self-auto shadow-sm active:scale-[0.98]"
                     >
                       <HiXMark className="w-5 h-5" />
                     </button>
@@ -166,7 +166,7 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
 
                 <button
                   onClick={addRule}
-                  className="mt-4 flex items-center justify-center gap-3 py-4 border-2 border-dashed border-primary/20 rounded-2xl text-primary font-black text-[10px] uppercase tracking-[0.2em] hover:border-primary/40 hover:bg-primary/2 hover:scale-[1.01] active:scale-[0.99] transition-all w-full shadow-sm"
+                  className="mt-4 flex items-center justify-center gap-3 h-11 border-2 border-dashed border-primary/20 rounded-xl text-primary font-semibold text-sm hover:border-primary/40 hover:bg-primary/2 hover:scale-[1.01] active:scale-[0.98] transition-all w-full shadow-sm"
                 >
                   <HiPlus className="w-5 h-5" /> New Filtering Rule
                 </button>

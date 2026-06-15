@@ -79,15 +79,15 @@ export default function SalaryLevelsPage() {
       <div className="page-container-sm pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
           <div>
-            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Salary Settings</h1>
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1">Manage corporate base salary levels</p>
+            <h1 className="text-2xl font-bold uppercase tracking-tight text-foreground">Salary Settings</h1>
+            <p className="text-xs font-semibold text-muted-foreground mt-1">Manage corporate base salary levels</p>
           </div>
-          <Link href="/hr/salary-levels/trash" className="flex items-center gap-2 px-5 py-2.5 bg-danger/10 text-danger rounded-2xl font-black text-[10px] uppercase tracking-[0.15em] hover:bg-danger/20 transition-all active:scale-95 shadow-sm border border-danger/20">
+          <Link href="/hr/salary-levels/trash" className="flex items-center gap-2 h-10 px-4 bg-danger/10 text-danger rounded-lg font-semibold text-xs transition-all active:scale-[0.98] shadow-sm border border-danger/20">
             <HiOutlineTrash className="w-4 h-4" /> TRASH
           </Link>
         </header>
         
-        <div className="bg-card p-8 rounded-3xl shadow-premium border border-border pb-10 mb-10 relative overflow-hidden group">
+        <div className="bg-card p-6 rounded-xl shadow-premium border border-border mb-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
           
           <form onSubmit={handleSubmit} className="relative z-10 flex gap-6 items-end flex-wrap">
@@ -140,16 +140,16 @@ export default function SalaryLevelsPage() {
           <table className="w-full text-left text-sm border-separate border-spacing-0">
             <thead>
               <tr className="bg-muted/30">
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] border-b border-border/50 first:rounded-tl-4xl">Level Name</th>
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] border-b border-border/50">Monthly Base (ETB)</th>
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-right text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] border-b border-border/50 last:rounded-tr-4xl">Actions</th>
+                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">Level Name</th>
+                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">Monthly Base (ETB)</th>
+                <th className="px-4 sm:px-8 py-4 sm:py-5 text-right text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
               {isLoading ? (
-                <tr><td colSpan={3} className="p-16 text-center text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground animate-pulse">Initializing data structure...</td></tr>
+                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground animate-pulse">Initializing data structure...</td></tr>
               ) : levels?.length === 0 ? (
-                <tr><td colSpan={3} className="p-16 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground bg-card-alt rounded-b-4xl">No salary levels config detected</td></tr>
+                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-card-alt">No salary levels config detected</td></tr>
               ) : (
                 levels?.map(lvl => (
                   <tr key={lvl.id} className="hover:bg-primary/2 transition-colors group">
@@ -159,14 +159,14 @@ export default function SalaryLevelsPage() {
                           setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
-                        className="inline-flex items-center justify-center min-w-10 px-3 py-1.5 bg-foreground text-background rounded-full font-black text-[10px] uppercase tracking-widest hover:opacity-85 active:scale-95 transition-all shadow-sm cursor-pointer"
+                        className="inline-flex items-center justify-center min-w-10 px-3 py-1 bg-foreground text-background rounded-lg font-semibold text-xs uppercase tracking-wider hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
                       >
                         {lvl.level_name}
                       </button>
                     </td>
                     <td className="px-4 sm:px-8 py-4 sm:py-6">
                       <div className="flex flex-col">
-                        <span className="text-base sm:text-lg font-black tracking-tighter text-foreground">
+                        <span className="text-base sm:text-lg font-bold tracking-tight text-foreground">
                           ETB {Number(lvl.base_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-widest mt-0.5 opacity-60">Gross Base Monthly</span>
@@ -176,8 +176,8 @@ export default function SalaryLevelsPage() {
                       <button onClick={() => {
                         setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }} className="text-[10px] font-black tracking-widest text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">Edit</button>
-                      <button onClick={() => setDeleteId(lvl.id)} className="text-[10px] font-black tracking-widest text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">Delete</button>
+                      }} className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">Edit</button>
+                      <button onClick={() => setDeleteId(lvl.id)} className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">Delete</button>
                     </td>
                   </tr>
                 ))

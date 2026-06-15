@@ -97,15 +97,15 @@ export default function SalaryLevelsTrashPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/hr/salary-levels"
-              className="p-2.5 bg-card-alt rounded-2xl text-muted hover:text-foreground border border-border transition-all"
+              className="p-2.5 bg-card-alt rounded-xl text-muted hover:text-foreground border border-border transition-all"
             >
               <HiArrowUturnLeft className="w-5 h-5" />
             </Link>
-            <div className="p-2.5 bg-red-500/10 rounded-2xl text-red-500 shadow-sm">
+            <div className="p-2.5 bg-red-500/10 rounded-xl text-red-500 shadow-sm">
               <HiTrash className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight">
+              <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
                 Salary Level Trash
               </h1>
               <p className="text-xs md:text-sm text-muted font-medium">
@@ -138,7 +138,7 @@ export default function SalaryLevelsTrashPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-black rounded-xl shadow-premium hover:bg-red-700 active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl shadow-sm hover:bg-red-700 active:scale-[0.98] transition-all"
                 >
                   <HiTrash className="w-4 h-4" />
                   Delete {selectedIds.size}
@@ -152,15 +152,15 @@ export default function SalaryLevelsTrashPage() {
         {isLoading ? (
           <div className="space-y-3 animate-pulse">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-20 bg-card-alt rounded-3xl" />
+              <div key={i} className="h-20 bg-card-alt rounded-xl" />
             ))}
           </div>
         ) : error ? (
-          <div className="p-12 text-center rounded-3xl border border-dashed border-destructive/30 text-destructive font-black uppercase tracking-widest text-sm">
+          <div className="p-12 text-center rounded-xl border border-dashed border-destructive/30 text-destructive font-semibold uppercase tracking-wider text-sm">
             Error loading trash
           </div>
         ) : !items || items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-3xl border border-dashed border-border text-center px-4">
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-dashed border-border text-center px-4">
             <HiTrash className="w-16 h-16 text-muted mb-4 opacity-10" />
             <h3 className="text-lg font-bold text-foreground opacity-50">Trash is empty</h3>
             <p className="text-xs text-muted mt-1">Deleted salary levels will appear here</p>
@@ -169,7 +169,7 @@ export default function SalaryLevelsTrashPage() {
           <div className="space-y-3">
             {/* Select All Bar */}
             {selectMode && (
-              <div className="flex items-center gap-3 px-4 py-2.5 bg-card-alt rounded-2xl border border-border/50">
+              <div className="flex items-center gap-3 px-4 py-2 bg-card-alt rounded-xl border border-border/50">
                 <button
                   onClick={toggleAll}
                   className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
@@ -182,7 +182,7 @@ export default function SalaryLevelsTrashPage() {
                     </svg>
                   )}
                 </button>
-                <span className="text-xs font-black uppercase tracking-widest text-muted">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {isAllSelected ? "Deselect All" : "Select All"}
                 </span>
               </div>
@@ -192,7 +192,7 @@ export default function SalaryLevelsTrashPage() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className={`group flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-3xl bg-card shadow-sm transition-all gap-4 ${
+                className={`group flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-xl bg-card shadow-sm transition-all gap-4 ${
                   selectMode && selectedIds.has(item.id)
                     ? "ring-2 ring-primary"
                     : "border border-border/30 hover:border-border"
@@ -218,13 +218,13 @@ export default function SalaryLevelsTrashPage() {
                   )}
 
                   {/* Icon */}
-                  <div className="w-10 h-10 rounded-2xl bg-red-500/10 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
                     <HiCurrencyDollar className="w-5 h-5 text-red-500" />
                   </div>
 
                   {/* Info */}
                   <div>
-                    <div className="font-black text-foreground tracking-tight">{item.level_name}</div>
+                    <div className="font-bold text-foreground tracking-tight">{item.level_name}</div>
                     <div className="text-xs text-muted font-semibold mt-0.5">
                       ETB {Number(item.base_salary).toLocaleString()}
                     </div>
@@ -236,7 +236,7 @@ export default function SalaryLevelsTrashPage() {
                   <button
                     onClick={() => restoreMutation.mutate(item.id)}
                     disabled={restoreMutation.isPending}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-black bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50"
                   >
                     <HiArrowUturnLeft className="w-4 h-4" />
                     Restore
@@ -244,7 +244,7 @@ export default function SalaryLevelsTrashPage() {
                   {!selectMode && (
                     <button
                       onClick={() => handleSingleDelete(item.id)}
-                      className="p-2 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
+                      className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
                       title="Delete permanently"
                     >
                       <HiTrash className="w-4 h-4" />

@@ -175,7 +175,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       >
         {/* Warning Banner for Completed Event Locks */}
         {isCompleted && (
-          <div className={`mb-6 p-4 rounded-2xl border flex items-start gap-3 text-xs leading-relaxed ${isReadOnly ? "bg-red-500/10 border-red-500/20 text-red-500 font-semibold" : "bg-warning/10 border-warning/20 text-warning font-semibold"}`}>
+          <div className={`mb-6 p-4 rounded-xl border flex items-start gap-3 text-xs leading-relaxed ${isReadOnly ? "bg-red-500/10 border-red-500/20 text-red-500 font-semibold" : "bg-warning/10 border-warning/20 text-warning font-semibold"}`}>
             <HiExclamationCircle className="w-5 h-5 shrink-0" />
             <div>
               {isReadOnly ? (

@@ -193,7 +193,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                           >
                             <HiArrowPath className="w-8 h-8 text-white animate-spin-slow" />
                           </motion.div>
-                          <p className="text-white font-black text-[10px] uppercase tracking-[0.2em] drop-shadow-md">
+                          <p className="text-white font-bold text-[10px] uppercase tracking-wider drop-shadow-md">
                             {imageFile ? "Converting to WebP & Syncing..." : "Syncing Asset..."}
                           </p>
                           <div className="mt-4 w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -212,13 +212,13 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     <div className="p-4 bg-background rounded-xl shadow-sm border border-border">
                       <HiCamera className="w-8 h-8 text-primary" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Tap to change photo</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Tap to change photo</span>
                   </div>
                 )}
                 
                 {!updateMutation.isPending && (
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                    <span className="bg-background text-foreground px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-massive">Update Image</span>
+                    <span className="bg-background text-foreground px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider shadow-massive">Update Image</span>
                   </div>
                 )}
               </div>
@@ -228,7 +228,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   type="button"
                   onClick={() => rotateMutation.mutate()}
                   disabled={rotateMutation.isPending || updateMutation.isPending}
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
+                  className="flex items-center justify-center gap-2 w-full h-11 rounded-xl text-sm font-semibold uppercase tracking-wider border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
                 >
                   <HiArrowPath className={`w-4 h-4 text-primary ${rotateMutation.isPending ? "animate-spin" : ""}`} />
                   {rotateMutation.isPending ? "Rotating..." : "Rotate Asset 90°"}
@@ -238,11 +238,11 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               {/* Reconciliation Info */}
               {(item.last_counted_at || item.last_counted_by) && (
                 <div className="p-4 rounded-xl bg-card-alt/50 border border-border/40 shadow-sm">
-                  <p className="text-[10px] uppercase font-black text-muted tracking-[0.2em] mb-3">Audit Traceability</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-3">Audit Traceability</p>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-muted">Last Reconciled</span>
-                      <span className="text-xs font-black text-foreground">
+                      <span className="text-xs font-bold text-foreground">
                         {item.last_counted_at ? new Date(item.last_counted_at).toLocaleDateString(undefined, { 
                           month: 'short', day: 'numeric', year: 'numeric' 
                         }) : "Pending"}
@@ -251,7 +251,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     {item.last_counted_by && (
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-muted">Verified By</span>
-                        <span className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-black tracking-wider">
+                        <span className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-semibold tracking-wider">
                           {item.last_counted_by.full_name.toUpperCase()}
                         </span>
                       </div>

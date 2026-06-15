@@ -33,7 +33,7 @@ export default function MobileEmployeeCard({
         if (showTrash && selectMode) { onSelect?.(employee.id); return; }
         if (!editMode && !showTrash) onTap?.(employee);
       }}
-      className={`bg-card rounded-4xl border-none p-5 shadow-premium transition-all ${
+      className={`bg-card rounded-xl border-none p-5 shadow-premium transition-all ${
         selected ? "ring-2 ring-primary" : ""
       } ${
         (editMode || showTrash) && !selectMode ? "" : "active:scale-[0.98] cursor-pointer"
@@ -47,7 +47,7 @@ export default function MobileEmployeeCard({
               alt={employee.full_name}
               width={48}
               height={48}
-              className="w-full h-full object-cover rounded-2xl"
+              className="w-full h-full object-cover rounded-lg"
               unoptimized
             />
           ) : (
@@ -63,7 +63,7 @@ export default function MobileEmployeeCard({
                     type="text"
                     defaultValue={employee.full_name}
                     onChange={(e) => onUpdate?.(employee.id, "full_name", e.target.value)}
-                    className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
+                    className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-semibold"
                     placeholder="Full Name"
                     onClick={(e) => e.stopPropagation()}
                   />
@@ -117,7 +117,7 @@ export default function MobileEmployeeCard({
                  {/* Restore */}
                  <button
                    onClick={(e) => { e.stopPropagation(); onRestore?.(employee); }}
-                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-black hover:bg-emerald-700 transition-all flex-1 justify-center"
+                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-all flex-1 justify-center"
                  >
                    <HiArrowUturnLeft className="w-3.5 h-3.5" />
                    Restore
@@ -126,7 +126,7 @@ export default function MobileEmployeeCard({
                  {!selectMode && (
                    <button
                      onClick={(e) => { e.stopPropagation(); onDelete?.(employee); }}
-                     className="p-2.5 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
+                     className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
                      title="Delete permanently"
                    >
                      <HiTrash className="w-4 h-4" />
@@ -139,7 +139,7 @@ export default function MobileEmployeeCard({
                     e.stopPropagation();
                     onDelete?.(employee);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-red-700 transition-all shadow-md group"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-all shadow-md group"
                 >
                   <HiTrash className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                   Move to Trash
@@ -152,9 +152,9 @@ export default function MobileEmployeeCard({
                         <HiPhone className="w-3 h-3" /> {employee.phone}
                       </span>
                     )}
-                    {employee.salary_level && (
+                     {employee.salary_level && (
                       <div className="flex items-center gap-1 bg-accent/10 px-1.5 py-0.5 rounded shrink min-w-0">
-                        <span className="text-accent-dark font-black tracking-widest text-[10px] whitespace-nowrap">
+                        <span className="text-accent-dark font-bold tracking-wider text-[10px] whitespace-nowrap">
                           {employee.salary_level}
                         </span>
                         {employee.base_salary ? (
@@ -171,7 +171,7 @@ export default function MobileEmployeeCard({
                         e.stopPropagation();
                         onTap?.(employee);
                       }}
-                      className="p-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/10"
+                      className="p-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/10"
                     >
                       <HiPencilSquare className="w-4 h-4" />
                     </button>
@@ -180,7 +180,7 @@ export default function MobileEmployeeCard({
                         e.stopPropagation();
                         onDelete?.(employee);
                       }}
-                      className="p-2.5 rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
+                      className="p-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
                     >
                       <HiTrash className="w-4 h-4" />
                     </button>

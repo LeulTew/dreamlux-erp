@@ -180,7 +180,7 @@ function ReportContent() {
       <div className="mb-6 md:hidden print:hidden">
         <Link
           href="/assets"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-gray-300 text-sm font-bold uppercase tracking-wider"
+          className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-gray-300 text-sm font-semibold uppercase tracking-wider"
         >
           <HiArrowLeft className="w-4 h-4" />
           Back
