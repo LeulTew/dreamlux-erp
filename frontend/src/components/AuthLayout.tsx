@@ -2,8 +2,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getEmployees, getEvents, getItems } from "@/lib/api";
-import type { Employee, Event, Item } from "@/lib/types";
+import { getEmployees, getEvents, getItems, getPayrollRuns, getSalaryLevels } from "@/lib/api";
+import type { Employee, Event, Item, PayrollRun, SalaryLevel } from "@/lib/types";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import PayrollReminder from "@/components/PayrollReminder";
@@ -164,11 +164,14 @@ function SearchDialog({
       getEmployees(1, 5, debouncedQuery, "active"),
       getItems(1, 5, debouncedQuery),
       getEvents(1, 5, debouncedQuery),
+      getSalaryLevels(),
+      getPayrollRuns({ view: "active" }),
     ])
-      .then(([employeesResult, assetsResult, eventsResult]) => {
+      .then(([employeesResult, assetsResult, eventsResult, salaryLevelsResult, payrollRunsResult]) => {
         if (!active) return;
 
         const nextResults: SearchResult[] = [];
+        const normalizedQuery = debouncedQuery.toLowerCase();
 
         if (employeesResult.status === "fulfilled") {
           const employees = (employeesResult.value?.employees || []) as Employee[];
@@ -212,11 +215,56 @@ function SearchDialog({
           );
         }
 
+        if (salaryLevelsResult.status === "fulfilled") {
+          const salaryLevels = ((salaryLevelsResult.value || []) as SalaryLevel[])
+            .filter((level) =>
+              compactDetail([level.level_name, level.base_salary]).toLowerCase().includes(normalizedQuery)
+            )
+            .slice(0, 5);
+          nextResults.push(
+            ...salaryLevels.map((level) => ({
+              key: `salary-level:${level.id}`,
+              label: level.level_name,
+              amLabel: level.level_name,
+              href: `/hr/salary-levels?highlight=${encodeURIComponent(level.id)}`,
+              category: "Salary",
+              detail: `ETB ${Number(level.base_salary).toLocaleString()}`,
+            }))
+          );
+        }
+
+        if (payrollRunsResult.status === "fulfilled") {
+          const payrollRuns = ((payrollRunsResult.value || []) as PayrollRun[])
+            .filter((run) =>
+              compactDetail([
+                run.status,
+                run.year,
+                run.month,
+                run.period_start,
+                run.period_end,
+                run.total_payroll_value,
+              ]).toLowerCase().includes(normalizedQuery)
+            )
+            .slice(0, 5);
+          nextResults.push(
+            ...payrollRuns.map((run) => ({
+              key: `payroll:${run.id}`,
+              label: compactDetail([run.period_start, run.period_end]) || `Payroll ${run.id.slice(0, 8)}`,
+              amLabel: compactDetail([run.period_start, run.period_end]) || `Payroll ${run.id.slice(0, 8)}`,
+              href: `/hr/payments?highlight=${encodeURIComponent(run.id)}`,
+              category: "Payroll",
+              detail: compactDetail([run.status, `ETB ${Number(run.total_payroll_value || 0).toLocaleString()}`]),
+            }))
+          );
+        }
+
         setRecordResults(nextResults.slice(0, 8));
         setRecordSearchError(
           employeesResult.status === "rejected" &&
             assetsResult.status === "rejected" &&
-            eventsResult.status === "rejected"
+            eventsResult.status === "rejected" &&
+            salaryLevelsResult.status === "rejected" &&
+            payrollRunsResult.status === "rejected"
         );
       })
       .catch(() => {

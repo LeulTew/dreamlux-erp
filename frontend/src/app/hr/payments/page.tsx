@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { format } from "date-fns";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRuns, updatePayrollRunStatus, exportPayrollPDF, permanentlyDeletePayrollRun } from "@/lib/api";
 import { HiPlusCircle, HiClock, HiOutlineChevronRight, HiPencilSquare, HiTrash, HiPrinter, HiArrowUturnLeft, HiArrowPath } from "react-icons/hi2";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import toast from "react-hot-toast";
@@ -24,6 +25,7 @@ type PayrollRunRow = {
 };
 
 export default function PaymentsPage() {
+  const searchParams = useSearchParams();
   const selectedMonth = format(new Date(), "yyyy-MM");
   const queryClient = useQueryClient();
   const [view, setView] = useState<"active" | "trash">("active");
@@ -33,6 +35,7 @@ export default function PaymentsPage() {
   const [sortBy, setSortBy] = useState("period_start");
   const [sortOrder, setSortOrder] = useState("desc");
   const [confirmState, setConfirmState] = useState<{ id: string; action: "trash" | "restore" | "delete" } | null>(null);
+  const highlightedId = searchParams.get("highlight");
 
   const { data: runs, isLoading, isRefetching, refetch } = useQuery<PayrollRunRow[]>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder],
@@ -91,6 +94,15 @@ export default function PaymentsPage() {
   }, [page, sortedRuns]);
 
   const isMutating = trashMutation.isPending || restoreMutation.isPending || permanentDeleteMutation.isPending;
+
+  useEffect(() => {
+    if (!highlightedId || sortedRuns.length === 0) return;
+
+    const highlightedIndex = sortedRuns.findIndex((run) => run.id === highlightedId);
+    if (highlightedIndex === -1) return;
+
+    setPage(Math.floor(highlightedIndex / ITEMS_PER_PAGE) + 1);
+  }, [highlightedId, sortedRuns]);
 
   const executeConfirmAction = async () => {
     if (!confirmState) return;
@@ -256,7 +268,14 @@ export default function PaymentsPage() {
               const currentStatus = (run.status ?? "draft").toUpperCase();
 
               return (
-                <div key={run.id} className="group p-6 bg-card rounded-3xl border border-border/60 hover:border-primary/40 hover:shadow-2xl transition-all duration-300 relative overflow-hidden">
+                <div
+                  key={run.id}
+                  className={`group p-6 bg-card rounded-3xl border transition-all duration-300 relative overflow-hidden ${
+                    highlightedId === run.id
+                      ? "border-primary/60 ring-2 ring-primary/20"
+                      : "border-border/60 hover:border-primary/40 hover:shadow-2xl"
+                  }`}
+                >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-[4rem] -mr-4 -mt-4 transition-transform group-hover:scale-110 pointer-events-none" />
                   
                   <div className="flex flex-col gap-6 md:flex-row md:items-center relative z-10">
