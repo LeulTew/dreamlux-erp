@@ -18,7 +18,6 @@ import {
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Sidebar,
   SidebarContent,
@@ -245,6 +244,7 @@ function SidebarLink({
       </Link>
     </SidebarMenuButton>
   );
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
