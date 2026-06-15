@@ -12,12 +12,72 @@ import { Item, ItemsResponse, Store } from "@/lib/types";
 import { HiArrowLeft, HiMiniArrowUturnLeft, HiTrash } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/hooks/use-language";
 
 const ITEMS_PER_PAGE = 10;
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Trash": "Trash",
+    "deleted item": "deleted item",
+    "deleted items": "deleted items",
+    "Location": "Location",
+    "All Locations": "All Locations",
+    "Search": "Search",
+    "Search deleted items...": "Search deleted items...",
+    "Deleted From": "Deleted From",
+    "Deleted To": "Deleted To",
+    "Clear": "Clear",
+    "Item": "Item",
+    "Quantity (at delete)": "Quantity (at delete)",
+    "Actions": "Actions",
+    "Loading trash...": "Loading trash...",
+    "Trash is empty.": "Trash is empty.",
+    "Restore": "Restore",
+    "Permanent Delete": "Permanent Delete",
+    "Quantity at delete": "Quantity at delete",
+    "Restore Item": "Restore Item",
+    "Set restored quantity for": "Set restored quantity for",
+    "This will permanently remove": "This will permanently remove",
+    "Item restored": "Item restored",
+    "Failed to restore item": "Failed to restore item",
+    "Item permanently deleted": "Item permanently deleted",
+    "Permanent delete failed": "Permanent delete failed",
+  },
+  am: {
+    "Trash": "ቆሻሻ መጣያ",
+    "deleted item": "የተሰረዘ እቃ",
+    "deleted items": "የተሰረዙ እቃዎች",
+    "Location": "ቦታ",
+    "All Locations": "ሁሉም ቦታዎች",
+    "Search": "ፈልግ",
+    "Search deleted items...": "የተሰረዙ እቃዎችን ፈልግ...",
+    "Deleted From": "ከተሰረዘበት ቀን",
+    "Deleted To": "እስከተሰረዘበት ቀን",
+    "Clear": "አፅዳ",
+    "Item": "እቃ",
+    "Quantity (at delete)": "ብዛት (ሲሰረዝ)",
+    "Actions": "ድርጊቶች",
+    "Loading trash...": "ቆሻሻ መጣያ በመጫን ላይ...",
+    "Trash is empty.": "ቆሻሻ መጣያው ባዶ ነው።",
+    "Restore": "መልስ",
+    "Permanent Delete": "በቋሚነት ሰርዝ",
+    "Quantity at delete": "ብዛት በሚሰረዝበት ጊዜ",
+    "Restore Item": "እቃውን መልስ",
+    "Set restored quantity for": "የሚመለሰውን ብዛት ይወስኑ ለ",
+    "This will permanently remove": "ይህ በቋሚነት ያስወግዳል",
+    "Item restored": "እቃው ተመልሷል",
+    "Failed to restore item": "እቃውን መመለስ አልተሳካም",
+    "Item permanently deleted": "እቃው በቋሚነት ተሰርዟል",
+    "Permanent delete failed": "በቋሚነት መሰረዝ አልተሳካም",
+  }
+};
 
 export default function TrashPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   const [storeFilter, setStoreFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -55,25 +115,25 @@ export default function TrashPage() {
   const recoverMutation = useMutation({
     mutationFn: ({ id, quantity }: { id: string; quantity: number }) => recoverItem(id, quantity),
     onSuccess: () => {
-      toast.success("Item restored");
+      toast.success(t("Item restored"));
       setItemToRecover(null);
       queryClient.invalidateQueries({ queryKey: ["trash"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
     },
-    onError: () => toast.error("Failed to restore item"),
+    onError: () => toast.error(t("Failed to restore item")),
   });
 
   const permanentDeleteMutation = useMutation({
     mutationFn: (id: string) => permanentlyDeleteItem(id),
     onSuccess: () => {
-      toast.success("Item permanently deleted");
+      toast.success(t("Item permanently deleted"));
       setItemToPermanentlyDelete(null);
       queryClient.invalidateQueries({ queryKey: ["trash"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
     },
-    onError: () => toast.error("Permanent delete failed"),
+    onError: () => toast.error(t("Permanent delete failed")),
   });
 
   return (
@@ -90,19 +150,21 @@ export default function TrashPage() {
             <div>
               <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
                 <HiTrash className="w-6 h-6 text-danger" />
-                Trash
+                {t("Trash")}
               </h1>
-              <p className="text-sm text-muted font-medium">{total} deleted item{total !== 1 ? "s" : ""}</p>
+              <p className="text-sm text-muted font-medium">
+                {total} {t(total === 1 ? "deleted item" : "deleted items")}
+              </p>
             </div>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-3xl p-4 shadow-sm">
           <div className="lg:col-span-3">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Location</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">{t("Location")}</label>
             <Select
               options={[
-                { id: "all", label: "All Locations" },
+                { id: "all", label: t("All Locations") },
                 ...stores.map((store) => ({ id: store.id, label: store.name }))
               ]}
               value={storeFilter}
@@ -114,7 +176,7 @@ export default function TrashPage() {
           </div>
 
           <div className="lg:col-span-3">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Search</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">{t("Search")}</label>
             <input
               type="text"
               value={search}
@@ -122,13 +184,13 @@ export default function TrashPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search deleted items..."
+              placeholder={t("Search deleted items...")}
               className="w-full px-3 py-2.5 rounded-2xl border border-border bg-card-alt text-foreground text-sm font-semibold placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
 
           <div className="lg:col-span-2">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Deleted From</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">{t("Deleted From")}</label>
             <input
               type="datetime-local"
               value={fromDateTime}
@@ -141,7 +203,7 @@ export default function TrashPage() {
           </div>
 
           <div className="lg:col-span-2">
-            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">Deleted To</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">{t("Deleted To")}</label>
             <input
               type="datetime-local"
               value={toDateTime}
@@ -164,7 +226,7 @@ export default function TrashPage() {
               }}
               className="w-full px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card-alt text-foreground border border-border hover:bg-border transition-all"
             >
-              Clear
+              {t("Clear")}
             </button>
           </div>
         </div>
@@ -173,20 +235,20 @@ export default function TrashPage() {
           <table className="w-full text-left border-collapse hidden md:table">
             <thead>
               <tr className="bg-card-alt/30 border-b border-border/50 text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                <th className="px-6 py-4">Item</th>
-                <th className="px-6 py-4">Location</th>
-                <th className="px-6 py-4">Quantity (at delete)</th>
-                <th className="px-6 py-4">Actions</th>
+                <th className="px-6 py-4">{t("Item")}</th>
+                <th className="px-6 py-4">{t("Location")}</th>
+                <th className="px-6 py-4">{t("Quantity (at delete)")}</th>
+                <th className="px-6 py-4">{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-16 text-center text-muted">Loading trash...</td>
+                  <td colSpan={4} className="px-6 py-16 text-center text-muted">{t("Loading trash...")}</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-16 text-center text-muted">Trash is empty.</td>
+                  <td colSpan={4} className="px-6 py-16 text-center text-muted">{t("Trash is empty.")}</td>
                 </tr>
               ) : (
                 items.map((item) => (
@@ -206,13 +268,13 @@ export default function TrashPage() {
                           className="px-3 py-2 rounded-xl bg-success text-white text-xs font-black uppercase tracking-wider hover:opacity-90 transition-all inline-flex items-center gap-1"
                         >
                           <HiMiniArrowUturnLeft className="w-4 h-4" />
-                          Restore
+                          {t("Restore")}
                         </button>
                         <button
                           onClick={() => setItemToPermanentlyDelete(item)}
                           className="px-3 py-2 rounded-xl bg-danger text-white text-xs font-black uppercase tracking-wider hover:opacity-90 transition-all"
                         >
-                          Permanent Delete
+                          {t("Permanent Delete")}
                         </button>
                       </div>
                     </td>
@@ -224,9 +286,9 @@ export default function TrashPage() {
 
           <div className="md:hidden divide-y divide-border/30">
             {isLoading ? (
-              <div className="px-4 py-12 text-center text-muted">Loading trash...</div>
+              <div className="px-4 py-12 text-center text-muted">{t("Loading trash...")}</div>
             ) : items.length === 0 ? (
-              <div className="px-4 py-12 text-center text-muted">Trash is empty.</div>
+              <div className="px-4 py-12 text-center text-muted">{t("Trash is empty.")}</div>
             ) : (
               items.map((item) => (
                 <div key={item.id} className="px-4 py-4 space-y-3 active:bg-primary-light/10 transition-colors"
@@ -236,19 +298,19 @@ export default function TrashPage() {
                     <div className="font-bold text-foreground">{item.name}</div>
                     <div className="text-xs text-muted mt-1">{item.store?.name || "Unknown"}</div>
                   </div>
-                  <div className="text-xs text-muted">Quantity at delete: {item.quantity}</div>
+                  <div className="text-xs text-muted">{t("Quantity at delete")}: {item.quantity}</div>
                   <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setItemToRecover(item)}
                       className="flex-1 px-3 py-2 rounded-xl bg-success text-white text-[11px] font-black uppercase tracking-wider"
                     >
-                      Restore
+                      {t("Restore")}
                     </button>
                     <button
                       onClick={() => setItemToPermanentlyDelete(item)}
                       className="flex-1 px-3 py-2 rounded-xl bg-danger text-white text-[11px] font-black uppercase tracking-wider"
                     >
-                      Permanent Delete
+                      {t("Permanent Delete")}
                     </button>
                   </div>
                 </div>
@@ -267,10 +329,10 @@ export default function TrashPage() {
               recoverMutation.mutate({ id: itemToRecover.id, quantity: qty });
             }
           }}
-          title="Restore Item"
-          message="Set restored quantity for"
+          title={t("Restore Item")}
+          message={t("Set restored quantity for")}
           itemName={itemToRecover?.name || ""}
-          confirmLabel="Restore"
+          confirmLabel={t("Restore")}
         />
 
         <DeleteConfirmModal
@@ -282,8 +344,8 @@ export default function TrashPage() {
             }
           }}
           isDeleting={permanentDeleteMutation.isPending}
-          title="Permanent Delete"
-          message="This will permanently remove"
+          title={t("Permanent Delete")}
+          message={t("This will permanently remove")}
           itemName={itemToPermanentlyDelete?.name || ""}
         />
       </div>

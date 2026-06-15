@@ -32,8 +32,72 @@ import {
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
+import { useLanguage } from "@/hooks/use-language";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4"];
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Back to Dashboard": "Back to Dashboard",
+    "Reports": "Reports",
+    "Asset Reports": "Asset Reports",
+    "View stock data by location, then print or download a report.": "View stock data by location, then print or download a report.",
+    "All Locations": "All Locations",
+    "Print Report": "Print Report",
+    "Print Asset Report": "Print Asset Report",
+    "Choose whether to include item thumbnails in your printed layout.": "Choose whether to include item thumbnails in your printed layout.",
+    "Locations": "Locations",
+    "Stock Split": "Stock Split",
+    "How items are split across locations.": "How items are split across locations.",
+    "Trend": "Trend",
+    "points": "points",
+    "Stock Trend": "Stock Trend",
+    "Recent stock level and movement signal.": "Recent stock level and movement signal.",
+    "Item List": "Item List",
+    "Top items with quantity and status.": "Top items with quantity and status.",
+    "Open Inventory": "Open Inventory",
+    "Item": "Item",
+    "Location": "Location",
+    "Quantity": "Quantity",
+    "Status": "Status",
+    "Open": "Open",
+    "Low": "Low",
+    "OK": "OK",
+    "No items to download": "No items to download",
+    "Download started": "Download started",
+    "Download failed": "Download failed",
+  },
+  am: {
+    "Back to Dashboard": "ወደ ዳሽቦርድ ተመለስ",
+    "Reports": "ሪፖርቶች",
+    "Asset Reports": "የንብረት ሪፖርቶች",
+    "View stock data by location, then print or download a report.": "የቅርንጫፎችን የክምችት መረጃ ይመልከቱ፣ ከዚያም ያትሙ ወይም ሪፖርቱን ያውርዱ።",
+    "All Locations": "ሁሉም ቦታዎች",
+    "Print Report": "ሪፖርት አትም",
+    "Print Asset Report": "የንብረት ሪፖርት አትም",
+    "Choose whether to include item thumbnails in your printed layout.": "በሚታተመው ሰነድ ላይ የእቃዎች ምስል እንዲካተት መፈለግዎን ይምረጡ።",
+    "Locations": "ቦታዎች",
+    "Stock Split": "የክምችት ክፍፍል",
+    "How items are split across locations.": "እቃዎች በተለያዩ ቦታዎች እንዴት እንደተከፋፈሉ የሚያሳይ።",
+    "Trend": "አዝማሚያ",
+    "points": "ነጥቦች",
+    "Stock Trend": "የክምችት አዝማሚያ",
+    "Recent stock level and movement signal.": "የቅርብ ጊዜ የክምችት ደረጃ እና የእንቅስቃሴ ምልክት።",
+    "Item List": "የእቃዎች ዝርዝር",
+    "Top items with quantity and status.": "ዋነኛ እቃዎች ከነብዛታቸው እና ሁኔታቸው ጋር።",
+    "Open Inventory": "የንብረት መዝገብ ክፈት",
+    "Item": "እቃ",
+    "Location": "ቦታ",
+    "Quantity": "ብዛት",
+    "Status": "ሁኔታ",
+    "Open": "ክፈት",
+    "Low": "ያለቀ",
+    "OK": "በቂ",
+    "No items to download": "የሚወርድ ምንም እቃ የለም",
+    "Download started": "ማውረድ ተጀምሯል",
+    "Download failed": "ማውረድ አልተሳካም",
+  }
+};
 
 export default function ReportsPage() {
   const router = useRouter();
@@ -41,6 +105,8 @@ export default function ReportsPage() {
   const [storeFilter, setStoreFilter] = useState<string>("all");
   const [chartsReady, setChartsReady] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => setChartsReady(true));
@@ -90,16 +156,16 @@ export default function ReportsPage() {
 
   const handleDownload = async () => {
     if (items.length === 0) {
-      toast.error("No items to download");
+      toast.error(t("No items to download"));
       return;
     }
 
     setDownloading(true);
     try {
       await exportCSV(storeFilter);
-      toast.success("Download started");
+      toast.success(t("Download started"));
     } catch {
-      toast.error("Download failed");
+      toast.error(t("Download failed"));
     }
     setDownloading(false);
   };
@@ -114,23 +180,23 @@ export default function ReportsPage() {
               className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-muted hover:text-foreground transition-colors"
             >
               <HiChevronLeft className="w-5 h-5" />
-              Back to Dashboard
+              {t("Back to Dashboard")}
             </button>
 
             <div className="flex items-center gap-3 mb-2">
-              <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full border border-primary/20">Reports</span>
+              <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full border border-primary/20">{t("Reports")}</span>
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
             </div>
-            <h1 className="text-5xl font-black text-foreground tracking-tighter leading-none">Asset Reports</h1>
+            <h1 className="text-5xl font-black text-foreground tracking-tighter leading-none">{t("Asset Reports")}</h1>
             <p className="text-base font-medium text-muted mt-4 max-w-xl leading-relaxed">
-              View stock data by location, then print or download a report.
+              {t("View stock data by location, then print or download a report.")}
             </p>
           </motion.div>
 
           <div className="flex flex-wrap items-center gap-4">
             <Select
               options={[
-                { id: "all", label: "All Locations" },
+                { id: "all", label: t("All Locations") },
                 ...(stores?.map((s) => ({ id: s.id, label: s.name })) || [])
               ]}
               value={storeFilter}
@@ -143,7 +209,7 @@ export default function ReportsPage() {
               className="px-8 py-4 bg-foreground text-background rounded-3xl flex items-center gap-3 font-black text-sm shadow-premium hover:scale-105 active:scale-95 transition-all"
             >
               <HiPrinter className="w-5 h-5" />
-              Print Report
+              {t("Print Report")}
             </button>
           </div>
         </header>
@@ -155,8 +221,8 @@ export default function ReportsPage() {
             const imgQuery = options.includeImages ? "&images=true" : "&images=false";
             router.push(`/report?store=${storeFilter}${imgQuery}`);
           }}
-          title="Print Asset Report"
-          description="Choose whether to include item thumbnails in your printed layout."
+          title={t("Print Asset Report")}
+          description={t("Choose whether to include item thumbnails in your printed layout.")}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -169,12 +235,12 @@ export default function ReportsPage() {
                 <HiMapPin className="w-7 h-7" />
               </div>
               <div className="flex flex-col text-right">
-                <span className="text-[10px] font-black text-muted tracking-widest uppercase">Locations</span>
+                <span className="text-[10px] font-black text-muted tracking-widest uppercase">{t("Locations")}</span>
                 <span className="text-2xl font-black text-foreground">{stats?.stockPerLocation.length || 0}</span>
               </div>
             </div>
-            <h3 className="text-xl font-black tracking-tight mb-2">Stock Split</h3>
-            <p className="text-xs font-medium text-muted">How items are split across locations.</p>
+            <h3 className="text-xl font-black tracking-tight mb-2">{t("Stock Split")}</h3>
+            <p className="text-xs font-medium text-muted">{t("How items are split across locations.")}</p>
             <div className="h-64 mt-6 min-w-0">
               {chartsReady ? (
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1} debounce={50}>
@@ -211,13 +277,13 @@ export default function ReportsPage() {
               </div>
               <div className="flex gap-4">
                 <div className="flex flex-col text-right">
-                  <span className="text-[10px] font-black text-muted tracking-widest uppercase">Trend</span>
-                  <span className="text-2xl font-black text-foreground">6 points</span>
+                  <span className="text-[10px] font-black text-muted tracking-widest uppercase">{t("Trend")}</span>
+                  <span className="text-2xl font-black text-foreground">{`6 ${t("points")}`}</span>
                 </div>
               </div>
             </div>
-            <h3 className="text-xl font-black tracking-tight mb-2">Stock Trend</h3>
-            <p className="text-xs font-medium text-muted">Recent stock level and movement signal.</p>
+            <h3 className="text-xl font-black tracking-tight mb-2">{t("Stock Trend")}</h3>
+            <p className="text-xs font-medium text-muted">{t("Recent stock level and movement signal.")}</p>
             <div className="h-64 mt-6 min-w-0">
               {chartsReady ? (
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1} debounce={50}>
@@ -253,8 +319,8 @@ export default function ReportsPage() {
 
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-16 relative z-10">
             <div>
-              <h2 className="text-4xl font-black text-foreground tracking-tighter leading-tight mb-2">Item List</h2>
-              <p className="text-sm font-medium text-muted leading-relaxed max-w-lg">Top items with quantity and status.</p>
+              <h2 className="text-4xl font-black text-foreground tracking-tighter leading-tight mb-2">{t("Item List")}</h2>
+              <p className="text-sm font-medium text-muted leading-relaxed max-w-lg">{t("Top items with quantity and status.")}</p>
             </div>
             <div className="flex gap-3">
               <button
@@ -269,7 +335,7 @@ export default function ReportsPage() {
                 onClick={() => router.push(`/assets${storeFilter !== "all" ? `?store=${storeFilter}` : ""}`)}
                 className="px-8 py-4 rounded-xl bg-primary text-background font-black text-sm shadow-premium hover:opacity-90 transition-all flex items-center gap-3"
               >
-                Open Inventory
+                {t("Open Inventory")}
                 <HiArrowUpRight className="w-5 h-5" />
               </button>
             </div>
@@ -279,11 +345,11 @@ export default function ReportsPage() {
             <table className="w-full text-left border-separate border-spacing-y-4">
               <thead>
                 <tr className="text-[10px] font-black uppercase text-muted tracking-[0.2em]">
-                  <th className="px-6 pb-2">Item</th>
-                  <th className="px-6 pb-2">Location</th>
-                  <th className="px-6 pb-2">Quantity</th>
-                  <th className="px-6 pb-2">Status</th>
-                  <th className="px-6 pb-2 text-right">Open</th>
+                  <th className="px-6 pb-2">{t("Item")}</th>
+                  <th className="px-6 pb-2">{t("Location")}</th>
+                  <th className="px-6 pb-2">{t("Quantity")}</th>
+                  <th className="px-6 pb-2">{t("Status")}</th>
+                  <th className="px-6 pb-2 text-right">{t("Open")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -326,7 +392,7 @@ export default function ReportsPage() {
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${item.quantity <= 5 ? "bg-danger" : "bg-success"}`} />
                         <span className={`text-[10px] font-black uppercase tracking-widest ${item.quantity <= 5 ? "text-danger" : "text-success"}`}>
-                          {item.quantity <= 5 ? "Low" : "OK"}
+                          {item.quantity <= 5 ? t("Low") : t("OK")}
                         </span>
                       </div>
                     </td>

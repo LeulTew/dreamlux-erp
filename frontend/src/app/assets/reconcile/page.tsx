@@ -19,8 +19,69 @@ import Select from "@/components/ui/Select";
 import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import PaginationControls from "@/components/PaginationControls";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "No items match your criteria.": "No items match your criteria.",
+    "Qty": "Qty",
+    "Physical Count": "Physical Count",
+    "Counted": "Counted",
+    "Diff": "Diff",
+    "Net": "Net",
+    "Notes...": "Notes...",
+    "Confirm": "Confirm",
+    "Count Finalized": "Count Finalized",
+    "Reconciliation run": "Reconciliation run",
+    "has been securely committed to the audit ledger.": "has been securely committed to the audit ledger.",
+    "Counts were saved, but the audit trail ledger is temporarily unavailable. Please retry later to restore full audit commit tracking.": "Counts were saved, but the audit trail ledger is temporarily unavailable. Please retry later to restore full audit commit tracking.",
+    "Discrepancies": "Discrepancies",
+    "Net Flow": "Net Flow",
+    "Audit Trail Detail": "Audit Trail Detail",
+    "View Audit History": "View Audit History",
+    "Dismiss View": "Dismiss View",
+    "Finalize Reconciliation?": "Finalize Reconciliation?",
+    "You are about to submit": "You are about to submit",
+    "count records. This will create an permanent audit trail for stock adjustments.": "count records. This will create an permanent audit trail for stock adjustments.",
+    "Impacted Items": "Impacted Items",
+    "adjustments": "adjustments",
+    "Operator Notes": "Operator Notes",
+    "Back to Edit": "Back to Edit",
+    "Confirm & Post": "Confirm & Post"
+  },
+  am: {
+    "No items match your criteria.": "ምንም ንብረት ከእርስዎ ፍላጎት ጋር አይዛመድም።",
+    "Qty": "ብዛት",
+    "Physical Count": "የአካል ቆጠራ",
+    "Counted": "የተቆጠረው",
+    "Diff": "ልዩነት",
+    "Net": "የተጣራ",
+    "Notes...": "ማስታወሻዎች...",
+    "Confirm": "አረጋግጥ",
+    "Count Finalized": "ቆጠራ ተጠናቋል",
+    "Reconciliation run": "የማስታረቅ ተግባር",
+    "has been securely committed to the audit ledger.": "በኦዲት መዝገብ ላይ በደህና ተመዝግቧል።",
+    "Counts were saved, but the audit trail ledger is temporarily unavailable. Please retry later to restore full audit commit tracking.": "ቆጠራዎች ተቀምጠዋል፣ ነገር ግን የኦዲት መዝገብ ለጊዜው አይገኝም። እባክዎን የኦዲት ቁጥጥርን ሙሉ በሙሉ ለማስቀጠል ቆይተው እንደገና ይሞክሩ።",
+    "Discrepancies": "ልዩነቶች",
+    "Net Flow": "የተጣራ ፍሰት",
+    "Audit Trail Detail": "የኦዲት መዝገብ ዝርዝር",
+    "View Audit History": "የኦዲት ታሪክን ተመልከት",
+    "Dismiss View": "እይታን ዝጋ",
+    "Finalize Reconciliation?": "ማስታረቅን ያጠናቅቁ?",
+    "You are about to submit": "ለማስገባት እያዘጋጁ ነው",
+    "count records. This will create an permanent audit trail for stock adjustments.": "የቆጠራ መዛግብት። ይህ ለክምችት ማስተካከያዎች ቋሚ የኦዲት መዝገብ ይፈጥራል።",
+    "Impacted Items": "የተጎዱ ንብረቶች",
+    "adjustments": "ማስተካከያዎች",
+    "Operator Notes": "የኦፕሬተር ማስታወሻዎች",
+    "Back to Edit": "ወደ ማስተካከያ ተመለስ",
+    "Confirm & Post": "አረጋግጥ እና ይለጥፉ"
+  }
+};
 
 export default function ReconcilePage() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+
   const router = useRouter();
   const queryClient = useQueryClient();
   const [store, setStore] = useState<string>("all");
@@ -390,7 +451,7 @@ export default function ReconcilePage() {
                 <div key={i} className="bg-card rounded-2xl p-6 border border-border animate-pulse h-32" />
               ))
             ) : filteredItems.length === 0 ? (
-              <div className="bg-card rounded-2xl p-10 border border-border text-center text-muted font-bold">No items match your criteria.</div>
+              <div className="bg-card rounded-2xl p-10 border border-border text-center text-muted font-bold">{t("No items match your criteria.")}</div>
             ) : (
               filteredItems.map((item) => {
                 const countValue = counts.get(item.id);
@@ -409,7 +470,7 @@ export default function ReconcilePage() {
                             {item.store?.name || 'General Inventory'}
                           </span>
                           <span className="text-[10px] text-muted font-medium italic">
-                            Qty: <span className="text-foreground font-black">{item.quantity}</span>
+                            {t("Qty")}: <span className="text-foreground font-black">{item.quantity}</span>
                           </span>
                         </div>
                       </div>
@@ -430,7 +491,7 @@ export default function ReconcilePage() {
                           type="number"
                           min="0"
                           step="1"
-                          placeholder="Physical Count"
+                          placeholder={t("Physical Count")}
                           value={counts.get(item.id) ?? ""}
                           onChange={(e) => handleCountChange(item.id, e.target.value)}
                           className="w-full bg-card-alt border border-border focus:border-primary rounded-xl px-4 py-3 text-sm font-black transition-all outline-none"
@@ -477,17 +538,17 @@ export default function ReconcilePage() {
           >
             <div className="flex-1 flex items-center justify-around md:justify-start md:gap-8 w-full md:w-auto px-1 md:px-4">
               <div className="flex flex-col items-center md:items-start leading-tight">
-                <span className="text-[8px] font-black uppercase tracking-widest text-muted">Counted</span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-muted">{t("Counted")}</span>
                 <span className="text-sm md:text-xl font-black text-foreground">{stats.itemsCounted}</span>
               </div>
               <div className="flex flex-col items-center md:items-start leading-tight">
-                <span className="text-[8px] font-black uppercase tracking-widest text-muted">Diff</span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-muted">{t("Diff")}</span>
                 <span className={`text-sm md:text-xl font-black ${stats.changed > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
                   {stats.changed}
                 </span>
               </div>
               <div className="flex flex-col items-center md:items-start leading-tight">
-                <span className="text-[8px] font-black uppercase tracking-widest text-muted">Net</span>
+                <span className="text-[8px] font-black uppercase tracking-widest text-muted">{t("Net")}</span>
                 <span className="text-sm md:text-xl font-black text-primary">
                   {stats.totalDelta > 0 ? '+' : ''}{stats.totalDelta}
                 </span>
@@ -498,7 +559,7 @@ export default function ReconcilePage() {
               <div className="relative group flex-1 md:w-56">
                 <input 
                   type="text"
-                  placeholder="Notes..."
+                  placeholder={t("Notes...")}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full bg-card-alt border border-border rounded-2xl pl-4 pr-3 py-2 text-xs font-bold focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all text-foreground placeholder:text-muted/70"
@@ -509,7 +570,7 @@ export default function ReconcilePage() {
                 disabled={counts.size === 0 || reconcileMutation.isPending}
                 className="flex items-center justify-center gap-1.5 px-4 md:px-10 py-2.5 md:py-4 rounded-2xl bg-primary text-background font-black hover:opacity-90 transition-all active:scale-95 disabled:bg-card-alt disabled:text-muted shadow-premium whitespace-nowrap text-xs md:text-base border border-primary/20"
               >
-                {reconcileMutation.isPending ? '...' : 'Confirm'}
+                {reconcileMutation.isPending ? '...' : t("Confirm")}
                 <HiOutlineChevronRight className="w-3.5 h-3.5 md:w-5 md:h-5" />
               </button>
             </div>
@@ -537,26 +598,26 @@ export default function ReconcilePage() {
                     <HiCheckBadge className="w-12 h-12 text-success" />
                   </div>
 
-                  <h2 className="text-4xl font-black text-foreground tracking-tighter mb-4">Count Finalized</h2>
+                  <h2 className="text-4xl font-black text-foreground tracking-tighter mb-4">{t("Count Finalized")}</h2>
                   <p className="text-muted font-medium mb-10 leading-relaxed px-4">
                     {summaryData.run_id ? (
                       <>
-                        Reconciliation run <code className="text-[10px] bg-card-alt px-2 py-0.5 rounded font-black">{summaryData.run_id.slice(0, 8)}</code> has been securely committed to the audit ledger.
+                        {t("Reconciliation run")} <code className="text-[10px] bg-card-alt px-2 py-0.5 rounded font-black">{summaryData.run_id.slice(0, 8)}</code> {t("has been securely committed to the audit ledger.")}
                       </>
                     ) : (
                       <>
-                        Counts were saved, but the audit trail ledger is temporarily unavailable. Please retry later to restore full audit commit tracking.
+                        {t("Counts were saved, but the audit trail ledger is temporarily unavailable. Please retry later to restore full audit commit tracking.")}
                       </>
                     )}
                   </p>
 
                   <div className="grid grid-cols-2 gap-4 mb-10">
                     <div className="p-6 bg-card-alt/50 rounded-3xl border border-border/50">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-1">Adjustments</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-1">{t("Discrepancies")}</p>
                       <p className="text-2xl font-black text-foreground">{summaryData.summary.changed_rows}</p>
                     </div>
                     <div className="p-6 bg-card-alt/50 rounded-3xl border border-border/50">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-1">Net Flow</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted mb-1">{t("Net Flow")}</p>
                       <p className={`text-2xl font-black ${summaryData.summary.total_delta === 0 ? 'text-muted' : summaryData.summary.total_delta > 0 ? 'text-success' : 'text-danger'}`}>
                         {summaryData.summary.total_delta > 0 ? '+' : ''}{summaryData.summary.total_delta}
                       </p>
@@ -572,7 +633,7 @@ export default function ReconcilePage() {
                       }
                       className="w-full py-5 rounded-2xl bg-foreground text-background font-black flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-premium"
                     >
-                      {summaryData.run_id ? "Audit Trail Detail" : "View Audit History"}
+                      {summaryData.run_id ? t("Audit Trail Detail") : t("View Audit History")}
                       <HiOutlineArrowRight className="w-5 h-5" />
                     </button>
                     <button 
@@ -583,7 +644,7 @@ export default function ReconcilePage() {
                       }}
                       className="w-full py-4 text-muted font-black text-xs uppercase tracking-widest hover:text-foreground transition-all"
                     >
-                      Dismiss View
+                      {t("Dismiss View")}
                     </button>
                   </div>
                 </div>
@@ -617,21 +678,20 @@ export default function ReconcilePage() {
                     <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-4 border border-primary/20">
                       <HiOutlineClipboardDocumentCheck className="w-10 h-10 text-primary" />
                     </div>
-                    <h2 className="text-2xl font-black text-foreground tracking-tight">Finalize Reconciliation?</h2>
+                    <h2 className="text-2xl font-black text-foreground tracking-tight">{t("Finalize Reconciliation?")}</h2>
                     <p className="text-muted font-medium text-sm px-4">
-                      You are about to submit <strong className="text-foreground">{stats.itemsCounted}</strong> count records. 
-                      This will create an permanent audit trail for stock adjustments.
+                      {t("You are about to submit")} <strong className="text-foreground">{stats.itemsCounted}</strong> {t("count records. This will create an permanent audit trail for stock adjustments.")}
                     </p>
                   </div>
 
                   <div className="bg-card-alt/50 rounded-3xl p-6 border border-border mb-8 space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-muted">Impacted Items</span>
-                      <span className="text-lg font-black text-foreground">{stats.changed} adjustments</span>
+                      <span className="text-sm font-bold text-muted">{t("Impacted Items")}</span>
+                      <span className="text-lg font-black text-foreground">{stats.changed} {t("adjustments")}</span>
                     </div>
                     {notes && (
                       <div className="border-t border-border pt-4">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted block mb-1">Operator Notes</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted block mb-1">{t("Operator Notes")}</span>
                         <p className="text-sm font-medium text-foreground italic">&ldquo;{notes}&rdquo;</p>
                       </div>
                     )}
@@ -642,14 +702,14 @@ export default function ReconcilePage() {
                       onClick={() => setShowConfirm(false)}
                       className="flex-1 py-4 rounded-2xl bg-card-alt text-foreground font-black hover:bg-border transition-all active:scale-95 border border-border"
                     >
-                      Back to Edit
+                      {t("Back to Edit")}
                     </button>
                     <button 
                       onClick={handleSubmit}
                       disabled={reconcileMutation.isPending}
                       className="flex-1 py-4 rounded-2xl bg-primary text-background font-black hover:opacity-90 transition-all active:scale-95 shadow-premium flex items-center justify-center gap-2"
                     >
-                      {reconcileMutation.isPending ? 'Processing...' : 'Confirm & Post'}
+                      {reconcileMutation.isPending ? '...' : t("Confirm & Post")}
                     </button>
                   </div>
                 </div>
