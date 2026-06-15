@@ -9,8 +9,8 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
 import { 
-  HiSun, 
-  HiMoon, 
+  HiOutlineSun, 
+  HiOutlineMoon, 
   HiChevronDown, 
   HiArrowRightOnRectangle, 
   HiOutlineUser, 
@@ -310,9 +310,9 @@ function HeaderUserMenu({
           >
             <div className="flex items-center gap-2">
               {dark ? (
-                <HiSun className="w-4 h-4 shrink-0 text-amber-400" />
+                <HiOutlineSun className="w-4 h-4 shrink-0 text-muted" />
               ) : (
-                <HiMoon className="w-4 h-4 shrink-0 text-muted" />
+                <HiOutlineMoon className="w-4 h-4 shrink-0 text-muted" />
               )}
               <span>{t("Theme")}</span>
             </div>
