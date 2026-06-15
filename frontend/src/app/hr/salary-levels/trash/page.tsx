@@ -91,7 +91,7 @@ export default function SalaryLevelsTrashPage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-4xl mx-auto pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+      <div className="page-container-sm pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">

@@ -112,7 +112,7 @@ export default function PaymentsPage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-6xl mx-auto pt-4 md:py-8 px-4 sm:px-6 md:px-8 space-y-6 md:space-y-8">
+      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8 space-y-6 md:space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-border/40">
           <div>
             <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-foreground">Archive</h1>

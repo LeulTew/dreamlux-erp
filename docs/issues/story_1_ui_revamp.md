@@ -34,8 +34,8 @@ The current demo UI is generic and uses standard colors/borders. We need a moder
 - [x] Refactor `frontend/src/components/NavBar.tsx` to match the new contrast and typography layout.
 - [x] Clean up pages to remove generic placeholders and align visual styling.
 - [x] Implement bilingual support (Amharic & English) toggle in navigation.
-- [/] Redesign desktop layout to float page content inside a curved inset card, and move settings into the account dropdown.
-- [/] Document and architecture the scalable, role-specific action notification system.
+- [x] Redesign desktop layout to float page content inside a curved inset card, and move settings into the account dropdown.
+- [x] Document and architecture the scalable, role-specific action notification system.
 
 ## Verification Plan
 

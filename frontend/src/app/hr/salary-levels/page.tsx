@@ -76,7 +76,7 @@ export default function SalaryLevelsPage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-4xl mx-auto pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+      <div className="page-container-sm pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
           <div>
             <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Salary Settings</h1>
