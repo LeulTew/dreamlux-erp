@@ -109,7 +109,7 @@ function CollapsedPopout({
   const handleMouseLeave = () => {
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
-    }, 150);
+    }, 200); // 200ms delay for smooth transition
   };
 
   useEffect(() => {
@@ -142,6 +142,9 @@ function CollapsedPopout({
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
+          {/* Transparent bridge to fill the 16px hover gap and prevent mouse-leave trigger */}
+          <div className="absolute right-full top-0 w-6 h-full bg-transparent" style={{ marginRight: "-1px" }} />
+
           {/* Subtle curved SVG connection tree-lines */}
           <svg className="absolute right-full top-0 w-[52px] h-full pointer-events-none" style={{ marginRight: "-1px" }}>
             {links.map((link, idx) => {
@@ -201,6 +204,8 @@ function SidebarLink({
   active: boolean;
   isCollapsed: boolean;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   const buttonContent = (
     <span
       className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer mx-auto ${
@@ -215,15 +220,19 @@ function SidebarLink({
 
   if (isCollapsed) {
     return (
-      <div className="flex justify-center w-full">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link href={href}>{buttonContent}</Link>
-          </TooltipTrigger>
-          <TooltipContent side="right" align="center" className="font-semibold text-[10px]">
-            {label}
-          </TooltipContent>
-        </Tooltip>
+      <div 
+        className="relative flex justify-center w-full"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <Link href={href} className="w-full flex justify-center">{buttonContent}</Link>
+        {hovered && (
+          <div className="absolute left-[calc(100%+16px)] top-[6px] z-50 bg-card border border-border/80 rounded-2xl px-3 py-2 shadow-massive flex items-center animate-scale-in pointer-events-none whitespace-nowrap">
+            <span className="text-foreground/90 font-semibold text-xs leading-none">
+              {label}
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -236,7 +245,6 @@ function SidebarLink({
       </Link>
     </SidebarMenuButton>
   );
-}
 
 export function AppSidebar() {
   const pathname = usePathname();
