@@ -149,10 +149,13 @@ function CollapsedPopout({
             {links.map((link, idx) => {
               const y_item = 22 + idx * 34; // First item center is ~22px, next centers are spaced by 34px
               const x_start = 8; // Button center in 96px sidebar (SVG width 72px, popout starts at 96+16=112px, 112-48=64px offset)
+              const x_trunk = 28; // Completely clears the button circle (24px radius from center)
               const y_start = 16; // Button bottom height relative to top-[32px] container
               const r = 6;
               
-              const path = `M ${x_start},${y_start} V ${y_item - r} Q ${x_start},${y_item} ${x_start + r},${y_item} L 72,${y_item}`;
+              const path = idx === 0
+                ? `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_item} L 72,${y_item}`
+                : `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_start + r} V ${y_item - r} Q ${x_trunk},${y_item} ${x_trunk + r},${y_item} L 72,${y_item}`;
               
               return (
                 <path
