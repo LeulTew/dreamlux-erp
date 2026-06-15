@@ -123,7 +123,7 @@ export default function InventoryDashboardPage() {
           </motion.div>
 
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex bg-card-alt p-1.5 rounded-3xl border border-border shadow-soft">
+            <div className="flex bg-card-alt p-1.5 rounded-xl border border-border shadow-soft">
               {(["current", "finance", "forecasting"] as TabType[]).map((tab) => (
                 <button
                   key={tab}
@@ -131,14 +131,14 @@ export default function InventoryDashboardPage() {
                     setActiveTab(tab);
                     setChartsReady(false);
                   }}
-                  className={`px-4 py-2 md:px-6 md:py-2.5 rounded-[1.1rem] text-[10px] md:text-xs font-black transition-all relative ${
+                  className={`px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[10px] md:text-xs font-black transition-all relative ${
                     activeTab === tab ? "text-background" : "text-muted hover:text-foreground"
                   }`}
                 >
                   {activeTab === tab && (
                     <motion.div
                       layoutId="activeTabBg"
-                      className="absolute inset-0 bg-primary rounded-[1.1rem] shadow-premium"
+                      className="absolute inset-0 bg-primary rounded-xl shadow-premium"
                       transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                     />
                   )}
@@ -150,7 +150,7 @@ export default function InventoryDashboardPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/assets/reports")}
-                className="px-6 py-3.5 bg-card border border-border/50 text-foreground rounded-2xl flex items-center gap-2 font-black text-xs shadow-soft hover:shadow-premium transition-all"
+                className="px-6 py-3.5 bg-card border border-border/50 text-foreground rounded-xl flex items-center gap-2 font-black text-xs shadow-soft hover:shadow-premium transition-all"
               >
                 <HiOutlineDocumentChartBar className="w-5 h-5 text-primary" />
                 Reports

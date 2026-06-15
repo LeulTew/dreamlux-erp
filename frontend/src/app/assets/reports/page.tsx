@@ -246,7 +246,7 @@ export default function ReportsPage() {
           </motion.div>
         </div>
 
-        <section className="glass-card p-12 rounded-[4rem] border border-border/50 shadow-premium overflow-hidden relative">
+        <section className="glass-card p-12 rounded-xl border border-border/50 shadow-premium overflow-hidden relative">
           {/* Modern Aurora Decorative Element */}
           <div className="absolute top-0 right-0 -mr-32 -mt-32 w-140 h-140 bg-primary/10 blur-[130px] rounded-full pointer-events-none -z-10" />
           <div className="absolute top-20 right-20 w-80 h-80 bg-accent/5 blur-[100px] rounded-full pointer-events-none -z-10" />
@@ -260,14 +260,14 @@ export default function ReportsPage() {
               <button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="p-4 rounded-2xl bg-card-alt border border-border text-foreground hover:bg-border transition-all shadow-sm disabled:opacity-60"
+                className="p-4 rounded-xl bg-card-alt border border-border text-foreground hover:bg-border transition-all shadow-sm disabled:opacity-60"
                 title="Download CSV"
               >
                 <HiArrowDownTray className="w-6 h-6" />
               </button>
               <button
                 onClick={() => router.push(`/assets${storeFilter !== "all" ? `?store=${storeFilter}` : ""}`)}
-                className="px-8 py-4 rounded-2xl bg-primary text-background font-black text-sm shadow-premium hover:opacity-90 transition-all flex items-center gap-3"
+                className="px-8 py-4 rounded-xl bg-primary text-background font-black text-sm shadow-premium hover:opacity-90 transition-all flex items-center gap-3"
               >
                 Open Inventory
                 <HiArrowUpRight className="w-5 h-5" />
@@ -295,7 +295,7 @@ export default function ReportsPage() {
                     transition={{ delay: i * 0.05 }}
                     className="bg-card-alt/30 hover:bg-card-alt/60 transition-all"
                   >
-                    <td className="px-6 py-6 rounded-l-3xl border-y border-l border-border/30">
+                    <td className="px-6 py-6 rounded-l-xl border-y border-l border-border/30">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-card border border-border flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
                           {item.image_url ? (
@@ -330,7 +330,7 @@ export default function ReportsPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-6 rounded-r-3xl border-y border-r border-border/30 text-right">
+                    <td className="px-6 py-6 rounded-r-xl border-y border-r border-border/30 text-right">
                       <button
                         onClick={() => router.push(`/assets?id=${item.id}`)}
                         className="p-3 rounded-xl bg-card border border-border hover:bg-primary hover:border-primary/20 hover:text-background transition-all"

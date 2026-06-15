@@ -55,7 +55,7 @@ export default function ReconcileReviewModal({
               {counts.map((item) => {
                 const diff = item.actual - item.expected;
                 return (
-                  <div key={item.id} className="p-4 rounded-2xl bg-card-alt/50 border border-border/30 flex items-center justify-between gap-4">
+                  <div key={item.id} className="p-4 rounded-xl bg-card-alt/50 border border-border/30 flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-black text-muted uppercase tracking-widest truncate">{item.name}</p>
                       <div className="flex items-center gap-4 mt-1">
@@ -82,7 +82,7 @@ export default function ReconcileReviewModal({
             </div>
 
             <footer className="mt-8 pt-6 border-t border-border/50 space-y-4">
-              <div className="flex items-center justify-between px-4 py-3 bg-primary-light rounded-2xl text-primary font-black uppercase text-xs tracking-widest">
+              <div className="flex items-center justify-between px-4 py-3 bg-primary-light rounded-xl text-primary font-black uppercase text-xs tracking-widest">
                 <span>Net Change to Inventory</span>
                 <span className={totalDiff < 0 ? "text-danger" : totalDiff > 0 ? "text-success" : ""}>
                   {totalDiff > 0 ? `+${totalDiff}` : totalDiff} Items
@@ -93,7 +93,7 @@ export default function ReconcileReviewModal({
                  <button
                   onClick={onConfirm}
                   disabled={isSubmitting}
-                  className="flex-1 py-5 bg-primary text-on-primary rounded-3xl font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-95 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-5 bg-primary text-on-primary rounded-xl font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-95 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? "Syncing..." : (
                     <>
@@ -105,7 +105,7 @@ export default function ReconcileReviewModal({
                 <button
                   onClick={onClose}
                   disabled={isSubmitting}
-                  className="px-8 py-5 bg-card-alt text-foreground rounded-[1.25rem] font-black uppercase tracking-[0.15em] hover:bg-border transition-all active:scale-95 text-[10px]"
+                  className="px-8 py-5 bg-card-alt text-foreground rounded-xl font-black uppercase tracking-[0.15em] hover:bg-border transition-all active:scale-95 text-[10px]"
                 >
                   Cancel
                 </button>
