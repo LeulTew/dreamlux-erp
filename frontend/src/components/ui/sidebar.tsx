@@ -108,6 +108,21 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
 
+  // Load initial sidebar state from cookie on client mount to prevent auto-expanding on page change
+  React.useEffect(() => {
+    const getCookie = (name: string) => {
+      if (typeof document === "undefined") return null
+      const value = `; ${document.cookie}`
+      const parts = value.split(`; ${name}=`)
+      if (parts.length === 2) return parts.pop()?.split(";").shift()
+      return null
+    }
+    const saved = getCookie(SIDEBAR_COOKIE_NAME)
+    if (saved !== null) {
+      _setOpen(saved === "true")
+    }
+  }, [])
+
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed"

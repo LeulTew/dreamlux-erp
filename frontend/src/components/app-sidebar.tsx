@@ -99,23 +99,37 @@ function CollapsedPopout({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 150);
+  };
 
   useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, []);
 
   return (
-    <div ref={ref} className="relative flex justify-center w-full">
+    <div
+      ref={ref}
+      className="relative flex justify-center w-full"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <button
         onClick={() => setOpen(!open)}
         className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
           isActive 
-            ? "bg-primary text-primary-foreground shadow-md" 
+            ? "bg-primary text-primary-foreground shadow-md animate-pulse-subtle" 
             : "text-muted hover:bg-card-alt hover:text-foreground"
         }`}
         title={label}
@@ -123,8 +137,35 @@ function CollapsedPopout({
         <Icon className="w-[22px] h-[22px] shrink-0" />
       </button>
       {open && (
-        <div className="absolute left-[calc(100%+12px)] top-0 z-50 bg-card border border-border rounded-2xl p-2 min-w-[190px] shadow-massive flex flex-col gap-1.5 animate-scale-in">
-          <p className="text-[10px] font-black text-muted uppercase tracking-[0.15em] px-3 py-2 border-b border-border/40 mb-1">{label}</p>
+        <div 
+          className="absolute left-[calc(100%+16px)] top-[-6px] z-50 bg-card border border-border/80 rounded-2xl p-1.5 min-w-[170px] shadow-massive flex flex-col gap-0.5 animate-scale-in"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Subtle curved SVG connection tree-lines */}
+          <svg className="absolute right-full top-0 w-[52px] h-full pointer-events-none" style={{ marginRight: "-1px" }}>
+            {links.map((link, idx) => {
+              const y_start = 30; // Button vertical center (24px button center + 6px top offset)
+              const y_item = 22 + idx * 34; // First item center is ~22px, next centers are spaced by 34px (32px item + 2px gap)
+              const isBelow = y_item >= y_start;
+              const r = Math.min(12, Math.abs(y_item - y_start));
+              const y_turn = isBelow ? (y_item - r) : (y_item + r);
+              const path = `M 0,${y_start} V ${y_turn} Q 0,${y_item} ${r},${y_item} L 52,${y_item}`;
+              
+              return (
+                <path
+                  key={link.href}
+                  d={path}
+                  fill="none"
+                  stroke="currentColor"
+                  className="text-border/60"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              );
+            })}
+          </svg>
+
           <div className="flex flex-col gap-0.5">
             {links.map((link) => (
               <Link
@@ -134,7 +175,7 @@ function CollapsedPopout({
                 className={`block px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                   link.active 
                     ? "bg-primary/10 text-primary font-bold" 
-                    : "text-foreground hover:bg-card-alt"
+                    : "text-foreground/80 hover:bg-card-alt hover:text-foreground"
                 }`}
               >
                 {link.label}
