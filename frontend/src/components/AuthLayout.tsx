@@ -511,7 +511,7 @@ export default function AuthLayout({
           </header>
 
           {/* Main View Area - page content in a curved container on desktop */}
-          <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 md:px-6 md:pb-6">
+          <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 md:pl-6 md:pr-6 md:pb-6 peer-data-[state=collapsed]:md:pl-0">
             <div className="flex-1 flex flex-col min-h-0 bg-background md:bg-card md:border md:border-border/10 md:rounded-[2rem] p-4 md:p-8 overflow-y-auto">
               <div className="flex-1 flex flex-col min-h-0 w-full">
                 {children}

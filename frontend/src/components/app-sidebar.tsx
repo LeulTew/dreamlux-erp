@@ -137,41 +137,22 @@ function CollapsedPopout({
       </button>
       {open && (
         <div 
-          className="absolute left-[calc(100%+16px)] top-[-6px] z-50 bg-card border border-border/80 rounded-2xl p-1.5 min-w-[170px] shadow-massive flex flex-col gap-0.5 animate-scale-in"
+          className="absolute left-[calc(100%+16px)] top-[32px] z-50 bg-card border border-border/80 rounded-2xl p-1.5 min-w-[170px] shadow-massive flex flex-col gap-0.5 animate-scale-in"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
           {/* Transparent bridge to fill the 16px hover gap and prevent mouse-leave trigger */}
-          <div className="absolute right-full top-0 w-6 h-full bg-transparent" style={{ marginRight: "-1px" }} />
+          <div className="absolute right-full top-[-32px] w-6 h-[calc(100%+32px)] bg-transparent" style={{ marginRight: "-1px" }} />
 
           {/* Subtle curved SVG connection tree-lines */}
-          <svg className="absolute right-full top-0 w-[52px] h-full pointer-events-none" style={{ marginRight: "-1px" }}>
+          <svg className="absolute right-full top-0 w-[72px] h-full pointer-events-none" style={{ marginRight: "-1px" }}>
             {links.map((link, idx) => {
-              const y_start = 30; // Button vertical center (24px button center + 6px top offset)
-              const y_item = 22 + idx * 34; // First item center is ~22px, next centers are spaced by 34px (32px item + 2px gap)
+              const y_item = 22 + idx * 34; // First item center is ~22px, next centers are spaced by 34px
+              const x_start = 8; // Button center in 96px sidebar (SVG width 72px, popout starts at 96+16=112px, 112-48=64px offset)
+              const y_start = 16; // Button bottom height relative to top-[32px] container
+              const r = 6;
               
-              const x_start = 28; // Clear the button highlights
-              const x_trunk = 38;
-              const dy = Math.abs(y_item - y_start);
-              
-              if (dy < 4) {
-                return (
-                  <path
-                    key={link.href}
-                    d={`M ${x_start},${y_start} L 52,${y_item}`}
-                    fill="none"
-                    stroke="currentColor"
-                    className="text-border/60"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                );
-              }
-              
-              const r = Math.min(8, dy / 2);
-              const isBelow = y_item >= y_start;
-              const y_turn = isBelow ? (y_item - r) : (y_item + r);
-              const path = `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_start + (isBelow ? r : -r)} V ${y_turn} Q ${x_trunk},${y_item} ${x_trunk + r},${y_item} L 52,${y_item}`;
+              const path = `M ${x_start},${y_start} V ${y_item - r} Q ${x_start},${y_item} ${x_start + r},${y_item} L 72,${y_item}`;
               
               return (
                 <path
@@ -179,7 +160,7 @@ function CollapsedPopout({
                   d={path}
                   fill="none"
                   stroke="currentColor"
-                  className="text-border/60"
+                  className="text-muted/40 dark:text-muted/20"
                   strokeWidth="1.5"
                   strokeLinecap="round"
                 />
@@ -265,7 +246,7 @@ function SidebarLink({
 function SubItemBranchLine({ isLast }: { isLast: boolean }) {
   return (
     <div className="absolute left-[-14px] top-0 bottom-0 w-3.5 pointer-events-none flex items-center">
-      <svg className="w-full h-full text-border/40" viewBox="0 0 14 36" preserveAspectRatio="none">
+      <svg className="w-full h-full text-muted/40 dark:text-muted/20" viewBox="0 0 14 36" preserveAspectRatio="none">
         {isLast ? (
           <path
             d="M 0,0 V 18 Q 0,18 8,18 L 14,18"
