@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 import toast from "react-hot-toast";
-import { HiLockClosed, HiUsers, HiUser, HiEye, HiEyeSlash } from "react-icons/hi2";
+import { HiLockClosed, HiUser, HiEye, HiEyeSlash } from "react-icons/hi2";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -39,17 +39,17 @@ export default function LoginPage() {
       <div className="w-full max-w-sm relative z-10">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-4xl bg-primary text-on-primary shadow-premium mb-6">
-            <HiUsers className="w-10 h-10" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[1.25rem] bg-foreground text-background font-black text-3xl shadow-premium mb-6 select-none">
+            D
           </div>
-          <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase mb-2">EL ERP</h1>
-          <p className="text-muted text-sm font-medium opacity-60">HR · Payroll · Inventory</p>
+          <h1 className="text-3xl font-black text-foreground tracking-tight uppercase mb-1">Dream Lux</h1>
+          <p className="text-[10px] text-primary font-black uppercase tracking-widest">Event Logistics · HR · Payroll</p>
         </div>
 
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="glass-card rounded-xl shadow-premium p-8 space-y-6"
+          className="glass-card rounded-[2rem] shadow-premium p-8 space-y-6"
         >
           <div className="space-y-4">
             <div className="space-y-2">
@@ -96,7 +96,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || !username.trim() || !password.trim()}
-            className="w-full py-4 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
