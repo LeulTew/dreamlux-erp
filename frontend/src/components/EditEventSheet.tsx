@@ -188,191 +188,199 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6 pb-6">
-          
-          {/* Section 1: Client & General Info */}
-          <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-primary">General Information</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Title</label>
-                <input
-                  type="text"
-                  disabled={isReadOnly}
-                  placeholder="e.g. Betty's Wedding"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.name ? "border-red-500" : "border-border"
-                  }`}
-                />
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4 pb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Left Column: General Info & Finance */}
+            <div className="space-y-4">
+              {/* Section 1: Client & General Info */}
+              <div className="bg-card-alt/30 p-4 rounded-xl border border-border/50 space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-widest text-primary">General Information</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Title</label>
+                    <input
+                      type="text"
+                      disabled={isReadOnly}
+                      placeholder="e.g. Betty's Wedding"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.name ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Type</label>
+                    <Select
+                      options={eventTypes.map((et) => ({
+                        id: et.id,
+                        label: et.event_name,
+                      }))}
+                      value={formData.event_type_id}
+                      onChange={(val) => setFormData({ ...formData, event_type_id: val })}
+                      placeholder="Select Type"
+                      className={isReadOnly ? "pointer-events-none opacity-60" : ""}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
+                      <HiUser className="w-3.5 h-3.5" /> Client Name
+                    </label>
+                    <input
+                      type="text"
+                      disabled={isReadOnly}
+                      placeholder="e.g. Betty Hailu"
+                      value={formData.client_name}
+                      onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                      className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.client_name ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1">Client Phone</label>
+                    <input
+                      type="tel"
+                      disabled={isReadOnly}
+                      placeholder="e.g. 0911223344"
+                      value={formData.client_phone}
+                      onChange={(e) => setFormData({ ...formData, client_phone: e.target.value.replace(/[^\d+]/g, "") })}
+                      className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.client_phone ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Type</label>
-                <Select
-                  options={eventTypes.map((et) => ({
-                    id: et.id,
-                    label: et.event_name,
-                  }))}
-                  value={formData.event_type_id}
-                  onChange={(val) => setFormData({ ...formData, event_type_id: val })}
-                  placeholder="Select Type"
-                  className={isReadOnly ? "pointer-events-none opacity-60" : ""}
-                />
-              </div>
-            </div>
+              {/* Section 3: Finance & Status */}
+              <div className="bg-card-alt/30 p-4 rounded-xl border border-border/50 space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-widest text-primary">Status & Budget</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
+                      <HiCurrencyDollar className="w-3.5 h-3.5" /> Contract Price (ETB)
+                    </label>
+                    <input
+                      type="number"
+                      disabled={isReadOnly}
+                      placeholder="0.00"
+                      value={formData.contract_price || ""}
+                      onChange={(e) => setFormData({ ...formData, contract_price: Number(e.target.value) })}
+                      className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.contract_price ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                  </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
-                  <HiUser className="w-3.5 h-3.5" /> Client Name
-                </label>
-                <input
-                  type="text"
-                  disabled={isReadOnly}
-                  placeholder="e.g. Betty Hailu"
-                  value={formData.client_name}
-                  onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
-                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.client_name ? "border-red-500" : "border-border"
-                  }`}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1">Client Phone</label>
-                <input
-                  type="tel"
-                  disabled={isReadOnly}
-                  placeholder="e.g. 0911223344"
-                  value={formData.client_phone}
-                  onChange={(e) => setFormData({ ...formData, client_phone: e.target.value.replace(/[^\d+]/g, "") })}
-                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.client_phone ? "border-red-500" : "border-border"
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Venue & Schedule */}
-          <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-primary">Schedule & Location</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1">Start Date</label>
-                <input
-                  type="date"
-                  disabled={isReadOnly}
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.start_date ? "border-red-500" : "border-border"
-                  }`}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1">End Date</label>
-                <input
-                  type="date"
-                  disabled={isReadOnly}
-                  value={formData.end_date}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.end_date ? "border-red-500" : "border-border"
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1">Start Time</label>
-                <input
-                  type="time"
-                  disabled={isReadOnly}
-                  value={formData.start_time}
-                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1">End Time</label>
-                <input
-                  type="time"
-                  disabled={isReadOnly}
-                  value={formData.end_time}
-                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                />
+                  {event && (
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Status</label>
+                      <Select
+                        options={[
+                          { id: "Planned", label: "Planned (ቀጠሮ)" },
+                          { id: "Ongoing", label: "Ongoing (በሂደት ላይ)" },
+                          { id: "Completed", label: "Completed (የተጠናቀቀ)" },
+                        ]}
+                        value={formData.status}
+                        onChange={(val) => setFormData({ ...formData, status: val as "Planned" | "Ongoing" | "Completed" })}
+                        placeholder="Select Status"
+                        className={isReadOnly ? "pointer-events-none opacity-60" : ""}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
-                <HiMapPin className="w-3.5 h-3.5" /> Venue Location
-              </label>
-              <input
-                type="text"
-                disabled={isReadOnly}
-                placeholder="e.g. Sheraton Ballroom / CMC Residence"
-                value={formData.venue_location}
-                onChange={(e) => setFormData({ ...formData, venue_location: e.target.value })}
-                className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                  formErrors.venue_location ? "border-red-500" : "border-border"
-                }`}
-              />
-            </div>
-          </div>
+            {/* Right Column: Venue & Schedule */}
+            <div className="space-y-4">
+              {/* Section 2: Venue & Schedule */}
+              <div className="bg-card-alt/30 p-4 rounded-xl border border-border/50 space-y-3">
+                <h3 className="text-xs font-black uppercase tracking-widest text-primary">Schedule & Location</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1">Start Date</label>
+                    <input
+                      type="date"
+                      disabled={isReadOnly}
+                      value={formData.start_date}
+                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.start_date ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                  </div>
 
-          {/* Section 3: Finance & Status */}
-          <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-primary">Status & Budget</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
-                  <HiCurrencyDollar className="w-3.5 h-3.5" /> Contract Price (ETB)
-                </label>
-                <input
-                  type="number"
-                  disabled={isReadOnly}
-                  placeholder="0.00"
-                  value={formData.contract_price || ""}
-                  onChange={(e) => setFormData({ ...formData, contract_price: Number(e.target.value) })}
-                  className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.contract_price ? "border-red-500" : "border-border"
-                  }`}
-                />
-              </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1">End Date</label>
+                    <input
+                      type="date"
+                      disabled={isReadOnly}
+                      value={formData.end_date}
+                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.end_date ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                  </div>
+                </div>
 
-              {event && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1">Start Time</label>
+                    <input
+                      type="time"
+                      disabled={isReadOnly}
+                      value={formData.start_time}
+                      onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold uppercase text-muted px-1">End Time</label>
+                    <input
+                      type="time"
+                      disabled={isReadOnly}
+                      value={formData.end_time}
+                      onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold uppercase text-muted px-1">Event Status</label>
-                  <Select
-                    options={[
-                      { id: "Planned", label: "Planned (ቀጠሮ)" },
-                      { id: "Ongoing", label: "Ongoing (በሂደት ላይ)" },
-                      { id: "Completed", label: "Completed (የተጠናቀቀ)" },
-                    ]}
-                    value={formData.status}
-                    onChange={(val) => setFormData({ ...formData, status: val as "Planned" | "Ongoing" | "Completed" })}
-                    placeholder="Select Status"
-                    className={isReadOnly ? "pointer-events-none opacity-60" : ""}
+                  <label className="block text-[10px] font-bold uppercase text-muted px-1 flex items-center gap-1">
+                    <HiMapPin className="w-3.5 h-3.5" /> Venue Location
+                  </label>
+                  <input
+                    type="text"
+                    disabled={isReadOnly}
+                    placeholder="e.g. Sheraton Ballroom / CMC Residence"
+                    value={formData.venue_location}
+                    onChange={(e) => setFormData({ ...formData, venue_location: e.target.value })}
+                    className={`w-full px-3 py-2.5 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                      formErrors.venue_location ? "border-red-500" : "border-border"
+                    }`}
                   />
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
           {/* Form Actions */}
           {!isReadOnly && (
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3 pt-4">
               <button
                 type="submit"
                 disabled={saveMutation.isPending}

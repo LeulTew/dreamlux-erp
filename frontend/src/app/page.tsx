@@ -110,7 +110,13 @@ function buildColumns(
             className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold"
           />
         ) : (
-          <span className="font-bold text-foreground">{getValue()}</span>
+          <button
+            type="button"
+            onClick={() => setEditingEmployee(row.original)}
+            className="font-bold text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+          >
+            {getValue()}
+          </button>
         ),
       size: 200,
     }),
@@ -125,7 +131,13 @@ function buildColumns(
             className="w-full px-2 py-1.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
           />
         ) : (
-          <span className="font-mono text-sm text-primary-dark font-bold">{getValue()}</span>
+          <button
+            type="button"
+            onClick={() => setEditingEmployee(row.original)}
+            className="font-mono text-sm text-primary-dark font-bold hover:text-primary transition-all text-left cursor-pointer hover:underline"
+          >
+            {getValue()}
+          </button>
         ),
       size: 120,
     }),
@@ -175,7 +187,7 @@ function buildColumns(
     }),
     columnHelper.display({
       id: "actions",
-      header: "",
+      header: () => <div className="text-right">Actions</div>,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1.5">
           {showTrash ? (

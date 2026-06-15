@@ -262,7 +262,9 @@ export default function PaymentsPage() {
                   <div className="flex flex-col gap-6 md:flex-row md:items-center relative z-10">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="font-black tracking-tight text-xl uppercase text-foreground">{periodText}</div>
+                        <Link href={`/hr/payments/${run.id}`} className="hover:text-primary transition-all">
+                          <div className="font-black tracking-tight text-xl uppercase text-foreground hover:text-primary transition-all">{periodText}</div>
+                        </Link>
                         <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${statusColors[currentStatus] || "bg-muted text-muted-foreground"}`}>
                           {currentStatus}
                         </span>

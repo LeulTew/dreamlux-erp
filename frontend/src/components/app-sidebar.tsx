@@ -6,7 +6,6 @@ import {
   HiUsers,
   HiOutlineCalendar,
   HiOutlineBanknotes,
-  HiOutlineCurrencyDollar,
   HiBuildingOffice,
   HiTableCells,
   HiOutlineClipboardDocumentCheck,
@@ -52,9 +51,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "List Items": "List Items",
     Admin: "Settings",
     Events: "Events",
-    "HR Management": "MAIN",
+    "HR Management": "HR",
     "Inventory Management": "INVENTORY",
     Search: "Search",
+    "List Events": "List Events",
+    Finance: "Finance",
   },
   am: {
     Employees: "ሰራተኞች",
@@ -72,9 +73,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "List Items": "የዕቃዎች ዝርዝር",
     Admin: "አስተዳዳሪ",
     Events: "ዝግጅቶች",
-    "HR Management": "ዋና",
+    "HR Management": "የሰው ኃይል",
     "Inventory Management": "ዕቃዎች",
     Search: "ፈልግ",
+    "List Events": "የዝግጅቶች ዝርዝር",
+    Finance: "ፋይናንስ",
   },
 };
 
@@ -281,6 +284,8 @@ export function AppSidebar() {
   // Collapsible sub-menus state
   const [employeesOpen, setEmployeesOpen] = useState(true);
   const [itemsOpen, setItemsOpen] = useState(true);
+  const [eventsOpen, setEventsOpen] = useState(true);
+  const [financeOpen, setFinanceOpen] = useState(true);
 
   // Sync user details reactively
   const userSnapshot = useSyncExternalStore(
@@ -334,6 +339,16 @@ export function AppSidebar() {
     "EVENT_MANAGER", "event_manager", "OWNER", "owner",
     "OPS_MANAGER", "ops_manager", "ACCOUNTANT", "accountant",
   ];
+
+  const eventLinks = [
+    { href: "/events", label: t("List Events"), active: pathname === "/events", show: hasAccess(hrRoles) },
+    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
+  ].filter(l => l.show);
+
+  const financeLinks = [
+    { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN", "ACCOUNTANT", "accountant"]) },
+    { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
+  ].filter(l => l.show);
 
   return (
     <Sidebar 
@@ -449,55 +464,101 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 )}
 
-                {/* Events */}
-                {hasAccess(hrRoles) && (
+                {/* Events dropdown */}
+                {eventLinks.length > 0 && (
                   <SidebarMenuItem className="w-full flex justify-center">
-                    <SidebarLink
-                      href="/events"
-                      icon={HiOutlineCalendar}
-                      label={t("Events")}
-                      active={isActive("/events")}
-                      isCollapsed={isCollapsed}
-                    />
+                    {isCollapsed ? (
+                      <CollapsedPopout
+                        icon={HiOutlineCalendar}
+                        label={t("Events")}
+                        isActive={isActive("/events") || isActive("/hr/event-types")}
+                        links={eventLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
+                      />
+                    ) : (
+                      <div className="w-full">
+                        <SidebarMenuButton
+                          onClick={() => setEventsOpen(!eventsOpen)}
+                          className={`w-full justify-between rounded-xl h-10 ${
+                            isActive("/events") || isActive("/hr/event-types") ? "text-primary font-semibold" : ""
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <HiOutlineCalendar className="w-[18px] h-[18px] shrink-0" />
+                            <span>{t("Events")}</span>
+                          </span>
+                          <span className="shrink-0">
+                            {eventsOpen ? (
+                              <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                            ) : (
+                              <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                            )}
+                          </span>
+                        </SidebarMenuButton>
+                        {eventsOpen && (
+                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                            {eventLinks.map((link, idx) => (
+                              <SidebarMenuSubItem key={link.href} className="relative">
+                                <SubItemBranchLine isLast={idx === eventLinks.length - 1} />
+                                <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
+                                  <Link href={link.href} className={link.active ? "text-foreground font-medium" : "text-muted"}>
+                                    {link.label}
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
+                        )}
+                      </div>
+                    )}
                   </SidebarMenuItem>
                 )}
 
-                {/* Payroll */}
-                {hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN", "ACCOUNTANT", "accountant"]) && (
+                {/* Finance dropdown */}
+                {financeLinks.length > 0 && (
                   <SidebarMenuItem className="w-full flex justify-center">
-                    <SidebarLink
-                      href="/hr/payments"
-                      icon={HiOutlineBanknotes}
-                      label={t("Payroll")}
-                      active={isActive("/hr/payments")}
-                      isCollapsed={isCollapsed}
-                    />
-                  </SidebarMenuItem>
-                )}
-
-                {/* Salary Levels */}
-                {hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) && (
-                  <SidebarMenuItem className="w-full flex justify-center">
-                    <SidebarLink
-                      href="/hr/salary-levels"
-                      icon={HiOutlineCurrencyDollar}
-                      label={t("Salary")}
-                      active={isActive("/hr/salary-levels")}
-                      isCollapsed={isCollapsed}
-                    />
-                  </SidebarMenuItem>
-                )}
-
-                {/* Event Types */}
-                {hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) && (
-                  <SidebarMenuItem className="w-full flex justify-center">
-                    <SidebarLink
-                      href="/hr/event-types"
-                      icon={HiOutlineCalendar}
-                      label={t("Event Types")}
-                      active={isActive("/hr/event-types")}
-                      isCollapsed={isCollapsed}
-                    />
+                    {isCollapsed ? (
+                      <CollapsedPopout
+                        icon={HiOutlineBanknotes}
+                        label={t("Finance")}
+                        isActive={isActive("/hr/payments") || isActive("/hr/salary-levels")}
+                        links={financeLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
+                      />
+                    ) : (
+                      <div className="w-full">
+                        <SidebarMenuButton
+                          onClick={() => setFinanceOpen(!financeOpen)}
+                          className={`w-full justify-between rounded-xl h-10 ${
+                            isActive("/hr/payments") || isActive("/hr/salary-levels") ? "text-primary font-semibold" : ""
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <HiOutlineBanknotes className="w-[18px] h-[18px] shrink-0" />
+                            <span>{t("Finance")}</span>
+                          </span>
+                          <span className="shrink-0">
+                            {financeOpen ? (
+                              <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                            ) : (
+                              <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                            )}
+                          </span>
+                        </SidebarMenuButton>
+                        {financeOpen && (
+                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                            {financeLinks.map((link, idx) => (
+                              <SidebarMenuSubItem key={link.href} className="relative">
+                                <SubItemBranchLine isLast={idx === financeLinks.length - 1} />
+                                <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
+                                  <Link href={link.href} className={link.active ? "text-foreground font-medium" : "text-muted"}>
+                                    {link.label}
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
+                        )}
+                      </div>
+                    )}
                   </SidebarMenuItem>
                 )}
               </SidebarMenu>

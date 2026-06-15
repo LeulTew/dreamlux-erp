@@ -140,7 +140,13 @@ function buildColumns(
             />
           </div>
         ) : (
-          <span className="font-medium text-foreground">{getValue()}</span>
+          <button
+            type="button"
+            onClick={() => setEditingItem(row.original)}
+            className="font-medium text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+          >
+            {getValue()}
+          </button>
         ),
     }),
     columnHelper.accessor("quantity", {

@@ -196,11 +196,23 @@ function EventsPageContent() {
                         {(page - 1) * limit + index + 1}
                       </td>
                       <td className="px-6 py-4 font-bold text-foreground">
-                        {event.name}
+                        <button
+                          type="button"
+                          onClick={() => setEditingEvent(event)}
+                          className="font-bold text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+                        >
+                          {event.name}
+                        </button>
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="font-semibold">{event.client_name}</div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingEvent(event)}
+                            className="font-semibold text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+                          >
+                            {event.client_name}
+                          </button>
                           {event.client_phone && (
                             <div className="text-xs text-muted font-mono">{event.client_phone}</div>
                           )}

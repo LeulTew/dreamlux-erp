@@ -151,9 +151,15 @@ export default function SalaryLevelsPage() {
                 levels?.map(lvl => (
                   <tr key={lvl.id} className="hover:bg-primary/2 transition-colors group">
                     <td className="px-4 sm:px-8 py-4 sm:py-6">
-                      <span className="inline-flex items-center justify-center min-w-10 px-3 py-1.5 bg-foreground text-background rounded-full font-black text-[10px] uppercase tracking-widest group-hover:scale-105 transition-transform shadow-sm">
+                      <button
+                        onClick={() => {
+                          setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="inline-flex items-center justify-center min-w-10 px-3 py-1.5 bg-foreground text-background rounded-full font-black text-[10px] uppercase tracking-widest hover:opacity-85 active:scale-95 transition-all shadow-sm cursor-pointer"
+                      >
                         {lvl.level_name}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-4 sm:px-8 py-4 sm:py-6">
                       <div className="flex flex-col">
