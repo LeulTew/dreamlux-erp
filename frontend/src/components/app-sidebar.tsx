@@ -149,10 +149,29 @@ function CollapsedPopout({
             {links.map((link, idx) => {
               const y_start = 30; // Button vertical center (24px button center + 6px top offset)
               const y_item = 22 + idx * 34; // First item center is ~22px, next centers are spaced by 34px (32px item + 2px gap)
+              
+              const x_start = 28; // Clear the button highlights
+              const x_trunk = 38;
+              const dy = Math.abs(y_item - y_start);
+              
+              if (dy < 4) {
+                return (
+                  <path
+                    key={link.href}
+                    d={`M ${x_start},${y_start} L 52,${y_item}`}
+                    fill="none"
+                    stroke="currentColor"
+                    className="text-border/60"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                );
+              }
+              
+              const r = Math.min(8, dy / 2);
               const isBelow = y_item >= y_start;
-              const r = Math.min(12, Math.abs(y_item - y_start));
               const y_turn = isBelow ? (y_item - r) : (y_item + r);
-              const path = `M 0,${y_start} V ${y_turn} Q 0,${y_item} ${r},${y_item} L 52,${y_item}`;
+              const path = `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_start + (isBelow ? r : -r)} V ${y_turn} Q ${x_trunk},${y_item} ${x_trunk + r},${y_item} L 52,${y_item}`;
               
               return (
                 <path
@@ -205,18 +224,6 @@ function SidebarLink({
 }) {
   const [hovered, setHovered] = useState(false);
 
-  const buttonContent = (
-    <span
-      className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer mx-auto ${
-        active 
-          ? "bg-primary text-primary-foreground shadow-md" 
-          : "text-muted hover:bg-card-alt hover:text-foreground"
-      }`}
-    >
-      <Icon className="w-[22px] h-[22px] shrink-0" />
-    </span>
-  );
-
   if (isCollapsed) {
     return (
       <div 
@@ -224,7 +231,16 @@ function SidebarLink({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <Link href={href} className="w-full flex justify-center">{buttonContent}</Link>
+        <Link 
+          href={href} 
+          className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
+            active 
+              ? "bg-primary text-primary-foreground shadow-md" 
+              : "text-muted hover:bg-card-alt hover:text-foreground"
+          }`}
+        >
+          <Icon className="w-[22px] h-[22px] shrink-0" />
+        </Link>
         {hovered && (
           <div className="absolute left-[calc(100%+16px)] top-[6px] z-50 bg-card border border-border/80 rounded-2xl px-3 py-2 shadow-massive flex items-center animate-scale-in pointer-events-none whitespace-nowrap">
             <span className="text-foreground/90 font-semibold text-xs leading-none">
@@ -243,6 +259,32 @@ function SidebarLink({
         <span>{label}</span>
       </Link>
     </SidebarMenuButton>
+  );
+}
+
+function SubItemBranchLine({ isLast }: { isLast: boolean }) {
+  return (
+    <div className="absolute left-[-14px] top-0 bottom-0 w-3.5 pointer-events-none flex items-center">
+      <svg className="w-full h-full text-border/40" viewBox="0 0 14 36" preserveAspectRatio="none">
+        {isLast ? (
+          <path
+            d="M 0,0 V 18 Q 0,18 8,18 L 14,18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        ) : (
+          <path
+            d="M 0,0 V 36 M 0,18 Q 0,18 8,18 L 14,18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        )}
+      </svg>
+    </div>
   );
 }
 
@@ -399,15 +441,17 @@ export function AppSidebar() {
                           </span>
                         </SidebarMenuButton>
                         {employeesOpen && (
-                          <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1">
-                            <SidebarMenuSubItem>
+                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                            <SidebarMenuSubItem className="relative">
+                              <SubItemBranchLine isLast={false} />
                               <SidebarMenuSubButton asChild isActive={pathname === "/"} className="rounded-xl">
                                 <Link href="/" className={pathname === "/" ? "text-foreground font-medium" : "text-muted"}>
                                   {t("List Employees")}
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
-                            <SidebarMenuSubItem>
+                            <SidebarMenuSubItem className="relative">
+                              <SubItemBranchLine isLast={true} />
                               <SidebarMenuSubButton asChild isActive={pathname === "/insert"} className="rounded-xl">
                                 <Link href="/insert" className={pathname === "/insert" ? "text-foreground font-medium" : "text-muted"}>
                                   {t("Add Employee")}
@@ -529,15 +573,17 @@ export function AppSidebar() {
                         </span>
                       </SidebarMenuButton>
                       {itemsOpen && (
-                        <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1">
-                          <SidebarMenuSubItem>
+                        <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                          <SidebarMenuSubItem className="relative">
+                            <SubItemBranchLine isLast={false} />
                             <SidebarMenuSubButton asChild isActive={pathname === "/assets"} className="rounded-xl">
                               <Link href="/assets" className={pathname === "/assets" ? "text-foreground font-medium" : "text-muted"}>
                                 {t("List Items")}
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
-                          <SidebarMenuSubItem>
+                          <SidebarMenuSubItem className="relative">
+                            <SubItemBranchLine isLast={true} />
                             <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"} className="rounded-xl">
                               <Link href="/assets/insert" className={pathname === "/assets/insert" ? "text-foreground font-medium" : "text-muted"}>
                                 {t("Add Item")}

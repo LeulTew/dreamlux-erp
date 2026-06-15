@@ -472,8 +472,8 @@ export default function AuthLayout({
   if (status !== "authenticated") return null;
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
+    <SidebarProvider className="h-screen overflow-hidden">
+      <div className="flex h-full w-full bg-background overflow-hidden">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 w-full overflow-hidden">
           {/* Header - Flat borderless design */}
