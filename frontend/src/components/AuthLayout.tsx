@@ -42,11 +42,11 @@ export default function AuthLayout({
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 w-full overflow-hidden">
-          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/50 px-4 md:px-6 bg-card">
+          <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border/50 px-4 md:px-6 bg-sidebar">
             <SidebarTrigger className="text-muted hover:text-foreground transition-all cursor-pointer" />
-            <div className="h-4 w-px bg-border shrink-0" />
+            <div className="h-4 w-px bg-border/50 shrink-0" />
             <Breadcrumbs />
-            <div className="ml-auto shrink-0">
+            <div className="ml-auto shrink-0 flex items-center gap-2">
               <PayrollReminder />
             </div>
           </header>

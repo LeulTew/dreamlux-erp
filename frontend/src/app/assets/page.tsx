@@ -1005,11 +1005,9 @@ function AssetsContent() {
         onPageChange={setPage}
       />
 
-      <AnimatePresence>
-        {editingItem && (
+      {editingItem && (
           <EditAssetSheet item={editingItem} onClose={() => setEditingItem(null)} />
         )}
-      </AnimatePresence>
 
       <DeleteConfirmModal
         isOpen={!!itemToDelete}

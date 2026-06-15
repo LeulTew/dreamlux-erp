@@ -17,6 +17,7 @@ import {
   HiMoon,
   HiChevronDown,
   HiChevronUp,
+  HiMagnifyingGlass,
 } from "react-icons/hi2";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
@@ -52,13 +53,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Reports: "Reports",
     "Add Item": "Add Item",
     "List Items": "List Items",
-    Admin: "Admin Settings",
+    Admin: "Settings",
     Events: "Events",
-    "HR Management": "HR Management",
-    "Inventory Management": "Inventory Management",
+    "HR Management": "MAIN",
+    "Inventory Management": "INVENTORY",
     "Sign Out": "Sign Out",
     Cancel: "Cancel",
     "Are you sure you want to sign out?": "Are you sure you want to sign out?",
+    Search: "Search",
   },
   am: {
     Employees: "ሰራተኞች",
@@ -76,11 +78,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "List Items": "የዕቃዎች ዝርዝር",
     Admin: "አስተዳዳሪ",
     Events: "ዝግጅቶች",
-    "HR Management": "የሰራተኞች ገጽ",
-    "Inventory Management": "የዕቃዎች ገጽ",
+    "HR Management": "ዋና",
+    "Inventory Management": "ዕቃዎች",
     "Sign Out": "ውጣ",
     Cancel: "ተመለስ",
     "Are you sure you want to sign out?": "በእርግጥ መውጣት ይፈልጋሉ?",
+    Search: "ፈልግ",
   },
 };
 
@@ -90,6 +93,7 @@ export function AppSidebar() {
   const { dark, toggle: toggleTheme } = useTheme();
   const { lang, toggle: toggleLang } = useLanguage();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // Collapsible sub-menus state
   const [employeesOpen, setEmployeesOpen] = useState(true);
@@ -151,24 +155,33 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="icon" className="border-r border-border bg-card">
-        {/* Header - App Branding */}
-        <SidebarHeader className="border-b border-border/50 py-4 px-6 flex flex-row items-center gap-3 select-none">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-black text-lg shadow-none shrink-0">
+      <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
+        {/* Header - Logo */}
+        <SidebarHeader className="py-5 px-5 flex flex-row items-center gap-3 select-none">
+          <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center text-background font-black text-base shrink-0">
             D
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
             <span className="font-black tracking-tight text-foreground text-sm leading-tight">
-              DREAM LUX
+              Dream Lux
             </span>
-            <span className="text-[9px] text-muted font-bold tracking-widest uppercase leading-none mt-0.5">
+            <span className="text-[9px] text-muted font-medium tracking-widest uppercase leading-none mt-0.5">
               ERP System
             </span>
           </div>
         </SidebarHeader>
 
+        {/* Search Bar */}
+        <div className="px-3 pb-2 group-data-[collapsible=icon]:px-2">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card-alt/50 text-muted text-xs group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2.5 cursor-pointer hover:border-primary/30 transition-all">
+            <HiMagnifyingGlass className="w-4 h-4 shrink-0" />
+            <span className="group-data-[collapsible=icon]:hidden">{t("Search")}</span>
+            <span className="group-data-[collapsible=icon]:hidden ml-auto text-[10px] text-muted/60 font-mono">⌘S</span>
+          </div>
+        </div>
+
         {/* Content Groupings */}
-        <SidebarContent className="py-4 space-y-4">
+        <SidebarContent className="py-2">
           {/* HR Management Section */}
           {hasAccess([
             "SUPER_ADMIN",
@@ -186,7 +199,7 @@ export function AppSidebar() {
             "accountant",
           ]) && (
             <SidebarGroup>
-              <SidebarGroupLabel className="px-4 text-[10px] font-black tracking-widest uppercase text-muted/80 group-data-[collapsible=icon]:hidden">
+              <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
                 {t("HR Management")}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -197,35 +210,35 @@ export function AppSidebar() {
                       <SidebarMenuButton
                         onClick={() => setEmployeesOpen(!employeesOpen)}
                         className={`w-full justify-between group-data-[collapsible=icon]:justify-center ${
-                          isActive("/") || isActive("/insert") ? "text-primary bg-primary-light dark:bg-primary-light" : ""
+                          isActive("/") || isActive("/insert") ? "text-primary font-semibold" : ""
                         }`}
                       >
                         <span className="flex items-center gap-3">
-                          <HiUsers className="w-5 h-5 shrink-0" />
-                          <span className="group-data-[collapsible=icon]:hidden font-bold">
+                          <HiUsers className="w-[18px] h-[18px] shrink-0" />
+                          <span className="group-data-[collapsible=icon]:hidden">
                             {t("Employees")}
                           </span>
                         </span>
                         <span className="group-data-[collapsible=icon]:hidden shrink-0">
                           {employeesOpen ? (
-                            <HiChevronUp className="w-3.5 h-3.5 text-muted" />
+                            <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
                           ) : (
-                            <HiChevronDown className="w-3.5 h-3.5 text-muted" />
+                            <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
                           )}
                         </span>
                       </SidebarMenuButton>
                       {employeesOpen && (
-                        <SidebarMenuSub className="ml-8 border-l border-border/80 pl-3 space-y-1 mt-1 group-data-[collapsible=icon]:hidden">
+                        <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1 group-data-[collapsible=icon]:hidden">
                           <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={pathname === "/"}>
-                              <Link href="/" className="font-bold">
+                              <Link href="/" className={pathname === "/" ? "text-foreground font-medium" : "text-muted"}>
                                 {t("List Employees")}
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem>
                             <SidebarMenuSubButton asChild isActive={pathname === "/insert"}>
-                              <Link href="/insert" className="font-bold">
+                              <Link href="/insert" className={pathname === "/insert" ? "text-foreground font-medium" : "text-muted"}>
                                 {t("Add Employee")}
                               </Link>
                             </SidebarMenuSubButton>
@@ -253,8 +266,8 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={isActive("/events")}>
                         <Link href="/events">
-                          <HiOutlineCalendar className="w-5 h-5 shrink-0" />
-                          <span className="font-bold">{t("Events")}</span>
+                          <HiOutlineCalendar className="w-[18px] h-[18px] shrink-0" />
+                          <span>{t("Events")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -265,8 +278,8 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={isActive("/hr/payments")}>
                         <Link href="/hr/payments">
-                          <HiOutlineBanknotes className="w-5 h-5 shrink-0" />
-                          <span className="font-bold">{t("Payroll")}</span>
+                          <HiOutlineBanknotes className="w-[18px] h-[18px] shrink-0" />
+                          <span>{t("Payroll")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -277,8 +290,8 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={isActive("/hr/salary-levels")}>
                         <Link href="/hr/salary-levels">
-                          <HiOutlineCurrencyDollar className="w-5 h-5 shrink-0" />
-                          <span className="font-bold">{t("Salary")}</span>
+                          <HiOutlineCurrencyDollar className="w-[18px] h-[18px] shrink-0" />
+                          <span>{t("Salary")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -289,8 +302,8 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={isActive("/hr/event-types")}>
                         <Link href="/hr/event-types">
-                          <HiOutlineCalendar className="w-5 h-5 shrink-0" />
-                          <span className="font-bold">{t("Event Types")}</span>
+                          <HiOutlineCalendar className="w-[18px] h-[18px] shrink-0" />
+                          <span>{t("Event Types")}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -303,7 +316,7 @@ export function AppSidebar() {
           {/* Inventory Management Section */}
           {hasAccess(["SUPER_ADMIN", "INVENTORY_CONTROLLER", "admin"]) && (
             <SidebarGroup>
-              <SidebarGroupLabel className="px-4 text-[10px] font-black tracking-widest uppercase text-muted/80 group-data-[collapsible=icon]:hidden">
+              <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
                 {t("Inventory Management")}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -312,8 +325,8 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive("/assets/dashboard")}>
                       <Link href="/assets/dashboard">
-                        <HiBuildingOffice className="w-5 h-5 shrink-0" />
-                        <span className="font-bold">{t("Dashboard")}</span>
+                        <HiBuildingOffice className="w-[18px] h-[18px] shrink-0" />
+                        <span>{t("Dashboard")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -323,35 +336,35 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       onClick={() => setItemsOpen(!itemsOpen)}
                       className={`w-full justify-between group-data-[collapsible=icon]:justify-center ${
-                        isActive("/assets") || isActive("/assets/insert") ? "text-primary bg-primary-light" : ""
+                        isActive("/assets") || isActive("/assets/insert") ? "text-primary font-semibold" : ""
                       }`}
                     >
                       <span className="flex items-center gap-3">
-                        <HiTableCells className="w-5 h-5 shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden font-bold">
+                        <HiTableCells className="w-[18px] h-[18px] shrink-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">
                           {t("Inventory")}
                         </span>
                       </span>
                       <span className="group-data-[collapsible=icon]:hidden shrink-0">
                         {itemsOpen ? (
-                          <HiChevronUp className="w-3.5 h-3.5 text-muted" />
+                          <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
                         ) : (
-                          <HiChevronDown className="w-3.5 h-3.5 text-muted" />
+                          <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
                         )}
                       </span>
                     </SidebarMenuButton>
                     {itemsOpen && (
-                      <SidebarMenuSub className="ml-8 border-l border-border/80 pl-3 space-y-1 mt-1 group-data-[collapsible=icon]:hidden">
+                      <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1 group-data-[collapsible=icon]:hidden">
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === "/assets"}>
-                            <Link href="/assets" className="font-bold">
+                            <Link href="/assets" className={pathname === "/assets" ? "text-foreground font-medium" : "text-muted"}>
                               {t("List Items")}
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"}>
-                            <Link href="/assets/insert" className="font-bold">
+                            <Link href="/assets/insert" className={pathname === "/assets/insert" ? "text-foreground font-medium" : "text-muted"}>
                               {t("Add Item")}
                             </Link>
                           </SidebarMenuSubButton>
@@ -364,8 +377,8 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive("/assets/reconcile")}>
                       <Link href="/assets/reconcile">
-                        <HiOutlineClipboardDocumentCheck className="w-5 h-5 shrink-0" />
-                        <span className="font-bold">{t("Reconcile")}</span>
+                        <HiOutlineClipboardDocumentCheck className="w-[18px] h-[18px] shrink-0" />
+                        <span>{t("Reconcile")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -374,8 +387,8 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive("/assets/history")}>
                       <Link href="/assets/history">
-                        <HiCog6Tooth className="w-5 h-5 shrink-0" />
-                        <span className="font-bold">{t("Audit Log")}</span>
+                        <HiCog6Tooth className="w-[18px] h-[18px] shrink-0" />
+                        <span>{t("Audit Log")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -384,8 +397,8 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive("/assets/reports")}>
                       <Link href="/assets/reports">
-                        <HiOutlineDocumentChartBar className="w-5 h-5 shrink-0" />
-                        <span className="font-bold">{t("Reports")}</span>
+                        <HiOutlineDocumentChartBar className="w-[18px] h-[18px] shrink-0" />
+                        <span>{t("Reports")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -402,8 +415,8 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive("/settings")}>
                       <Link href="/settings">
-                        <HiCog6Tooth className="w-5 h-5 shrink-0" />
-                        <span className="font-bold">{t("Admin")}</span>
+                        <HiCog6Tooth className="w-[18px] h-[18px] shrink-0" />
+                        <span>{t("Admin")}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -413,67 +426,82 @@ export function AppSidebar() {
           )}
         </SidebarContent>
 
-        {/* Footer - User Profile & System Toggles */}
-        <SidebarFooter className="border-t border-border/50 p-4 space-y-4 bg-card-alt/30 shrink-0">
-          {/* User profile block */}
-          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+        {/* Footer - User Profile with dropdown */}
+        <SidebarFooter className="border-t border-border/50 p-3 shrink-0">
+          {/* User card — click to toggle controls */}
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-card-alt transition-all group-data-[collapsible=icon]:justify-center"
+          >
             <UserAvatar
               fullName={currentUser.full_name}
               imageUrl={currentUser.profile_image_url}
               sizeClassName="w-9 h-9"
-              className="shadow-none border border-border"
+              className="shadow-none border border-border shrink-0"
               textClassName="text-[10px] font-black text-muted"
             />
-            <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
-              <span className="font-bold text-foreground text-xs leading-tight">
+            <div className="flex flex-col truncate text-left group-data-[collapsible=icon]:hidden">
+              <span className="font-semibold text-foreground text-xs leading-tight">
                 {currentUser.full_name}
               </span>
-              <span className="text-[9px] text-muted font-black uppercase tracking-wider mt-0.5">
+              <span className="text-[9px] text-muted font-medium uppercase tracking-wider mt-0.5">
                 {currentUser.role_name}
               </span>
             </div>
-          </div>
-
-          {/* System Toggles */}
-          <div className="grid grid-cols-2 gap-2 group-data-[collapsible=icon]:hidden">
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-xs font-bold transition-all"
-            >
-              {dark ? (
-                <>
-                  <HiSun className="w-4 h-4 shrink-0" />
-                  Light
-                </>
+            <span className="ml-auto group-data-[collapsible=icon]:hidden shrink-0">
+              {showUserMenu ? (
+                <HiChevronUp className="w-3.5 h-3.5 text-muted" />
               ) : (
-                <>
-                  <HiMoon className="w-4 h-4 shrink-0" />
-                  Dark
-                </>
+                <HiChevronDown className="w-3.5 h-3.5 text-muted" />
               )}
-            </button>
-
-            {/* Language Toggle */}
-            <button
-              onClick={toggleLang}
-              className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-xs font-bold transition-all"
-            >
-              <span className="font-black text-[10px] shrink-0 leading-none">
-                {lang === "en" ? "EN" : "አማ"}
-              </span>
-              {lang === "en" ? "English" : "አማርኛ"}
-            </button>
-          </div>
-
-          {/* Sign Out Button */}
-          <button
-            onClick={() => setShowConfirmLogout(true)}
-            className="w-full py-2.5 rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2 border border-danger/20 text-xs font-black uppercase tracking-wider group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:py-3 shrink-0"
-          >
-            <HiArrowRightOnRectangle className="w-4 h-4 shrink-0" />
-            <span className="group-data-[collapsible=icon]:hidden">{t("Sign Out")}</span>
+            </span>
           </button>
+
+          {/* Expandable user controls */}
+          {showUserMenu && (
+            <div className="space-y-2 pt-1 group-data-[collapsible=icon]:hidden">
+              {/* System Toggles */}
+              <div className="grid grid-cols-2 gap-1.5">
+                {/* Theme Toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-[11px] font-medium transition-all"
+                >
+                  {dark ? (
+                    <>
+                      <HiSun className="w-3.5 h-3.5 shrink-0" />
+                      Light
+                    </>
+                  ) : (
+                    <>
+                      <HiMoon className="w-3.5 h-3.5 shrink-0" />
+                      Dark
+                    </>
+                  )}
+                </button>
+
+                {/* Language Toggle */}
+                <button
+                  onClick={toggleLang}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-[11px] font-medium transition-all"
+                >
+                  <span className="font-bold text-[10px] shrink-0 leading-none">
+                    {lang === "en" ? "EN" : "አማ"}
+                  </span>
+                  {lang === "en" ? "English" : "አማርኛ"}
+                </button>
+              </div>
+
+              {/* Sign Out Button */}
+              <button
+                onClick={() => setShowConfirmLogout(true)}
+                className="w-full py-2 rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2 border border-danger/20 text-[11px] font-semibold uppercase tracking-wider shrink-0"
+              >
+                <HiArrowRightOnRectangle className="w-3.5 h-3.5 shrink-0" />
+                <span>{t("Sign Out")}</span>
+              </button>
+            </div>
+          )}
         </SidebarFooter>
       </Sidebar>
 

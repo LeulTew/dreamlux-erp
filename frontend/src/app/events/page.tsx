@@ -11,7 +11,7 @@ import EditEventSheet from "@/components/EditEventSheet";
 import PaginationControls from "@/components/PaginationControls";
 import Link from "next/link";
 import { useLanguage } from "@/hooks/use-language";
-import { AnimatePresence } from "framer-motion";
+
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -328,8 +328,7 @@ function EventsPageContent() {
         )}
       </div>
 
-      <AnimatePresence>
-        {isAddOpen && (
+      {isAddOpen && (
           <EditEventSheet
             onClose={() => setIsAddOpen(false)}
             onSuccess={() => setPage(1)}
@@ -341,7 +340,6 @@ function EventsPageContent() {
             onClose={() => setEditingEvent(null)}
           />
         )}
-      </AnimatePresence>
     </AuthLayout>
   );
 }
