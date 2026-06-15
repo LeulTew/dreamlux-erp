@@ -13,6 +13,86 @@ import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Loading payroll data...": "Loading payroll data...",
+    "Error loading payroll data": "Error loading payroll data",
+    "Payroll Run Detail": "Payroll Run Detail",
+    "Print PDF": "Print PDF",
+    "Excel": "Excel",
+    "CSV": "CSV",
+    "Finalize Payout": "Finalize Payout",
+    "Payroll Report": "Payroll Report",
+    "Generate a detailed PDF summary of this payroll period.": "Generate a detailed PDF summary of this payroll period.",
+    "Move to Trash": "Move to Trash",
+    "Are you sure you want to archive this payroll run? It will be moved to history trash.": "Are you sure you want to archive this payroll run? It will be moved to history trash.",
+    "Flag as Incorrect": "Flag as Incorrect",
+    "Mark this run as containing errors? This will help auditors identify discrepancies.": "Mark this run as containing errors? This will help auditors identify discrepancies.",
+    "Finalize Payroll": "Finalize Payroll",
+    "Confirm Finalization": "Confirm Finalization",
+    "Lock this payroll run and mark it as active? This will finalize all payout totals for this period.": "Lock this payroll run and mark it as active? This will finalize all payout totals for this period.",
+    "Total Paid": "Total Paid",
+    "Employees": "Employees",
+    "Average Paid": "Average Paid",
+    "Base": "Base",
+    "Events Total": "Events Total",
+    "Payout": "Payout",
+    "Event": "Event",
+    "Qty": "Qty",
+    "Unit": "Unit",
+    "Line Total": "Line Total",
+    "Payroll run moved to trash": "Payroll run moved to trash",
+    "Status updated to": "Status updated to",
+    "Failed to update status": "Failed to update status",
+    "FINALIZED": "FINALIZED",
+    "DRAFT": "DRAFT",
+    "FLAGGED_WRONG": "FLAGGED WRONG",
+    "unknown": "unknown",
+    "Period not available": "Period not available",
+    "1st-15th": "1st-15th",
+    "16th-End": "16th-End"
+  },
+  am: {
+    "Loading payroll data...": "የክፍያ መረጃ በመጫን ላይ...",
+    "Error loading payroll data": "የክፍያ መረጃን በመጫን ላይ ስህተት ተፈጥሯል",
+    "Payroll Run Detail": "የክፍያ ሩጫ ዝርዝር",
+    "Print PDF": "ፒዲኤፍ አትም",
+    "Excel": "ኤክሴል",
+    "CSV": "ሲኤስቪ",
+    "Finalize Payout": "ክፍያውን አጠናቅ",
+    "Payroll Report": "የክፍያ ሪፖርት",
+    "Generate a detailed PDF summary of this payroll period.": "ለዚህ የክፍያ ጊዜ ዝርዝር የፒዲኤፍ ማጠቃለያ ያመንጩ።",
+    "Move to Trash": "ወደ መጣያ ውሰድ",
+    "Are you sure you want to archive this payroll run? It will be moved to history trash.": "ይህን የክፍያ ሩጫ በእርግጠኝነት ወደ ማህደር ማስገባት ይፈልጋሉ? ወደ ታሪክ መጣያ ይዛወራል።",
+    "Flag as Incorrect": "ስህተት መሆኑን ምልክት አድርግ",
+    "Mark this run as containing errors? This will help auditors identify discrepancies.": "ይህ ሩጫ ስህተቶች እንዳሉበት ምልክት ይደረግበት? ይህ ኦዲተሮች ልዩነቶችን እንዲለዩ ይረዳል።",
+    "Finalize Payroll": "የክፍያ መዝገብ አጠናቅ",
+    "Confirm Finalization": "ማጠናቀቅን አረጋግጥ",
+    "Lock this payroll run and mark it as active? This will finalize all payout totals for this period.": "ይህን የክፍያ ሩጫ ይቆልፉ እና ንቁ መሆኑን ምልክት ያድርጉ? ይህ የዚህን ጊዜ አጠቃላይ ክፍያዎች ያጠናቅቃል።",
+    "Total Paid": "በጠቅላላ የተከፈለ",
+    "Employees": "ሠራተኞች",
+    "Average Paid": "አማካይ የተከፈለ",
+    "Base": "መሠረታዊ",
+    "Events Total": "የክስተቶች ድምር",
+    "Payout": "የተከፈለ ክፍያ",
+    "Event": "ክስተት",
+    "Qty": "ብዛት",
+    "Unit": "ነጠላ",
+    "Line Total": "መስመር ድምር",
+    "Payroll run moved to trash": "የክፍያ ሩጫ ወደ መጣያ ተወስዷል",
+    "Status updated to": "ሁኔታው ተሻሽሏል ወደ",
+    "Failed to update status": "ሁኔታውን ማሻሻል አልተቻለም",
+    "FINALIZED": "የተጠናቀቀ",
+    "DRAFT": "ረቂቅ",
+    "FLAGGED_WRONG": "ስህተት የተገኘበት",
+    "unknown": "ያልታወቀ",
+    "Period not available": "የክፍያ ጊዜው አልተገኘም",
+    "1st-15th": "ከ1ኛ-15ኛ",
+    "16th-End": "ከ16ኛ-መጨረሻ"
+  }
+};
 
 type RunEventLine = {
   id: string;
@@ -34,6 +114,8 @@ type RunEmployeeLine = {
 };
 
 export default function PaymentRunDetailPage() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const { id } = useParams() as { id: string };
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -60,14 +142,14 @@ export default function PaymentRunDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["payroll-run", id] });
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       if (data.status === "TRASH") {
-        toast.success("Payroll run moved to trash");
+        toast.success(t("Payroll run moved to trash"));
         router.push("/hr/payments");
       } else {
-        toast.success(`Status updated to ${data.status}`);
+        toast.success(`${t("Status updated to")} ${t(data.status)}`);
       }
     },
     onError: () => {
-      toast.error("Failed to update status");
+      toast.error(t("Failed to update status"));
     }
   });
 
@@ -75,7 +157,7 @@ export default function PaymentRunDetailPage() {
     return (
       <AuthLayout>
         <div className="p-8 font-black uppercase tracking-widest text-muted-foreground animate-pulse text-center">
-          Loading payroll data...
+          {t("Loading payroll data...")}
         </div>
       </AuthLayout>
     );
@@ -85,7 +167,7 @@ export default function PaymentRunDetailPage() {
     return (
       <AuthLayout>
         <div className="p-8 text-destructive font-black uppercase tracking-widest text-center">
-          Error loading payroll data
+          {t("Error loading payroll data")}
         </div>
       </AuthLayout>
     );
@@ -93,13 +175,13 @@ export default function PaymentRunDetailPage() {
 
    const isH1 = run.period_start?.endsWith("-01") && run.period_end?.endsWith("-15");
   const isH2 = run.period_start?.endsWith("-16");
-  const suffix = isH1 ? " (1st-15th)" : isH2 ? " (16th-End)" : "";
+  const suffix = isH1 ? ` (${t("1st-15th")})` : isH2 ? ` (${t("16th-End")})` : "";
 
   const periodLabel = run.period_start && run.period_end
     ? `${format(new Date(run.period_start), "MMM yyyy")}${suffix}`
     : run.month && run.year
       ? `${format(new Date(run.year, run.month - 1), "MMMM yyyy")}${suffix}`
-      : "Period not available";
+      : t("Period not available");
 
   const totalPaid = Number(run.total_payroll_value ?? 0);
   const employeeCount = run.employee_lines?.length ?? 0;
@@ -118,14 +200,14 @@ export default function PaymentRunDetailPage() {
               <HiOutlineArrowUturnLeft className="w-6 h-6" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold uppercase tracking-tight">Payroll Run Detail</h1>
+              <h1 className="text-2xl font-bold uppercase tracking-tight">{t("Payroll Run Detail")}</h1>
               <p className="text-xs uppercase tracking-wider text-muted-foreground">{periodLabel}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider border ${statusColors[run.status ?? ""] ?? "bg-muted text-muted-foreground border-border"}`}>
-              {run.status ?? "unknown"}
+              {t(run.status ?? "unknown")}
             </span>
 
             <div className="h-8 w-px bg-border/50 mx-2 hidden sm:block" />
@@ -135,7 +217,7 @@ export default function PaymentRunDetailPage() {
               className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:opacity-90 transition-all active:scale-[0.98] shadow-sm"
             >
               <HiPrinter className="w-4 h-4" />
-              Print PDF
+              {t("Print PDF")}
             </button>
 
             <button 
@@ -143,7 +225,7 @@ export default function PaymentRunDetailPage() {
               className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
               <HiTableCells className="w-4 h-4 text-emerald-500" />
-              Excel
+              {t("Excel")}
             </button>
 
             <button 
@@ -151,7 +233,7 @@ export default function PaymentRunDetailPage() {
               className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
               <HiDocumentArrowDown className="w-4 h-4 text-amber-500" />
-              CSV
+              {t("CSV")}
             </button>
 
              {run.status === "FINALIZED" && (
@@ -159,14 +241,14 @@ export default function PaymentRunDetailPage() {
                 <button 
                   onClick={() => setIsFlagModalOpen(true)}
                   className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg hover:bg-amber-500/20 transition-all active:scale-[0.98]"
-                  title="Flag as Wrong"
+                  title={t("Flag as Wrong")}
                 >
                   <HiExclamationTriangle className="w-5 h-5" />
                 </button>
                 <button 
                   onClick={() => setIsDeleteModalOpen(true)}
                   className="p-2.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all active:scale-[0.98]"
-                  title="Move to Trash"
+                  title={t("Move to Trash")}
                 >
                   <HiTrash className="w-5 h-5" />
                 </button>
@@ -178,7 +260,7 @@ export default function PaymentRunDetailPage() {
                 onClick={() => setIsFinalizeModalOpen(true)}
                 className="inline-flex items-center gap-2 h-10 px-4 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm"
               >
-                Finalize Payout
+                {t("Finalize Payout")}
               </button>
             )}
           </div>
@@ -188,16 +270,16 @@ export default function PaymentRunDetailPage() {
           isOpen={isPrintModalOpen}
           onClose={() => setIsPrintModalOpen(false)}
           onPrint={(options) => router.push(`/hr/payments/${id}/report?includeImages=${options.includeImages}`)}
-          title="Payroll Report"
-          description="Generate a detailed PDF summary of this payroll period."
+          title={t("Payroll Report")}
+          description={t("Generate a detailed PDF summary of this payroll period.")}
         />
 
         <DeleteConfirmModal 
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
           onConfirm={() => statusMutation.mutate("TRASH")}
-          title="Move to Trash"
-          message="Are you sure you want to archive this payroll run? It will be moved to history trash."
+          title={t("Move to Trash")}
+          message={t("Are you sure you want to archive this payroll run? It will be moved to history trash.")}
           itemName={`${run?.month}/${run?.year} Run`}
           isDeleting={statusMutation.isPending}
         />
@@ -206,8 +288,8 @@ export default function PaymentRunDetailPage() {
           isOpen={isFlagModalOpen}
           onClose={() => setIsFlagModalOpen(false)}
           onConfirm={() => statusMutation.mutate("FLAGGED_WRONG")}
-          title="Flag as Incorrect"
-          message="Mark this run as containing errors? This will help auditors identify discrepancies."
+          title={t("Flag as Incorrect")}
+          message={t("Mark this run as containing errors? This will help auditors identify discrepancies.")}
           itemName={periodLabel}
           isDeleting={statusMutation.isPending}
         />
@@ -220,24 +302,24 @@ export default function PaymentRunDetailPage() {
             setIsFinalizeModalOpen(false);
           }}
           variant="primary"
-          confirmLabel="Confirm Finalization"
-          title="Finalize Payroll"
-          message="Lock this payroll run and mark it as active? This will finalize all payout totals for this period."
+          confirmLabel={t("Confirm Finalization")}
+          title={t("Finalize Payroll")}
+          message={t("Lock this payroll run and mark it as active? This will finalize all payout totals for this period.")}
           itemName={periodLabel}
           isDeleting={statusMutation.isPending}
         />
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-xl border border-border/50 bg-card p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total Paid</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Total Paid")}</p>
             <p className="text-xl font-bold mt-1">ETB {totalPaid.toLocaleString()}</p>
           </div>
           <div className="rounded-xl border border-border/50 bg-card p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Employees</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Employees")}</p>
             <p className="text-xl font-bold mt-1">{employeeCount}</p>
           </div>
           <div className="rounded-xl border border-border/50 bg-card p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Average Paid</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Average Paid")}</p>
             <p className="text-xl font-bold mt-1">ETB {avgPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
           </div>
         </div>
@@ -248,7 +330,7 @@ export default function PaymentRunDetailPage() {
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-bold tracking-wide">{line.employee_name_snapshot}</p>
-                  <p className="text-xs text-muted-foreground">Base ETB {Number(line.snapshot_base_salary).toLocaleString()} • Events ETB {Number(line.total_events_value).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">{t("Base")} ETB {Number(line.snapshot_base_salary).toLocaleString()} • {t("Events Total")} ETB {Number(line.total_events_value).toLocaleString()}</p>
                 </div>
                 <p className="font-bold text-lg">ETB {Number(line.total_line_pay).toLocaleString()}</p>
               </div>
@@ -258,16 +340,16 @@ export default function PaymentRunDetailPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/30">
                       <tr>
-                        <th className="text-left px-3 py-2 text-[10px] uppercase tracking-widest">Event</th>
-                        <th className="text-right px-3 py-2 text-[10px] uppercase tracking-widest">Qty</th>
-                        <th className="text-right px-3 py-2 text-[10px] uppercase tracking-widest">Unit</th>
-                        <th className="text-right px-3 py-2 text-[10px] uppercase tracking-widest">Line Total</th>
+                        <th className="text-left px-3 py-2 text-[10px] uppercase tracking-widest">{t("Event")}</th>
+                        <th className="text-right px-3 py-2 text-[10px] uppercase tracking-widest">{t("Qty")}</th>
+                        <th className="text-right px-3 py-2 text-[10px] uppercase tracking-widest">{t("Unit")}</th>
+                        <th className="text-right px-3 py-2 text-[10px] uppercase tracking-widest">{t("Line Total")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {line.events.map((eventLine: RunEventLine) => (
                         <tr key={eventLine.id} className="border-t border-border/40">
-                          <td className="px-3 py-2">{eventLine.event_name ?? "Event"}</td>
+                          <td className="px-3 py-2">{eventLine.event_name ?? t("Event")}</td>
                           <td className="px-3 py-2 text-right">{eventLine.quantity}</td>
                           <td className="px-3 py-2 text-right">ETB {Number(eventLine.price_applied).toLocaleString()}</td>
                           <td className="px-3 py-2 text-right font-bold">ETB {Number(eventLine.total_price_for_type).toLocaleString()}</td>

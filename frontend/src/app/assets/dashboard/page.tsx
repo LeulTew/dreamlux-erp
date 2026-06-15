@@ -35,13 +35,80 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { useLanguage } from "@/hooks/use-language";
 
 type TabType = "current" | "finance" | "forecasting";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Inventory Dashboard": "Inventory Dashboard",
+    "See stock by location, recent activity, and quick trends.": "See stock by location, recent activity, and quick trends.",
+    "Current": "Current",
+    "Value": "Value",
+    "Forecast": "Forecast",
+    "Reports": "Reports",
+    "Print List": "Print List",
+    "Print Asset Dashboard": "Print Asset Dashboard",
+    "Choose whether to include item thumbnails in your printed layout.": "Choose whether to include item thumbnails in your printed layout.",
+    "Stock by Location": "Stock by Location",
+    "Units per branch": "Units per branch",
+    "Location Share": "Location Share",
+    "Percent by branch": "Percent by branch",
+    "units": "units",
+    "Recent Activity": "Recent Activity",
+    "Latest stock actions by branch.": "Latest stock actions by branch.",
+    "Estimated Inventory Value": "Estimated Inventory Value",
+    "Simple estimate by branch based on current quantity.": "Simple estimate by branch based on current quantity.",
+    "No branch stock data yet. Add or reconcile inventory to see value projections.": "No branch stock data yet. Add or reconcile inventory to see value projections.",
+    "Expected Demand": "Expected Demand",
+    "Projected units for the next 6 months.": "Projected units for the next 6 months.",
+    "Forecast will appear after inventory records are available.": "Forecast will appear after inventory records are available.",
+    "Manual stock update": "Manual stock update",
+    "Stock received": "Stock received",
+    "Quantity fix": "Quantity fix",
+    "14m ago": "14m ago",
+    "2h ago": "2h ago",
+    "5h ago": "5h ago",
+  },
+  am: {
+    "Inventory Dashboard": "የክምችት ዳሽቦርድ",
+    "See stock by location, recent activity, and quick trends.": "የቅርንጫፎች ክምችት፣ የቅርብ ጊዜ እንቅስቃሴዎች እና አጠቃላይ ሁኔታዎችን እዚህ ይመልከቱ።",
+    "Current": "ወቅታዊ",
+    "Value": "ዋጋ",
+    "Forecast": "ትንበያ",
+    "Reports": "ሪፖርቶች",
+    "Print List": "ዝርዝር አትም",
+    "Print Asset Dashboard": "የንብረት ዳሽቦርድ አትም",
+    "Choose whether to include item thumbnails in your printed layout.": "በሚታተመው ሰነድ ላይ የእቃዎች ምስል እንዲካተት መፈለግዎን ይምረጡ።",
+    "Stock by Location": "ክምችት በቦታ",
+    "Units per branch": "በእያንዳንዱ ቅርንጫፍ ያሉ እቃዎች ብዛት",
+    "Location Share": "የቅርንጫፎች ድርሻ",
+    "Percent by branch": "በቅርንጫፍ በመቶኛ",
+    "units": "እቃዎች",
+    "Recent Activity": "የቅርብ ጊዜ እንቅስቃሴዎች",
+    "Latest stock actions by branch.": "በቅርንጫፎች የተከናወኑ የቅርብ ጊዜ የክምችት እንቅስቃሴዎች።",
+    "Estimated Inventory Value": "ግምታዊ የክምችት ዋጋ",
+    "Simple estimate by branch based on current quantity.": "አሁን ባለው ብዛት ላይ የተመሰረተ ቀላል የቅርንጫፎች ግምታዊ ዋጋ።",
+    "No branch stock data yet. Add or reconcile inventory to see value projections.": "እስካሁን ምንም የቅርንጫፍ ክምችት መረጃ የለም። የግምት ዋጋዎችን ለማየት እቃዎችን ይጨምሩ ወይም ያስታርቁ።",
+    "Expected Demand": "የሚጠበቅ ፍላጎት",
+    "Projected units for the next 6 months.": "ለሚቀጥሉት 6 ወራት የሚጠበቀው የእቃዎች ብዛት ትንበያ።",
+    "Forecast will appear after inventory records are available.": "የክምችት መዛግብት ሲኖሩ ትንበያው እዚህ ይታያል።",
+    "Manual stock update": "በእጅ የተደረገ የክምችት ማሻሻያ",
+    "Stock received": "እቃ ተረክቧል",
+    "Quantity fix": "የብዛት ማስተካከያ",
+    "14m ago": "ከ14 ደቂቃ በፊት",
+    "2h ago": "ከ2 ሰዓት በፊት",
+    "5h ago": "ከ5 ሰዓት በፊት",
+  }
+};
+
 export default function InventoryDashboardPage() {
   const router = useRouter();
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+
   const [activeTab, setActiveTab] = useState<TabType>("current");
   const [chartsReady, setChartsReady] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -97,15 +164,15 @@ export default function InventoryDashboardPage() {
   const hasForecastData = forecastingData.length > 0;
 
   const timelineEvents = [
-    { code: "BC", label: "Manual stock update", branch: "Bulbula Coka", time: "14m ago", href: "/assets/reconcile" },
-    { code: "B2", label: "Stock received", branch: "Bulbula 2", time: "2h ago", href: "/assets/insert" },
-    { code: "HA", label: "Quantity fix", branch: "Haya Arat", time: "5h ago", href: "/assets/history" },
+    { code: "BC", label: t("Manual stock update"), branch: "Bulbula Coka", time: t("14m ago"), href: "/assets/reconcile" },
+    { code: "B2", label: t("Stock received"), branch: "Bulbula 2", time: t("2h ago"), href: "/assets/insert" },
+    { code: "HA", label: t("Quantity fix"), branch: "Haya Arat", time: t("5h ago"), href: "/assets/history" },
   ];
 
   const tabLabels: Record<TabType, string> = {
-    current: "Current",
-    finance: "Value",
-    forecasting: "Forecast",
+    current: t("Current"),
+    finance: t("Value"),
+    forecasting: t("Forecast"),
   };
 
   return (
@@ -114,11 +181,11 @@ export default function InventoryDashboardPage() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <h1 className="text-3xl md:text-4xl font-black text-foreground tracking-tight flex items-center gap-3">
-              Inventory Dashboard
+              {t("Inventory Dashboard")}
               <span className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-black uppercase tracking-widest border border-primary/20">v2026.1</span>
             </h1>
             <p className="text-sm font-medium text-muted mt-2 max-w-lg leading-relaxed">
-              See stock by location, recent activity, and quick trends.
+              {t("See stock by location, recent activity, and quick trends.")}
             </p>
           </motion.div>
 
@@ -153,14 +220,14 @@ export default function InventoryDashboardPage() {
                 className="px-6 py-3.5 bg-card border border-border/50 text-foreground rounded-xl flex items-center gap-2 font-black text-xs shadow-soft hover:shadow-premium transition-all"
               >
                 <HiOutlineDocumentChartBar className="w-5 h-5 text-primary" />
-                Reports
+                {t("Reports")}
               </button>
               <button
                 onClick={() => setIsPrintModalOpen(true)}
                 className="px-6 py-3.5 bg-foreground text-background rounded-2xl flex items-center gap-2 font-black text-xs shadow-premium hover:opacity-90 transition-all"
               >
                 <HiOutlinePrinter className="w-5 h-5" />
-                Print List
+                {t("Print List")}
               </button>
             </div>
           </div>
@@ -173,8 +240,8 @@ export default function InventoryDashboardPage() {
             const imgQuery = options.includeImages ? "?images=true" : "?images=false";
             router.push(`/report${imgQuery}`);
           }}
-          title="Print Asset Dashboard"
-          description="Choose whether to include item thumbnails in your printed layout."
+          title={t("Print Asset Dashboard")}
+          description={t("Choose whether to include item thumbnails in your printed layout.")}
         />
 
         <DashboardCards />
@@ -191,8 +258,8 @@ export default function InventoryDashboardPage() {
               <div className="glass-card p-6 md:p-10 rounded-xl md:rounded-xl border border-border/50 shadow-premium flex flex-col group hover:border-primary/20 transition-all">
                 <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">Stock by Location</h2>
-                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mt-1">Units per branch</p>
+                    <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">{t("Stock by Location")}</h2>
+                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mt-1">{t("Units per branch")}</p>
                   </div>
                   <div className="p-3 bg-primary/5 rounded-2xl text-primary border border-primary/10">
                     <HiMapPin className="w-6 h-6" />
@@ -227,8 +294,8 @@ export default function InventoryDashboardPage() {
               <div className="glass-card p-6 md:p-10 rounded-xl md:rounded-xl border border-border/50 shadow-premium flex flex-col group hover:border-indigo-500/20 transition-all">
                 <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">Location Share</h2>
-                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mt-1">Percent by branch</p>
+                    <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">{t("Location Share")}</h2>
+                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mt-1">{t("Percent by branch")}</p>
                   </div>
                   <div className="p-3 bg-indigo-500/5 rounded-2xl text-indigo-500 border border-indigo-500/10">
                     <HiChartBar className="w-6 h-6" />
@@ -258,7 +325,7 @@ export default function InventoryDashboardPage() {
                         <div className="w-2.5 h-10 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                         <div>
                           <p className="text-[10px] font-black uppercase text-muted tracking-widest">{d.name}</p>
-                          <p className="text-lg font-black text-foreground">{d.value} units</p>
+                          <p className="text-lg font-black text-foreground">{d.value} {t("units")}</p>
                         </div>
                       </div>
                     ))}
@@ -273,8 +340,8 @@ export default function InventoryDashboardPage() {
                       <HiClock className="w-8 h-8" />
                     </div>
                     <div>
-                      <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Recent Activity</h2>
-                      <p className="text-sm font-medium text-muted tracking-wide">Latest stock actions by branch.</p>
+                      <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">{t("Recent Activity")}</h2>
+                      <p className="text-sm font-medium text-muted tracking-wide">{t("Latest stock actions by branch.")}</p>
                     </div>
                   </div>
                 </div>
@@ -325,8 +392,10 @@ export default function InventoryDashboardPage() {
                   <HiCurrencyDollar className="w-10 h-10" />
                 </div>
                 <div>
-                  <h2 className="text-4xl font-black text-foreground tracking-tight">Estimated Inventory Value</h2>
-                  <p className="text-sm font-medium text-muted">Simple estimate by branch based on current quantity.</p>
+                  <h2 className="text-4xl font-black text-foreground tracking-tight">{t("Estimated Inventory Value")}</h2>
+                  <p className="text-sm font-medium text-muted">
+                    {t("Simple estimate by branch based on current quantity.")}
+                  </p>
                 </div>
               </div>
 
@@ -364,7 +433,9 @@ export default function InventoryDashboardPage() {
                   )
                 ) : (
                   <div className="h-full min-h-125 flex items-center justify-center rounded-3xl border border-dashed border-border bg-card-alt/20 px-6 text-center">
-                    <p className="text-sm font-semibold text-muted">No branch stock data yet. Add or reconcile inventory to see value projections.</p>
+                    <p className="text-sm font-semibold text-muted">
+                      {t("No branch stock data yet. Add or reconcile inventory to see value projections.")}
+                    </p>
                   </div>
                 )}
               </div>
@@ -384,8 +455,8 @@ export default function InventoryDashboardPage() {
                   <HiBriefcase className="w-10 h-10" />
                 </div>
                 <div>
-                  <h2 className="text-4xl font-black text-foreground tracking-tight">Expected Demand</h2>
-                  <p className="text-sm font-medium text-muted">Projected units for the next 6 months.</p>
+                  <h2 className="text-4xl font-black text-foreground tracking-tight">{t("Expected Demand")}</h2>
+                  <p className="text-sm font-medium text-muted">{t("Projected units for the next 6 months.")}</p>
                 </div>
               </div>
 
@@ -425,7 +496,9 @@ export default function InventoryDashboardPage() {
                   )
                 ) : (
                   <div className="h-full min-h-125 flex items-center justify-center rounded-3xl border border-dashed border-border bg-card-alt/20 px-6 text-center">
-                    <p className="text-sm font-semibold text-muted">Forecast will appear after inventory records are available.</p>
+                    <p className="text-sm font-semibold text-muted">
+                      {t("Forecast will appear after inventory records are available.")}
+                    </p>
                   </div>
                 )}
               </div>

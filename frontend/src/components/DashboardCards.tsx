@@ -4,6 +4,30 @@ import { useQuery } from "@tanstack/react-query";
 import { getInventoryStats } from "@/lib/api";
 import { HiOutlineExclamationTriangle, HiOutlineCubeTransparent, HiOutlineMapPin, HiOutlineClock } from "react-icons/hi2";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Total Inventory": "Total Inventory",
+    "Units": "Units",
+    "Critical Stock": "Critical Stock",
+    "Requires reorder": "Requires reorder",
+    "Active Locations": "Active Locations",
+    "Live monitoring": "Live monitoring",
+    "Last Reconciliation": "Last Reconciliation",
+    "Items checked this month": "Items checked this month"
+  },
+  am: {
+    "Total Inventory": "ጠቅላላ ክምችት",
+    "Units": "እቃዎች",
+    "Critical Stock": "ያለቁ ንብረቶች",
+    "Requires reorder": "ትዕዛዝ ያስፈልገዋል",
+    "Active Locations": "ንቁ ቦታዎች",
+    "Live monitoring": "በቀጥታ ክትትል",
+    "Last Reconciliation": "የመጨረሻ እርቅ",
+    "Items checked this month": "በዚህ ወር የተረጋገጡ እቃዎች"
+  }
+};
 
 export default function DashboardCards() {
   const { data, isLoading } = useQuery({
@@ -11,6 +35,8 @@ export default function DashboardCards() {
     queryFn: getInventoryStats,
     refetchInterval: 30000,
   });
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   if (isLoading) {
     return (
@@ -26,36 +52,36 @@ export default function DashboardCards() {
 
   const cards = [
     {
-      label: "Total Inventory",
+      label: t("Total Inventory"),
       value: data.totalEntries,
-      subValue: `${data.totalItems} Units`,
+      subValue: `${data.totalItems} ${t("Units")}`,
       icon: HiOutlineCubeTransparent,
       color: "text-primary",
       bg: "bg-primary/5",
       border: "border-primary/20"
     },
     {
-      label: "Critical Stock",
+      label: t("Critical Stock"),
       value: data.lowStockItems,
-      subValue: "Requires reorder",
+      subValue: t("Requires reorder"),
       icon: HiOutlineExclamationTriangle,
       color: "text-danger",
       bg: "bg-danger/5",
       border: "border-danger/20"
     },
     {
-      label: "Active Locations",
+      label: t("Active Locations"),
       value: data.stockPerLocation?.length || 0,
-      subValue: "Live monitoring",
+      subValue: t("Live monitoring"),
       icon: HiOutlineMapPin,
       color: "text-indigo-500",
       bg: "bg-indigo-500/5",
       border: "border-indigo-500/20"
     },
     {
-      label: "Last Reconciliation",
+      label: t("Last Reconciliation"),
       value: data.reconciledRecently,
-      subValue: "Items checked this month",
+      subValue: t("Items checked this month"),
       icon: HiOutlineClock,
       color: "text-success",
       bg: "bg-success/5",

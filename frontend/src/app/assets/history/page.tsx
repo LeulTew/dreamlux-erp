@@ -35,8 +35,170 @@ import {
 } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
 import PaginationControls from "@/components/PaginationControls";
+import { useLanguage } from "@/hooks/use-language";
 
 type ConfirmType = "trash" | "delete" | "clear" | "undo" | "undo-item";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "All Time": "All Time",
+    "Today": "Today",
+    "Last 7 Days": "Last 7 Days",
+    "This Month": "This Month",
+    "Custom Range": "Custom Range",
+    "From": "From",
+    "To": "To",
+    "Apply Custom Range": "Apply Custom Range",
+    "Inventory Audit History": "Inventory Audit History",
+    "Monthly reconciliation timeline and adjustment logs.": "Monthly reconciliation timeline and adjustment logs.",
+    "Search audits...": "Search audits...",
+    "All Locations": "All Locations",
+    "Active": "Active",
+    "Trash": "Trash",
+    "Move All To Trash": "Move All To Trash",
+    "Clear Trash": "Clear Trash",
+    "Select": "Select",
+    "Done": "Done",
+    "Deselect All": "Deselect All",
+    "Select All on Page": "Select All on Page",
+    "Loading history...": "Loading history...",
+    "Unable To Load History": "Unable To Load History",
+    "The audit feed request failed. Try refresh or check API deployment/auth.": "The audit feed request failed. Try refresh or check API deployment/auth.",
+    "Trash Is Empty": "Trash Is Empty",
+    "No History Found": "No History Found",
+    "Soft-deleted audit entries will appear here.": "Soft-deleted audit entries will appear here.",
+    "Run a reconciliation to see adjustments here.": "Run a reconciliation to see adjustments here.",
+    "Bulk Reconciliation": "Bulk Reconciliation",
+    "diffs": "diffs",
+    "Prior → Adjustment": "Prior → Adjustment",
+    "Previous": "Previous",
+    "Adjust": "Adjust",
+    "Batch Summary": "Batch Summary",
+    "entries": "entries",
+    "Net": "Net",
+    "Selected": "Selected",
+    "Undo All": "Undo All",
+    "Restore": "Restore",
+    "Delete": "Delete",
+    "Processing...": "Processing...",
+    "Undo blocked: item changed since the selected audit entry.": "Undo blocked: item changed since the selected audit entry.",
+    "Undo applied with inverse audit record.": "Undo applied with inverse audit record.",
+    "Undo blocked: one or more items changed since that run.": "Undo blocked: one or more items changed since that run.",
+    "Run undo applied with inverse audit record.": "Run undo applied with inverse audit record.",
+    "Bulk undo completed": "Bulk undo completed",
+    "Failed to undo some records": "Failed to undo some records",
+    "Undo": "Undo",
+    "Revert Adjustment?": "Revert Adjustment?",
+    "Move to Trash?": "Move to Trash?",
+    "Restore Record?": "Restore Record?",
+    "Trash All History?": "Trash All History?",
+    "Clear Trash?": "Clear Trash?",
+    "Delete History Record?": "Delete History Record?",
+    "Cancel": "Cancel",
+    "Confirm Undo": "Confirm Undo",
+    "Move to Trash": "Move to Trash",
+    "Move All": "Move All",
+    "Clear Permanently": "Clear Permanently",
+    "Delete Permanently": "Delete Permanently",
+    "This will permanently delete all records in the trash. This cannot be undone.": "This will permanently delete all records in the trash. This cannot be undone.",
+    "This creates a new inverse reconciliation run for": "This creates a new inverse reconciliation run for",
+    "Undo is only allowed when the item's current quantity still matches the latest recorded final value.": "Undo is only allowed when the item's current quantity still matches the latest recorded final value.",
+    "Are you sure you want to move the audit record for": "Are you sure you want to move the audit record for",
+    "Are you sure you want to restore the audit record for": "Are you sure you want to restore the audit record for",
+    "All active history records will be moved to trash.": "All active history records will be moved to trash.",
+    "Are you sure you want to permanently delete the audit record for": "Are you sure you want to permanently delete the audit record for",
+    "This action is irreversible.": "This action is irreversible.",
+    "Adjustment Report": "Adjustment Report",
+    "Summary of item counts and discrepancy adjustments.": "Summary of item counts and discrepancy adjustments.",
+    "Items Counted": "Items Counted",
+    "Discrepancies": "Discrepancies",
+    "Operator Note": "Operator Note",
+    "Movement Logs": "Movement Logs",
+    "Final": "Final",
+    "Record Not Found": "Record Not Found",
+    "This run profile is no longer available in the audit log.": "This run profile is no longer available in the audit log.",
+    "Close History View": "Close History View",
+  },
+  am: {
+    "All Time": "ሁልጊዜ",
+    "Today": "ዛሬ",
+    "Last 7 Days": "ላለፉት 7 ቀናት",
+    "This Month": "በዚህ ወር",
+    "Custom Range": "የተወሰነ ቀን",
+    "From": "ከ",
+    "To": "እስከ",
+    "Apply Custom Range": "ቀን ማስተካከያውን ተግብር",
+    "Inventory Audit History": "የንብረት እርቅ ታሪክ",
+    "Monthly reconciliation timeline and adjustment logs.": "የወርሃዊ እርቅ ሂደት እና የማስተካከያ ምዝግብ ማስታወሻዎች።",
+    "Search audits...": "እርቆችን ፈልግ...",
+    "All Locations": "ሁሉም ቦታዎች",
+    "Active": "ንቁ",
+    "Trash": "ቆሻሻ መጣያ",
+    "Move All To Trash": "ሁሉንም ወደ ቆሻሻ መጣያ ውሰድ",
+    "Clear Trash": "ቆሻሻ መጣያውን አጽዳ",
+    "Select": "ምረጥ",
+    "Done": "አጠናቅቅ",
+    "Deselect All": "ሁሉንም አትምረጥ",
+    "Select All on Page": "በገጹ ያሉትን ሁሉንም ምረጥ",
+    "Loading history...": "ታሪክ በመጫን ላይ...",
+    "Unable To Load History": "ታሪኩን መጫን አልተቻለም",
+    "The audit feed request failed. Try refresh or check API deployment/auth.": "የእርቅ ታሪክ ጥያቄ አልተሳካም። እባክዎን ገጹን ያድሱት ወይም የግንኙነት ሁኔታውን ያረጋግጡ።",
+    "Trash Is Empty": "ቆሻሻ መጣያው ባዶ ነው",
+    "No History Found": "ምንም ታሪክ አልተገኘም",
+    "Soft-deleted audit entries will appear here.": "በጊዜያዊነት የተሰረዙ እርቆች እዚህ ይዘረዘራሉ።",
+    "Run a reconciliation to see adjustments here.": "የእቃዎች እርቅ ሲያካሂዱ ማስተካከያዎቹ እዚህ ይዘረዘራሉ።",
+    "Bulk Reconciliation": "የጅምላ እርቅ",
+    "diffs": "ልዩነቶች",
+    "Prior → Adjustment": "ቀድሞ የነበረ → ማስተካከያ",
+    "Previous": "የቀድሞ",
+    "Adjust": "አስተካክል",
+    "Batch Summary": "የቡድን ማጠቃለያ",
+    "entries": "መዝገቦች",
+    "Net": "የተጣራ",
+    "Selected": "ተመርጧል",
+    "Undo All": "ሁሉንም መልስ",
+    "Restore": "መልስ",
+    "Delete": "ሰርዝ",
+    "Processing...": "በማቀነባበር ላይ...",
+    "Undo blocked: item changed since the selected audit entry.": "መልስ መመለስ አልተቻለም፡ እቃው ከተመረጠው ኦዲት በኋላ ተቀይሯል።",
+    "Undo applied with inverse audit record.": "መልስ መመለስ በተሳካ ሁኔታ ተተግብሯል።",
+    "Undo blocked: one or more items changed since that run.": "መልስ መመለስ አልተቻለም፡ ከተመረጠው እርቅ በኋላ አንድ ወይም ከዚያ በላይ እቃዎች ተቀይረዋል።",
+    "Run undo applied with inverse audit record.": "የእርቅ እርምጃው በተሳካ ሁኔታ ተመልሷል።",
+    "Bulk undo completed": "የጅምላ መልስ መመለስ ተጠናቋል",
+    "Failed to undo some records": "አንዳንድ መዝገቦችን መመለስ አልተቻለም",
+    "Undo": "መልስ",
+    "Revert Adjustment?": "ማስተካከያውን መመለስ ይፈልጋሉ?",
+    "Move to Trash?": "ወደ ቆሻሻ መጣያ መውሰድ ይፈልጋሉ?",
+    "Restore Record?": "መዝገቡን መመለስ ይፈልጋሉ?",
+    "Trash All History?": "ሁሉንም ታሪክ ወደ ቆሻሻ መጣያ መውሰድ?",
+    "Clear Trash?": "ቆሻሻ መጣያውን ማጽዳት?",
+    "Delete History Record?": "የታሪክ መዝገብ መሰረዝ?",
+    "Cancel": "ሰርዝ",
+    "Confirm Undo": "መመለሱን አረጋግጥ",
+    "Move to Trash": "ወደ ቆሻሻ መጣያ ውሰድ",
+    "Move All": "ሁሉንም ውሰድ",
+    "Clear Permanently": "ለዘላለም አጽዳ",
+    "Delete Permanently": "በቋሚነት ሰርዝ",
+    "This will permanently delete all records in the trash. This cannot be undone.": "ይህ በቆሻሻ መጣያ ውስጥ ያሉትን ሁሉንም መዝገቦች በቋሚነት ያጠፋል። ይህ ሊመለስ አይችልም።",
+    "This creates a new inverse reconciliation run for": "ይህ ተቃራኒ የሆነ አዲስ የእርቅ ሂደት ይፈጥራል ለ",
+    "Undo is only allowed when the item's current quantity still matches the latest recorded final value.": "የእቃው የአሁኑ ብዛት ከተመዘገበው የመጨረሻ ዋጋ ጋር የሚዛመድ ከሆነ ብቻ መመለስ ይፈቀዳል።",
+    "Are you sure you want to move the audit record for": "የእርቅ መዝገቡን ወደ ቆሻሻ መጣያ መውሰድ እርግጠኛ ነዎት ለ",
+    "Are you sure you want to restore the audit record for": "የእርቅ መዝገቡን ከቆሻሻ መጣያ መመለስ እርግጠኛ ነዎት ለ",
+    "All active history records will be moved to trash.": "ሁሉም ንቁ የታሪክ መዝገቦች ወደ ቆሻሻ መጣያ ይወሰዳሉ።",
+    "Are you sure you want to permanently delete the audit record for": "የእርቅ መዝገቡን በቋሚነት ለመሰረዝ እርግጠኛ ነዎት ለ",
+    "This action is irreversible.": "ይህ ተግባር ወደኋላ ሊመለስ የማይችል ነው።",
+    "Adjustment Report": "የማስተካከያ ሪፖርት",
+    "Summary of item counts and discrepancy adjustments.": "የእቃዎች ቆጠራ እና የልዩነቶች ማስተካከያ ማጠቃለያ።",
+    "Items Counted": "የተቆጠሩ እቃዎች",
+    "Discrepancies": "ልዩነቶች",
+    "Operator Note": "የኦፕሬተር ማስታወሻ",
+    "Movement Logs": "የእንቅስቃሴ ምዝግብ ማስታወሻዎች",
+    "Final": "የመጨረሻ",
+    "Record Not Found": "መዝገቡ አልተገኘም",
+    "This run profile is no longer available in the audit log.": "ይህ የእርቅ መዝገብ በኦዲት መዝገብ ውስጥ አይገኝም።",
+    "Close History View": "የታሪክ እይታን ዝጋ",
+  }
+};
 
 interface ConfirmState {
   type: ConfirmType;
@@ -52,12 +214,14 @@ interface ConfirmState {
 function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeRange, setActiveRange] = useState('all');
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   const presets = [
-    { id: 'all', label: 'All Time' },
-    { id: 'today', label: 'Today' },
-    { id: 'week', label: 'Last 7 Days' },
-    { id: 'month', label: 'This Month' },
+    { id: 'all', label: t('All Time') },
+    { id: 'today', label: t('Today') },
+    { id: 'week', label: t('Last 7 Days') },
+    { id: 'month', label: t('This Month') },
   ];
 
   const handlePreset = (id: string) => {
@@ -95,7 +259,7 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
       >
         <HiOutlineCalendarDays className="w-5 h-5 text-primary shrink-0" />
         <span className="text-sm font-black text-foreground capitalize whitespace-nowrap">
-          {presets.find(p => p.id === activeRange)?.label || 'Custom Range'}
+          {presets.find(p => p.id === activeRange)?.label || t('Custom Range')}
         </span>
       </button>
 
@@ -127,7 +291,7 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
 
               <div className="pt-2 border-t border-border space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-muted tracking-widest px-1">From</label>
+                  <label className="text-[9px] font-black uppercase text-muted tracking-widest px-1">{t("From")}</label>
                   <input 
                     type="date" 
                     value={localStart}
@@ -136,7 +300,7 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-muted tracking-widest px-1">To</label>
+                  <label className="text-[9px] font-black uppercase text-muted tracking-widest px-1">{t("To")}</label>
                   <input 
                     type="date" 
                     value={localEnd}
@@ -153,7 +317,7 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
                   }}
                   className="w-full py-2.5 rounded-xl bg-foreground text-background text-[10px] font-black uppercase tracking-[0.2em] shadow-lg disabled:opacity-50 active:scale-95 transition-all"
                 >
-                  Apply Custom Range
+                  {t("Apply Custom Range")}
                 </button>
               </div>
             </motion.div>
@@ -167,6 +331,9 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
 function HistoryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+
   const [page, setPage] = useState(1);
   const [store, setStore] = useState<string>("all");
   const [view, setView] = useState<"active" | "trash">("active");
@@ -231,7 +398,7 @@ function HistoryContent() {
     if (response?.status === 409) {
       return (
         response.data?.details ||
-        "Undo blocked: only the latest change for this item can be undone."
+        t("Undo blocked: only the latest change for this item can be undone.")
       );
     }
 
@@ -240,7 +407,7 @@ function HistoryContent() {
       response?.data?.details ||
       response?.data?.message ||
       (error as Error)?.message ||
-      "Undo failed."
+      t("Undo failed.")
     );
   };
 
@@ -299,9 +466,9 @@ function HistoryContent() {
       }),
     onSuccess: async (data) => {
       if ((data.failed_item_ids || []).length > 0 || data.count === 0) {
-        toast.error("Undo blocked: item changed since the selected audit entry.");
+        toast.error(t("Undo blocked: item changed since the selected audit entry."));
       } else {
-        toast.success("Undo applied with inverse audit record.");
+        toast.success(t("Undo applied with inverse audit record."));
       }
       await refreshHistory();
     },
@@ -314,9 +481,9 @@ function HistoryContent() {
     mutationFn: (runId: string) => undoReconcileHistoryRun(runId),
     onSuccess: async (data) => {
       if ((data.failed_item_ids || []).length > 0 || data.count === 0) {
-        toast.error("Undo blocked: one or more items changed since that run.");
+        toast.error(t("Undo blocked: one or more items changed since that run."));
       } else {
-        toast.success("Run undo applied with inverse audit record.");
+        toast.success(t("Run undo applied with inverse audit record."));
       }
       await refreshHistory();
     },
@@ -353,12 +520,12 @@ function HistoryContent() {
       }
     },
     onSuccess: async () => {
-      toast.success("Bulk undo completed");
+      toast.success(t("Bulk undo completed"));
       setSelectedIds(new Set());
       await refreshHistory();
     },
     onError: (err) => {
-      toast.error("Failed to undo some records");
+      toast.error(t("Failed to undo some records"));
       console.error(err);
     }
   });

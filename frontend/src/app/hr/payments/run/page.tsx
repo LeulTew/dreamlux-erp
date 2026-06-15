@@ -46,6 +46,116 @@ import { useAuth } from "@/hooks/useAuth";
 import { fuzzySearch } from "@/lib/fuzzy-search";
 import toast from "react-hot-toast";
 import { findRunForPeriod } from "@/utils/payroll-period";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Salary & Event Disbursement": "Salary & Event Disbursement",
+    "Paginated cards with persistent totals": "Paginated cards with persistent totals",
+    "Print": "Print",
+    "Saving...": "Saving...",
+    "Save Draft": "Save Draft",
+    "Previewing...": "Previewing...",
+    "Preview": "Preview",
+    "Finalizing...": "Finalizing...",
+    "Finalize Run": "Finalize Run",
+    "Saving draft...": "Saving draft...",
+    "Unsaved changes": "Unsaved changes",
+    "Saved": "Saved",
+    "Not saved yet": "Not saved yet",
+    "Summary Report": "Summary Report",
+    "Generate a detailed HTML report for this draft run.": "Generate a detailed HTML report for this draft run.",
+    "Period (Month)": "Period (Month)",
+    "Search & Drafts": "Search & Drafts",
+    "Name, code, department": "Name, code, department",
+    "Load Draft": "Load Draft",
+    "Open Finalized Run": "Open Finalized Run",
+    "Office": "Office",
+    "All offices": "All offices",
+    "Sort: Name": "Sort: Name",
+    "Sort: Dept": "Sort: Dept",
+    "Sort: Pay": "Sort: Pay",
+    "Manage Event Types": "Manage Event Types",
+    "Base Salary": "Base Salary",
+    "Events / Commissions": "Events / Commissions",
+    "No events added for this employee yet.": "No events added for this employee yet.",
+    "Select event": "Select event",
+    "Decrease": "Decrease",
+    "Increase": "Increase",
+    "Remove Event": "Remove Event",
+    "Add Event": "Add Event",
+    "Total Earnings": "Total Earnings",
+    "Base Salary Total": "Base Salary Total",
+    "Commission Total": "Commission Total",
+    "Grand Total Disbursement": "Grand Total Disbursement",
+    "Loading payroll run...": "Loading payroll run...",
+    "Existing draft loaded!": "Existing draft loaded!",
+    "Draft saved": "Draft saved",
+    "Failed to generate preview": "Failed to generate preview",
+    "Failed to save draft": "Failed to save draft",
+    "Failed to finalize payroll run": "Failed to finalize payroll run",
+    "Payroll history is still loading. Please try finalizing again in a moment.": "Payroll history is still loading. Please try finalizing again in a moment.",
+    "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.": "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.",
+    "A finalized payroll run already exists for": "A finalized payroll run already exists for",
+    "Open the existing run instead of creating a duplicate.": "Open the existing run instead of creating a duplicate.",
+    "1st-15th": "1st-15th",
+    "16th-End": "16th-End",
+    "NO LEVEL": "NO LEVEL"
+  },
+  am: {
+    "Salary & Event Disbursement": "የደመወዝ እና ክስተት ክፍያ ማስተላለፊያ",
+    "Paginated cards with persistent totals": "የቀጠሉ ካርዶች ከማይለወጥ አጠቃላይ ድምር ጋር",
+    "Print": "አትም",
+    "Saving...": "በማስቀመጥ ላይ...",
+    "Save Draft": "ረቂቅ አስቀምጥ",
+    "Previewing...": "ቅድመ-ዕይታ በማዘጋጀት ላይ...",
+    "Preview": "ቅድመ-ዕይታ",
+    "Finalizing...": "በማጠናቀቅ ላይ...",
+    "Finalize Run": "ክፍያውን አጠናቅ",
+    "Saving draft...": "ረቂቅ በመቀመጥ ላይ...",
+    "Unsaved changes": "ያልተቀመጡ ለውጦች",
+    "Saved": "ተቀምጧል",
+    "Not saved yet": "እስካሁን አልተቀመጠም",
+    "Summary Report": "አጠቃላይ ሪፖርት",
+    "Generate a detailed HTML report for this draft run.": "ለዚህ የረቂቅ ክፍያ ዝርዝር የኤችቲኤምኤል ሪፖርት ያመንጩ።",
+    "Period (Month)": "የክፍያ ጊዜ (ወር)",
+    "Search & Drafts": "ፈልግ እና ረቂቆች",
+    "Name, code, department": "ስም፣ ኮድ፣ የሥራ ክፍል",
+    "Load Draft": "ረቂቅ ጫን",
+    "Open Finalized Run": "የተጠናቀቀ ክፍያ ክፈት",
+    "Office": "ቢሮ",
+    "All offices": "ሁሉም ቢሮዎች",
+    "Sort: Name": "በስም ደርድር",
+    "Sort: Dept": "በክፍል ደርድር",
+    "Sort: Pay": "በክፍያ ደርድር",
+    "Manage Event Types": "የክስተት ዓይነቶችን ያስተዳድሩ",
+    "Base Salary": "መሠረታዊ ደመወዝ",
+    "Events / Commissions": "ክስተቶች / ኮሚሽኖች",
+    "No events added for this employee yet.": "ለዚህ ሠራተኛ እስካሁን የተጨመረ ክስተት የለም።",
+    "Select event": "ክስተት ይምረጡ",
+    "Decrease": "ቀንስ",
+    "Increase": "ጨምር",
+    "Remove Event": "ክስተት አስወግድ",
+    "Add Event": "ክስተት ጨምር",
+    "Total Earnings": "አጠቃላይ ገቢ",
+    "Base Salary Total": "አጠቃላይ መሠረታዊ ደመወዝ",
+    "Commission Total": "አጠቃላይ ኮሚሽን",
+    "Grand Total Disbursement": "አጠቃላይ የተከፈለ ክፍያ",
+    "Loading payroll run...": "የክፍያ መዝገብ በመጫን ላይ...",
+    "Existing draft loaded!": "ያለው ረቂቅ ተጭኗል!",
+    "Draft saved": "ረቂቅ ተቀምጧል",
+    "Failed to generate preview": "ቅድመ-ዕይታ ማመንጨት አልተቻለም",
+    "Failed to save draft": "ረቂቅ ማስቀመጥ አልተቻለም",
+    "Failed to finalize payroll run": "የክፍያ መዝገብ ማጠናቀቅ አልተቻለም",
+    "Payroll history is still loading. Please try finalizing again in a moment.": "የክፍያ ታሪክ ገና በመጫን ላይ ነው። እባክዎ ከጥቂት ቆይታ በኋላ እንደገና ይሞክሩ።",
+    "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.": "ለዚህ የክፍያ ጊዜ ቀደም ሲል የተጠናቀቀ የክፍያ መዝገብ አለ። እንደገና ከማጠናቀቅዎ በፊት ያለውን መዝገብ ወደ መጣያ ይውሰዱት።",
+    "A finalized payroll run already exists for": "የተጠናቀቀ የክፍያ መዝገብ ቀደም ሲል ለ",
+    "Open the existing run instead of creating a duplicate.": "የተባዛ ከመፍጠር ይልቅ ያለውን መዝገብ ይክፈቱ።",
+    "1st-15th": "ከ1ኛ-15ኛ",
+    "16th-End": "ከ16ኛ-መጨረሻ",
+    "NO LEVEL": "ደረጃ የለውም"
+  }
+};
 
 type EventLine = {
   event_type_id: string;
@@ -112,6 +222,8 @@ function parseMonth(monthValue: string): { month: number; year: number } {
 }
 
 function PaymentRunProcessPageContent() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const searchParams = useSearchParams();
   const router = useRouter();
   const hasAutoLoaded = useRef<string | null>(null);
@@ -229,7 +341,7 @@ function PaymentRunProcessPageContent() {
       setIsDraftDirty(false);
       setLastSavedAt(data.updated_at ?? null);
       setDraftPeriodKey(`${selectedMonth}:${periodType}`);
-      toast.success("Existing draft loaded!");
+      toast.success(t("Existing draft loaded!"));
     }
   });
 
@@ -357,7 +469,7 @@ function PaymentRunProcessPageContent() {
     mutationFn: (payload: PayrollGenerateRequest) =>
       previewPayrollRun(payload as unknown as Record<string, unknown>) as Promise<PreviewResponse>,
     onError: (error: Error) => {
-      setErrorMsg(error.message || "Failed to generate preview");
+      setErrorMsg(error.message || t("Failed to generate preview"));
     },
   });
 
@@ -374,7 +486,7 @@ function PaymentRunProcessPageContent() {
       }
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       if (lastSaveSourceRef.current === "manual") {
-        toast.success("Draft saved");
+        toast.success(t("Draft saved"));
       }
     },
     onError: (error: unknown) => {
@@ -386,11 +498,11 @@ function PaymentRunProcessPageContent() {
       }
 
       if (error instanceof Error) {
-        setErrorMsg(error.message || "Failed to save draft");
+        setErrorMsg(error.message || t("Failed to save draft"));
         return;
       }
 
-      setErrorMsg("Failed to save draft");
+      setErrorMsg(t("Failed to save draft"));
     },
   });
 
@@ -406,7 +518,7 @@ function PaymentRunProcessPageContent() {
       if (status === 409) {
         setErrorMsg(
           message ||
-            "A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again."
+            t("A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.")
         );
         return;
       }
@@ -417,11 +529,11 @@ function PaymentRunProcessPageContent() {
       }
 
       if (error instanceof Error) {
-        setErrorMsg(error.message || "Failed to finalize payroll run");
+        setErrorMsg(error.message || t("Failed to finalize payroll run"));
         return;
       }
 
-      setErrorMsg("Failed to finalize payroll run");
+      setErrorMsg(t("Failed to finalize payroll run"));
     },
   });
 
@@ -529,14 +641,14 @@ function PaymentRunProcessPageContent() {
     setErrorMsg("");
 
     if (runsHistoryLoading) {
-      setErrorMsg("Payroll history is still loading. Please try finalizing again in a moment.");
+      setErrorMsg(t("Payroll history is still loading. Please try finalizing again in a moment."));
       return;
     }
 
     if (existingFinalized) {
-      const periodLabel = periodType === "h1" ? "1st-15th" : "16th-end";
+      const periodLabel = periodType === "h1" ? t("1st-15th") : t("16th-End");
       setErrorMsg(
-        `A finalized payroll run already exists for ${selectedMonth} (${periodLabel}). Open the existing run instead of creating a duplicate.`
+        `${t("A finalized payroll run already exists for")} ${selectedMonth} (${periodLabel}). ${t("Open the existing run instead of creating a duplicate.")}`
       );
       return;
     }
@@ -585,12 +697,12 @@ function PaymentRunProcessPageContent() {
   };
 
   const draftStatusLabel = saveDraftMutation.isPending
-    ? "Saving draft..."
+    ? t("Saving draft...")
     : isDraftDirty
-      ? "Unsaved changes"
+      ? t("Unsaved changes")
       : lastSavedAt
-        ? `Saved ${format(new Date(lastSavedAt), "HH:mm")}`
-        : "Not saved yet";
+        ? `${t("Saved")} ${format(new Date(lastSavedAt), "HH:mm")}`
+        : t("Not saved yet");
 
   return (
     <AuthLayout>
@@ -601,8 +713,8 @@ function PaymentRunProcessPageContent() {
               <HiOutlineArrowUturnLeft className="w-6 h-6" />
             </Link>
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-tight">Salary & Event Disbursement</h1>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest">Paginated cards with persistent totals</p>
+              <h1 className="text-2xl font-black uppercase tracking-tight">{t("Salary & Event Disbursement")}</h1>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest">{t("Paginated cards with persistent totals")}</p>
             </div>
           </div>
 
@@ -614,7 +726,7 @@ function PaymentRunProcessPageContent() {
                   className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card border border-border/50 text-foreground shadow-premium hover:bg-card-alt transition-all items-center gap-2 flex"
                 >
                   <HiPrinter className="w-4 h-4" />
-                  Print
+                  {t("Print")}
                 </button>
               )}
               <button
@@ -622,21 +734,21 @@ function PaymentRunProcessPageContent() {
                 disabled={saveDraftMutation.isPending || employeesLoading || authLoading}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-500/10 text-amber-700 border border-amber-500/20 shadow-premium hover:bg-amber-500/20 transition-all disabled:opacity-50"
               >
-                {saveDraftMutation.isPending ? "Saving..." : "Save Draft"}
+                {saveDraftMutation.isPending ? t("Saving...") : t("Save Draft")}
               </button>
               <button
                 onClick={handlePreview}
                 disabled={previewMutation.isPending || employeesLoading || authLoading}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card text-foreground shadow-premium hover:bg-card-alt transition-all disabled:opacity-50"
               >
-                {previewMutation.isPending ? "Previewing..." : "Preview"}
+                {previewMutation.isPending ? t("Previewing...") : t("Preview")}
               </button>
               <button
                 onClick={handleFinalize}
                 disabled={finalizeMutation.isPending || employeesLoading || authLoading || runsHistoryLoading || !!existingFinalized}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-primary text-background shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
               >
-                {finalizeMutation.isPending ? "Finalizing..." : "Finalize Run"}
+                {finalizeMutation.isPending ? t("Finalizing...") : t("Finalize Run")}
               </button>
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -650,14 +762,14 @@ function PaymentRunProcessPageContent() {
             isOpen={isPrintModalOpen}
             onClose={() => setIsPrintModalOpen(false)}
             onPrint={(options) => router.push(`/hr/payments/${existingDraft.id}/report?includeImages=${options.includeImages}`)}
-            title="Summary Report"
-            description="Generate a detailed HTML report for this draft run."
+            title={t("Summary Report")}
+            description={t("Generate a detailed HTML report for this draft run.")}
           />
         )}
 
         <div className="rounded-2xl border border-border/60 bg-card p-4 grid gap-6 md:grid-cols-[1fr_2fr_1fr] items-end">
           <div>
-            <label className="block text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">Period (Month)</label>
+            <label className="block text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">{t("Period (Month)")}</label>
             <div className="flex gap-2">
               <div className="relative flex-1 group">
                 <input
@@ -673,8 +785,8 @@ function PaymentRunProcessPageContent() {
               </div>
               <Select 
                 options={[
-                  { id: "h1", label: "1st-15th" },
-                  { id: "h2", label: "16th-End" }
+                  { id: "h1", label: t("1st-15th") },
+                  { id: "h2", label: t("16th-End") }
                 ]}
                 value={periodType}
                 onChange={(val) => {
@@ -687,7 +799,7 @@ function PaymentRunProcessPageContent() {
             </div>
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">Search & Drafts</label>
+            <label className="block text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">{t("Search & Drafts")}</label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input
@@ -697,7 +809,7 @@ function PaymentRunProcessPageContent() {
                     setSearch(e.target.value);
                     setPage(1);
                   }}
-                  placeholder="Name, code, department"
+                  placeholder={t("Name, code, department")}
                   className="w-full rounded-xl border border-border/50 bg-card px-3 py-2.5 text-sm font-bold"
                 />
               </div>
@@ -708,7 +820,7 @@ function PaymentRunProcessPageContent() {
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all active:scale-95"
                 >
                   <HiArrowPath className={`w-4 h-4 ${loadDraftMutation.isPending ? 'animate-spin' : ''}`} />
-                  Load Draft
+                  {t("Load Draft")}
                 </button>
               )}
               {existingFinalized && (
@@ -716,16 +828,16 @@ function PaymentRunProcessPageContent() {
                   href={`/hr/payments/${existingFinalized.id}`}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-xs font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all active:scale-95"
                 >
-                  Open Finalized Run
+                  {t("Open Finalized Run")}
                 </Link>
               )}
             </div>
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">Office</label>
+            <label className="block text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">{t("Office")}</label>
             <Select
               options={[
-                { id: "all", label: "All offices" },
+                { id: "all", label: t("All offices") },
                 ...(stores ?? []).map((store: { id: string; name: string }) => ({ id: store.id, label: store.name })),
               ]}
               value={officeId}
@@ -735,9 +847,9 @@ function PaymentRunProcessPageContent() {
           <div className="flex items-end justify-end gap-2">
             <Select
               options={[
-                { id: "name", label: "Sort: Name" },
-                { id: "department", label: "Sort: Dept" },
-                { id: "pay", label: "Sort: Pay" },
+                { id: "name", label: t("Sort: Name") },
+                { id: "department", label: t("Sort: Dept") },
+                { id: "pay", label: t("Sort: Pay") },
               ]}
               value={sortBy}
               onChange={(val) => setSortBy(val as "name" | "department" | "pay")}
@@ -748,7 +860,7 @@ function PaymentRunProcessPageContent() {
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-card-alt text-foreground hover:bg-muted transition-colors"
             >
               <HiOutlineCog6Tooth className="w-4 h-4" />
-              Manage Event Types
+              {t("Manage Event Types")}
             </Link>
           </div>
         </div>
@@ -781,18 +893,18 @@ function PaymentRunProcessPageContent() {
 
                   <div className="rounded-xl border border-border/50 bg-card-alt px-3 py-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-black">Base Salary</span>
-                      <span className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-lg bg-indigo-600/10 text-indigo-800 dark:text-indigo-200 border border-indigo-600/20 shadow-sm">{employeeTotals.levelName}</span>
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-black">{t("Base Salary")}</span>
+                      <span className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-lg bg-indigo-600/10 text-indigo-800 dark:text-indigo-200 border border-indigo-600/20 shadow-sm">{employeeTotals.levelName === "NO LEVEL" ? t("NO LEVEL") : employeeTotals.levelName}</span>
                     </div>
                     <p className="text-sm font-bold mt-1">ETB {employeeTotals.baseSalary.toLocaleString()}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Events / Commissions</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t("Events / Commissions")}</p>
 
                   {lines.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">No events added for this employee yet.</p>
+                    <p className="text-xs text-muted-foreground italic">{t("No events added for this employee yet.")}</p>
                   ) : (
                     lines.map((line, index) => {
                       const unitPrice = line.price_override != null ? Number(line.price_override) : getEmployeeEventPrice(employee, line.event_type_id);
@@ -812,7 +924,7 @@ function PaymentRunProcessPageContent() {
                                 const defaults = getDefaultLinePatch(employee.id, val);
                                 updateEventLine(employee.id, index, { event_type_id: val, ...defaults });
                               }}
-                              placeholder="Select event"
+                              placeholder={t("Select event")}
                               className="w-full"
                             />
                           </div>
@@ -824,7 +936,7 @@ function PaymentRunProcessPageContent() {
                               <button
                                 onClick={() => updateEventLine(employee.id, index, { quantity: Math.max(1, (line.quantity || 1) - 1) })}
                                 className="px-2.5 py-2 text-foreground hover:bg-muted transition-colors"
-                                title="Decrease"
+                                title={t("Decrease")}
                               >
                                 <HiMinus className="w-3.5 h-3.5" />
                               </button>
@@ -832,7 +944,7 @@ function PaymentRunProcessPageContent() {
                               <button
                                 onClick={() => updateEventLine(employee.id, index, { quantity: (line.quantity || 1) + 1 })}
                                 className="px-2.5 py-2 text-foreground hover:bg-muted transition-colors"
-                                title="Increase"
+                                title={t("Increase")}
                               >
                                 <HiOutlinePlus className="w-3.5 h-3.5" />
                               </button>
@@ -867,7 +979,7 @@ function PaymentRunProcessPageContent() {
                             <button
                               onClick={() => removeEventLine(employee.id, index)}
                               className="w-8 h-8 rounded-full border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center shrink-0"
-                              title="Remove Event"
+                              title={t("Remove Event")}
                             >
                               <HiOutlineTrash className="w-3.5 h-3.5" />
                             </button>
@@ -882,12 +994,12 @@ function PaymentRunProcessPageContent() {
                     className="w-full py-2 rounded-xl border border-dashed border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2"
                   >
                     <HiOutlinePlus className="w-3.5 h-3.5" />
-                    Add Event
+                    {t("Add Event")}
                   </button>
                 </div>
 
                 <div className="rounded-2xl bg-card-alt border border-border/50 p-4 flex flex-col justify-center shadow-sm">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">Total Earnings</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-0.5">{t("Total Earnings")}</p>
                   <p className="text-xl font-black text-primary">ETB {employeeTotals.total.toLocaleString()}</p>
                 </div>
               </div>
@@ -902,17 +1014,17 @@ function PaymentRunProcessPageContent() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className={`flex items-center transition-all duration-300 ${isFloating ? 'gap-4' : 'gap-6'}`}>
               <div>
-                <p className={`font-black uppercase tracking-widest text-muted-foreground transition-all duration-300 ${isFloating ? 'text-[7px] mb-0' : 'text-[10px] mb-1'}`}>Base Salary Total</p>
+                <p className={`font-black uppercase tracking-widest text-muted-foreground transition-all duration-300 ${isFloating ? 'text-[7px] mb-0' : 'text-[10px] mb-1'}`}>{t("Base Salary Total")}</p>
                 <p className={`font-black transition-all duration-300 ${isFloating ? 'text-base' : 'text-xl'}`}>ETB {totals.base.toLocaleString()}</p>
               </div>
               <div className={`w-px bg-border/40 transition-all duration-300 ${isFloating ? 'h-6' : 'h-10'}`} />
               <div>
-                <p className={`font-black uppercase tracking-widest text-muted-foreground transition-all duration-300 ${isFloating ? 'text-[7px] mb-0' : 'text-[10px] mb-1'}`}>Commission Total</p>
+                <p className={`font-black uppercase tracking-widest text-muted-foreground transition-all duration-300 ${isFloating ? 'text-[7px] mb-0' : 'text-[10px] mb-1'}`}>{t("Commission Total")}</p>
                 <p className={`font-black transition-all duration-300 ${isFloating ? 'text-base' : 'text-xl'}`}>ETB {totals.commission.toLocaleString()}</p>
               </div>
             </div>
             <div className="text-right">
-              <p className={`font-black uppercase tracking-widest text-muted-foreground transition-all duration-300 ${isFloating ? 'text-[7px] mb-0' : 'text-[10px] mb-1'}`}>Grand Total Disbursement</p>
+              <p className={`font-black uppercase tracking-widest text-muted-foreground transition-all duration-300 ${isFloating ? 'text-[7px] mb-0' : 'text-[10px] mb-1'}`}>{t("Grand Total Disbursement")}</p>
               <p className={`font-black text-primary drop-shadow-sm transition-all duration-300 ${isFloating ? 'text-xl' : 'text-3xl'}`}>ETB {totals.grand.toLocaleString()}</p>
             </div>
           </div>
@@ -931,13 +1043,16 @@ function PaymentRunProcessPageContent() {
 }
 
 export default function PaymentRunProcessPage() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+
   return (
     <Suspense
       fallback={
         <AuthLayout>
           <div className="max-w-5xl mx-auto py-20 flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-bold text-muted animate-pulse">Loading payroll run...</p>
+            <p className="text-sm font-bold text-muted animate-pulse">{t("Loading payroll run...")}</p>
           </div>
         </AuthLayout>
       }
