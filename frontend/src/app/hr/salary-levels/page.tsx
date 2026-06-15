@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { HiOutlineTrash, HiPlus } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,8 +11,9 @@ import { SalaryLevel } from "@/lib/types";
 import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
-export default function SalaryLevelsPage() {
+function SalaryLevelsContent() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const { data: levels, isLoading } = useQuery<SalaryLevel[]>({
     queryKey: ["salary-levels"],
     queryFn: getSalaryLevels
@@ -19,6 +21,7 @@ export default function SalaryLevelsPage() {
 
   const [form, setForm] = useState<{ id?: string, level_name: string, base_salary: string }>({ level_name: "", base_salary: "" });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const highlightedId = searchParams.get("highlight");
 
   const { data: deleteImpact, isLoading: isDeleteImpactLoading } = useQuery<{ salary_level_id: string; level_name: string; active_employee_count: number }>({
     queryKey: ["salary-level-delete-impact", deleteId],
@@ -65,6 +68,22 @@ export default function SalaryLevelsPage() {
     if (form.id) updateMut.mutate();
     else createMut.mutate();
   };
+
+  useEffect(() => {
+    if (!highlightedId || !levels?.length) return;
+
+    const highlightedLevel = levels.find((level) => level.id === highlightedId);
+    if (!highlightedLevel) return;
+
+    const timer = setTimeout(() => {
+      setForm({
+        id: highlightedLevel.id,
+        level_name: highlightedLevel.level_name,
+        base_salary: highlightedLevel.base_salary.toString(),
+      });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [highlightedId, levels]);
 
   const activeDeleteLevel = levels?.find(l => l.id === deleteId);
   const impactedEmployees = deleteImpact?.active_employee_count ?? 0;
@@ -152,7 +171,14 @@ export default function SalaryLevelsPage() {
                 <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-card-alt">No salary levels config detected</td></tr>
               ) : (
                 levels?.map(lvl => (
-                  <tr key={lvl.id} className="hover:bg-primary/2 transition-colors group">
+                  <tr
+                    key={lvl.id}
+                    className={`transition-colors group ${
+                      highlightedId === lvl.id
+                        ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
+                        : "hover:bg-primary/2"
+                    }`}
+                  >
                     <td className="px-4 sm:px-8 py-4 sm:py-6">
                       <button
                         onClick={() => {
@@ -197,5 +223,13 @@ export default function SalaryLevelsPage() {
         isDeleting={deleteMut.isPending}
       />
     </AuthLayout>
+  );
+}
+
+export default function SalaryLevelsPage() {
+  return (
+    <Suspense>
+      <SalaryLevelsContent />
+    </Suspense>
   );
 }

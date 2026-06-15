@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getEmployees, getEvents, getItems, getPayrollRuns, getSalaryLevels } from "@/lib/api";
+import type { Employee, Event, Item, PayrollRun, SalaryLevel } from "@/lib/types";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import PayrollReminder from "@/components/PayrollReminder";
@@ -73,6 +75,25 @@ const SEARCH_ITEMS = [
   { label: "Admin Settings", amLabel: "አስተዳዳሪ ቅንብሮች", href: "/settings", category: "Admin" },
 ];
 
+type StaticSearchItem = (typeof SEARCH_ITEMS)[number];
+
+type SearchResult = {
+  key: string;
+  label: string;
+  amLabel: string;
+  href: string;
+  category: string;
+  detail?: string;
+};
+
+const toPageResult = (item: StaticSearchItem): SearchResult => ({
+  ...item,
+  key: `page:${item.href}`,
+});
+
+const compactDetail = (values: Array<string | number | null | undefined>) =>
+  values.filter((value) => value !== null && value !== undefined && String(value).trim().length > 0).join(" · ");
+
 function SearchDialog({
   isOpen,
   onClose,
@@ -84,28 +105,184 @@ function SearchDialog({
 }) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [recordResults, setRecordResults] = useState<SearchResult[]>([]);
+  const [isSearchingRecords, setIsSearchingRecords] = useState(false);
+  const [recordSearchError, setRecordSearchError] = useState(false);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = SEARCH_ITEMS.filter((item) => {
-    const term = query.toLowerCase();
+  const pageResults = SEARCH_ITEMS.filter((item) => {
+    const term = query.trim().toLowerCase();
     return (
+      !term ||
       item.label.toLowerCase().includes(term) ||
       item.amLabel.toLowerCase().includes(term) ||
       item.category.toLowerCase().includes(term)
     );
-  });
+  }).map(toPageResult);
+
+  const filtered = [...recordResults, ...pageResults].slice(0, 12);
 
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
         setQuery("");
+        setDebouncedQuery("");
+        setRecordResults([]);
+        setRecordSearchError(false);
         setSelectedIndex(0);
         inputRef.current?.focus();
       }, 50);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = window.setTimeout(() => {
+      const nextQuery = query.trim();
+      setDebouncedQuery(nextQuery);
+      if (nextQuery.length >= 2) {
+        setIsSearchingRecords(true);
+        setRecordSearchError(false);
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [isOpen, query]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (debouncedQuery.length < 2) {
+      return;
+    }
+
+    let active = true;
+
+    Promise.allSettled([
+      getEmployees(1, 5, debouncedQuery, "active"),
+      getItems(1, 5, debouncedQuery),
+      getEvents(1, 5, debouncedQuery),
+      getSalaryLevels(),
+      getPayrollRuns({ view: "active" }),
+    ])
+      .then(([employeesResult, assetsResult, eventsResult, salaryLevelsResult, payrollRunsResult]) => {
+        if (!active) return;
+
+        const nextResults: SearchResult[] = [];
+        const normalizedQuery = debouncedQuery.toLowerCase();
+
+        if (employeesResult.status === "fulfilled") {
+          const employees = (employeesResult.value?.employees || []) as Employee[];
+          nextResults.push(
+            ...employees.map((employee) => ({
+              key: `employee:${employee.id}`,
+              label: employee.full_name,
+              amLabel: employee.full_name,
+              href: `/?edit=${encodeURIComponent(employee.id)}`,
+              category: "Employee",
+              detail: compactDetail([employee.employee_id, employee.department, employee.office]),
+            }))
+          );
+        }
+
+        if (assetsResult.status === "fulfilled") {
+          const assets = (assetsResult.value?.items || []) as Item[];
+          nextResults.push(
+            ...assets.map((item) => ({
+              key: `asset:${item.id}`,
+              label: item.name,
+              amLabel: item.name,
+              href: `/assets?q=${encodeURIComponent(item.name)}`,
+              category: "Asset",
+              detail: compactDetail([item.store?.name, `Qty ${item.quantity}`]),
+            }))
+          );
+        }
+
+        if (eventsResult.status === "fulfilled") {
+          const events = (eventsResult.value?.events || []) as Event[];
+          nextResults.push(
+            ...events.map((event) => ({
+              key: `event:${event.id}`,
+              label: event.name,
+              amLabel: event.name,
+              href: `/events?edit=${encodeURIComponent(event.id)}`,
+              category: "Event",
+              detail: compactDetail([event.client_name, event.venue_location, event.status]),
+            }))
+          );
+        }
+
+        if (salaryLevelsResult.status === "fulfilled") {
+          const salaryLevels = ((salaryLevelsResult.value || []) as SalaryLevel[])
+            .filter((level) =>
+              compactDetail([level.level_name, level.base_salary]).toLowerCase().includes(normalizedQuery)
+            )
+            .slice(0, 5);
+          nextResults.push(
+            ...salaryLevels.map((level) => ({
+              key: `salary-level:${level.id}`,
+              label: level.level_name,
+              amLabel: level.level_name,
+              href: `/hr/salary-levels?highlight=${encodeURIComponent(level.id)}`,
+              category: "Salary",
+              detail: `ETB ${Number(level.base_salary).toLocaleString()}`,
+            }))
+          );
+        }
+
+        if (payrollRunsResult.status === "fulfilled") {
+          const payrollRuns = ((payrollRunsResult.value || []) as PayrollRun[])
+            .filter((run) =>
+              compactDetail([
+                run.status,
+                run.year,
+                run.month,
+                run.period_start,
+                run.period_end,
+                run.total_payroll_value,
+              ]).toLowerCase().includes(normalizedQuery)
+            )
+            .slice(0, 5);
+          nextResults.push(
+            ...payrollRuns.map((run) => ({
+              key: `payroll:${run.id}`,
+              label: compactDetail([run.period_start, run.period_end]) || `Payroll ${run.id.slice(0, 8)}`,
+              amLabel: compactDetail([run.period_start, run.period_end]) || `Payroll ${run.id.slice(0, 8)}`,
+              href: `/hr/payments?highlight=${encodeURIComponent(run.id)}`,
+              category: "Payroll",
+              detail: compactDetail([run.status, `ETB ${Number(run.total_payroll_value || 0).toLocaleString()}`]),
+            }))
+          );
+        }
+
+        setRecordResults(nextResults.slice(0, 8));
+        setRecordSearchError(
+          employeesResult.status === "rejected" &&
+            assetsResult.status === "rejected" &&
+            eventsResult.status === "rejected" &&
+            salaryLevelsResult.status === "rejected" &&
+            payrollRunsResult.status === "rejected"
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setRecordResults([]);
+          setRecordSearchError(true);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setIsSearchingRecords(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedQuery, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -150,8 +327,14 @@ function SearchDialog({
               type="text"
               value={query}
               onChange={(e) => {
-                setQuery(e.target.value);
+                const nextQuery = e.target.value;
+                setQuery(nextQuery);
                 setSelectedIndex(0);
+                if (nextQuery.trim().length < 2) {
+                  setRecordResults([]);
+                  setIsSearchingRecords(false);
+                  setRecordSearchError(false);
+                }
               }}
               placeholder={lang === "en" ? "Search pages, tools or settings..." : "ገጾችን፣ ዕቃዎችን ወይም ቅንብሮችን ይፈልጉ..."}
               className="w-full bg-transparent border-none text-foreground text-sm focus:outline-none placeholder-muted"
@@ -166,7 +349,7 @@ function SearchDialog({
                   const isSelected = idx === selectedIndex;
                   return (
                     <button
-                      key={item.href}
+                      key={item.key}
                       onClick={() => {
                         router.push(item.href);
                         onClose();
@@ -177,7 +360,7 @@ function SearchDialog({
                     >
                       <div className="flex flex-col gap-0.5">
                         <span className="text-xs font-bold">{lang === "en" ? item.label : item.amLabel}</span>
-                        <span className="text-[9px] text-muted">{item.href}</span>
+                        <span className="text-[9px] text-muted">{item.detail || item.href}</span>
                       </div>
                       <span className="text-[9px] font-black uppercase tracking-wider text-muted bg-border/40 px-2 py-0.5 rounded-md">
                         {item.category}
@@ -188,7 +371,20 @@ function SearchDialog({
               </div>
             ) : (
               <div className="py-8 text-center text-xs text-muted font-medium">
-                {lang === "en" ? "No results found for your query." : "ምንም ውጤት አልተገኘም።"}
+                {isSearchingRecords
+                  ? lang === "en"
+                    ? "Searching records..."
+                    : "መዝገቦችን በመፈለግ ላይ..."
+                  : lang === "en"
+                    ? "No results found for your query."
+                    : "ምንም ውጤት አልተገኘም።"}
+              </div>
+            )}
+            {recordSearchError && (
+              <div className="px-3 pb-2 text-[10px] font-medium text-danger">
+                {lang === "en"
+                  ? "Record search is unavailable. Page search still works."
+                  : "የመዝገብ ፍለጋ አልተሳካም። የገጽ ፍለጋ ግን ይሰራል።"}
               </div>
             )}
           </div>
