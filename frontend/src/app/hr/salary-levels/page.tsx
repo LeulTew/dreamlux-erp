@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { HiOutlineTrash, HiPlus } from "react-icons/hi2";
@@ -11,7 +11,7 @@ import { SalaryLevel } from "@/lib/types";
 import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
-export default function SalaryLevelsPage() {
+function SalaryLevelsContent() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const { data: levels, isLoading } = useQuery<SalaryLevel[]>({
@@ -75,11 +75,14 @@ export default function SalaryLevelsPage() {
     const highlightedLevel = levels.find((level) => level.id === highlightedId);
     if (!highlightedLevel) return;
 
-    setForm({
-      id: highlightedLevel.id,
-      level_name: highlightedLevel.level_name,
-      base_salary: highlightedLevel.base_salary.toString(),
-    });
+    const timer = setTimeout(() => {
+      setForm({
+        id: highlightedLevel.id,
+        level_name: highlightedLevel.level_name,
+        base_salary: highlightedLevel.base_salary.toString(),
+      });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [highlightedId, levels]);
 
   const activeDeleteLevel = levels?.find(l => l.id === deleteId);
@@ -220,5 +223,13 @@ export default function SalaryLevelsPage() {
         isDeleting={deleteMut.isPending}
       />
     </AuthLayout>
+  );
+}
+
+export default function SalaryLevelsPage() {
+  return (
+    <Suspense>
+      <SalaryLevelsContent />
+    </Suspense>
   );
 }

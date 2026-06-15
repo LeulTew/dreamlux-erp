@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRuns, updatePayrollRunStatus, exportPayrollPDF, permanentlyDeletePayrollRun } from "@/lib/api";
 import { HiPlusCircle, HiClock, HiOutlineChevronRight, HiPencilSquare, HiTrash, HiPrinter, HiArrowUturnLeft, HiArrowPath } from "react-icons/hi2";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import toast from "react-hot-toast";
@@ -24,7 +24,7 @@ type PayrollRunRow = {
   created_at?: string;
 };
 
-export default function PaymentsPage() {
+function PaymentsPageContent() {
   const searchParams = useSearchParams();
   const selectedMonth = format(new Date(), "yyyy-MM");
   const queryClient = useQueryClient();
@@ -101,7 +101,10 @@ export default function PaymentsPage() {
     const highlightedIndex = sortedRuns.findIndex((run) => run.id === highlightedId);
     if (highlightedIndex === -1) return;
 
-    setPage(Math.floor(highlightedIndex / ITEMS_PER_PAGE) + 1);
+    const timer = setTimeout(() => {
+      setPage(Math.floor(highlightedIndex / ITEMS_PER_PAGE) + 1);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [highlightedId, sortedRuns]);
 
   const executeConfirmAction = async () => {
@@ -392,5 +395,13 @@ export default function PaymentsPage() {
         />
       </div>
     </AuthLayout>
+  );
+}
+
+export default function PaymentsPage() {
+  return (
+    <Suspense>
+      <PaymentsPageContent />
+    </Suspense>
   );
 }
