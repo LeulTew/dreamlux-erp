@@ -41,7 +41,7 @@ export default function PrintOptionsModal({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: "100%", opacity: 0.5 }}
               transition={{ type: "spring", damping: 30, stiffness: 350 }}
-              className="pointer-events-auto w-full md:max-w-md bg-card rounded-t-[2.5rem] md:rounded-[3rem] shadow-premium overflow-hidden border border-border/50"
+              className="pointer-events-auto w-full md:max-w-md bg-card rounded-t-xl md:rounded-xl shadow-premium overflow-hidden border border-border/50"
             >
               <div className="p-8 pb-6 border-b border-border/50 relative">
                 <button

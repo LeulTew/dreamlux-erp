@@ -147,7 +147,7 @@ export default function EventTypesPage() {
               exit={{ height: 0, opacity: 0, marginBottom: 0 }}
               className="overflow-hidden"
             >
-              <div className="bg-card p-8 rounded-[2.5rem] shadow-premium border border-border relative">
+              <div className="bg-card p-8 rounded-xl shadow-premium border border-border relative">
                 <div className="relative z-10 mb-6">
                   <h2 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
                     <HiPlus className="w-5 h-5 text-primary/40" />
@@ -193,7 +193,7 @@ export default function EventTypesPage() {
           {isLoading ? (
             <div className="p-20 text-center text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground animate-pulse">Computing Layout...</div>
           ) : events?.length === 0 ? (
-             <div className="p-20 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground bg-card rounded-[3rem] border-2 border-border border-dashed shadow-inner">Nothing here yet. Add an event above.</div>
+             <div className="p-20 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground bg-card rounded-xl border-2 border-border border-dashed shadow-inner">Nothing here yet. Add an event above.</div>
           ) : (
             <div style={{ height: masonryResult.containerHeight, position: "relative" }}>
               <AnimatePresence mode="popLayout">

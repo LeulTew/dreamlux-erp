@@ -227,11 +227,11 @@ export default function PaymentsPage() {
         </div>
 
         {isLoading ? (
-          <div className="p-20 text-center text-muted-foreground animate-pulse font-black uppercase text-[10px] tracking-[0.4em] bg-card rounded-[3rem] border border-border/50 shadow-inner">
+          <div className="p-20 text-center text-muted-foreground animate-pulse font-black uppercase text-[10px] tracking-[0.4em] bg-card rounded-xl border border-border/50 shadow-inner">
             Retrieving payroll audit history...
           </div>
         ) : sortedRuns.length === 0 ? (
-          <div className="p-20 text-center rounded-[3rem] border-2 border-dashed border-border/50 text-muted-foreground font-black uppercase tracking-widest text-sm bg-card shadow-sm">
+          <div className="p-20 text-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground font-black uppercase tracking-widest text-sm bg-card shadow-sm">
             {view === "trash" ? "Trash is empty" : "No payroll records found in the archive"}
           </div>
         ) : (

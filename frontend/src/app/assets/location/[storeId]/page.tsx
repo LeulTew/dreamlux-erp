@@ -113,7 +113,7 @@ export default function LocationDrilldownPage() {
 
         {/* Local KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass-card p-8 rounded-[2.5rem] border border-border/50 shadow-soft">
+          <div className="glass-card p-8 rounded-xl border border-border/50 shadow-soft">
              <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted">Total Units</span>
                 <HiChartBar className="w-5 h-5 text-primary" />
@@ -124,7 +124,7 @@ export default function LocationDrilldownPage() {
              </div>
           </div>
 
-          <div className="glass-card p-8 rounded-[2.5rem] border border-border/50 shadow-soft">
+          <div className="glass-card p-8 rounded-xl border border-border/50 shadow-soft">
              <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted">Critical Stock</span>
                 <HiExclamationTriangle className={`w-5 h-5 ${locationStats?.lowStockItems && locationStats.lowStockItems > 0 ? 'text-danger' : 'text-muted opacity-30'}`} />
@@ -137,7 +137,7 @@ export default function LocationDrilldownPage() {
              </div>
           </div>
 
-          <div className="glass-card p-8 rounded-[2.5rem] border border-border/50 shadow-soft">
+          <div className="glass-card p-8 rounded-xl border border-border/50 shadow-soft">
              <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted">System Health</span>
                 <div className="w-2 h-2 rounded-full bg-success animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
@@ -150,7 +150,7 @@ export default function LocationDrilldownPage() {
         </div>
 
         {/* Items Surface */}
-        <section className="glass-card rounded-[3rem] border border-border/50 shadow-premium overflow-hidden bg-white/50 dark:bg-black/20">
+        <section className="glass-card rounded-xl border border-border/50 shadow-premium overflow-hidden bg-white/50 dark:bg-black/20">
           <div className="p-8 border-b border-border/50 flex items-center justify-between bg-card-alt/30">
             <h2 className="text-xl font-black text-foreground tracking-tight">Items in This Location</h2>
             <div className="text-[10px] font-black uppercase tracking-widest text-muted bg-card px-4 py-2 rounded-full border border-border/50 shadow-sm">

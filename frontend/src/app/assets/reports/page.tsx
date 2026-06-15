@@ -162,7 +162,7 @@ export default function ReportsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="glass-card p-8 rounded-[3rem] border border-border/50 shadow-premium group hover:border-primary/30 transition-all"
+            className="glass-card p-8 rounded-xl border border-border/50 shadow-premium group hover:border-primary/30 transition-all"
           >
             <div className="flex items-center justify-between mb-8">
               <div className="p-4 bg-primary/5 text-primary rounded-3xl border border-primary/10">
@@ -203,7 +203,7 @@ export default function ReportsPage() {
 
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="glass-card p-8 rounded-[3rem] border border-border/50 shadow-premium group hover:border-emerald-500/30 transition-all lg:col-span-2"
+            className="glass-card p-8 rounded-xl border border-border/50 shadow-premium group hover:border-emerald-500/30 transition-all lg:col-span-2"
           >
             <div className="flex items-center justify-between mb-8">
               <div className="p-4 bg-emerald-500/5 text-emerald-500 rounded-3xl border border-emerald-500/10">

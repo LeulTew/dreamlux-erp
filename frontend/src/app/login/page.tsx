@@ -49,7 +49,7 @@ export default function LoginPage() {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="glass-card rounded-[3xl] shadow-premium p-8 space-y-6"
+          className="glass-card rounded-xl shadow-premium p-8 space-y-6"
         >
           <div className="space-y-4">
             <div className="space-y-2">

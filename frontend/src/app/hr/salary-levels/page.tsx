@@ -133,7 +133,7 @@ export default function SalaryLevelsPage() {
           </form>
         </div>
 
-        <div className="bg-card rounded-[2.5rem] shadow-premium border border-border overflow-hidden p-2">
+        <div className="bg-card rounded-xl shadow-premium border border-border overflow-hidden p-2">
           <table className="w-full text-left text-sm border-separate border-spacing-0">
             <thead>
               <tr className="bg-muted/30">

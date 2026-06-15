@@ -191,7 +191,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
         <form onSubmit={handleSubmit} className="space-y-6 pb-6">
           
           {/* Section 1: Client & General Info */}
-          <div className="bg-card-alt/30 p-5 rounded-3xl border border-border/50 space-y-4">
+          <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-primary">General Information</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -258,7 +258,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
           </div>
 
           {/* Section 2: Venue & Schedule */}
-          <div className="bg-card-alt/30 p-5 rounded-3xl border border-border/50 space-y-4">
+          <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-primary">Schedule & Location</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -331,7 +331,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
           </div>
 
           {/* Section 3: Finance & Status */}
-          <div className="bg-card-alt/30 p-5 rounded-3xl border border-border/50 space-y-4">
+          <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
             <h3 className="text-xs font-black uppercase tracking-widest text-primary">Status & Budget</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -376,7 +376,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               <button
                 type="submit"
                 disabled={saveMutation.isPending}
-                className="flex-1 py-4 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-xs"
+                className="flex-1 py-4 rounded-xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 text-xs"
               >
                 {saveMutation.isPending ? "Saving..." : event ? "Save Changes" : "Create Event"}
               </button>

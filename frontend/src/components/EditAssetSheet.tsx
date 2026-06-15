@@ -157,7 +157,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
             <div className="space-y-6">
               <div
                 onClick={() => !updateMutation.isPending && fileInputRef.current?.click()}
-                className={`relative w-full aspect-square md:aspect-video rounded-3xl md:rounded-4xl overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
+                className={`relative w-full aspect-square md:aspect-video rounded-xl md:rounded-xl overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
                   updateMutation.isPending ? "cursor-wait opacity-80" : "cursor-pointer group"
                 }`}
               >
@@ -208,7 +208,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-3">
-                    <div className="p-4 bg-background rounded-3xl shadow-sm border border-border">
+                    <div className="p-4 bg-background rounded-xl shadow-sm border border-border">
                       <HiCamera className="w-8 h-8 text-primary" />
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Tap to change photo</span>
@@ -236,7 +236,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
 
               {/* Reconciliation Info */}
               {(item.last_counted_at || item.last_counted_by) && (
-                <div className="p-6 rounded-4xl bg-card-alt/50 border border-border/40 shadow-sm">
+                <div className="p-6 rounded-xl bg-card-alt/50 border border-border/40 shadow-sm">
                   <p className="text-[10px] uppercase font-black text-muted tracking-[0.2em] mb-4">Audit Traceability</p>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -353,7 +353,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   <button
                     type="submit"
                     disabled={updateMutation.isPending}
-                    className="flex-4 py-4 md:py-5 rounded-2xl md:rounded-3xl bg-primary text-background font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
+                    className="flex-4 py-4 md:py-5 rounded-2xl md:rounded-xl bg-primary text-background font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
                   >
                     {updateMutation.isPending ? "Syncing..." : "Update Asset"}
                   </button>
@@ -361,7 +361,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     type="button"
                     onClick={handleDelete}
                     disabled={deleteMutation.isPending}
-                    className="flex-1 h-14 md:h-16 rounded-2xl md:rounded-3xl bg-red-50 text-danger flex items-center justify-center hover:bg-danger hover:text-background transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                    className="flex-1 h-14 md:h-16 rounded-2xl md:rounded-xl bg-red-50 text-danger flex items-center justify-center hover:bg-danger hover:text-background transition-all shadow-sm active:scale-95 disabled:opacity-50"
                     aria-label="Delete asset"
                   >
                     <HiTrash className="w-6 md:w-7 h-6 md:h-7" />
@@ -372,7 +372,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   type="button"
                   onClick={handleReconcile}
                   disabled={reconcileMutation.isPending || updateMutation.isPending}
-                  className="w-full py-4 md:py-5 rounded-2xl md:rounded-3xl bg-card border border-border text-foreground font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 md:py-5 rounded-2xl md:rounded-xl bg-card border border-border text-foreground font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <HiCheckCircle className="w-5 h-5 text-primary" />
                   {reconcileMutation.isPending ? "Applying Audit..." : "Mark as Physically Verified"}

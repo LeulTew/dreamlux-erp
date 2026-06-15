@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useSyncExternalStore } from "react";
+import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -36,6 +36,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -87,6 +88,63 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   },
 };
 
+/* ── Popout menu for collapsed sidebar ──────────────────── */
+function CollapsedPopout({
+  icon: Icon,
+  label,
+  isActive,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  isActive: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all ${
+          isActive ? "bg-primary/10 text-primary" : "text-muted hover:bg-card-alt hover:text-foreground"
+        }`}
+      >
+        <Icon className="w-[18px] h-[18px]" />
+      </button>
+      {open && (
+        <div className="absolute left-full top-0 ml-2 z-50 bg-card border border-border rounded-xl p-2 min-w-[160px] shadow-lg">
+          <p className="text-[10px] font-semibold text-muted uppercase tracking-wider px-2.5 py-1.5 mb-1">{label}</p>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PopoutLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`block px-2.5 py-1.5 rounded-lg text-sm transition-all ${
+        active ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-card-alt"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -94,6 +152,8 @@ export function AppSidebar() {
   const { lang, toggle: toggleLang } = useLanguage();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const { state: sidebarState } = useSidebar();
+  const isCollapsed = sidebarState === "collapsed";
 
   // Collapsible sub-menus state
   const [employeesOpen, setEmployeesOpen] = useState(true);
@@ -136,7 +196,6 @@ export function AppSidebar() {
 
   const userRole = currentUser.role;
 
-  // Filter links based on role
   const hasAccess = (roles?: string[]) => {
     if (!roles) return true;
     return roles.includes(userRole);
@@ -153,12 +212,18 @@ export function AppSidebar() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
+  const hrRoles = [
+    "SUPER_ADMIN", "super_admin", "admin", "ADMIN", "HR_ADMIN",
+    "EVENT_MANAGER", "event_manager", "OWNER", "owner",
+    "OPS_MANAGER", "ops_manager", "ACCOUNTANT", "accountant",
+  ];
+
   return (
     <>
       <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
         {/* Header - Logo */}
         <SidebarHeader className="py-5 px-5 flex flex-row items-center gap-3 select-none">
-          <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center text-background font-black text-base shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center text-background font-black text-base shrink-0">
             D
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
@@ -173,7 +238,7 @@ export function AppSidebar() {
 
         {/* Search Bar */}
         <div className="px-3 pb-2 group-data-[collapsible=icon]:px-2">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card-alt/50 text-muted text-xs group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2.5 cursor-pointer hover:border-primary/30 transition-all">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border bg-card-alt/50 text-muted text-xs group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2.5 cursor-pointer hover:border-primary/30 transition-all">
             <HiMagnifyingGlass className="w-4 h-4 shrink-0" />
             <span className="group-data-[collapsible=icon]:hidden">{t("Search")}</span>
             <span className="group-data-[collapsible=icon]:hidden ml-auto text-[10px] text-muted/60 font-mono">⌘S</span>
@@ -183,86 +248,70 @@ export function AppSidebar() {
         {/* Content Groupings */}
         <SidebarContent className="py-2">
           {/* HR Management Section */}
-          {hasAccess([
-            "SUPER_ADMIN",
-            "super_admin",
-            "admin",
-            "ADMIN",
-            "HR_ADMIN",
-            "EVENT_MANAGER",
-            "event_manager",
-            "OWNER",
-            "owner",
-            "OPS_MANAGER",
-            "ops_manager",
-            "ACCOUNTANT",
-            "accountant",
-          ]) && (
+          {hasAccess(hrRoles) && (
             <SidebarGroup>
               <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
                 {t("HR Management")}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {/* Employees (Nested) */}
+                  {/* Employees (Nested) — expanded vs collapsed */}
                   {hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) && (
                     <SidebarMenuItem>
-                      <SidebarMenuButton
-                        onClick={() => setEmployeesOpen(!employeesOpen)}
-                        className={`w-full justify-between group-data-[collapsible=icon]:justify-center ${
-                          isActive("/") || isActive("/insert") ? "text-primary font-semibold" : ""
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <HiUsers className="w-[18px] h-[18px] shrink-0" />
-                          <span className="group-data-[collapsible=icon]:hidden">
-                            {t("Employees")}
-                          </span>
-                        </span>
-                        <span className="group-data-[collapsible=icon]:hidden shrink-0">
-                          {employeesOpen ? (
-                            <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
-                          ) : (
-                            <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                      {isCollapsed ? (
+                        <CollapsedPopout
+                          icon={HiUsers}
+                          label={t("Employees")}
+                          isActive={isActive("/") || isActive("/insert")}
+                        >
+                          <PopoutLink href="/" label={t("List Employees")} active={pathname === "/"} />
+                          <PopoutLink href="/insert" label={t("Add Employee")} active={pathname === "/insert"} />
+                        </CollapsedPopout>
+                      ) : (
+                        <>
+                          <SidebarMenuButton
+                            onClick={() => setEmployeesOpen(!employeesOpen)}
+                            className={`w-full justify-between ${
+                              isActive("/") || isActive("/insert") ? "text-primary font-semibold" : ""
+                            }`}
+                          >
+                            <span className="flex items-center gap-3">
+                              <HiUsers className="w-[18px] h-[18px] shrink-0" />
+                              <span>{t("Employees")}</span>
+                            </span>
+                            <span className="shrink-0">
+                              {employeesOpen ? (
+                                <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                              ) : (
+                                <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                              )}
+                            </span>
+                          </SidebarMenuButton>
+                          {employeesOpen && (
+                            <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1">
+                              <SidebarMenuSubItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === "/"}>
+                                  <Link href="/" className={pathname === "/" ? "text-foreground font-medium" : "text-muted"}>
+                                    {t("List Employees")}
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                              <SidebarMenuSubItem>
+                                <SidebarMenuSubButton asChild isActive={pathname === "/insert"}>
+                                  <Link href="/insert" className={pathname === "/insert" ? "text-foreground font-medium" : "text-muted"}>
+                                    {t("Add Employee")}
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            </SidebarMenuSub>
                           )}
-                        </span>
-                      </SidebarMenuButton>
-                      {employeesOpen && (
-                        <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1 group-data-[collapsible=icon]:hidden">
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton asChild isActive={pathname === "/"}>
-                              <Link href="/" className={pathname === "/" ? "text-foreground font-medium" : "text-muted"}>
-                                {t("List Employees")}
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                          <SidebarMenuSubItem>
-                            <SidebarMenuSubButton asChild isActive={pathname === "/insert"}>
-                              <Link href="/insert" className={pathname === "/insert" ? "text-foreground font-medium" : "text-muted"}>
-                                {t("Add Employee")}
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        </SidebarMenuSub>
+                        </>
                       )}
                     </SidebarMenuItem>
                   )}
 
                   {/* Events */}
-                  {hasAccess([
-                    "SUPER_ADMIN",
-                    "super_admin",
-                    "admin",
-                    "ADMIN",
-                    "EVENT_MANAGER",
-                    "event_manager",
-                    "OWNER",
-                    "owner",
-                    "OPS_MANAGER",
-                    "ops_manager",
-                    "ACCOUNTANT",
-                    "accountant",
-                  ]) && (
+                  {hasAccess(hrRoles) && (
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={isActive("/events")}>
                         <Link href="/events">
@@ -333,43 +382,54 @@ export function AppSidebar() {
 
                   {/* Items (Nested) */}
                   <SidebarMenuItem>
-                    <SidebarMenuButton
-                      onClick={() => setItemsOpen(!itemsOpen)}
-                      className={`w-full justify-between group-data-[collapsible=icon]:justify-center ${
-                        isActive("/assets") || isActive("/assets/insert") ? "text-primary font-semibold" : ""
-                      }`}
-                    >
-                      <span className="flex items-center gap-3">
-                        <HiTableCells className="w-[18px] h-[18px] shrink-0" />
-                        <span className="group-data-[collapsible=icon]:hidden">
-                          {t("Inventory")}
-                        </span>
-                      </span>
-                      <span className="group-data-[collapsible=icon]:hidden shrink-0">
-                        {itemsOpen ? (
-                          <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
-                        ) : (
-                          <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                    {isCollapsed ? (
+                      <CollapsedPopout
+                        icon={HiTableCells}
+                        label={t("Inventory")}
+                        isActive={isActive("/assets") || isActive("/assets/insert")}
+                      >
+                        <PopoutLink href="/assets" label={t("List Items")} active={pathname === "/assets"} />
+                        <PopoutLink href="/assets/insert" label={t("Add Item")} active={pathname === "/assets/insert"} />
+                      </CollapsedPopout>
+                    ) : (
+                      <>
+                        <SidebarMenuButton
+                          onClick={() => setItemsOpen(!itemsOpen)}
+                          className={`w-full justify-between ${
+                            isActive("/assets") || isActive("/assets/insert") ? "text-primary font-semibold" : ""
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <HiTableCells className="w-[18px] h-[18px] shrink-0" />
+                            <span>{t("Inventory")}</span>
+                          </span>
+                          <span className="shrink-0">
+                            {itemsOpen ? (
+                              <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                            ) : (
+                              <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                            )}
+                          </span>
+                        </SidebarMenuButton>
+                        {itemsOpen && (
+                          <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1">
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton asChild isActive={pathname === "/assets"}>
+                                <Link href="/assets" className={pathname === "/assets" ? "text-foreground font-medium" : "text-muted"}>
+                                  {t("List Items")}
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"}>
+                                <Link href="/assets/insert" className={pathname === "/assets/insert" ? "text-foreground font-medium" : "text-muted"}>
+                                  {t("Add Item")}
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          </SidebarMenuSub>
                         )}
-                      </span>
-                    </SidebarMenuButton>
-                    {itemsOpen && (
-                      <SidebarMenuSub className="ml-7 border-l border-border/40 pl-3 space-y-0.5 mt-1 group-data-[collapsible=icon]:hidden">
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/assets"}>
-                            <Link href="/assets" className={pathname === "/assets" ? "text-foreground font-medium" : "text-muted"}>
-                              {t("List Items")}
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"}>
-                            <Link href="/assets/insert" className={pathname === "/assets/insert" ? "text-foreground font-medium" : "text-muted"}>
-                              {t("Add Item")}
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
+                      </>
                     )}
                   </SidebarMenuItem>
 
@@ -402,7 +462,7 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                  </SidebarMenu>
+                </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           )}
@@ -426,12 +486,11 @@ export function AppSidebar() {
           )}
         </SidebarContent>
 
-        {/* Footer - User Profile with dropdown */}
+        {/* Footer - User Profile */}
         <SidebarFooter className="border-t border-border/50 p-3 shrink-0">
-          {/* User card — click to toggle controls */}
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-card-alt transition-all group-data-[collapsible=icon]:justify-center"
+            className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-card-alt transition-all group-data-[collapsible=icon]:justify-center"
           >
             <UserAvatar
               fullName={currentUser.full_name}
@@ -457,33 +516,22 @@ export function AppSidebar() {
             </span>
           </button>
 
-          {/* Expandable user controls */}
           {showUserMenu && (
             <div className="space-y-2 pt-1 group-data-[collapsible=icon]:hidden">
-              {/* System Toggles */}
               <div className="grid grid-cols-2 gap-1.5">
-                {/* Theme Toggle */}
                 <button
                   onClick={toggleTheme}
-                  className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-[11px] font-medium transition-all"
+                  className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-[11px] font-medium transition-all"
                 >
                   {dark ? (
-                    <>
-                      <HiSun className="w-3.5 h-3.5 shrink-0" />
-                      Light
-                    </>
+                    <><HiSun className="w-3.5 h-3.5 shrink-0" /> Light</>
                   ) : (
-                    <>
-                      <HiMoon className="w-3.5 h-3.5 shrink-0" />
-                      Dark
-                    </>
+                    <><HiMoon className="w-3.5 h-3.5 shrink-0" /> Dark</>
                   )}
                 </button>
-
-                {/* Language Toggle */}
                 <button
                   onClick={toggleLang}
-                  className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-[11px] font-medium transition-all"
+                  className="flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border border-border bg-card hover:bg-card-alt text-muted hover:text-foreground text-[11px] font-medium transition-all"
                 >
                   <span className="font-bold text-[10px] shrink-0 leading-none">
                     {lang === "en" ? "EN" : "አማ"}
@@ -491,11 +539,9 @@ export function AppSidebar() {
                   {lang === "en" ? "English" : "አማርኛ"}
                 </button>
               </div>
-
-              {/* Sign Out Button */}
               <button
                 onClick={() => setShowConfirmLogout(true)}
-                className="w-full py-2 rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2 border border-danger/20 text-[11px] font-semibold uppercase tracking-wider shrink-0"
+                className="w-full py-2 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2 border border-danger/20 text-[11px] font-semibold uppercase tracking-wider shrink-0"
               >
                 <HiArrowRightOnRectangle className="w-3.5 h-3.5 shrink-0" />
                 <span>{t("Sign Out")}</span>
@@ -505,7 +551,7 @@ export function AppSidebar() {
         </SidebarFooter>
       </Sidebar>
 
-      {/* Logout Confirmation Backdrop & Modal */}
+      {/* Logout Confirmation Modal */}
       {showConfirmLogout && (
         <>
           <div
@@ -513,8 +559,8 @@ export function AppSidebar() {
             onClick={() => setShowConfirmLogout(false)}
           />
           <div className="fixed inset-0 z-70 flex items-center justify-center pointer-events-none p-4">
-            <div className="pointer-events-auto bg-card rounded-lg border border-border p-6 w-full max-w-sm flex flex-col items-center">
-              <div className="w-12 h-12 rounded-lg bg-danger/10 flex items-center justify-center text-danger mb-4 shrink-0">
+            <div className="pointer-events-auto bg-card rounded-xl border border-border p-6 w-full max-w-sm flex flex-col items-center">
+              <div className="w-12 h-12 rounded-xl bg-danger/10 flex items-center justify-center text-danger mb-4 shrink-0">
                 <HiArrowRightOnRectangle className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-foreground mb-1">{t("Sign Out")}</h3>
@@ -524,13 +570,13 @@ export function AppSidebar() {
               <div className="flex gap-3 w-full">
                 <button
                   onClick={() => setShowConfirmLogout(false)}
-                  className="flex-1 py-2.5 rounded-lg bg-card-alt border border-border text-foreground font-bold hover:bg-border transition-all text-xs active:scale-95"
+                  className="flex-1 py-2.5 rounded-xl bg-card-alt border border-border text-foreground font-bold hover:bg-border transition-all text-xs active:scale-95"
                 >
                   {t("Cancel")}
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="flex-1 py-2.5 rounded-lg bg-danger text-white font-bold hover:opacity-90 transition-all text-xs active:scale-95"
+                  className="flex-1 py-2.5 rounded-xl bg-danger text-white font-bold hover:opacity-90 transition-all text-xs active:scale-95"
                 >
                   {t("Sign Out")}
                 </button>

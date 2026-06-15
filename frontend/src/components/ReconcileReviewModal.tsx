@@ -35,7 +35,7 @@ export default function ReconcileReviewModal({
             animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
             exit={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 z-110 w-[calc(100%-2rem)] max-w-lg bg-card border-none rounded-[3rem] shadow-premium p-8 flex flex-col max-h-[85vh] overflow-hidden"
+            className="fixed left-1/2 top-1/2 z-110 w-[calc(100%-2rem)] max-w-lg bg-card border-none rounded-xl shadow-premium p-8 flex flex-col max-h-[85vh] overflow-hidden"
           >
             
             <header className="flex items-center justify-between mb-6">

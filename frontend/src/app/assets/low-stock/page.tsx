@@ -108,7 +108,7 @@ export default function LowStockPage() {
               <div key={i} className="h-32 bg-card-alt/20 animate-pulse rounded-4xl" />
             ))
           ) : itemData?.items.length === 0 ? (
-            <div className="py-24 text-center glass-card rounded-[3rem] border border-dashed border-border flex flex-col items-center gap-4">
+            <div className="py-24 text-center glass-card rounded-xl border border-dashed border-border flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-4xl bg-success/10 border border-success/20 flex items-center justify-center">
                 <HiOutlineInbox className="w-10 h-10 text-success" />
               </div>
@@ -125,7 +125,7 @@ export default function LowStockPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="group relative glass-card p-6 md:p-8 rounded-[2.5rem] border border-border/50 shadow-premium hover:shadow-massive hover:border-danger/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6"
+                  className="group relative glass-card p-6 md:p-8 rounded-xl border border-border/50 shadow-premium hover:shadow-massive hover:border-danger/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6"
                 >
                   <div className="flex items-center gap-6">
                     <div className="relative">

@@ -897,7 +897,7 @@ function PaymentRunProcessPageContent() {
 
         <div ref={sentinelRef} className="h-px w-full invisible" />
         <div 
-          className={`sticky bottom-10 md:bottom-8 flex flex-col p-6 rounded-[2.5rem] bg-card/80 backdrop-blur-xl shadow-massive border border-border/40 text-foreground z-30 transition-all duration-300 ease-in-out ${isFloating ? '-translate-y-1' : 'translate-y-0'}`}
+          className={`sticky bottom-10 md:bottom-8 flex flex-col p-6 rounded-xl bg-card/80 backdrop-blur-xl shadow-massive border border-border/40 text-foreground z-30 transition-all duration-300 ease-in-out ${isFloating ? '-translate-y-1' : 'translate-y-0'}`}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className={`flex items-center transition-all duration-300 ${isFloating ? 'gap-4' : 'gap-6'}`}>

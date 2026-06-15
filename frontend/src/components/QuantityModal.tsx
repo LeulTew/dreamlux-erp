@@ -48,7 +48,7 @@ export default function QuantityModal({
             animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
             exit={{ opacity: 0, scale: 0.95, x: "-50%", y: "-50%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 z-110 w-[calc(100%-2rem)] max-w-sm bg-card border-none rounded-[3rem] shadow-premium p-8"
+            className="fixed left-1/2 top-1/2 z-110 w-[calc(100%-2rem)] max-w-sm bg-card border-none rounded-xl shadow-premium p-8"
           >
             <button 
               onClick={onClose}

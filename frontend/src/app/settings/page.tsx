@@ -900,8 +900,8 @@ export default function SettingsPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-card w-full md:max-w-2xl rounded-t-3xl md:rounded-3xl shadow-premium border border-border/50 flex flex-col max-h-[95vh]">
-            <div className="p-5 border-b border-border/50 flex justify-between items-center bg-card-alt/30 rounded-t-3xl">
+          <div className="bg-card w-full md:max-w-2xl rounded-t-xl md:rounded-3xl shadow-premium border border-border/50 flex flex-col max-h-[95vh]">
+            <div className="p-5 border-b border-border/50 flex justify-between items-center bg-card-alt/30 rounded-t-xl">
               <h2 className="text-lg md:text-xl font-black text-foreground tracking-tight">
                 {selectedUser ? "Edit User" : "Add New User"}
               </h2>

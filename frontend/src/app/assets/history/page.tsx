@@ -792,7 +792,7 @@ function HistoryContent() {
             />
 
             <div className="fixed inset-0 z-90 flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
-              <div className="w-full max-w-md bg-card border border-border rounded-t-[2.5rem] md:rounded-4xl shadow-massive p-7 pointer-events-auto max-h-[90vh] overflow-y-auto">
+              <div className="w-full max-w-md bg-card border border-border rounded-t-xl md:rounded-4xl shadow-massive p-7 pointer-events-auto max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-center pt-1 pb-2 md:hidden">
                   <div className="w-12 h-1.5 rounded-full bg-border/60" />
                 </div>
@@ -860,7 +860,7 @@ function HistoryContent() {
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                 className={`fixed bg-card z-70 border-white/10 shadow-massive overflow-hidden flex flex-col ${
                   isMobile 
-                    ? "inset-x-0 bottom-0 top-[10%] rounded-t-[2.5rem] border-t" 
+                    ? "inset-x-0 bottom-0 top-[10%] rounded-t-xl border-t" 
                     : "right-0 top-0 bottom-0 w-full max-w-2xl border-l"
                 }`}
               >

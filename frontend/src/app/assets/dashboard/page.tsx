@@ -188,7 +188,7 @@ export default function InventoryDashboardPage() {
               exit={{ opacity: 0, y: -20 }}
               className="grid grid-cols-1 lg:grid-cols-2 gap-8"
             >
-              <div className="glass-card p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-border/50 shadow-premium flex flex-col group hover:border-primary/20 transition-all">
+              <div className="glass-card p-6 md:p-10 rounded-xl md:rounded-xl border border-border/50 shadow-premium flex flex-col group hover:border-primary/20 transition-all">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">Stock by Location</h2>
@@ -224,7 +224,7 @@ export default function InventoryDashboardPage() {
                 </div>
               </div>
 
-              <div className="glass-card p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-border/50 shadow-premium flex flex-col group hover:border-indigo-500/20 transition-all">
+              <div className="glass-card p-6 md:p-10 rounded-xl md:rounded-xl border border-border/50 shadow-premium flex flex-col group hover:border-indigo-500/20 transition-all">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">Location Share</h2>
@@ -266,7 +266,7 @@ export default function InventoryDashboardPage() {
                 </div>
               </div>
 
-              <section className="lg:col-span-2 glass-card p-6 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] border border-border/50 shadow-premium group hover:border-primary/20 transition-all">
+              <section className="lg:col-span-2 glass-card p-6 md:p-12 rounded-xl md:rounded-xl border border-border/50 shadow-premium group hover:border-primary/20 transition-all">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-4">
                     <div className="p-4 bg-primary/5 rounded-3xl text-primary border border-primary/10 shadow-soft">
@@ -318,7 +318,7 @@ export default function InventoryDashboardPage() {
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.02 }}
-              className="glass-card p-12 rounded-[3.5rem] border border-border/50 shadow-premium"
+              className="glass-card p-12 rounded-xl border border-border/50 shadow-premium"
             >
               <div className="flex items-center gap-6 mb-12">
                 <div className="p-5 bg-success/5 rounded-4xl text-success border border-success/10 shadow-soft">
@@ -377,7 +377,7 @@ export default function InventoryDashboardPage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="glass-card p-12 rounded-[3.5rem] border border-border/50 shadow-premium"
+              className="glass-card p-12 rounded-xl border border-border/50 shadow-premium"
             >
               <div className="flex items-center gap-6 mb-12">
                 <div className="p-5 bg-amber-500/5 rounded-4xl text-amber-500 border border-amber-500/10 shadow-soft">

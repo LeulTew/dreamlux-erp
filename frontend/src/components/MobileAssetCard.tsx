@@ -12,7 +12,7 @@ export default function MobileAssetCard({ item, onEdit, onDelete }: Props) {
   const isLowStock = item.quantity <= 5;
 
   return (
-    <div className="w-full flex items-center gap-5 p-5 rounded-[2.5rem] bg-card border border-border/50 shadow-premium group active:scale-[0.98] transition-all text-left">
+    <div className="w-full flex items-center gap-5 p-5 rounded-xl bg-card border border-border/50 shadow-premium group active:scale-[0.98] transition-all text-left">
       {/* Thumbnail */}
       <div className="relative shrink-0">
         {item.image_url ? (

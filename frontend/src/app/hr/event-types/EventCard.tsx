@@ -51,7 +51,7 @@ export default function EventCard({
   return (
     <motion.div 
       layout
-      className="bg-card rounded-[2.5rem] border border-border/60 flex flex-col shadow-premium relative group overflow-hidden transition-all duration-500 hover:shadow-2xl hover:border-primary/30 h-full"
+      className="bg-card rounded-xl border border-border/60 flex flex-col shadow-premium relative group overflow-hidden transition-all duration-500 hover:shadow-2xl hover:border-primary/30 h-full"
     >
       {/* Visual Flair */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[4rem] z-0 pointer-events-none group-hover:bg-primary/10 transition-colors" />

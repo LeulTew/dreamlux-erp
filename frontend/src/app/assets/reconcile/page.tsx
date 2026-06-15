@@ -473,7 +473,7 @@ export default function ReconcilePage() {
           <motion.div 
             initial={{ y: 100 }}
             animate={{ y: 0 }}
-            className="bg-card/95 backdrop-blur-3xl border border-white/20 shadow-massive rounded-[2.5rem] p-3 md:p-4 flex flex-col md:flex-row items-center gap-2 md:gap-4"
+            className="bg-card/95 backdrop-blur-3xl border border-white/20 shadow-massive rounded-xl p-3 md:p-4 flex flex-col md:flex-row items-center gap-2 md:gap-4"
           >
             <div className="flex-1 flex items-center justify-around md:justify-start md:gap-8 w-full md:w-auto px-1 md:px-4">
               <div className="flex flex-col items-center md:items-start leading-tight">
@@ -530,7 +530,7 @@ export default function ReconcilePage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 className="fixed inset-0 z-90 flex items-center justify-center p-4 pointer-events-none"
               >
-                <div className="bg-card w-full max-w-lg rounded-[3.5rem] border border-border/50 shadow-massive p-10 pointer-events-auto text-center relative overflow-hidden">
+                <div className="bg-card w-full max-w-lg rounded-xl border border-border/50 shadow-massive p-10 pointer-events-auto text-center relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-success via-primary to-primary" />
                   
                   <div className="w-24 h-24 rounded-full bg-success/10 border border-success/20 flex items-center justify-center mx-auto mb-8 shadow-premium">

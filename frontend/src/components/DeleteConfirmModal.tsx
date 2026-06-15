@@ -46,7 +46,7 @@ export default function DeleteConfirmModal({
             }}
             exit={{ y: "100%", x: "-50%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed z-110 bottom-0 left-1/2 right-auto md:top-1/2 md:bottom-auto w-full md:max-w-sm bg-card border-none rounded-t-[2.5rem] md:rounded-[3rem] shadow-premium p-8"
+            className="fixed z-110 bottom-0 left-1/2 right-auto md:top-1/2 md:bottom-auto w-full md:max-w-sm bg-card border-none rounded-t-xl md:rounded-xl shadow-premium p-8"
           >
             <button 
               onClick={onClose}
@@ -56,7 +56,7 @@ export default function DeleteConfirmModal({
             </button>
 
             <div className="flex flex-col items-center text-center space-y-4 pt-4 md:pt-0">
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-2 shadow-inner ${isDanger ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+              <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-2 shadow-inner ${isDanger ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                 <HiExclamationTriangle className="w-8 h-8" />
               </div>
 
@@ -72,14 +72,14 @@ export default function DeleteConfirmModal({
                 <button
                   onClick={onConfirm}
                   disabled={isDeleting}
-                  className={`w-full py-4 text-white rounded-3xl font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
+                  className={`w-full py-4 text-white rounded-xl font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
                 >
                   {isDeleting ? (isDanger ? "Deleting..." : "Restoring...") : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
                 </button>
                 <button
                   onClick={onClose}
                   disabled={isDeleting}
-                  className="w-full py-4 bg-card-alt text-foreground border border-border rounded-3xl font-black uppercase tracking-[0.2em] shadow-sm hover:bg-border active:scale-95 transition-all disabled:opacity-50"
+                  className="w-full py-4 bg-card-alt text-foreground border border-border rounded-xl font-black uppercase tracking-[0.2em] shadow-sm hover:bg-border active:scale-95 transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>

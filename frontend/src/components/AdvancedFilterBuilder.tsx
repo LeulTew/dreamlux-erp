@@ -96,10 +96,10 @@ export default function AdvancedFilterBuilder({ fields, rules, onChange }: Advan
                 y: (typeof window !== 'undefined' && window.innerWidth >= 768) ? "-50%" : "100%"
               }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="absolute bottom-0 md:bottom-auto left-1/2 md:top-1/2 w-full md:max-w-5xl bg-card rounded-t-[2.5rem] md:rounded-5xl max-h-[90vh] md:max-h-[min(90vh,900px)] overflow-y-auto border border-border/60 shadow-massive pb-10 md:pb-0"
+              className="absolute bottom-0 md:bottom-auto left-1/2 md:top-1/2 w-full md:max-w-5xl bg-card rounded-t-xl md:rounded-xl max-h-[90vh] md:max-h-[min(90vh,900px)] overflow-y-auto border border-border/60 shadow-massive pb-10 md:pb-0"
             >
-              <div className="bg-card p-6 md:p-8 rounded-[2.5rem] border border-border/60 shadow-inner flex flex-col gap-4 mb-4 relative">
-                <div className="absolute inset-0 bg-primary/1 pointer-events-none rounded-[2.5rem]" />
+              <div className="bg-card p-6 md:p-8 rounded-xl border border-border/60 shadow-inner flex flex-col gap-4 mb-4 relative">
+                <div className="absolute inset-0 bg-primary/1 pointer-events-none rounded-xl" />
                 
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="text-xs font-black uppercase text-primary tracking-widest">Filter System</h2>

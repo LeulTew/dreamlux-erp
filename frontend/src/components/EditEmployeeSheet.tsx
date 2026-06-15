@@ -267,9 +267,9 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         title="Edit Employee"
         subtitle={`Updating ${employee.full_name}`}
       >
-        <form onSubmit={handleSubmit} className="space-y-8 pb-12">
+        <form onSubmit={handleSubmit} className="space-y-6 pb-12">
           {/* Profile Photo */}
-          <div className="flex flex-col items-center gap-3 bg-card-alt/30 p-4 rounded-3xl border border-border/50">
+          <div className="flex flex-col items-center gap-3 bg-card-alt/30 p-4 rounded-xl border border-border/50">
              <div className="relative group">
                 <div 
                   className={`relative w-24 h-24 rounded-full border-4 border-dashed overflow-hidden flex items-center justify-center transition-all bg-card-alt ${
@@ -335,7 +335,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                    input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "front");
                    input.click();
                  }}
-                 className="relative aspect-[1.6/1] rounded-2xl border-2 border-dashed border-border overflow-hidden cursor-pointer bg-card-alt/50 hover:border-primary/30 transition-all"
+                 className="relative aspect-[1.6/1] rounded-xl border-2 border-dashed border-border overflow-hidden cursor-pointer bg-card-alt/50 hover:border-primary/30 transition-all"
                >
                  {frontPreview ? (
                    <Image src={frontPreview} alt="Front" fill className="object-cover" unoptimized />
@@ -358,7 +358,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                    input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "back");
                    input.click();
                  }}
-                 className="relative aspect-[1.6/1] rounded-2xl border-2 border-dashed border-border overflow-hidden cursor-pointer bg-card-alt/50 hover:border-primary/30 transition-all"
+                 className="relative aspect-[1.6/1] rounded-xl border-2 border-dashed border-border overflow-hidden cursor-pointer bg-card-alt/50 hover:border-primary/30 transition-all"
                >
                  {backPreview ? (
                    <Image src={backPreview} alt="Back" fill className="object-cover" unoptimized />
@@ -372,7 +372,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
              </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase text-muted mb-1 px-1">Full Name *</label>
               <input
@@ -399,7 +399,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               {formErrors.employee_id && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.employee_id}</p>}
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold uppercase text-muted px-1">Department</label>
                 <div className="flex gap-2">
@@ -434,7 +434,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 md:col-span-2">
               <label className="block text-[10px] font-bold uppercase text-muted px-1">Office / Branch</label>
               <Select
                 options={stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []}
@@ -444,7 +444,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 md:col-span-2">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold uppercase text-muted px-1">Phone</label>
                 <div className="relative">
@@ -475,7 +475,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 pt-2">
+            <div className="grid grid-cols-1 gap-4 pt-2 md:col-span-2">
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold uppercase text-muted px-1">Base Salary</label>
                 <Select
@@ -495,7 +495,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               </div>
             </div>
 
-             <div className="pt-6 space-y-4">
+             <div className="pt-6 space-y-4 md:col-span-2">
               <div className="flex items-center gap-2 px-1">
                 <HiPlus className="w-5 h-5 text-primary" />
                 <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Event Rates</h3>
@@ -506,7 +506,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {eventTypes.map((et) => (
-                  <div key={et.id} className="bg-card-alt p-3.5 rounded-2xl border border-border flex flex-col gap-2.5 group hover:border-primary/30 transition-all shadow-premium-sm">
+                  <div key={et.id} className="bg-card-alt p-3.5 rounded-xl border border-border flex flex-col gap-2.5 group hover:border-primary/30 transition-all shadow-premium-sm">
                     <div className="flex justify-between items-center">
                       <span className="text-[11px] text-foreground font-bold uppercase tracking-wider truncate mr-2" title={et.event_name}>{et.event_name}</span>
                       <span className="text-[9px] text-muted font-black uppercase tracking-tight shrink-0">ETB</span>
@@ -535,11 +535,11 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             </div>
           </div>
 
-          <div className="flex gap-3 mt-4">
+          <div className="flex gap-3 mt-4 md:col-span-2">
             <button
               type="submit"
               disabled={updateMutation.isPending}
-              className="flex-1 py-4 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+              className="flex-1 py-4 rounded-xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
             >
               {updateMutation.isPending ? "Updating..." : "Save Changes"}
             </button>
@@ -547,7 +547,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               type="button"
               disabled={deleteMutation.isPending}
               onClick={() => setShowDeleteModal(true)}
-              className="w-14 h-14 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-premium group"
+              className="w-14 h-14 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-premium group"
               title="Delete Permanently"
             >
               <HiTrash className="w-6 h-6 group-hover:scale-110 transition-transform" />
