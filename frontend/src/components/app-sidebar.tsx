@@ -15,6 +15,7 @@ import {
   HiChevronDown,
   HiChevronUp,
   HiMagnifyingGlass,
+  HiChevronLeft,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
@@ -138,7 +139,7 @@ function PopoutLink({ href, label, active }: { href: string; label: string; acti
 export function AppSidebar() {
   const pathname = usePathname();
   const { lang } = useLanguage();
-  const { state: sidebarState } = useSidebar();
+  const { state: sidebarState, toggleSidebar } = useSidebar();
   const isCollapsed = sidebarState === "collapsed";
 
   // Collapsible sub-menus state
@@ -201,21 +202,37 @@ export function AppSidebar() {
   return (
     <Sidebar 
       collapsible="icon" 
-      className="border-r border-border bg-sidebar [&_[data-sidebar=sidebar]]:rounded-r-2xl [&_[data-sidebar=sidebar]]:border-y [&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-border/50 [&_[data-sidebar=sidebar]]:my-3 [&_[data-sidebar=sidebar]]:h-[calc(100vh-24px)] [&_[data-sidebar=sidebar]]:shadow-sm"
+      className="border-none bg-transparent [&_[data-sidebar=sidebar]]:border-none [&_[data-sidebar=sidebar]]:bg-transparent [&_[data-sidebar=sidebar]]:shadow-none"
     >
-      {/* Header - Logo */}
-      <SidebarHeader className="py-5 px-5 flex flex-row items-center gap-3 select-none">
-        <div className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center text-background font-black text-base shrink-0">
-          D
+      {/* Header - Logo & Collapse Toggle */}
+      <SidebarHeader className="py-5 px-4 flex flex-row items-center justify-between select-none">
+        <div className="flex items-center gap-3 truncate">
+          <button
+            onClick={toggleSidebar}
+            className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center text-background font-black text-base shrink-0 hover:opacity-90 transition-all cursor-pointer active:scale-95 shadow-md border border-border/10"
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            D
+          </button>
+          <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden animate-fade-in">
+            <span className="font-black tracking-tight text-foreground text-sm leading-tight">
+              Dream Lux
+            </span>
+            <span className="text-[9px] text-muted font-medium tracking-widest uppercase leading-none mt-0.5">
+              ERP System
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
-          <span className="font-black tracking-tight text-foreground text-sm leading-tight">
-            Dream Lux
-          </span>
-          <span className="text-[9px] text-muted font-medium tracking-widest uppercase leading-none mt-0.5">
-            ERP System
-          </span>
-        </div>
+        
+        {!isCollapsed && (
+          <button
+            onClick={toggleSidebar}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-card-alt transition-all cursor-pointer shrink-0"
+            title="Collapse Sidebar"
+          >
+            <HiChevronLeft className="w-4 h-4" />
+          </button>
+        )}
       </SidebarHeader>
 
       {/* Search Bar */}
