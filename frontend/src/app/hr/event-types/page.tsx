@@ -12,8 +12,44 @@ import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import EventCard from "./EventCard";
 import { packMasonry } from "@/lib/masonry-engine";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Event Payments": "Event Payments",
+    "Professional Rate Engine": "Professional Rate Engine",
+    "TRASH": "TRASH",
+    "CANCEL": "CANCEL",
+    "ADD EVENT": "ADD EVENT",
+    "New Event Setup": "New Event Setup",
+    "Event Name": "Event Name",
+    "Description": "Description",
+    "CREATE EVENT": "CREATE EVENT",
+    "Computing Layout...": "Computing Layout...",
+    "Nothing here yet. Add an event above.": "Nothing here yet. Add an event above.",
+    "Move to Trash": "Move to Trash",
+    "Are you sure you want to soft-delete this event type?": "Are you sure you want to soft-delete this event type? It will be moved to the trash and can be restored later."
+  },
+  am: {
+    "Event Payments": "የክስተት ክፍያዎች",
+    "Professional Rate Engine": "የደረጃ ማስላት ሞተር",
+    "TRASH": "ቆሻሻ መጣያ",
+    "CANCEL": "ሰርዝ",
+    "ADD EVENT": "አዲስ ክስተት",
+    "New Event Setup": "አዲስ የክስተት መዋቅር",
+    "Event Name": "የክስተት ስም",
+    "Description": "መግለጫ",
+    "CREATE EVENT": "ክስተት ፍጠር",
+    "Computing Layout...": "አቀማመጥ በመስራት ላይ...",
+    "Nothing here yet. Add an event above.": "እስካሁን ምንም ነገር የለም። ከላይ ክስተት ይጨምሩ።",
+    "Move to Trash": "ወደ መጣያ ውሰድ",
+    "Are you sure you want to soft-delete this event type?": "ይህንን የክስተት አይነት ወደ መጣያ ለመውሰድ እርግጠኛ ነዎት? በኋላ መልሰው ሊያገኟቸው ይችላሉ።"
+  }
+};
 
 export default function EventTypesPage() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
@@ -114,15 +150,15 @@ export default function EventTypesPage() {
       <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
           <div>
-            <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-foreground">Event Payments</h1>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1 pl-1">Professional Rate Engine</p>
+            <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-foreground">{t("Event Payments")}</h1>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1 pl-1">{t("Professional Rate Engine")}</p>
           </div>
           <div className="flex gap-3 sm:gap-4 w-full sm:w-auto">
             <Link 
               href="/hr/event-types/trash" 
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-danger/10 text-danger rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-danger/20 transition-all shadow-sm border border-danger/20"
             >
-              <HiOutlineTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> TRASH
+              <HiOutlineTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t("TRASH")}
             </Link>
             <button 
               onClick={() => setShowAddForm(!showAddForm)}
@@ -131,9 +167,9 @@ export default function EventTypesPage() {
               }`}
             >
               {showAddForm ? (
-                <><HiXMark className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">CANCEL</span><span className="sm:hidden">X</span></>
+                <><HiXMark className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">{t("CANCEL")}</span><span className="sm:hidden">X</span></>
               ) : (
-                <><HiPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">ADD EVENT</span><span className="sm:hidden">ADD</span></>
+                <><HiPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">{t("ADD EVENT")}</span><span className="sm:hidden">ADD</span></>
               )}
             </button>
           </div>
@@ -151,14 +187,14 @@ export default function EventTypesPage() {
                 <div className="relative z-10 mb-6">
                   <h2 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
                     <HiPlus className="w-5 h-5 text-primary/40" />
-                    New Event Setup
+                    {t("New Event Setup")}
                   </h2>
                 </div>
 
                 <form onSubmit={handleCreateSubmit} className="relative z-10 flex flex-col gap-8">
                   <div className="flex gap-6 items-end flex-wrap">
                     <div className="flex-2 min-w-70">
-                      <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">Event Name</label>
+                      <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">{t("Event Name")}</label>
                       <input 
                         type="text" required value={form.event_name} 
                         onChange={e => setForm({...form, event_name: e.target.value})} 
@@ -167,7 +203,7 @@ export default function EventTypesPage() {
                       />
                     </div>
                     <div className="flex-3 min-w-70">
-                      <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">Description</label>
+                      <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">{t("Description")}</label>
                       <input 
                         type="text" value={form.description} 
                         onChange={e => setForm({...form, description: e.target.value})} 
@@ -180,7 +216,7 @@ export default function EventTypesPage() {
                       disabled={createMut.isPending}
                       className="px-10 py-3.5 h-12 rounded-2xl bg-primary text-on-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary-dark shadow-lg shadow-primary/20 active:scale-95 disabled:opacity-50"
                     >
-                      CREATE EVENT
+                      {t("CREATE EVENT")}
                     </button>
                   </div>
                 </form>
@@ -191,9 +227,9 @@ export default function EventTypesPage() {
 
         <div className="relative min-h-100">
           {isLoading ? (
-            <div className="p-20 text-center text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground animate-pulse">Computing Layout...</div>
+            <div className="p-20 text-center text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground animate-pulse">{t("Computing Layout...")}</div>
           ) : events?.length === 0 ? (
-             <div className="p-20 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground bg-card rounded-xl border-2 border-border border-dashed shadow-inner">Nothing here yet. Add an event above.</div>
+             <div className="p-20 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground bg-card rounded-xl border-2 border-border border-dashed shadow-inner">{t("Nothing here yet. Add an event above.")}</div>
           ) : (
             <div style={{ height: masonryResult.containerHeight, position: "relative" }}>
               <AnimatePresence mode="popLayout">
@@ -232,8 +268,8 @@ export default function EventTypesPage() {
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={() => deleteId && deleteMut.mutate(deleteId)}
-        title="Move to Trash"
-        message="Are you sure you want to soft-delete this event type? It will be moved to the trash and can be restored later."
+        title={t("Move to Trash")}
+        message={t("Are you sure you want to soft-delete this event type?")}
         itemName={activeDeleteEvent?.event_name ?? ""}
         isDeleting={deleteMut.isPending}
       />

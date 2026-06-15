@@ -31,6 +31,78 @@ import PrintOptionsModal from "@/components/PrintOptionsModal";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Employees": "Employees",
+    "Deleted Records": "Deleted Records",
+    "Total Records": "Total Records",
+    "Search": "Search...",
+    "All Offices": "All Offices",
+    "All Depts": "All Depts",
+    "Sort: Salary": "Sort: Salary",
+    "Sort: Name": "Sort: Name",
+    "Sort: Recent": "Sort: Recent",
+    "Exit Trash": "Exit Trash",
+    "Trash": "Trash",
+    "Add Employee": "Add Employee",
+    "Quick Edit": "Quick Edit",
+    "Done": "Done",
+    "Select": "Select",
+    "Export": "Export",
+    "Choose Format": "Choose Format",
+    "CSV Spreadsheet": "CSV Spreadsheet",
+    "Excel Workbook": "Excel Workbook",
+    "PDF Report": "PDF Report",
+    "Photo": "Photo",
+    "Employee Name": "Employee Name",
+    "ID": "ID",
+    "Department": "Department",
+    "Base Salary": "Base Salary",
+    "Actions": "Actions",
+    "Restore": "Restore",
+    "Trash is empty": "Trash is empty",
+    "No employees found": "No employees found",
+    "Loading Dashboard...": "Loading Dashboard...",
+    "Selected": "Selected",
+    "Delete": "Delete"
+  },
+  am: {
+    "Employees": "ሰራተኞች",
+    "Deleted Records": "የጠፉ መዝገቦች",
+    "Total Records": "ጠቅላላ መዝገቦች",
+    "Search": "ፈልግ...",
+    "All Offices": "ሁሉም ቢሮዎች",
+    "All Depts": "ሁሉም ክፍሎች",
+    "Sort: Salary": "በደመወዝ ደድርግ",
+    "Sort: Name": "በስም ደድርግ",
+    "Sort: Recent": "በቅርብ ጊዜ ደድርግ",
+    "Exit Trash": "ከቆሻሻ መውጫ",
+    "Trash": "ቆሻሻ መጣያ",
+    "Add Employee": "ሰራተኛ መዝግብ",
+    "Quick Edit": "ፈጣን ማስተካከያ",
+    "Done": "አጠናቅቅ",
+    "Select": "ምረጥ",
+    "Export": "ላክ",
+    "Choose Format": "ቅርጸት ይምረጡ",
+    "CSV Spreadsheet": "CSV ሰንጠረዥ",
+    "Excel Workbook": "Excel ሰንጠረዥ",
+    "PDF Report": "PDF ሪፖርት",
+    "Photo": "ፎቶ",
+    "Employee Name": "የሰራተኛው ስም",
+    "ID": "መታወቂያ",
+    "Department": "ክፍል",
+    "Base Salary": "መሰረታዊ ደመወዝ",
+    "Actions": "ክንውኖች",
+    "Restore": "መልስ",
+    "Trash is empty": "የቆሻሻ መጣያው ባዶ ነው",
+    "No employees found": "ምንም ሰራተኛ አልተገኘም",
+    "Loading Dashboard...": "ሰራተኞች በመጫን ላይ...",
+    "Selected": "ተመርጧል",
+    "Delete": "ሰርዝ"
+  }
+};
 
 const columnHelper = createColumnHelper<Employee>();
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -51,6 +123,7 @@ function buildColumns(
   toggleAll: () => void,
   singleDelete: (id: string) => void,
   selectMode: boolean,
+  t: (key: string) => string,
 ) {
   const cols = [];
 
@@ -90,7 +163,7 @@ function buildColumns(
     }),
     columnHelper.display({
       id: "image",
-      header: "Photo",
+      header: t("Photo"),
       cell: ({ row }) => (
         <ImageCell src={row.original.profile_photo_url} alt={row.original.full_name} />
       ),
@@ -100,7 +173,7 @@ function buildColumns(
 
   cols.push(
     columnHelper.accessor("full_name", {
-      header: "Employee Name",
+      header: t("Employee Name"),
       cell: ({ row, getValue }) =>
         editMode ? (
           <input
@@ -121,7 +194,7 @@ function buildColumns(
       size: 200,
     }),
     columnHelper.accessor("employee_id", {
-      header: "ID",
+      header: t("ID"),
       cell: ({ row, getValue }) =>
         editMode ? (
           <input
@@ -142,7 +215,7 @@ function buildColumns(
       size: 120,
     }),
     columnHelper.accessor("department", {
-      header: "Department",
+      header: t("Department"),
       cell: ({ row, getValue }) =>
         editMode ? (
           <input
@@ -159,7 +232,7 @@ function buildColumns(
         ),
     }),
     columnHelper.accessor("salary_level", {
-      header: "Base Salary",
+      header: t("Base Salary"),
       cell: ({ row, getValue }) =>
         editMode ? (
           <Select
@@ -187,7 +260,7 @@ function buildColumns(
     }),
     columnHelper.display({
       id: "actions",
-      header: () => <div className="text-right">Actions</div>,
+      header: () => <div className="text-right">{t("Actions")}</div>,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1.5">
           {showTrash ? (
@@ -198,7 +271,7 @@ function buildColumns(
                 title="Restore Employee"
               >
                 <HiArrowUturnLeft className="w-3.5 h-3.5" />
-                Restore
+                {t("Restore")}
               </button>
               {!selectMode && (
                 <button
@@ -239,6 +312,8 @@ function buildColumns(
 
 
 function EmployeesPageContent() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -423,8 +498,8 @@ function EmployeesPageContent() {
   };
 
   const columns = useMemo(
-    () => buildColumns(editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length > 0 && selectedIds.size === employees.length, toggleAll, handleSinglePermanentDelete, selectMode),
-    [editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length, toggleAll, selectMode],
+    () => buildColumns(editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length > 0 && selectedIds.size === employees.length, toggleAll, handleSinglePermanentDelete, selectMode, t),
+    [editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length, toggleAll, selectMode, t],
   );
 
   const table = useReactTable({
@@ -443,10 +518,10 @@ function EmployeesPageContent() {
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
-              Employees
+              {t("Employees")}
             </h1>
             <p className="text-xs md:text-sm text-muted font-medium">
-              {total} {showTrash ? "Deleted Records" : "Total Records"}
+              {total} {showTrash ? t("Deleted Records") : t("Total Records")}
             </p>
           </div>
         </div>
@@ -456,7 +531,7 @@ function EmployeesPageContent() {
              <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
              <input
                 type="text"
-                placeholder="Search..."
+                placeholder={t("Search")}
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 className="w-full pl-10 pr-4 h-11 rounded-xl bg-card-alt border border-border/20 focus:ring-2 focus:ring-primary/20 transition-all text-sm outline-none shadow-sm"
@@ -465,7 +540,7 @@ function EmployeesPageContent() {
 
           <Select
             options={[
-              { id: "all", label: "All Offices" },
+              { id: "all", label: t("All Offices") },
               ...(stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []),
             ]}
             value={officeId}
@@ -475,7 +550,7 @@ function EmployeesPageContent() {
 
           <Select
             options={[
-              { id: "all", label: "All Depts" },
+              { id: "all", label: t("All Depts") },
               ...(departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []),
             ]}
             value={departmentId}
@@ -485,9 +560,9 @@ function EmployeesPageContent() {
 
           <Select
             options={[
-              { id: "salary", label: "Sort: Salary" },
-              { id: "name", label: "Sort: Name" },
-              { id: "date", label: "Sort: Recent" },
+              { id: "salary", label: t("Sort: Salary") },
+              { id: "name", label: t("Sort: Name") },
+              { id: "date", label: t("Sort: Recent") },
             ]}
             value={sortBy}
             onChange={(val) => { setSortBy(val); setPage(1); }}
@@ -509,7 +584,7 @@ function EmployeesPageContent() {
             }`}
           >
             <HiTrash className="w-4 h-4" />
-            {showTrash ? "Exit Trash" : "Trash"}
+            {showTrash ? t("Exit Trash") : t("Trash")}
           </button>
 
           {!showTrash && (
@@ -518,7 +593,7 @@ function EmployeesPageContent() {
               className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-sm font-semibold bg-primary text-background shadow-sm hover:opacity-90 active:scale-[0.98] transition-all"
             >
               <HiPlus className="w-4 h-4" />
-              Add Employee
+              {t("Add Employee")}
             </button>
           )}
 
@@ -530,7 +605,7 @@ function EmployeesPageContent() {
               }`}
             >
               <HiPencilSquare className="w-4 h-4" />
-              {editMode ? "Done" : "Quick Edit"}
+              {editMode ? t("Done") : t("Quick Edit")}
             </button>
           )}
 
@@ -548,7 +623,7 @@ function EmployeesPageContent() {
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                 </svg>
-                {selectMode ? `${selectedIds.size} Selected` : "Select"}
+                {selectMode ? `${selectedIds.size} ${t("Selected")}` : t("Select")}
               </button>
               {selectMode && selectedIds.size > 0 && (
                 <button
@@ -556,7 +631,7 @@ function EmployeesPageContent() {
                   className="flex items-center gap-1.5 h-11 px-4 rounded-xl bg-red-600 text-white text-sm font-semibold shadow-sm hover:bg-red-700 active:scale-95 transition-all"
                 >
                   <HiTrash className="w-4 h-4" />
-                  Delete {selectedIds.size}
+                  {t("Delete")} {selectedIds.size}
                 </button>
               )}
             </>
@@ -569,50 +644,50 @@ function EmployeesPageContent() {
                 className={`flex items-center gap-2 h-11 px-4 rounded-xl text-sm font-semibold transition-all border ${exportMenuOpen ? "bg-primary text-on-primary border-primary" : "bg-card-alt text-foreground border-border hover:bg-border/50"}`}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                Export
+                {t("Export")}
                 <svg className={`w-3.5 h-3.5 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
               </button>
               <AnimatePresence>
                 {exportMenuOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 4, scale: 0.96 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 mt-2 w-40 bg-card border border-border rounded-xl shadow-premium overflow-hidden z-50 flex flex-col text-foreground"
-                    >
-                      <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">Choose Format</div>
-                      <button
-                        onClick={() => { handleExportCSV(); setExportMenuOpen(false); }}
-                        disabled={exportingCSV}
-                        className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full disabled:opacity-50 font-semibold text-foreground"
-                      >
-                        <svg className="w-4 h-4 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0 1 18 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0 1 18 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 0 1 6 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-9.75 0h9.75" /></svg>
-                        {exportingCSV ? "Exporting…" : "CSV Spreadsheet"}
-                      </button>
-                      <button
-                        onClick={() => { handleExportExcel(); setExportMenuOpen(false); }}
-                        disabled={exportingExcel}
-                        className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border disabled:opacity-50 font-semibold text-foreground"
-                      >
-                        <svg className="w-4 h-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                        {exportingExcel ? "Exporting…" : "Excel Workbook"}
-                      </button>
-                      <button
-                        onClick={() => { setIsPrintModalOpen(true); setExportMenuOpen(false); }}
-                        className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border font-semibold text-foreground"
-                      >
-                        <svg className="w-4 h-4 text-rose-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                        PDF Report
-                      </button>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+                     <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
+                     <motion.div
+                       initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                       animate={{ opacity: 1, y: 0, scale: 1 }}
+                       exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                       transition={{ duration: 0.15 }}
+                       className="absolute right-0 mt-2 w-40 bg-card border border-border rounded-xl shadow-premium overflow-hidden z-50 flex flex-col text-foreground"
+                     >
+                       <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">{t("Choose Format")}</div>
+                       <button
+                         onClick={() => { handleExportCSV(); setExportMenuOpen(false); }}
+                         disabled={exportingCSV}
+                         className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full disabled:opacity-50 font-semibold text-foreground"
+                       >
+                         <svg className="w-4 h-4 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0 1 18 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0 1 18 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 0 1 6 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-9.75 0h9.75" /></svg>
+                         {exportingCSV ? "Exporting…" : t("CSV Spreadsheet")}
+                       </button>
+                       <button
+                         onClick={() => { handleExportExcel(); setExportMenuOpen(false); }}
+                         disabled={exportingExcel}
+                         className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border disabled:opacity-50 font-semibold text-foreground"
+                       >
+                         <svg className="w-4 h-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                         {exportingExcel ? "Exporting…" : t("Excel Workbook")}
+                       </button>
+                       <button
+                         onClick={() => { setIsPrintModalOpen(true); setExportMenuOpen(false); }}
+                         className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border font-semibold text-foreground"
+                       >
+                         <svg className="w-4 h-4 text-rose-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                         {t("PDF Report")}
+                       </button>
+                     </motion.div>
+                   </>
+                 )}
+               </AnimatePresence>
+             </div>
+           )}
 
         </div>
       </header>
@@ -662,7 +737,7 @@ function EmployeesPageContent() {
         <div className="flex flex-col items-center justify-center py-20 bg-card rounded-3xl border border-dashed border-border text-center px-4">
           <HiExclamationTriangle className="w-16 h-16 text-muted mb-4 opacity-10" />
           <h3 className="text-lg font-bold text-foreground opacity-50">
-            {showTrash ? "Trash is empty" : "No employees found"}
+            {showTrash ? t("Trash is empty") : t("No employees found")}
           </h3>
         </div>
       ) : (
@@ -747,7 +822,7 @@ function EmployeesPageContent() {
 
 export default function EmployeesPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-muted-foreground animate-pulse text-xs font-semibold uppercase tracking-wider">Loading Dashboard...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground animate-pulse text-xs font-semibold uppercase tracking-wider">Loading Dashboard... / በመጫን ላይ...</div>}>
       <EmployeesPageContent />
     </Suspense>
   );

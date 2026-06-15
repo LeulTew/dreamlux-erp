@@ -5,6 +5,24 @@ import { EventType } from "@/lib/types";
 import { HiOutlineTrash, HiPencilSquare, HiCheck, HiXMark } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Metadata": "Metadata",
+    "Event Name": "Event Name",
+    "Description": "Description",
+    "Optional description...": "Optional description...",
+    "SAVE": "SAVE"
+  },
+  am: {
+    "Metadata": "ተጨማሪ መረጃ",
+    "Event Name": "የክስተት ስም",
+    "Description": "መግለጫ",
+    "Optional description...": "አማራጭ መግለጫ...",
+    "SAVE": "አስቀምጥ"
+  }
+};
 
 interface EventCardProps {
   event: EventType;
@@ -23,6 +41,8 @@ export default function EventCard({
   isEditing,
   onEditStateChange 
 }: EventCardProps) {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const [editForm, setEditForm] = React.useState({
     event_name: event.event_name,
     description: event.description || ""
@@ -83,7 +103,7 @@ export default function EventCard({
 
               <div className="mt-auto pt-6 border-t border-border/40 flex justify-between items-center">
                 <div className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">
-                  Metadata
+                  {t("Metadata")}
                 </div>
                 <div className="flex gap-3">
                   <button 
@@ -112,7 +132,7 @@ export default function EventCard({
               className="flex flex-col gap-4"
             >
               <div>
-                <label className="block text-[10px] font-black uppercase text-muted-foreground mb-2 tracking-widest leading-none">Event Name</label>
+                <label className="block text-[10px] font-black uppercase text-muted-foreground mb-2 tracking-widest leading-none">{t("Event Name")}</label>
                 <input 
                   type="text" 
                   value={editForm.event_name}
@@ -122,13 +142,13 @@ export default function EventCard({
               </div>
 
               <div>
-                <label className="block text-[10px] font-black uppercase text-muted-foreground mb-2 tracking-widest leading-none">Description</label>
+                <label className="block text-[10px] font-black uppercase text-muted-foreground mb-2 tracking-widest leading-none">{t("Description")}</label>
                 <textarea 
                   value={editForm.description}
                   onChange={e => setEditForm({ ...editForm, description: e.target.value })}
                   className="w-full px-4 py-2 bg-card-alt border border-border/80 rounded-xl text-xs font-medium outline-none focus:border-primary/50 text-foreground resize-none"
                   rows={4}
-                  placeholder="Optional description..."
+                  placeholder={t("Optional description...")}
                 />
               </div>
 
@@ -138,7 +158,7 @@ export default function EventCard({
                   disabled={isUpdating}
                   className="flex-1 py-3 bg-primary text-on-primary rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <HiCheck className="w-4 h-4" /> SAVE
+                  <HiCheck className="w-4 h-4" /> {t("SAVE")}
                 </button>
                 <button 
                   onClick={handleCancel}

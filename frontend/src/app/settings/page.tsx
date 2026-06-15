@@ -39,6 +39,98 @@ import {
   HiShieldCheck,
   HiUsers,
 } from "react-icons/hi2";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Global Admin Settings": "Global Admin Settings",
+    "Manage users, profiles, permissions, and system configuration.": "Manage users, profiles, permissions, and system configuration.",
+    "Refresh Data": "Refresh Data",
+    "Overview": "Overview",
+    "Users": "Users",
+    "System": "System",
+    "Database": "Database",
+    "Roles": "Roles",
+    "Backend": "Backend",
+    "enabled /": "enabled /",
+    "disabled": "disabled",
+    "Role catalog from backend": "Role catalog from backend",
+    "Checking...": "Checking...",
+    "Healthy": "Healthy",
+    "Unavailable": "Unavailable",
+    "Health endpoint status": "Health endpoint status",
+    "Users & Access": "Users & Access",
+    "ERP-style user management with profile, contact, role, and status tabs.": "ERP-style user management with profile, contact, role, and status tabs.",
+    "Sync Default Users": "Sync Default Users",
+    "New User": "New User",
+    "Syncing...": "Syncing...",
+    "User": "User",
+    "Contact": "Contact",
+    "Role": "Role",
+    "Status": "Status",
+    "Actions": "Actions",
+    "No phone": "No phone",
+    "Enabled": "Enabled",
+    "Disabled": "Disabled",
+    "No users found in database.": "No users found in database.",
+    "Create default users": "Create default users",
+    "Employee ID Configuration": "Employee ID Configuration",
+    "ID Prefix *": "ID Prefix *",
+    "Save System Settings": "Save System Settings",
+    "Saving...": "Saving...",
+    "Backend & Database Sync": "Backend & Database Sync",
+    "Verify backend status and sync default admin account.": "Verify backend status and sync default admin account.",
+    "Health Check": "Health Check",
+    "Admin Sync": "Admin Sync",
+    "Ensures admin user exists and remains enabled.": "Ensures admin user exists and remains enabled.",
+    "Run Defaults Sync": "Run Defaults Sync",
+    "Go back": "Go back"
+  },
+  am: {
+    "Global Admin Settings": "አጠቃላይ የአስተዳዳሪ ቅንጅቶች",
+    "Manage users, profiles, permissions, and system configuration.": "ሠራተኞችን፣ መገለጫዎችን፣ ፈቃዶችን እና የስርዓት ውቅረትን ያስተዳድሩ።",
+    "Refresh Data": "መረጃ አድስ",
+    "Overview": "አጠቃላይ እይታ",
+    "Users": "ሠራተኞች",
+    "System": "ስርዓት",
+    "Database": "የመረጃ ቋት",
+    "Roles": "ሚናዎች",
+    "Backend": "የጀርባ አገልግሎት",
+    "enabled /": "ገባሪ /",
+    "disabled": "ያልነቃ",
+    "Role catalog from backend": "የሚናዎች ዝርዝር ከጀርባ አገልግሎት",
+    "Checking...": "በማጣራት ላይ...",
+    "Healthy": "በጥሩ ሁኔታ ላይ",
+    "Unavailable": "አልተገኘም",
+    "Health endpoint status": "የአገልግሎቱ ጤንነት ሁኔታ",
+    "Users & Access": "ተጠቃሚዎች እና ፈቃዶች",
+    "ERP-style user management with profile, contact, role, and status tabs.": "የተጠቃሚዎችን መረጃ፣ አድራሻ፣ ሚና እና ሁኔታ ማስተዳደሪያ።",
+    "Sync Default Users": "ነባሪ ተጠቃሚዎችን አመሳስል",
+    "New User": "አዲስ ተጠቃሚ",
+    "Syncing...": "በማመሳሰል ላይ...",
+    "User": "ተጠቃሚ",
+    "Contact": "አድራሻ",
+    "Role": "ሚና",
+    "Status": "ሁኔታ",
+    "Actions": "ድርጊቶች",
+    "No phone": "ስልክ የለም",
+    "Enabled": "ገባሪ",
+    "Disabled": "ያልነቃ",
+    "No users found in database.": "በመረጃ ቋቱ ውስጥ ምንም ተጠቃሚዎች አልተገኙም።",
+    "Create default users": "ነባሪ ተጠቃሚዎችን ፍጠር",
+    "Employee ID Configuration": "የሠራተኛ መለያ መዋቅር",
+    "ID Prefix *": "የመለያ መነሻ *",
+    "Save System Settings": "የስርዓት ቅንጅቶችን አስቀምጥ",
+    "Saving...": "በማስቀመጥ ላይ...",
+    "Backend & Database Sync": "የጀርባ አገልግሎት እና መረጃ ቋት ማመሳሰል",
+    "Verify backend status and sync default admin account.": "የጀርባ አገልግሎት ሁኔታን ያረጋግጡ እና ነባሪ የአስተዳዳሪ መለያ ያመሳስሉ።",
+    "Health Check": "የጤንነት ምርመራ",
+    "Admin Sync": "የአስተዳዳሪ ማመሳሰል",
+    "Ensures admin user exists and remains enabled.": "የአስተዳዳሪ ተጠቃሚ መኖሩን እና መከፈቱን ያረጋግጣል።",
+    "Run Defaults Sync": "ነባሪ ማመሳሰልን አሂድ",
+    "Go back": "ተመለስ"
+  }
+};
 
 type TabId = "overview" | "users" | "system" | "database";
 type UserModalTab = "identity" | "contact" | "access" | "security";
@@ -62,6 +154,8 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 }
 
 export default function SettingsPage() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -517,10 +611,10 @@ export default function SettingsPage() {
   }, [users]);
 
   const tabs: Array<{ id: TabId; label: string; icon: ComponentType<{ className?: string }> }> = [
-    { id: "overview", label: "Overview", icon: HiShieldCheck },
-    { id: "users", label: "Users", icon: HiUsers },
-    { id: "system", label: "System", icon: HiCog6Tooth },
-    { id: "database", label: "Database", icon: HiCircleStack },
+    { id: "overview", label: t("Overview"), icon: HiShieldCheck },
+    { id: "users", label: t("Users"), icon: HiUsers },
+    { id: "system", label: t("System"), icon: HiCog6Tooth },
+    { id: "database", label: t("Database"), icon: HiCircleStack },
   ];
 
   const modalTabs: Array<{ id: UserModalTab; label: string }> = [
@@ -549,7 +643,7 @@ export default function SettingsPage() {
       <AuthLayout>
         <div className="max-w-3xl mx-auto py-20">
           <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Restricted Settings</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">{t("Restricted Settings")}</h1>
             <p className="text-sm text-muted mt-3">Only Admin or System Manager roles can access this page.</p>
             <button
               onClick={() => router.push("/")}
@@ -571,7 +665,7 @@ export default function SettingsPage() {
             <button
               onClick={() => router.back()}
               className="w-10 h-10 rounded-xl bg-card-alt border border-border text-muted hover:text-foreground transition-colors flex items-center justify-center"
-              title="Go back"
+              title={t("Go back")}
             >
               <HiArrowLeft className="w-5 h-5" />
             </button>
@@ -579,8 +673,8 @@ export default function SettingsPage() {
               <HiCog6Tooth className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">Global Admin Settings</h1>
-              <p className="text-sm text-muted font-medium">Manage users, profiles, permissions, and system configuration.</p>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">{t("Global Admin Settings")}</h1>
+              <p className="text-sm text-muted font-medium">{t("Manage users, profiles, permissions, and system configuration.")}</p>
             </div>
           </div>
           <button
@@ -593,7 +687,7 @@ export default function SettingsPage() {
             className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
           >
             <HiArrowPath className="w-4 h-4" />
-            Refresh Data
+            {t("Refresh Data")}
           </button>
         </header>
 
@@ -625,21 +719,21 @@ export default function SettingsPage() {
             {activeTab === "overview" && (
               <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Users</p>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Users")}</p>
                   <p className="text-3xl font-bold text-foreground mt-2">{userStats.total}</p>
-                  <p className="text-xs text-muted mt-2">{userStats.active} enabled / {userStats.inactive} disabled</p>
+                  <p className="text-xs text-muted mt-2">{userStats.active} {t("enabled /")} {userStats.inactive} {t("disabled")}</p>
                 </div>
                 <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Roles</p>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Roles")}</p>
                   <p className="text-3xl font-bold text-foreground mt-2">{roles.length}</p>
-                  <p className="text-xs text-muted mt-2">Role catalog from backend</p>
+                  <p className="text-xs text-muted mt-2">{t("Role catalog from backend")}</p>
                 </div>
                 <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Backend</p>
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Backend")}</p>
                   <p className={`text-2xl font-bold mt-2 ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
-                    {healthLoading ? "Checking..." : health?.status === "ok" ? "Healthy" : "Unavailable"}
+                    {healthLoading ? t("Checking...") : health?.status === "ok" ? t("Healthy") : t("Unavailable")}
                   </p>
-                  <p className="text-xs text-muted mt-2">Health endpoint status</p>
+                  <p className="text-xs text-muted mt-2">{t("Health endpoint status")}</p>
                 </div>
               </section>
             )}
@@ -648,8 +742,8 @@ export default function SettingsPage() {
               <section className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-bold text-foreground tracking-tight">Users & Access</h2>
-                    <p className="text-sm text-muted">ERP-style user management with profile, contact, role, and status tabs.</p>
+                    <h2 className="text-lg font-bold text-foreground tracking-tight">{t("Users & Access")}</h2>
+                    <p className="text-sm text-muted">{t("ERP-style user management with profile, contact, role, and status tabs.")}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -657,14 +751,14 @@ export default function SettingsPage() {
                       className="h-10 px-4 rounded-lg bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
                       disabled={bootstrapMutation.isPending}
                     >
-                      {bootstrapMutation.isPending ? "Syncing..." : "Sync Default Users"}
+                      {bootstrapMutation.isPending ? t("Syncing...") : t("Sync Default Users")}
                     </button>
                     <button
                       onClick={handleAdd}
                       className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold shadow-sm flex items-center gap-2"
                     >
                       <HiOutlinePlus className="w-4 h-4" />
-                      New User
+                      {t("New User")}
                     </button>
                   </div>
                 </div>
@@ -681,11 +775,11 @@ export default function SettingsPage() {
                       <table className="w-full text-left text-sm">
                         <thead className="bg-card-alt/60 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
                           <tr>
-                            <th className="px-5 py-3">User</th>
-                            <th className="px-5 py-3">Contact</th>
-                            <th className="px-5 py-3">Role</th>
-                            <th className="px-5 py-3">Status</th>
-                            <th className="px-5 py-3 text-right">Actions</th>
+                            <th className="px-5 py-3">{t("User")}</th>
+                            <th className="px-5 py-3">{t("Contact")}</th>
+                            <th className="px-5 py-3">{t("Role")}</th>
+                            <th className="px-5 py-3">{t("Status")}</th>
+                            <th className="px-5 py-3 text-right">{t("Actions")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
@@ -706,7 +800,7 @@ export default function SettingsPage() {
                               </td>
                               <td className="px-5 py-3">
                                 <p className="text-sm text-foreground">{user.email || "—"}</p>
-                                <p className="text-xs text-muted">{user.phone || "No phone"}</p>
+                                <p className="text-xs text-muted">{user.phone || t("No phone")}</p>
                               </td>
                               <td className="px-5 py-3">
                                 <div className="flex flex-wrap gap-1.5">
@@ -723,21 +817,21 @@ export default function SettingsPage() {
                                     user.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
                                   }`}
                                 >
-                                  {user.is_active ? "Enabled" : "Disabled"}
+                                  {user.is_active ? t("Enabled") : t("Disabled")}
                                 </span>
                               </td>
                               <td className="px-5 py-3 text-right space-x-2">
                                 <button
                                   onClick={() => handleEdit(user)}
                                   className="p-2 rounded-lg border border-border bg-card-alt text-foreground hover:bg-primary/10 hover:text-primary dark:hover:text-foreground transition-colors"
-                                  title="Edit"
+                                  title={t("Edit")}
                                 >
                                   <HiOutlinePencil className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => setDeleteId(user.id)}
                                   className="p-2 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
-                                  title="Delete"
+                                  title={t("Delete")}
                                 >
                                   <HiOutlineTrash className="w-4 h-4" />
                                 </button>
@@ -766,7 +860,7 @@ export default function SettingsPage() {
                                 <p className="font-bold text-foreground truncate">{user.full_name}</p>
                                 <p className="text-xs text-muted truncate">@{user.username}</p>
                                 <p className="text-xs text-muted truncate">{user.email || "No email"}</p>
-                                <p className="text-xs text-muted truncate">{user.phone || "No phone"}</p>
+                                <p className="text-xs text-muted truncate">{user.phone || t("No phone")}</p>
                               </div>
                             </div>
                             <button
@@ -792,7 +886,7 @@ export default function SettingsPage() {
                                 user.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
                               }`}
                             >
-                              {user.is_active ? "Enabled" : "Disabled"}
+                              {user.is_active ? t("Enabled") : t("Disabled")}
                             </span>
                           </div>
                         </button>
@@ -801,13 +895,13 @@ export default function SettingsPage() {
 
                     {users?.length === 0 && (
                       <div className="rounded-xl border border-border bg-card p-8 text-center">
-                        <p className="text-muted font-medium mb-3">No users found in database.</p>
+                        <p className="text-muted font-medium mb-3">{t("No users found in database.")}</p>
                         <button
                           onClick={() => bootstrapMutation.mutate()}
                           className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold"
                           disabled={bootstrapMutation.isPending}
                         >
-                          {bootstrapMutation.isPending ? "Syncing defaults..." : "Create default users"}
+                          {bootstrapMutation.isPending ? t("Syncing...") : t("Create default users")}
                         </button>
                       </div>
                     )}
@@ -819,10 +913,10 @@ export default function SettingsPage() {
             {activeTab === "system" && (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="glass-card rounded-xl p-6 shadow-sm space-y-6">
-                  <h2 className="text-lg font-bold text-foreground tracking-tight">Employee ID Configuration</h2>
+                  <h2 className="text-lg font-bold text-foreground tracking-tight">{t("Employee ID Configuration")}</h2>
 
                   <div className="space-y-2 max-w-md">
-                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">ID Prefix *</label>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">{t("ID Prefix *")}</label>
                     <input
                       type="text"
                       required
@@ -832,7 +926,7 @@ export default function SettingsPage() {
                       className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
                     />
                     <p className="text-xs text-muted px-1 pt-2 font-medium opacity-60">
-                      This prefix generates sequential employee IDs (for example {prefix || "EMP"}001).
+                      {lang === "am" ? `ይህ መነሻ ቅጥያ ተከታታይ የሠራተኛ መለያዎችን ያመነጫል (ለምሳሌ ${prefix || "EMP"}001)።` : `This prefix generates sequential employee IDs (for example ${prefix || "EMP"}001).`}
                     </p>
                   </div>
                 </div>
@@ -848,7 +942,7 @@ export default function SettingsPage() {
                         : "bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
                   }`}
                 >
-                  {isSystemSavePending ? "Saving..." : "Save System Settings"}
+                  {isSystemSavePending ? t("Saving...") : t("Save System Settings")}
                 </button>
               </form>
             )}
@@ -858,8 +952,8 @@ export default function SettingsPage() {
                 <div className="rounded-xl border border-border bg-card p-6">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-lg font-bold text-foreground tracking-tight">Backend & Database Sync</h2>
-                      <p className="text-sm text-muted">Verify backend status and sync default admin account.</p>
+                      <h2 className="text-lg font-bold text-foreground tracking-tight">{t("Backend & Database Sync")}</h2>
+                      <p className="text-sm text-muted">{t("Verify backend status and sync default admin account.")}</p>
                     </div>
                     <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                       <HiServerStack className="w-6 h-6" />
@@ -868,9 +962,9 @@ export default function SettingsPage() {
 
                   <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="rounded-xl bg-card-alt border border-border p-4">
-                      <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Health Check</p>
+                      <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Health Check")}</p>
                       <p className={`text-lg font-bold mt-2 ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
-                        {healthLoading ? "Checking..." : health?.status === "ok" ? "OK" : "Unavailable"}
+                        {healthLoading ? t("Checking...") : health?.status === "ok" ? "OK" : t("Unavailable")}
                       </p>
                       <p className="text-xs text-muted mt-1">
                         {health?.timestamp ? new Date(health.timestamp).toLocaleString() : "No response timestamp"}
@@ -878,9 +972,9 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="rounded-xl bg-card-alt border border-border p-4">
-                      <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Admin Sync</p>
+                      <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Admin Sync")}</p>
                       <p className="text-sm text-foreground font-medium mt-2">
-                        Ensures admin user exists and remains enabled.
+                        {t("Ensures admin user exists and remains enabled.")}
                       </p>
                       <button
                         onClick={() => bootstrapMutation.mutate()}
