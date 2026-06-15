@@ -111,7 +111,7 @@ export default function EventTypesPage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-6xl mx-auto pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-12">
           <div>
             <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-foreground">Event Payments</h1>

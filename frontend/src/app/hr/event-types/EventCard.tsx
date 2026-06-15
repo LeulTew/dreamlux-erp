@@ -67,7 +67,10 @@ export default function EventCard({
               className="flex flex-col h-full"
             >
               <div className="flex items-start justify-between gap-4 mb-4">
-                <h3 className="text-xl font-black tracking-tight uppercase leading-tight text-foreground line-clamp-2">
+                <h3 
+                  onClick={() => onEditStateChange({ isEditing: true })}
+                  className="text-xl font-black tracking-tight uppercase leading-tight text-foreground line-clamp-2 hover:text-primary transition-all cursor-pointer hover:underline"
+                >
                   {event.event_name}
                 </h3>
               </div>

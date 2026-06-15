@@ -58,15 +58,15 @@ export default function QuantityModal({
             </button>
 
             <div className="flex flex-col items-center text-center space-y-6">
-              <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
                 <HiCheckCircle className="w-8 h-8" />
               </div>
 
               <div>
-                <h3 className="text-xl font-black text-foreground tracking-tight">{title}</h3>
-                <p className="mt-2 text-sm text-muted leading-relaxed font-bold">
+                <h3 className="text-lg font-bold text-foreground tracking-tight">{title}</h3>
+                <p className="mt-2 text-sm text-muted leading-relaxed font-semibold">
                   {message} <br/>
-                  <span className="text-foreground font-black italic">&quot;{itemName}&quot;</span>
+                  <span className="text-foreground font-bold italic">&quot;{itemName}&quot;</span>
                 </p>
               </div>
 
@@ -75,7 +75,7 @@ export default function QuantityModal({
                   <button
                     type="button"
                     onClick={() => setQuantity(String(Math.max(0, parseInt(quantity || "0") - 1)))}
-                    className="w-12 h-12 rounded-2xl bg-card-alt border border-border flex items-center justify-center text-xl font-bold hover:bg-primary-light transition-all active:scale-90"
+                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-xl font-bold hover:bg-primary-light transition-all active:scale-[0.98]"
                   >
                     −
                   </button>
@@ -84,12 +84,12 @@ export default function QuantityModal({
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     min="0"
-                    className="w-24 text-center px-4 py-3 rounded-2xl border border-border bg-background text-foreground font-black text-xl focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                    className="w-24 h-11 text-center px-4 rounded-xl border border-border bg-background text-foreground font-bold text-lg focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setQuantity(String(parseInt(quantity || "0") + 1))}
-                    className="w-12 h-12 rounded-2xl bg-card-alt border border-border flex items-center justify-center text-xl font-bold hover:bg-primary-light transition-all active:scale-90"
+                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-xl font-bold hover:bg-primary-light transition-all active:scale-[0.98]"
                   >
                     +
                   </button>
@@ -98,13 +98,13 @@ export default function QuantityModal({
                 <div className="flex flex-col gap-3 pt-2">
                   <button
                     onClick={handleConfirm}
-                    className="w-full py-4 bg-primary text-background rounded-3xl font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-95 transition-all"
+                    className="w-full h-11 bg-primary text-on-primary rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all"
                   >
                     {confirmLabel}
                   </button>
                   <button
                     onClick={onClose}
-                    className="w-full py-4 bg-card-alt text-foreground rounded-3xl font-black uppercase tracking-[0.15em] hover:bg-border transition-all active:scale-95 text-[10px]"
+                    className="w-full h-11 bg-card-alt text-foreground rounded-xl font-semibold hover:bg-border transition-all active:scale-[0.98] text-sm"
                   >
                     Cancel
                   </button>

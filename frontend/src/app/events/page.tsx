@@ -1,8 +1,8 @@
 "use client";
-import { useState, useMemo, Suspense } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { getEvents } from "@/lib/api";
+import { getEvent, getEvents } from "@/lib/api";
 import { Event, EventsResponse } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import { HiCalendar, HiPlus, HiMagnifyingGlass, HiPencilSquare, HiArrowTopRightOnSquare } from "react-icons/hi2";
@@ -11,6 +11,7 @@ import EditEventSheet from "@/components/EditEventSheet";
 import PaginationControls from "@/components/PaginationControls";
 import Link from "next/link";
 import { useLanguage } from "@/hooks/use-language";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -65,6 +66,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 function EventsPageContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
 
   const [page, setPage] = useState(1);
@@ -84,6 +88,28 @@ function EventsPageContent() {
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / limit);
 
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    let active = true;
+
+    if (editId && !editingEvent) {
+      const eventToEdit = events.find((event) => event.id === editId);
+      const eventRequest = eventToEdit ? Promise.resolve(eventToEdit) : getEvent(editId);
+
+      eventRequest
+        .then((event) => {
+          if (active && event) {
+            setEditingEvent(event);
+          }
+        })
+        .catch(console.error);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [searchParams, events, editingEvent]);
+
   // Status badge style helper
   const getStatusBadgeClass = (statusStr: string) => {
     switch (statusStr) {
@@ -100,7 +126,7 @@ function EventsPageContent() {
 
   return (
     <AuthLayout>
-      <div className="max-w-6xl mx-auto pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary/10 dark:bg-primary/20 rounded-lg text-primary border border-primary/20">
@@ -196,11 +222,23 @@ function EventsPageContent() {
                         {(page - 1) * limit + index + 1}
                       </td>
                       <td className="px-6 py-4 font-bold text-foreground">
-                        {event.name}
+                        <button
+                          type="button"
+                          onClick={() => setEditingEvent(event)}
+                          className="font-bold text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+                        >
+                          {event.name}
+                        </button>
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="font-semibold">{event.client_name}</div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingEvent(event)}
+                            className="font-semibold text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+                          >
+                            {event.client_name}
+                          </button>
                           {event.client_phone && (
                             <div className="text-xs text-muted font-mono">{event.client_phone}</div>
                           )}
@@ -337,7 +375,12 @@ function EventsPageContent() {
         {editingEvent && (
           <EditEventSheet
             event={editingEvent}
-            onClose={() => setEditingEvent(null)}
+            onClose={() => {
+              setEditingEvent(null);
+              if (searchParams.get("edit")) {
+                router.replace(pathname, { scroll: false });
+              }
+            }}
           />
         )}
     </AuthLayout>

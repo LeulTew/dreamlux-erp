@@ -40,8 +40,8 @@ export default function ReconcileReviewModal({
             
             <header className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-2xl font-black text-foreground tracking-tight">Audit Review</h3>
-                <p className="text-sm text-muted font-bold">Review discrepancies before finalizing</p>
+                <h3 className="text-xl font-bold text-foreground tracking-tight">Audit Review</h3>
+                <p className="text-sm text-muted font-semibold">Review discrepancies before finalizing</p>
               </div>
               <button 
                 onClick={onClose}
@@ -57,23 +57,23 @@ export default function ReconcileReviewModal({
                 return (
                   <div key={item.id} className="p-4 rounded-xl bg-card-alt/50 border border-border/30 flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black text-muted uppercase tracking-widest truncate">{item.name}</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">{item.name}</p>
                       <div className="flex items-center gap-4 mt-1">
                         <div className="text-sm font-bold text-foreground">
                           Exp: <span className="text-muted">{item.expected}</span>
                         </div>
-                        <div className="text-sm font-black text-foreground">
+                        <div className="text-sm font-bold text-foreground">
                           Act: <span className="text-primary">{item.actual}</span>
                         </div>
                       </div>
                     </div>
                     
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[10px] uppercase ${
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-semibold text-[10px] uppercase ${
                       diff === 0 ? "bg-muted/10 text-muted" :
                       diff > 0 ? "bg-green-500/10 text-success" : "bg-red-500/10 text-danger"
                     }`}>
-                      {diff > 0 && <HiArrowTrendingUp className="w-4 h-4" />}
-                      {diff < 0 && <HiArrowTrendingDown className="w-4 h-4" />}
+                      {diff > 0 && <HiArrowTrendingUp className="w-3.5 h-3.5" />}
+                      {diff < 0 && <HiArrowTrendingDown className="w-3.5 h-3.5" />}
                       {diff === 0 ? "MATCH" : `${diff > 0 ? "+" : ""}${diff} DISCREPANCY`}
                     </div>
                   </div>
@@ -82,7 +82,7 @@ export default function ReconcileReviewModal({
             </div>
 
             <footer className="mt-8 pt-6 border-t border-border/50 space-y-4">
-              <div className="flex items-center justify-between px-4 py-3 bg-primary-light rounded-xl text-primary font-black uppercase text-xs tracking-widest">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-primary-light rounded-xl text-primary font-semibold uppercase text-xs tracking-wider">
                 <span>Net Change to Inventory</span>
                 <span className={totalDiff < 0 ? "text-danger" : totalDiff > 0 ? "text-success" : ""}>
                   {totalDiff > 0 ? `+${totalDiff}` : totalDiff} Items
@@ -93,7 +93,7 @@ export default function ReconcileReviewModal({
                  <button
                   onClick={onConfirm}
                   disabled={isSubmitting}
-                  className="flex-1 py-5 bg-primary text-on-primary rounded-xl font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-95 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 h-11 bg-primary text-on-primary rounded-xl font-semibold text-sm shadow-sm hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? "Syncing..." : (
                     <>
@@ -105,7 +105,7 @@ export default function ReconcileReviewModal({
                 <button
                   onClick={onClose}
                   disabled={isSubmitting}
-                  className="px-8 py-5 bg-card-alt text-foreground rounded-xl font-black uppercase tracking-[0.15em] hover:bg-border transition-all active:scale-95 text-[10px]"
+                  className="h-11 px-6 bg-card-alt text-foreground rounded-xl font-semibold text-sm hover:bg-border transition-all active:scale-[0.98]"
                 >
                   Cancel
                 </button>

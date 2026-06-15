@@ -208,7 +208,7 @@ export default function ReconcilePage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-6xl mx-auto space-y-6 pb-32">
+      <div className="page-container space-y-6 pb-32">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
             <button 

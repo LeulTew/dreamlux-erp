@@ -64,11 +64,11 @@ export default function AdvancedStatsDashboard() {
           {[...Array(4)].map((_, i) => (
             <div
               key={i}
-              className="h-28 bg-card-alt rounded-3xl border border-border/50"
+              className="h-28 bg-card-alt rounded-xl border border-border/50"
             />
           ))}
         </div>
-        <div className="h-64 bg-card-alt rounded-4xl border border-border/50" />
+        <div className="h-64 bg-card-alt rounded-2xl border border-border/50" />
       </div>
     );
   }
@@ -89,9 +89,9 @@ export default function AdvancedStatsDashboard() {
             setActiveTab("overview");
             setChartsReady(false);
           }}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
             activeTab === "overview"
-              ? "bg-card text-foreground shadow-premium"
+              ? "bg-card text-foreground shadow-sm"
               : "text-muted hover:text-foreground"
           }`}
         >
@@ -103,9 +103,9 @@ export default function AdvancedStatsDashboard() {
             setActiveTab("analytics");
             setChartsReady(false);
           }}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all ${
             activeTab === "analytics"
-              ? "bg-card text-foreground shadow-premium"
+              ? "bg-card text-foreground shadow-sm"
               : "text-muted hover:text-foreground"
           }`}
         >
@@ -135,16 +135,16 @@ export default function AdvancedStatsDashboard() {
               hidden: { y: 20, opacity: 0 },
               visible: { y: 0, opacity: 1 },
             }}
-            className="bg-card p-6 rounded-3xl border border-border/50 shadow-sm relative overflow-hidden group"
+            className="bg-card p-6 rounded-xl border border-border/50 shadow-sm relative overflow-hidden group"
           >
             <div className="absolute -right-2 -bottom-2 opacity-5 text-foreground group-hover:scale-110 transition-transform">
               <HiInboxStack className="w-24 h-24" />
             </div>
-            <h3 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-1">
+            <h3 className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider mb-1">
               Total Assets
             </h3>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-foreground">
+              <span className="text-3xl font-bold text-foreground">
                 {data.totalItems}
               </span>
               <span className="text-xs font-bold text-muted">Items</span>
@@ -163,21 +163,21 @@ export default function AdvancedStatsDashboard() {
                 hidden: { y: 20, opacity: 0 },
                 visible: { y: 0, opacity: 1 },
               }}
-              className="bg-card p-6 rounded-3xl border border-border/50 shadow-sm relative overflow-hidden group cursor-pointer h-full"
+              className="bg-card p-6 rounded-xl border border-border/50 shadow-sm relative overflow-hidden group cursor-pointer h-full"
             >
               <div className="absolute -right-2 -bottom-2 opacity-5 text-danger group-hover:scale-110 transition-transform">
                 <HiExclamationTriangle className="w-24 h-24" />
               </div>
-              <h3 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-1">
+              <h3 className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider mb-1">
                 Low Stock
               </h3>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-danger">
+                <span className="text-3xl font-bold text-danger">
                   {data.lowStockItems}
                 </span>
                 <span className="text-xs font-bold text-danger/60">Alerts</span>
               </div>
-              <div className="text-[10px] text-primary group-hover:underline mt-2 font-black uppercase tracking-widest inline-block relative z-10">
+              <div className="text-[10px] text-primary group-hover:underline mt-2 font-semibold uppercase tracking-wider inline-block relative z-10">
                 Resolve Alerts →
               </div>
             </motion.div>
@@ -189,16 +189,16 @@ export default function AdvancedStatsDashboard() {
               hidden: { y: 20, opacity: 0 },
               visible: { y: 0, opacity: 1 },
             }}
-            className="bg-card p-6 rounded-3xl border border-border/50 shadow-sm relative overflow-hidden group"
+            className="bg-card p-6 rounded-xl border border-border/50 shadow-sm relative overflow-hidden group"
           >
             <div className="absolute -right-2 -bottom-2 opacity-5 text-primary group-hover:scale-110 transition-transform">
               <HiMapPin className="w-24 h-24" />
             </div>
-            <h3 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-1">
+            <h3 className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider mb-1">
               Active Hubs
             </h3>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-foreground">
+              <span className="text-3xl font-bold text-foreground">
                 {data.stockPerLocation.length}
               </span>
               <span className="text-xs font-bold text-muted">Stores</span>
@@ -218,16 +218,16 @@ export default function AdvancedStatsDashboard() {
                 hidden: { y: 20, opacity: 0 },
                 visible: { y: 0, opacity: 1 },
               }}
-              className="bg-card p-6 rounded-3xl border border-border/50 shadow-sm relative overflow-hidden group cursor-pointer h-full"
+              className="bg-card p-6 rounded-xl border border-border/50 shadow-sm relative overflow-hidden group cursor-pointer h-full"
             >
               <div className="absolute -right-2 -bottom-2 opacity-5 text-success group-hover:scale-110 transition-transform">
                 <HiCheckBadge className="w-24 h-24" />
               </div>
-              <h3 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-1">
+              <h3 className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-wider mb-1">
                 Audit Health
               </h3>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-success">
+                <span className="text-3xl font-bold text-success">
                   {reconciliationRate}%
                 </span>
               </div>
@@ -239,7 +239,7 @@ export default function AdvancedStatsDashboard() {
                   className="h-full bg-success"
                 />
               </div>
-              <div className="text-[10px] text-success group-hover:underline mt-2 font-black uppercase tracking-widest inline-block relative z-10">
+              <div className="text-[10px] text-success group-hover:underline mt-2 font-semibold uppercase tracking-wider inline-block relative z-10">
                 Run Audit →
               </div>
             </motion.div>
@@ -251,8 +251,8 @@ export default function AdvancedStatsDashboard() {
           animate={{ opacity: 1, scale: 1 }}
           className="grid grid-cols-1 lg:grid-cols-2 gap-6"
         >
-          <div className="bg-card p-8 rounded-4xl border border-border/50 shadow-sm min-h-87.5">
-            <h3 className="text-xs font-black text-muted uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
+          <div className="bg-card p-8 rounded-2xl border border-border/50 shadow-sm min-h-87.5">
+            <h3 className="text-xs font-bold text-foreground/80 uppercase tracking-wider mb-8 flex items-center gap-2">
               <HiMapPin className="text-primary w-4 h-4" />
               Distribution by Store
             </h3>
@@ -310,8 +310,8 @@ export default function AdvancedStatsDashboard() {
             </div>
           </div>
 
-          <div className="bg-card p-8 rounded-4xl border border-border/50 shadow-sm min-h-87.5">
-            <h3 className="text-xs font-black text-muted uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
+          <div className="bg-card p-8 rounded-2xl border border-border/50 shadow-sm min-h-87.5">
+            <h3 className="text-xs font-bold text-foreground/80 uppercase tracking-wider mb-8 flex items-center gap-2">
               <HiInboxStack className="text-accent w-4 h-4" />
               Stock Density Node
             </h3>

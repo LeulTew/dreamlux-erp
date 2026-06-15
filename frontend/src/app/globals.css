@@ -4,7 +4,7 @@
 
 :root {
   /* Dream Lux ERP — Elegant Gold & Light Slate Palette */
-  --background: #faf9f6;
+  --background: #eaeaf0;
   --foreground: #1c1917;
   --primary: oklch(78% 0.12 82);
   --primary-light: oklch(96% 0.03 82);
@@ -29,15 +29,20 @@
   --destructive-foreground: #ffffff;
   --input: #eae8e2;
   --ring: oklch(78% 0.12 82);
-  --radius-xl: 12px;
-  --radius-2xl: 12px;
-  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius: 14px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-3xl: 26px;
+  --radius-4xl: 32px;
   --chart-1: oklch(78% 0.12 82);
   --chart-2: #6b6661;
   --chart-3: oklch(55% 0.10 82);
   --chart-4: oklch(96% 0.03 82);
   --chart-5: #eae8e2;
-  --sidebar: #faf9f6;
+  --sidebar: #eaeaf0;
   --sidebar-foreground: #1c1917;
   --sidebar-primary: oklch(78% 0.12 82);
   --sidebar-primary-foreground: #1c1917;
@@ -74,9 +79,14 @@
   --destructive-foreground: #050506;
   --input: #1c1c20;
   --ring: oklch(78% 0.12 82);
-  --radius-xl: 12px;
-  --radius-2xl: 12px;
-  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius: 14px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-3xl: 26px;
+  --radius-4xl: 32px;
   --chart-1: oklch(78% 0.12 82);
   --chart-2: #9a9a9f;
   --chart-3: oklch(68% 0.10 82);
@@ -109,8 +119,13 @@
   --color-card-alt: var(--card-alt);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
   --radius-2xl: var(--radius-2xl);
+  --radius-3xl: var(--radius-3xl);
+  --radius-4xl: var(--radius-4xl);
   --shadow: none;
   --shadow-premium: none;
   --shadow-premium-sm: none;
@@ -146,11 +161,33 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
-  --radius-sm: calc(var(--radius) * 0.5);
-  --radius-md: calc(var(--radius) * 0.75);
-  --radius-lg: var(--radius);
-  --radius-3xl: var(--radius);
-  --radius-4xl: var(--radius);
+}
+
+/* Page width container rules */
+.page-container {
+  width: 100%;
+}
+.page-container-lg {
+  width: 100%;
+}
+.page-container-sm {
+  width: 100%;
+}
+
+[data-page-width="contained"] .page-container {
+  max-width: 72rem; /* 1152px - max-w-6xl */
+  margin-left: auto;
+  margin-right: auto;
+}
+[data-page-width="contained"] .page-container-lg {
+  max-width: 80rem; /* 1280px - max-w-7xl */
+  margin-left: auto;
+  margin-right: auto;
+}
+[data-page-width="contained"] .page-container-sm {
+  max-width: 56rem; /* 896px - max-w-4xl */
+  margin-left: auto;
+  margin-right: auto;
 }
 
 body {

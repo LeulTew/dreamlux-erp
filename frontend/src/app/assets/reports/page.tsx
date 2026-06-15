@@ -106,7 +106,7 @@ export default function ReportsPage() {
 
   return (
     <AuthLayout>
-      <div className="space-y-10 pb-20 max-w-7xl mx-auto">
+      <div className="page-container-lg space-y-10 pb-20">
         <header className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex-1">
             <button

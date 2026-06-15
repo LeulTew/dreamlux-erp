@@ -152,12 +152,12 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
         title="Edit Asset"
         subtitle={`Updating ${item.name}`}
       >
-        <div className="md:grid md:grid-cols-2 md:gap-12 items-start">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-8 items-start">
             {/* Left: Image & Quick Stats */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div
                 onClick={() => !updateMutation.isPending && fileInputRef.current?.click()}
-                className={`relative w-full aspect-square md:aspect-video rounded-xl md:rounded-xl overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
+                className={`relative w-full aspect-square lg:aspect-video rounded-xl overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
                   updateMutation.isPending ? "cursor-wait opacity-80" : "cursor-pointer group"
                 }`}
               >
@@ -180,6 +180,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
                           className="absolute inset-0 bg-primary/20 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
                         >
                           <motion.div
@@ -192,7 +193,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                           >
                             <HiArrowPath className="w-8 h-8 text-white animate-spin-slow" />
                           </motion.div>
-                          <p className="text-white font-black text-[10px] uppercase tracking-[0.2em] drop-shadow-md">
+                          <p className="text-white font-bold text-[10px] uppercase tracking-wider drop-shadow-md">
                             {imageFile ? "Converting to WebP & Syncing..." : "Syncing Asset..."}
                           </p>
                           <div className="mt-4 w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -211,13 +212,13 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     <div className="p-4 bg-background rounded-xl shadow-sm border border-border">
                       <HiCamera className="w-8 h-8 text-primary" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Tap to change photo</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted">Tap to change photo</span>
                   </div>
                 )}
                 
                 {!updateMutation.isPending && (
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                    <span className="bg-background text-foreground px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-massive">Update Image</span>
+                    <span className="bg-background text-foreground px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider shadow-massive">Update Image</span>
                   </div>
                 )}
               </div>
@@ -227,7 +228,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   type="button"
                   onClick={() => rotateMutation.mutate()}
                   disabled={rotateMutation.isPending || updateMutation.isPending}
-                  className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
+                  className="flex items-center justify-center gap-2 w-full h-11 rounded-xl text-sm font-semibold uppercase tracking-wider border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
                 >
                   <HiArrowPath className={`w-4 h-4 text-primary ${rotateMutation.isPending ? "animate-spin" : ""}`} />
                   {rotateMutation.isPending ? "Rotating..." : "Rotate Asset 90°"}
@@ -236,12 +237,12 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
 
               {/* Reconciliation Info */}
               {(item.last_counted_at || item.last_counted_by) && (
-                <div className="p-6 rounded-xl bg-card-alt/50 border border-border/40 shadow-sm">
-                  <p className="text-[10px] uppercase font-black text-muted tracking-[0.2em] mb-4">Audit Traceability</p>
-                  <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-card-alt/50 border border-border/40 shadow-sm">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-3">Audit Traceability</p>
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-muted">Last Reconciled</span>
-                      <span className="text-xs font-black text-foreground">
+                      <span className="text-xs font-bold text-foreground">
                         {item.last_counted_at ? new Date(item.last_counted_at).toLocaleDateString(undefined, { 
                           month: 'short', day: 'numeric', year: 'numeric' 
                         }) : "Pending"}
@@ -250,7 +251,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     {item.last_counted_by && (
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-muted">Verified By</span>
-                        <span className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-black tracking-wider">
+                        <span className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-semibold tracking-wider">
                           {item.last_counted_by.full_name.toUpperCase()}
                         </span>
                       </div>
@@ -261,7 +262,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
             </div>
 
             {/* Right: Form Fields */}
-            <form onSubmit={handleSubmit} className="mt-8 md:mt-0 space-y-6">
+            <form onSubmit={handleSubmit} className="mt-8 lg:mt-0 space-y-4">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -272,7 +273,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               />
 
               <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Reference Name
                 </label>
                 <input
@@ -280,19 +281,19 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Asset Name"
-                  className="w-full px-6 py-4 rounded-2xl border border-border bg-card-alt text-foreground font-black focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                  className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Adjust Stock Count
                 </label>
                 <div className="flex items-center gap-2 md:gap-3">
                   <button
                     type="button"
                     onClick={() => setQuantity(String(Math.max(0, parseInt(quantity) - 1)))}
-                    className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary hover:text-background transition-all active:scale-95"
+                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-semibold hover:bg-primary hover:text-background transition-all active:scale-95"
                   >
                     −
                   </button>
@@ -301,12 +302,12 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     min="0"
-                    className="flex-1 min-w-0 text-center px-2 py-4 rounded-2xl border border-border bg-card-alt text-foreground font-black text-xl md:text-2xl focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                    className="flex-1 min-w-0 text-center h-11 px-2 rounded-xl border border-border bg-card-alt text-foreground font-semibold text-base focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setQuantity(String(parseInt(quantity || "0") + 1))}
-                    className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary hover:text-background transition-all active:scale-95"
+                    className="w-11 h-11 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-semibold hover:bg-primary hover:text-background transition-all active:scale-95"
                   >
                     +
                   </button>
@@ -314,18 +315,18 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Assigned Location
                 </label>
-                <div className="flex flex-wrap gap-1.5 md:gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {offices.map((office) => (
                     <button
                       key={office.id}
                       type="button"
                       onClick={() => setOfficeId(office.id)}
-                      className={`px-3 md:px-4 py-2.5 md:py-3 rounded-xl text-[9px] md:text-[10px] font-black tracking-widest uppercase transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold tracking-wider uppercase transition-all ${
                         officeId === office.id
-                          ? "bg-primary text-background shadow-premium"
+                          ? "bg-primary text-background shadow-sm"
                           : "bg-card-alt text-muted border border-border hover:border-primary/30"
                       }`}
                     >
@@ -336,24 +337,24 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] px-1">
+                <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   Internal Notes
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
+                  rows={2}
                   placeholder="Categorize or add condition notes..."
-                  className="w-full px-5 py-4 rounded-2xl border border-border bg-card-alt text-foreground font-medium focus:ring-2 focus:ring-primary/20 transition-all resize-none outline-none leading-relaxed text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-card-alt text-foreground font-medium focus:ring-2 focus:ring-primary/20 transition-all resize-none outline-none leading-relaxed text-sm"
                 />
               </div>
 
-              <div className="pt-4 space-y-4">
-                <div className="flex gap-3 md:gap-4">
+              <div className="pt-2 space-y-3">
+                <div className="flex gap-3">
                   <button
                     type="submit"
                     disabled={updateMutation.isPending}
-                    className="flex-4 py-4 md:py-5 rounded-2xl md:rounded-xl bg-primary text-background font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
+                    className="flex-4 h-11 rounded-xl bg-primary text-background font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
                   >
                     {updateMutation.isPending ? "Syncing..." : "Update Asset"}
                   </button>
@@ -361,10 +362,10 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     type="button"
                     onClick={handleDelete}
                     disabled={deleteMutation.isPending}
-                    className="flex-1 h-14 md:h-16 rounded-2xl md:rounded-xl bg-red-50 text-danger flex items-center justify-center hover:bg-danger hover:text-background transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                    className="flex-1 h-11 rounded-xl bg-red-50 text-danger flex items-center justify-center hover:bg-danger hover:text-background transition-all active:scale-95 disabled:opacity-50"
                     aria-label="Delete asset"
                   >
-                    <HiTrash className="w-6 md:w-7 h-6 md:h-7" />
+                    <HiTrash className="w-4.5 h-4.5" />
                   </button>
                 </div>
                 
@@ -372,9 +373,9 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   type="button"
                   onClick={handleReconcile}
                   disabled={reconcileMutation.isPending || updateMutation.isPending}
-                  className="w-full py-4 md:py-5 rounded-2xl md:rounded-xl bg-card border border-border text-foreground font-black uppercase tracking-[0.2em] text-[10px] md:text-[11px] shadow-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full h-11 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <HiCheckCircle className="w-5 h-5 text-primary" />
+                  <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
                   {reconcileMutation.isPending ? "Applying Audit..." : "Mark as Physically Verified"}
                 </button>
               </div>

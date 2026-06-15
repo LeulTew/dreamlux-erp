@@ -30,10 +30,10 @@ export default function OfficeFilterChips({
       <div className="hidden md:flex flex-wrap gap-2 items-center">
         <button
           onClick={() => onChange("all")}
-          className={`px-5 py-2.5 rounded-2xl text-[10px] uppercase font-black tracking-[0.15em] transition-all shadow-sm ${
+          className={`h-10 px-4 rounded-xl text-xs uppercase font-semibold tracking-wider transition-all shadow-sm ${
             selected === "all"
-              ? "bg-primary text-on-primary shadow-premium"
-              : "bg-card-alt text-muted hover:text-foreground hover:bg-border"
+              ? "bg-primary text-on-primary shadow-sm"
+              : "bg-card-alt text-muted hover:text-foreground hover:bg-border/50"
           }`}
         >
           All Offices
@@ -42,10 +42,10 @@ export default function OfficeFilterChips({
           <button
             key={office.id}
             onClick={() => onChange(office.id)}
-            className={`px-5 py-2.5 rounded-2xl text-[10px] uppercase font-black tracking-[0.15em] transition-all shadow-sm ${
+            className={`h-10 px-4 rounded-xl text-xs uppercase font-semibold tracking-wider transition-all shadow-sm ${
               selected === office.id
-                ? "bg-primary text-on-primary shadow-premium"
-                : "bg-card-alt text-muted hover:text-foreground hover:bg-border"
+                ? "bg-primary text-on-primary shadow-sm"
+                : "bg-card-alt text-muted hover:text-foreground hover:bg-border/50"
             }`}
           >
             {office.name}

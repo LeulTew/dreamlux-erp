@@ -538,7 +538,7 @@ export default function SettingsPage() {
     return (
       <AuthLayout>
         <div className="max-w-3xl mx-auto py-20">
-          <div className="animate-pulse bg-card h-40 rounded-3xl border border-border" />
+          <div className="animate-pulse bg-card h-40 rounded-xl border border-border" />
         </div>
       </AuthLayout>
     );
@@ -548,12 +548,12 @@ export default function SettingsPage() {
     return (
       <AuthLayout>
         <div className="max-w-3xl mx-auto py-20">
-          <div className="rounded-3xl border border-border bg-card p-8 text-center">
-            <h1 className="text-2xl font-black text-foreground tracking-tight">Restricted Settings</h1>
+          <div className="rounded-xl border border-border bg-card p-8 text-center">
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Restricted Settings</h1>
             <p className="text-sm text-muted mt-3">Only Admin or System Manager roles can access this page.</p>
             <button
               onClick={() => router.push("/")}
-              className="mt-6 px-5 py-2.5 rounded-2xl bg-primary text-on-primary font-black"
+              className="mt-6 h-11 px-5 rounded-xl bg-primary text-on-primary font-semibold"
             >
               Back to Dashboard
             </button>
@@ -565,7 +565,7 @@ export default function SettingsPage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-6xl mx-auto pb-12 space-y-6">
+      <div className="page-container pb-12 space-y-6">
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -575,11 +575,11 @@ export default function SettingsPage() {
             >
               <HiArrowLeft className="w-5 h-5" />
             </button>
-            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-premium">
+            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm">
               <HiCog6Tooth className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-foreground tracking-tight">Global Admin Settings</h1>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">Global Admin Settings</h1>
               <p className="text-sm text-muted font-medium">Manage users, profiles, permissions, and system configuration.</p>
             </div>
           </div>
@@ -590,14 +590,14 @@ export default function SettingsPage() {
               queryClient.invalidateQueries({ queryKey: ["appSettings"] });
               queryClient.invalidateQueries({ queryKey: ["backendHealth"] });
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-card-alt border border-border text-sm font-bold hover:bg-border transition-colors"
+            className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
           >
             <HiArrowPath className="w-4 h-4" />
             Refresh Data
           </button>
         </header>
 
-        <section className="glass-card rounded-3xl p-3 shadow-premium">
+        <section className="glass-card rounded-2xl p-1 shadow-sm">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -606,8 +606,8 @@ export default function SettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center gap-2 rounded-2xl py-2.5 px-3 text-sm font-black tracking-wide transition-all ${
-                    selected ? "bg-primary text-on-primary shadow-premium" : "bg-card-alt text-muted hover:text-foreground"
+                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-sm font-semibold tracking-wide transition-all ${
+                    selected ? "bg-primary text-on-primary shadow-sm" : "bg-card-alt text-muted hover:text-foreground"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -619,24 +619,24 @@ export default function SettingsPage() {
         </section>
 
         {isLoading ? (
-          <div className="animate-pulse bg-card rounded-3xl h-32 border border-border" />
+          <div className="animate-pulse bg-card rounded-xl h-32 border border-border" />
         ) : (
           <div className="space-y-6">
             {activeTab === "overview" && (
               <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="rounded-3xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-widest font-black text-muted">Users</p>
-                  <p className="text-3xl font-black text-foreground mt-2">{userStats.total}</p>
+                <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Users</p>
+                  <p className="text-3xl font-bold text-foreground mt-2">{userStats.total}</p>
                   <p className="text-xs text-muted mt-2">{userStats.active} enabled / {userStats.inactive} disabled</p>
                 </div>
-                <div className="rounded-3xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-widest font-black text-muted">Roles</p>
-                  <p className="text-3xl font-black text-foreground mt-2">{roles.length}</p>
+                <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Roles</p>
+                  <p className="text-3xl font-bold text-foreground mt-2">{roles.length}</p>
                   <p className="text-xs text-muted mt-2">Role catalog from backend</p>
                 </div>
-                <div className="rounded-3xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-widest font-black text-muted">Backend</p>
-                  <p className={`text-2xl font-black mt-2 ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
+                <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
+                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Backend</p>
+                  <p className={`text-2xl font-bold mt-2 ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
                     {healthLoading ? "Checking..." : health?.status === "ok" ? "Healthy" : "Unavailable"}
                   </p>
                   <p className="text-xs text-muted mt-2">Health endpoint status</p>
@@ -648,20 +648,20 @@ export default function SettingsPage() {
               <section className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-black text-foreground tracking-tight">Users & Access</h2>
+                    <h2 className="text-lg font-bold text-foreground tracking-tight">Users & Access</h2>
                     <p className="text-sm text-muted">ERP-style user management with profile, contact, role, and status tabs.</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => bootstrapMutation.mutate()}
-                      className="px-4 py-2 rounded-2xl bg-card-alt border border-border text-sm font-bold hover:bg-border transition-colors"
+                      className="h-10 px-4 rounded-lg bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
                       disabled={bootstrapMutation.isPending}
                     >
                       {bootstrapMutation.isPending ? "Syncing..." : "Sync Default Users"}
                     </button>
                     <button
                       onClick={handleAdd}
-                      className="px-4 py-2 rounded-2xl bg-primary text-on-primary text-sm font-black shadow-premium flex items-center gap-2"
+                      className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold shadow-sm flex items-center gap-2"
                     >
                       <HiOutlinePlus className="w-4 h-4" />
                       New User
@@ -671,15 +671,15 @@ export default function SettingsPage() {
 
                 {usersLoading ? (
                   <div className="animate-pulse space-y-3">
-                    <div className="h-16 rounded-2xl bg-card border border-border" />
-                    <div className="h-16 rounded-2xl bg-card border border-border" />
-                    <div className="h-16 rounded-2xl bg-card border border-border" />
+                    <div className="h-16 rounded-xl bg-card border border-border" />
+                    <div className="h-16 rounded-xl bg-card border border-border" />
+                    <div className="h-16 rounded-xl bg-card border border-border" />
                   </div>
                 ) : (
                   <>
-                    <div className="hidden md:block glass-card rounded-3xl overflow-hidden border border-border/50">
+                    <div className="hidden md:block glass-card rounded-xl overflow-hidden border border-border/50">
                       <table className="w-full text-left text-sm">
-                        <thead className="bg-card-alt/60 text-xs uppercase tracking-widest font-black text-muted">
+                        <thead className="bg-card-alt/60 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
                           <tr>
                             <th className="px-5 py-3">User</th>
                             <th className="px-5 py-3">Contact</th>
@@ -729,14 +729,14 @@ export default function SettingsPage() {
                               <td className="px-5 py-3 text-right space-x-2">
                                 <button
                                   onClick={() => handleEdit(user)}
-                                  className="p-2 rounded-xl border border-border bg-card-alt text-foreground hover:bg-primary/10 hover:text-primary dark:hover:text-foreground transition-colors"
+                                  className="p-2 rounded-lg border border-border bg-card-alt text-foreground hover:bg-primary/10 hover:text-primary dark:hover:text-foreground transition-colors"
                                   title="Edit"
                                 >
                                   <HiOutlinePencil className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => setDeleteId(user.id)}
-                                  className="p-2 rounded-xl bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                                  className="p-2 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
                                   title="Delete"
                                 >
                                   <HiOutlineTrash className="w-4 h-4" />
@@ -753,7 +753,7 @@ export default function SettingsPage() {
                         <button
                           key={user.id}
                           onClick={() => handleEdit(user)}
-                          className="w-full text-left rounded-2xl border border-border bg-card p-4"
+                          className="w-full text-left rounded-xl border border-border bg-card p-4"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
@@ -774,7 +774,7 @@ export default function SettingsPage() {
                                 e.stopPropagation();
                                 setDeleteId(user.id);
                               }}
-                              className="p-2 rounded-xl bg-red-500/10 text-red-600"
+                              className="p-2 rounded-lg bg-red-500/10 text-red-600"
                             >
                               <HiOutlineTrash className="w-4 h-4" />
                             </button>
@@ -782,13 +782,13 @@ export default function SettingsPage() {
                           <div className="mt-3 flex items-center justify-between gap-2">
                             <div className="flex flex-wrap gap-1">
                               {(user.role_names?.length ? user.role_names : [user.role_name]).map((roleName) => (
-                                <span key={`${user.id}-${roleName}-mobile`} className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">
+                                <span key={`${user.id}-${roleName}-mobile`} className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wider">
                                   {roleName}
                                 </span>
                               ))}
                             </div>
                             <span
-                              className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
                                 user.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
                               }`}
                             >
@@ -800,11 +800,11 @@ export default function SettingsPage() {
                     </div>
 
                     {users?.length === 0 && (
-                      <div className="rounded-2xl border border-border bg-card p-8 text-center">
+                      <div className="rounded-xl border border-border bg-card p-8 text-center">
                         <p className="text-muted font-medium mb-3">No users found in database.</p>
                         <button
                           onClick={() => bootstrapMutation.mutate()}
-                          className="px-4 py-2 rounded-2xl bg-primary text-on-primary text-sm font-black"
+                          className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold"
                           disabled={bootstrapMutation.isPending}
                         >
                           {bootstrapMutation.isPending ? "Syncing defaults..." : "Create default users"}
@@ -818,18 +818,18 @@ export default function SettingsPage() {
 
             {activeTab === "system" && (
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="glass-card rounded-4xl p-8 shadow-premium space-y-6">
-                  <h2 className="text-xl font-black text-foreground tracking-tight">Employee ID Configuration</h2>
+                <div className="glass-card rounded-xl p-6 shadow-sm space-y-6">
+                  <h2 className="text-lg font-bold text-foreground tracking-tight">Employee ID Configuration</h2>
 
                   <div className="space-y-2 max-w-md">
-                    <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] mb-1.5 block px-1">ID Prefix *</label>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">ID Prefix *</label>
                     <input
                       type="text"
                       required
                       value={prefix}
                       onChange={(e) => setPrefix(e.target.value.toUpperCase())}
                       placeholder="e.g. EMP"
-                      className="w-full px-5 py-3.5 rounded-2xl border-none bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                      className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
                     />
                     <p className="text-xs text-muted px-1 pt-2 font-medium opacity-60">
                       This prefix generates sequential employee IDs (for example {prefix || "EMP"}001).
@@ -840,7 +840,7 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={isSystemSavePending || isSystemSaveDisabled}
-                  className={`w-full py-4 rounded-3xl font-black uppercase tracking-[0.2em] shadow-premium transition-all flex items-center justify-center gap-2 ${
+                  className={`w-full h-11 rounded-xl font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2 ${
                     isSystemSavePending
                       ? "bg-primary text-on-primary opacity-90 cursor-wait"
                       : isSystemSaveDisabled
@@ -855,21 +855,21 @@ export default function SettingsPage() {
 
             {activeTab === "database" && (
               <section className="space-y-4">
-                <div className="rounded-3xl border border-border bg-card p-6">
+                <div className="rounded-xl border border-border bg-card p-6">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-xl font-black text-foreground tracking-tight">Backend & Database Sync</h2>
+                      <h2 className="text-lg font-bold text-foreground tracking-tight">Backend & Database Sync</h2>
                       <p className="text-sm text-muted">Verify backend status and sync default admin account.</p>
                     </div>
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                       <HiServerStack className="w-6 h-6" />
                     </div>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="rounded-2xl bg-card-alt border border-border p-4">
-                      <p className="text-xs uppercase tracking-widest font-black text-muted">Health Check</p>
-                      <p className={`text-lg font-black mt-2 ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
+                    <div className="rounded-xl bg-card-alt border border-border p-4">
+                      <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Health Check</p>
+                      <p className={`text-lg font-bold mt-2 ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
                         {healthLoading ? "Checking..." : health?.status === "ok" ? "OK" : "Unavailable"}
                       </p>
                       <p className="text-xs text-muted mt-1">
@@ -877,14 +877,14 @@ export default function SettingsPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-2xl bg-card-alt border border-border p-4">
-                      <p className="text-xs uppercase tracking-widest font-black text-muted">Admin Sync</p>
+                    <div className="rounded-xl bg-card-alt border border-border p-4">
+                      <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">Admin Sync</p>
                       <p className="text-sm text-foreground font-medium mt-2">
                         Ensures admin user exists and remains enabled.
                       </p>
                       <button
                         onClick={() => bootstrapMutation.mutate()}
-                        className="mt-3 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-black"
+                        className="mt-3 h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold"
                         disabled={bootstrapMutation.isPending}
                       >
                         {bootstrapMutation.isPending ? "Syncing..." : "Run Defaults Sync"}
@@ -900,14 +900,14 @@ export default function SettingsPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-card w-full md:max-w-2xl rounded-t-xl md:rounded-3xl shadow-premium border border-border/50 flex flex-col max-h-[95vh]">
+          <div className="bg-card w-full md:max-w-2xl rounded-t-xl md:rounded-xl shadow-premium border border-border/50 flex flex-col max-h-[95vh]">
             <div className="p-5 border-b border-border/50 flex justify-between items-center bg-card-alt/30 rounded-t-xl">
-              <h2 className="text-lg md:text-xl font-black text-foreground tracking-tight">
+              <h2 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
                 {selectedUser ? "Edit User" : "Add New User"}
               </h2>
               <button
                 onClick={closeModal}
-                className="text-muted hover:text-foreground font-black text-2xl leading-none"
+                className="text-muted hover:text-foreground font-normal text-2xl leading-none"
               >
                 &times;
               </button>
@@ -919,7 +919,7 @@ export default function SettingsPage() {
                   <button
                     key={tab.id}
                     onClick={() => setUserModalTab(tab.id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-black tracking-wide transition-colors ${
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
                       userModalTab === tab.id
                         ? "bg-primary text-on-primary"
                         : "bg-card-alt text-muted hover:text-foreground"
@@ -935,8 +935,8 @@ export default function SettingsPage() {
               {userModalTab === "identity" && (
                 <div className="space-y-4">
                   <div className="space-y-3">
-                    <label className="text-xs uppercase font-black text-muted tracking-wider block">Profile Image</label>
-
+                    <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider block">Profile Image</label>
+ 
                     <input
                       id="profile-image-input"
                       type="file"
@@ -944,37 +944,37 @@ export default function SettingsPage() {
                       onChange={(e) => handleProfileImageChange(e.target.files?.[0] || null)}
                       className="hidden"
                     />
-
+ 
                     <label
                       htmlFor="profile-image-input"
-                      className="block rounded-2xl border border-dashed border-border bg-card-alt p-3 cursor-pointer hover:border-primary/50 transition-colors"
+                      className="block rounded-xl border border-dashed border-border bg-card-alt p-3 cursor-pointer hover:border-primary/50 transition-colors"
                     >
                       <div className="flex items-center gap-4">
                         <UserAvatar
                           fullName={formData.fullName || selectedUser?.full_name || "User"}
                           imageUrl={formData.profileImagePreviewUrl || null}
                           sizeClassName="w-20 h-20"
-                          textClassName="text-sm font-black text-muted"
+                          textClassName="text-xs font-semibold text-muted-foreground"
                         />
                         <div>
-                          <p className="text-sm font-black text-foreground">Upload / Replace Profile Image</p>
+                          <p className="text-sm font-semibold text-foreground">Upload / Replace Profile Image</p>
                           <p className="text-[11px] text-muted mt-1">Click this placeholder to choose an image.</p>
                         </div>
                       </div>
                     </label>
-
+ 
                     {formData.profileImagePreviewUrl && (
                       <button
                         type="button"
                         onClick={handleRemoveProfileImage}
-                        className="px-3 py-2 rounded-xl bg-red-500/10 text-red-600 text-xs font-black uppercase tracking-wider hover:bg-red-600 hover:text-white transition-colors"
+                        className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 text-xs font-semibold hover:bg-red-600 hover:text-white transition-colors"
                       >
                         Remove Image
                       </button>
                     )}
-
+ 
                     {(profileImageStatus || profileImageBusy) && (
-                      <div className="rounded-xl border border-border bg-card-alt p-3 space-y-2">
+                      <div className="rounded-lg border border-border bg-card-alt p-3 space-y-2">
                         <div className="h-2 rounded-full bg-border overflow-hidden">
                           <div
                             className={`h-full transition-all ${profileImageBusy ? "bg-primary" : "bg-success"}`}
@@ -985,27 +985,27 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
-
+ 
                   <div>
-                    <label className="block text-xs uppercase font-black text-muted tracking-wider mb-1.5">Username *</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Username *</label>
                     <input
                       required
                       type="text"
                       value={formData.username}
                       onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
                       disabled={!!selectedUser}
-                      className="w-full px-4 py-3 rounded-xl bg-card-alt border-none focus:ring-2 focus:ring-primary/50 text-sm font-medium disabled:opacity-50"
+                      className="w-full h-11 px-4 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium disabled:opacity-50"
                     />
                   </div>
-
+ 
                   <div>
-                    <label className="block text-xs uppercase font-black text-muted tracking-wider mb-1.5">Full Name *</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Full Name *</label>
                     <input
                       required
                       type="text"
                       value={formData.fullName}
                       onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))}
-                      className="w-full px-4 py-3 rounded-xl bg-card-alt border-none focus:ring-2 focus:ring-primary/50 text-sm font-medium"
+                      className="w-full h-11 px-4 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium"
                     />
                   </div>
                 </div>
@@ -1014,23 +1014,23 @@ export default function SettingsPage() {
               {userModalTab === "contact" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs uppercase font-black text-muted tracking-wider mb-1.5">Email</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Email</label>
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                      className="w-full px-4 py-3 rounded-xl bg-card-alt border-none focus:ring-2 focus:ring-primary/50 text-sm font-medium"
+                      className="w-full h-11 px-4 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs uppercase font-black text-muted tracking-wider mb-1.5">Ethiopian Phone</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Ethiopian Phone</label>
                     <input
                       type="text"
                       value={formData.phone}
                       onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                       placeholder="+2519XXXXXXXX or 09XXXXXXXX"
-                      className="w-full px-4 py-3 rounded-xl bg-card-alt border-none focus:ring-2 focus:ring-primary/50 text-sm font-medium"
+                      className="w-full h-11 px-4 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium"
                     />
                     <p className="text-[11px] text-muted mt-1">Normalized to +251 format when saved.</p>
                   </div>
@@ -1040,8 +1040,8 @@ export default function SettingsPage() {
               {userModalTab === "access" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs uppercase font-black text-muted tracking-wider mb-1.5">Roles *</label>
-                    <div className="rounded-2xl border border-border bg-card-alt p-3 space-y-2">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Roles *</label>
+                    <div className="rounded-xl border border-border bg-card-alt p-3 space-y-2">
                       {roles.map((r) => {
                         const checked = formData.roleIds.includes(r.id);
                         return (
@@ -1073,7 +1073,7 @@ export default function SettingsPage() {
                       onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.checked }))}
                       className="w-5 h-5 rounded border-border text-primary focus:ring-primary/50"
                     />
-                    <label htmlFor="isActive" className="text-sm font-bold text-foreground">
+                    <label htmlFor="isActive" className="text-sm font-semibold text-foreground">
                       Account Enabled
                     </label>
                   </div>
@@ -1083,7 +1083,7 @@ export default function SettingsPage() {
               {userModalTab === "security" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs uppercase font-black text-muted tracking-wider mb-1.5">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
                       {selectedUser ? "Password (leave blank to keep current)" : "Password *"}
                     </label>
                     <input
@@ -1091,12 +1091,12 @@ export default function SettingsPage() {
                       value={formData.rawPassword}
                       onChange={(e) => setFormData((prev) => ({ ...prev, rawPassword: e.target.value }))}
                       required={!selectedUser}
-                      className="w-full px-4 py-3 rounded-xl bg-card-alt border-none focus:ring-2 focus:ring-primary/50 text-sm font-medium"
+                      className="w-full h-11 px-4 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="mt-2 text-xs font-black uppercase tracking-wider text-muted hover:text-foreground"
+                      className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted hover:text-foreground"
                     >
                       {showPassword ? "Hide Password" : "Reveal Password"}
                     </button>
@@ -1108,7 +1108,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 py-3 text-sm font-black uppercase tracking-wider text-muted hover:text-foreground transition-colors rounded-xl bg-card-alt"
+                  className="flex-1 h-11 text-sm font-semibold text-muted hover:text-foreground transition-colors rounded-xl bg-card-alt"
                 >
                   Cancel
                 </button>
@@ -1120,7 +1120,7 @@ export default function SettingsPage() {
                       closeModal();
                       setDeleteId(selectedUser.id);
                     }}
-                    className="flex-1 py-3 text-sm font-black uppercase tracking-wider rounded-xl bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                    className="flex-1 h-11 text-sm font-semibold rounded-xl bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
                   >
                     Delete User
                   </button>
@@ -1129,7 +1129,7 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={isUserSavePending}
-                  className={`flex-1 py-3 text-sm font-black uppercase tracking-wider rounded-xl shadow-premium transition-colors ${
+                  className={`flex-1 h-11 text-sm font-semibold rounded-xl shadow-sm transition-colors ${
                     isUserSavePending
                       ? "bg-primary text-on-primary opacity-90 cursor-wait"
                       : "bg-primary text-on-primary hover:bg-primary/90"

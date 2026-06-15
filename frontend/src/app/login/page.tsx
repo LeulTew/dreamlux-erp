@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 import toast from "react-hot-toast";
-import { HiLockClosed, HiUsers, HiUser, HiEye, HiEyeSlash } from "react-icons/hi2";
+import { HiLockClosed, HiUser, HiEye, HiEyeSlash } from "react-icons/hi2";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -39,21 +39,21 @@ export default function LoginPage() {
       <div className="w-full max-w-sm relative z-10">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-4xl bg-primary text-on-primary shadow-premium mb-6">
-            <HiUsers className="w-10 h-10" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-foreground text-background font-bold text-3xl shadow-premium mb-6 select-none">
+            D
           </div>
-          <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase mb-2">EL ERP</h1>
-          <p className="text-muted text-sm font-medium opacity-60">HR · Payroll · Inventory</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight uppercase mb-1">Dream Lux</h1>
+          <p className="text-[10px] text-primary font-bold uppercase tracking-wider">Event Logistics · HR · Payroll</p>
         </div>
 
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="glass-card rounded-xl shadow-premium p-8 space-y-6"
+          className="glass-card rounded-2xl shadow-premium p-8 space-y-6"
         >
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] mb-1.5 block px-1">
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
                 Username
               </label>
               <div className="relative">
@@ -63,14 +63,14 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="admin"
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border-none bg-card-alt text-foreground placeholder:text-muted/30 focus:ring-1 focus:ring-muted/30 transition-all outline-none"
+                  className="w-full pl-12 pr-4 h-11 rounded-xl border border-border/50 bg-card-alt text-foreground placeholder:text-muted/30 focus:ring-1 focus:ring-muted/30 transition-all outline-none"
                   autoFocus
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] uppercase font-black text-muted tracking-[0.2em] mb-1.5 block px-1">
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
                 Password
               </label>
               <div className="relative">
@@ -80,7 +80,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-12 py-4 rounded-2xl border-none bg-card-alt text-foreground placeholder:text-muted/30 focus:ring-1 focus:ring-muted/30 transition-all outline-none"
+                  className="w-full pl-12 pr-12 h-11 rounded-xl border border-border/50 bg-card-alt text-foreground placeholder:text-muted/30 focus:ring-1 focus:ring-muted/30 transition-all outline-none"
                 />
                 <button
                   type="button"
@@ -96,7 +96,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || !username.trim() || !password.trim()}
-            className="w-full py-4 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

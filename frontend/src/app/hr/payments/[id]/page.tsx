@@ -118,13 +118,13 @@ export default function PaymentRunDetailPage() {
               <HiOutlineArrowUturnLeft className="w-6 h-6" />
             </Link>
             <div>
-              <h1 className="text-2xl font-black uppercase tracking-tight">Payroll Run Detail</h1>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">{periodLabel}</p>
+              <h1 className="text-2xl font-bold uppercase tracking-tight">Payroll Run Detail</h1>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">{periodLabel}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <span className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest border ${statusColors[run.status ?? ""] ?? "bg-muted text-muted-foreground border-border"}`}>
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider border ${statusColors[run.status ?? ""] ?? "bg-muted text-muted-foreground border-border"}`}>
               {run.status ?? "unknown"}
             </span>
 
@@ -132,7 +132,7 @@ export default function PaymentRunDetailPage() {
 
             <button 
               onClick={() => setIsPrintModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-3 bg-primary text-on-primary rounded-2xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-primary/20"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:opacity-90 transition-all active:scale-[0.98] shadow-sm"
             >
               <HiPrinter className="w-4 h-4" />
               Print PDF
@@ -140,7 +140,7 @@ export default function PaymentRunDetailPage() {
 
             <button 
               onClick={() => exportPayrollExcel(id)}
-              className="inline-flex items-center gap-2 px-5 py-3 bg-card border border-border text-foreground rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-muted transition-all active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
               <HiTableCells className="w-4 h-4 text-emerald-500" />
               Excel
@@ -148,7 +148,7 @@ export default function PaymentRunDetailPage() {
 
             <button 
               onClick={() => exportPayrollCSV(id)}
-              className="inline-flex items-center gap-2 px-5 py-3 bg-card border border-border text-foreground rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-muted transition-all active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
               <HiDocumentArrowDown className="w-4 h-4 text-amber-500" />
               CSV
@@ -158,14 +158,14 @@ export default function PaymentRunDetailPage() {
               <div className="flex gap-2">
                 <button 
                   onClick={() => setIsFlagModalOpen(true)}
-                  className="p-3 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-all active:scale-90"
+                  className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg hover:bg-amber-500/20 transition-all active:scale-[0.98]"
                   title="Flag as Wrong"
                 >
                   <HiExclamationTriangle className="w-5 h-5" />
                 </button>
                 <button 
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="p-3 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-xl hover:bg-rose-500/20 transition-all active:scale-90"
+                  className="p-2.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all active:scale-[0.98]"
                   title="Move to Trash"
                 >
                   <HiTrash className="w-5 h-5" />
@@ -176,7 +176,7 @@ export default function PaymentRunDetailPage() {
             {run.status === "DRAFT" && (
               <button 
                 onClick={() => setIsFinalizeModalOpen(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+                className="inline-flex items-center gap-2 h-10 px-4 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm"
               >
                 Finalize Payout
               </button>
@@ -229,16 +229,16 @@ export default function PaymentRunDetailPage() {
 
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-xl border border-border/50 bg-card p-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Paid</p>
-            <p className="text-xl font-black mt-1">ETB {totalPaid.toLocaleString()}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total Paid</p>
+            <p className="text-xl font-bold mt-1">ETB {totalPaid.toLocaleString()}</p>
           </div>
           <div className="rounded-xl border border-border/50 bg-card p-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Employees</p>
-            <p className="text-xl font-black mt-1">{employeeCount}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Employees</p>
+            <p className="text-xl font-bold mt-1">{employeeCount}</p>
           </div>
           <div className="rounded-xl border border-border/50 bg-card p-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Average Paid</p>
-            <p className="text-xl font-black mt-1">ETB {avgPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Average Paid</p>
+            <p className="text-xl font-bold mt-1">ETB {avgPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
           </div>
         </div>
 
@@ -250,7 +250,7 @@ export default function PaymentRunDetailPage() {
                   <p className="font-bold tracking-wide">{line.employee_name_snapshot}</p>
                   <p className="text-xs text-muted-foreground">Base ETB {Number(line.snapshot_base_salary).toLocaleString()} • Events ETB {Number(line.total_events_value).toLocaleString()}</p>
                 </div>
-                <p className="font-black text-lg">ETB {Number(line.total_line_pay).toLocaleString()}</p>
+                <p className="font-bold text-lg">ETB {Number(line.total_line_pay).toLocaleString()}</p>
               </div>
 
               {(line.events ?? []).length > 0 && (
