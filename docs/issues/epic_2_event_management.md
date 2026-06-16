@@ -19,7 +19,7 @@ Implement the complete lifecycle, allocation, and tracking system for Event Mana
 
 ## Child Stories
 
-- [ ] [STORY-2: Core Event Lifecycle](story_2_event_lifecycle.md)
+- [x] [STORY-2: Core Event Lifecycle](story_2_event_lifecycle.md)
 - [ ] [STORY-3: Employee & Vehicle Schedules](story_3_employee_vehicle.md)
 - [ ] [STORY-4: Expenses Entry & Approvals](story_4_expenses_reconciliation.md)
 - [ ] [STORY-5: Event Profitability Reports](story_5_profitability_reports.md)

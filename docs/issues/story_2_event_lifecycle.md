@@ -28,10 +28,10 @@ We need the basic tables and page layouts to support event creation. This forms 
 
 ## Sub-Tasks
 
-- [ ] Write database migration to add `events` and `event_logs` tables.
-- [ ] Create backend API endpoints for event CRUD and status transitions.
-- [ ] Build the Event List (`/events`) page with status-colored tags.
-- [ ] Implement Create/Edit Event page in Next.js (`/events/create`).
+- [x] Write database migration to add `events` and `event_logs` tables.
+- [x] Create backend API endpoints for event CRUD and status transitions.
+- [x] Build the Event List (`/events`) page with status-colored tags.
+- [x] Implement Create/Edit Event page in Next.js (`/events/create`).
 
 ## Verification Plan
 
