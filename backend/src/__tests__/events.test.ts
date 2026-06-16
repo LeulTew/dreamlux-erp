@@ -500,4 +500,194 @@ describe("Events API", () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("Done");
   });
+
+  // Scheduling - GET available employees
+  test("GET /events/:id/assignments/available-employees returns active employees not booked on overlapping dates", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22" }],
+      rowCount: 1,
+    });
+    // Available employees
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "emp-1", full_name: "Abebe Girma" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/event-1/assignments/available-employees")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].full_name).toBe("Abebe Girma");
+  });
+
+  // Scheduling - GET available vehicles
+  test("GET /events/:id/assignments/available-vehicles returns active vehicles not booked on overlapping dates", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22" }],
+      rowCount: 1,
+    });
+    // Available vehicles
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "veh-1", plate_number: "AA-3-A12345" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/event-1/assignments/available-vehicles")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].plate_number).toBe("AA-3-A12345");
+  });
+
+  // Scheduling - POST Employee Assignment success
+  test("POST /events/:id/assignments/employees creates assignment", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+      rowCount: 1,
+    });
+    // Employee team conflict check (returns 0 count)
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "0" }],
+      rowCount: 1,
+    });
+    // Employee driver conflict check (returns 0 count)
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "0" }],
+      rowCount: 1,
+    });
+    // Insert assignment
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ event_id: "event-1", employee_id: "emp-1", role: "Team Leader" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/event-1/assignments/employees")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        employee_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        role: "Team Leader",
+        commission_amount: 2000,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.role).toBe("Team Leader");
+  });
+
+  // Scheduling - POST Employee Assignment double booking conflict blocked
+  test("POST /events/:id/assignments/employees blocks assignment when employee is already booked", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+      rowCount: 1,
+    });
+    // Employee team conflict check (returns 1 count)
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "1" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/event-1/assignments/employees")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        employee_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        role: "Team Leader",
+        commission_amount: 2000,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Scheduling Conflict");
+  });
+
+  // Scheduling - POST Vehicle Assignment success
+  test("POST /events/:id/assignments/vehicles assigns vehicle and driver", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+      rowCount: 1,
+    });
+    // Vehicle conflict check (returns 0 count)
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "0" }],
+      rowCount: 1,
+    });
+    // Driver team conflict check (returns 0)
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "0" }],
+      rowCount: 1,
+    });
+    // Driver vehicle conflict check (returns 0)
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "0" }],
+      rowCount: 1,
+    });
+    // Insert vehicle assignment
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ event_id: "event-1", vehicle_id: "veh-1", driver_id: "emp-1" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/event-1/assignments/vehicles")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        vehicle_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        driver_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        is_night_shift: false,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.vehicle_id).toBe("veh-1");
+  });
+
+  // Scheduling - DELETE Employee Assignment
+  test("DELETE /events/:id/assignments/employees/:employeeId removes assignment", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Planned" }],
+      rowCount: 1,
+    });
+    // Delete query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ event_id: "event-1", employee_id: "emp-1" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .delete("/events/event-1/assignments/employees/emp-1")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain("removed successfully");
+  });
+
+  // Scheduling - Toggle Attendance
+  test("PATCH /events/:id/assignments/employees/:employeeId/attendance updates attended field", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Planned" }],
+      rowCount: 1,
+    });
+    // Update query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ event_id: "event-1", employee_id: "emp-1", attended: false }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .patch("/events/event-1/assignments/employees/emp-1/attendance")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({ attended: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.attended).toBe(false);
+  });
 });

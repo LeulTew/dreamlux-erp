@@ -33,6 +33,7 @@ export interface Employee {
   employee_id: string;
   department: string | null;
   department_id: string | null;
+  position: string | null;
   phone: string | null;
   email: string | null;
   salary_level: string | null;
@@ -45,6 +46,13 @@ export interface Employee {
   office: string | null;
   event_prices: Record<string, number> | null;
   base_salary?: number;
+  gender: string | null;
+  employment_type: string | null;
+  group_name: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
+  hire_date: string | null;
+  contract_status: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -309,9 +317,47 @@ export interface EventChecklistItem {
   updated_at: string;
 }
 
+export interface EventAssignment {
+  id: string;
+  event_id: string;
+  employee_id: string;
+  employee_name?: string;
+  employee_phone?: string;
+  role: string;
+  commission_amount: number;
+  attended: boolean;
+  created_at: string;
+}
+
+export interface Vehicle {
+  id: string;
+  plate_number: string;
+  vehicle_type: string;
+  fuel_type: string;
+  fuel_consumption_rate: number;
+  driver_license_details: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleAssignment {
+  id: string;
+  event_id: string;
+  vehicle_id: string;
+  plate_number?: string;
+  vehicle_type?: string;
+  driver_id: string | null;
+  driver_name?: string | null;
+  is_night_shift: boolean;
+  created_at: string;
+}
+
 export interface EventWorkspace {
   event: Event;
   allocations: EventInventoryAllocation[];
   checklist: EventChecklistItem[];
+  assignments: EventAssignment[];
+  vehicleAssignments: VehicleAssignment[];
 }
 

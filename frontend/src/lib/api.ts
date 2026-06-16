@@ -1215,3 +1215,28 @@ export const updateEventChecklistItem = (
   itemId: string,
   data: Partial<Pick<EventChecklistItem, "title" | "status" | "due_date" | "owner_name">>
 ) => api.patch(`/events/${eventId}/checklist/${itemId}`, data).then((r) => r.data);
+
+export const getAvailableEmployees = (eventId: string) =>
+  api.get(`/events/${eventId}/assignments/available-employees`).then((r) => r.data);
+
+export const getAvailableVehicles = (eventId: string) =>
+  api.get(`/events/${eventId}/assignments/available-vehicles`).then((r) => r.data);
+
+export const createEmployeeAssignment = (
+  eventId: string,
+  data: { employee_id: string; role: string; commission_amount: number; attended?: boolean }
+) => api.post(`/events/${eventId}/assignments/employees`, data).then((r) => r.data);
+
+export const deleteEmployeeAssignment = (eventId: string, employeeId: string) =>
+  api.delete(`/events/${eventId}/assignments/employees/${employeeId}`).then((r) => r.data);
+
+export const createVehicleAssignment = (
+  eventId: string,
+  data: { vehicle_id: string; driver_id?: string | null; is_night_shift?: boolean }
+) => api.post(`/events/${eventId}/assignments/vehicles`, data).then((r) => r.data);
+
+export const deleteVehicleAssignment = (eventId: string, vehicleId: string) =>
+  api.delete(`/events/${eventId}/assignments/vehicles/${vehicleId}`).then((r) => r.data);
+
+export const updateEmployeeAttendance = (eventId: string, employeeId: string, attended: boolean) =>
+  api.patch(`/events/${eventId}/assignments/employees/${employeeId}/attendance`, { attended }).then((r) => r.data);
