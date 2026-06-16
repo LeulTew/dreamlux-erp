@@ -110,7 +110,7 @@ const employeeValidationSchema = z.object({
 export default function InsertEmployeePage() {
   const queryClient = useQueryClient();
   const { lang } = useLanguage();
-  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
 
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);

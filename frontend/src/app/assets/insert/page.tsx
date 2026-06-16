@@ -70,7 +70,7 @@ export default function InsertAssetPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { lang } = useLanguage();
-  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);

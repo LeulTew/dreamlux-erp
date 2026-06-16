@@ -313,7 +313,7 @@ function buildColumns(
 
 function EmployeesPageContent() {
   const { lang } = useLanguage();
-  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
