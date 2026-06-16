@@ -263,6 +263,8 @@ export interface Event {
   end_time: string | null;
   venue_location: string;
   contract_price: number;
+  package_design_notes?: string | null;
+  estimated_design_cost?: number | null;
   status: "Planned" | "Ongoing" | "Completed";
   created_by: string | null;
   created_by_name?: string | null;
@@ -276,5 +278,40 @@ export interface EventsResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface EventInventoryAllocation {
+  id: string;
+  event_id: string;
+  item_id: string;
+  quantity_allocated: number;
+  status: "Reserved" | "Pulled" | "Returned";
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  item_name: string;
+  available_quantity: number;
+  item_description: string | null;
+  image_key: string | null;
+  store_name: string | null;
+}
+
+export interface EventChecklistItem {
+  id: string;
+  event_id: string;
+  title: string;
+  status: "Todo" | "Done";
+  due_date: string | null;
+  owner_name: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventWorkspace {
+  event: Event;
+  allocations: EventInventoryAllocation[];
+  checklist: EventChecklistItem[];
 }
 

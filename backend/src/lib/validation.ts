@@ -175,4 +175,31 @@ export const updateEventSchema = eventBaseSchema.partial().extend({
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 
+export const updateEventDesignSchema = z.object({
+  package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable(),
+  estimated_design_cost: z.coerce.number().min(0, "Estimated cost cannot be negative").optional().nullable(),
+});
 
+export const createEventAllocationSchema = z.object({
+  item_id: z.string().uuid("Invalid inventory item ID"),
+  quantity_allocated: z.coerce.number().int("Quantity must be a whole number").min(1, "Quantity must be at least 1"),
+  notes: z.string().max(1000, "Allocation notes too long").optional().nullable(),
+});
+
+export const createEventChecklistItemSchema = z.object({
+  title: z.string().min(1, "Task title is required").max(500, "Task title too long"),
+  due_date: z.string().optional().nullable().refine((val) => {
+    if (!val) return true;
+    return !isNaN(Date.parse(val));
+  }, "Invalid due date"),
+  owner_name: z.string().max(200, "Owner name too long").optional().nullable(),
+});
+
+export const updateEventChecklistItemSchema = createEventChecklistItemSchema.partial().extend({
+  status: z.enum(["Todo", "Done"]).optional(),
+});
+
+export type UpdateEventDesignInput = z.infer<typeof updateEventDesignSchema>;
+export type CreateEventAllocationInput = z.infer<typeof createEventAllocationSchema>;
+export type CreateEventChecklistItemInput = z.infer<typeof createEventChecklistItemSchema>;
+export type UpdateEventChecklistItemInput = z.infer<typeof updateEventChecklistItemSchema>;

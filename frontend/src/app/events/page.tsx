@@ -275,12 +275,12 @@ function EventsPageContent() {
                             <HiPencilSquare className="w-4 h-4" />
                           </button>
                           <Link
-                            href={`/settings?tab=logs&eventId=${event.id}`}
+                            href={`/events/${event.id}`}
                             className="p-1.5 rounded bg-card-alt border border-border text-muted hover:text-foreground hover:border-border transition-all flex items-center gap-1 text-xs font-black uppercase tracking-wider px-2.5"
-                            title="View Change Logs"
+                            title="Open Event Workspace"
                           >
                             <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
-                            {t("Logs")}
+                            {t("Workspace")}
                           </Link>
                         </div>
                       </td>
@@ -345,12 +345,12 @@ function EventsPageContent() {
                       </span>
                     </div>
                     <Link
-                      href={`/settings?tab=logs&eventId=${event.id}`}
+                      href={`/events/${event.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="text-[10px] font-black uppercase tracking-wider bg-card-alt border border-border px-2.5 py-1 rounded text-muted hover:text-foreground flex items-center gap-1"
                     >
                       <HiArrowTopRightOnSquare className="w-3 h-3" />
-                      {t("Logs")}
+                      {t("Workspace")}
                     </Link>
                   </div>
                 </div>
