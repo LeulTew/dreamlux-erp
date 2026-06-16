@@ -1,5 +1,17 @@
 import axios, { AxiosRequestConfig } from "axios";
-import { User, Role, InventoryStats, Store, ItemsResponse, Item, ReconcileSummary, ReconcileRunDetail, ReconcileRun } from "./types";
+import {
+  User,
+  Role,
+  InventoryStats,
+  Store,
+  ItemsResponse,
+  Item,
+  ReconcileSummary,
+  ReconcileRunDetail,
+  ReconcileRun,
+  EventWorkspace,
+  EventChecklistItem,
+} from "./types";
 
 export type CreateUserPayload = {
   username: string;
@@ -1168,6 +1180,9 @@ export const getEvents = (
 export const getEvent = (id: string) =>
   api.get(`/events/${id}`).then((r) => r.data);
 
+export const getEventWorkspace = (id: string): Promise<EventWorkspace> =>
+  api.get(`/events/${id}/workspace`).then((r) => r.data);
+
 export const createEvent = (data: Record<string, unknown>) =>
   api.post("/events", data).then((r) => r.data);
 
@@ -1177,3 +1192,26 @@ export const updateEvent = (id: string, data: Record<string, unknown>) =>
 export const deleteEvent = (id: string) =>
   api.delete(`/events/${id}`).then((r) => r.data);
 
+export const updateEventDesign = (
+  id: string,
+  data: { package_design_notes?: string | null; estimated_design_cost?: number | null }
+) => api.patch(`/events/${id}/design`, data).then((r) => r.data);
+
+export const createEventAllocation = (
+  id: string,
+  data: { item_id: string; quantity_allocated: number; notes?: string | null }
+) => api.post(`/events/${id}/allocations`, data).then((r) => r.data);
+
+export const deleteEventAllocation = (eventId: string, allocationId: string) =>
+  api.delete(`/events/${eventId}/allocations/${allocationId}`).then((r) => r.data);
+
+export const createEventChecklistItem = (
+  id: string,
+  data: { title: string; due_date?: string | null; owner_name?: string | null }
+) => api.post(`/events/${id}/checklist`, data).then((r) => r.data);
+
+export const updateEventChecklistItem = (
+  eventId: string,
+  itemId: string,
+  data: Partial<Pick<EventChecklistItem, "title" | "status" | "due_date" | "owner_name">>
+) => api.patch(`/events/${eventId}/checklist/${itemId}`, data).then((r) => r.data);

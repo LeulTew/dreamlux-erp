@@ -139,6 +139,12 @@ CREATE TABLE IF NOT EXISTS items (
   image_key TEXT,
   last_counted_at TIMESTAMP DEFAULT NULL,
   last_counted_by UUID REFERENCES users(id) DEFAULT NULL,
+  type TEXT,
+  color TEXT,
+  unit_of_measurement TEXT DEFAULT 'pcs',
+  purchase_date DATE,
+  purchase_cost NUMERIC(12, 2),
+  condition_status TEXT CHECK (condition_status IN ('Good', 'Damaged', 'Under Repair')) DEFAULT 'Good',
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   deleted_at TIMESTAMP DEFAULT NULL
@@ -258,6 +264,13 @@ CREATE TABLE IF NOT EXISTS employees (
   base_salary NUMERIC(15,2) DEFAULT 0,
   commission TEXT, -- Level 1, 2, 3, 4
   salary_level TEXT, -- Level 1, 2, 3, 4 (optional)
+  gender TEXT,
+  employment_type TEXT CHECK (employment_type IN ('full-time', 'part-time', 'event-based')) DEFAULT 'full-time',
+  group_name TEXT,
+  bank_name TEXT,
+  bank_account TEXT,
+  hire_date DATE,
+  contract_status TEXT CHECK (contract_status IN ('Active', 'Suspended', 'Expired')) DEFAULT 'Active',
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   deleted_at TIMESTAMP DEFAULT NULL,
@@ -362,5 +375,83 @@ CREATE TABLE IF NOT EXISTS payroll_run_line_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_payroll_run_line_events_employee_line_id ON payroll_run_line_events(employee_line_id);
+
+-- 15. Vehicles
+CREATE TABLE IF NOT EXISTS vehicles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  plate_number TEXT UNIQUE NOT NULL,
+  vehicle_type TEXT NOT NULL,
+  fuel_type TEXT NOT NULL,
+  fuel_consumption_rate NUMERIC(6, 2) NOT NULL, -- liters per km
+  driver_license_details TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_vehicles_deleted_at ON vehicles(deleted_at);
+
+-- 16. Event Assignments (links employees to events)
+CREATE TABLE IF NOT EXISTS event_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  commission_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  attended BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (event_id, employee_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_assignments_event ON event_assignments(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_assignments_employee ON event_assignments(employee_id);
+
+-- 17. Vehicle Assignments (links vehicles/drivers to events)
+CREATE TABLE IF NOT EXISTS vehicle_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+  driver_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+  is_night_shift BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (event_id, vehicle_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_vehicle_assignments_event ON vehicle_assignments(event_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_assignments_vehicle ON vehicle_assignments(vehicle_id);
+
+-- 18. Trips (tracks fuel and distance per vehicle assignment)
+CREATE TABLE IF NOT EXISTS trips (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vehicle_assignment_id UUID NOT NULL REFERENCES vehicle_assignments(id) ON DELETE CASCADE,
+  destination TEXT NOT NULL,
+  distance_km NUMERIC(8, 2) NOT NULL,
+  fuel_liters_used NUMERIC(8, 2) NOT NULL,
+  fuel_cost_etb NUMERIC(12, 2) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_trips_assignment ON trips(vehicle_assignment_id);
+
+-- 19. Expenses (event expenses logged for Accountant approval)
+CREATE TABLE IF NOT EXISTS expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('Fuel', 'Labor', 'Transportation', 'Equipment Rental', 'Consumables', 'Other')),
+  amount NUMERIC(12, 2) NOT NULL,
+  description TEXT NOT NULL,
+  receipt_image_key TEXT DEFAULT NULL,
+  status TEXT NOT NULL CHECK (status IN ('Pending', 'Approved', 'Rejected')) DEFAULT 'Pending',
+  rejected_reason TEXT DEFAULT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  approved_at TIMESTAMP DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_event ON expenses(event_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
+
 
 
