@@ -368,6 +368,8 @@ export default function EventWorkspacePage() {
       toast.success(t("Task updated"));
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
     },
+  });
+
   const [selectedEmpId, setSelectedEmpId] = useState("");
   const [assignRole, setAssignRole] = useState("");
   const [commissionAmt, setCommissionAmt] = useState("");
@@ -375,8 +377,8 @@ export default function EventWorkspacePage() {
   const [selectedDrvId, setSelectedDrvId] = useState("");
   const [nightShift, setNightShift] = useState(false);
 
-  const assignments = (workspaceQuery.data as any)?.assignments || [];
-  const vehicleAssignments = (workspaceQuery.data as any)?.vehicleAssignments || [];
+  const assignments = workspaceQuery.data?.assignments || [];
+  const vehicleAssignments = workspaceQuery.data?.vehicleAssignments || [];
 
   const availableEmployeesQuery = useQuery({
     queryKey: ["available-employees", eventId],
@@ -401,7 +403,7 @@ export default function EventWorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
       queryClient.invalidateQueries({ queryKey: ["available-employees", eventId] });
     },
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
       toast.error(err.response?.data?.error || err.message || t("Assignment failed"));
     },
   });
@@ -413,7 +415,7 @@ export default function EventWorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
       queryClient.invalidateQueries({ queryKey: ["available-employees", eventId] });
     },
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
       toast.error(err.response?.data?.error || err.message || t("Removal failed"));
     },
   });
@@ -429,7 +431,7 @@ export default function EventWorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
       queryClient.invalidateQueries({ queryKey: ["available-vehicles", eventId] });
     },
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
       toast.error(err.response?.data?.error || err.message || t("Assignment failed"));
     },
   });
@@ -441,7 +443,7 @@ export default function EventWorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
       queryClient.invalidateQueries({ queryKey: ["available-vehicles", eventId] });
     },
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
       toast.error(err.response?.data?.error || err.message || t("Removal failed"));
     },
   });
@@ -453,7 +455,7 @@ export default function EventWorkspacePage() {
       toast.success(t("Attendance updated"));
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
     },
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
       toast.error(err.response?.data?.error || err.message || t("Update failed"));
     },
   });

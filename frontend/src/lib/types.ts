@@ -33,6 +33,7 @@ export interface Employee {
   employee_id: string;
   department: string | null;
   department_id: string | null;
+  position: string | null;
   phone: string | null;
   email: string | null;
   salary_level: string | null;
@@ -45,6 +46,13 @@ export interface Employee {
   office: string | null;
   event_prices: Record<string, number> | null;
   base_salary?: number;
+  gender: string | null;
+  employment_type: string | null;
+  group_name: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
+  hire_date: string | null;
+  contract_status: string | null;
   created_at: string;
   updated_at: string;
 }
