@@ -1,0 +1,77 @@
+# 🚀 Dream Lux ERP - Agent Development Rules & Workflow
+
+This document details the mandatory workflow, tooling standards, build guidelines, and design quality practices that every developer agent (including Antigravity, ChatGPT, and Codex) must strictly follow in this repository.
+
+---
+
+## 1. 🛠️ Development & GitHub Workflow (`gh` CLI)
+
+Always interact with GitHub using the `gh` tool to maintain project hygiene:
+
+1. **Issue Management**:
+   - Every task or bug must correspond to an active GitHub issue.
+   - Use `gh issue list` to inspect current work, or `gh issue create` to initialize a new issue if none exists.
+   - Properly label the issue (e.g. `bug`, `enhancement`) and assign it to yourself (`assign @self`).
+
+2. **Branching Strategy**:
+   - Create a clean feature branch from `main` or `develop` using a standard naming pattern: `feature/<issue-id>-short-name` (e.g. `feature/6-amharic-fix`).
+   - Work must never be done directly on `main` unless it is a simple diagnostic/hotfix check.
+
+3. **Pull Request (PR) Lifecycle**:
+   - Use `gh pr create` to initiate a PR from your feature branch to the target integration branch.
+   - Set titles prefixed by semantic tags: `feat(...)`, `fix(...)`, `chore(...)`, `docs(...)`.
+   - Ensure the PR description matches the project template, references the solved issue number, and lists all completed tasks.
+   - All checkmarks on the issue and PR checklists must be ticked (`[x]`) before merging.
+   - Use `gh pr merge --merge` to merge once fully validated.
+
+---
+
+## 2. ⚠️ Zero-Warning Compilation Policy (`bun` Only)
+
+We maintain a strict quality gate: **Exactly 0 Errors and 0 Warnings** are allowed across the codebase.
+
+Before any commit, pull request, or deployment, you must run local build and lint validation checks:
+
+```bash
+# Frontend validation
+cd frontend && bun run lint && bun run build
+
+# Backend validation
+cd backend && bun run lint && bun run build
+
+# Entire repository validation
+bun run lint && bun run build
+```
+
+- **Warning Resolution**: Any ESLint warnings (such as missing react hook dependencies, unused variables, un-escaped HTML characters, or improper callback memoization) must be fixed before proceeding.
+- **Dependency Wrapping**: When passing translation methods (like the inline helper `t`) or complex objects into `useMemo` or React component dependencies, wrap them in `useCallback` or ensure stable closures to prevent infinite warning logs and re-render cycles.
+
+---
+
+## 3. 🎨 Design Aesthetics & Visual Quality (No AI Slop)
+
+All UI elements must look premium, modern, and aligned with standard high-quality styling principles:
+
+- **Impeccable Style Standards**: Refer to the style guidelines and rules defined in the [Impeccable Style Guide](file:///.agents/skills/impeccable/SKILL.md) and apply the visual hygiene rules listed in [AGENTS.md](file:///AGENTS.md).
+- **Anti-AI Slop**: Do not generate basic, raw, or unpolished layouts. Maintain balanced contrast ratios (meeting WCAG 4.5:1 standards), smooth modern transitions, and elegant styling tokens (e.g. warm elegant gold `#D4AF37` and dark slate gradients).
+- **Radius & Borders**: Keep container roundness clean and minimal (`rounded-lg` or `rounded-xl`). Avoid huge round shapes or extreme drop shadows; favor sharp, elegant high-contrast borders.
+
+---
+
+## 4. 🌍 Localization & Translation Sync
+
+- **Reactivity**: Ensure the language switcher toggle immediately propagates language state updates across all page components and layouts without requiring a hard refresh.
+- **Breadcrumbs**: All path routes must use localized labels inside [Breadcrumbs.tsx](file:///frontend/src/components/Breadcrumbs.tsx) dynamically synchronized through the language hook.
+- **Clean Fallbacks**: Never leave hardcoded strings in layouts, buttons, form headers, or report sheets. Every text node must use the translation function `t(...)` with clean fallbacks.
+
+---
+
+## 5. 🚀 Deployment & Release
+
+Once tests pass with **0 warnings**, deploy to Vercel production by running:
+
+```bash
+bun run deploy
+```
+
+This ensures that both the backend and frontend services are compiled, packaged, and published successfully. Always record the resulting production URLs in your final status report.
