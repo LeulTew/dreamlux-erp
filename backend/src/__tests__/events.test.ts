@@ -5,10 +5,18 @@ import jwt from "jsonwebtoken";
 
 // Mock the DB pool
 const mockQuery = mock((..._args: any[]) => Promise.resolve({ rows: [] as any[], rowCount: 1 }));
+const mockRelease = mock(() => {});
+const mockConnect = mock(() =>
+  Promise.resolve({
+    query: mockQuery,
+    release: mockRelease,
+  })
+);
 
 mock.module("../db/pool", () => ({
   pool: {
     query: mockQuery,
+    connect: mockConnect,
   },
 }));
 
@@ -28,6 +36,8 @@ function getToken(role = "SUPER_ADMIN", extra: Record<string, unknown> = {}): st
 beforeEach(() => {
   mockQuery.mockReset();
   mockQuery.mockResolvedValue({ rows: [], rowCount: 1 });
+  mockConnect.mockClear();
+  mockRelease.mockClear();
 });
 
 describe("Events API", () => {
@@ -282,5 +292,212 @@ describe("Events API", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+  });
+
+  // Workspace endpoint
+  test("GET /events/:id/workspace returns details, allocations, checklist and assignments", async () => {
+    // Event query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", name: "Wedding" }],
+      rowCount: 1,
+    });
+    // Allocations query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "alloc-1", item_name: "White Rose", quantity_allocated: 5, status: "Reserved" }],
+      rowCount: 1,
+    });
+    // Checklist query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "check-1", title: "Setup stage", status: "Todo" }],
+      rowCount: 1,
+    });
+    // Assignments query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "assign-1", employee_name: "John Doe" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/event-1/workspace")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.name).toBe("Wedding");
+    expect(res.body.allocations).toHaveLength(1);
+    expect(res.body.checklist).toHaveLength(1);
+    expect(res.body.assignments).toHaveLength(1);
+  });
+
+  // Design updates
+  test("PATCH /events/:id/design updates package design notes and cost", async () => {
+    // Event query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Planned", package_design_notes: "Old note" }],
+      rowCount: 1,
+    });
+    // Log queries
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // logs notes
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // logs cost
+    // Update query
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", package_design_notes: "New theme", estimated_design_cost: 1500 }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .patch("/events/event-1/design")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        package_design_notes: "New theme",
+        estimated_design_cost: 1500,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.package_design_notes).toBe("New theme");
+    expect(res.body.event.estimated_design_cost).toBe(1500);
+  });
+
+  // Allocation - Success
+  test("POST /events/:id/allocations reserves item when stock is available", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Planned" }],
+      rowCount: 1,
+    });
+    // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    // Item check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "item-1", quantity: 10 }],
+      rowCount: 1,
+    });
+    // Active allocations check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ total_allocated: "2" }],
+      rowCount: 1,
+    });
+    // Insert allocation
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "alloc-new", quantity_allocated: 5, status: "Reserved" }],
+      rowCount: 1,
+    });
+    // COMMIT
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+    const res = await request(app)
+      .post("/events/event-1/allocations")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        item_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        quantity_allocated: 5,
+        notes: "Test alloc",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.quantity_allocated).toBe(5);
+  });
+
+  // Allocation - Overflow blocked
+  test("POST /events/:id/allocations blocks allocation when requested quantity exceeds available stock", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Planned" }],
+      rowCount: 1,
+    });
+    // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    // Item check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "item-1", quantity: 10 }],
+      rowCount: 1,
+    });
+    // Active allocations check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ total_allocated: "8" }],
+      rowCount: 1,
+    });
+    // ROLLBACK
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+    const res = await request(app)
+      .post("/events/event-1/allocations")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        item_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        quantity_allocated: 5,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Requested quantity exceeds available stock");
+  });
+
+  // Allocation - Delete
+  test("DELETE /events/:id/allocations/:allocationId releases allocation", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Planned" }],
+      rowCount: 1,
+    });
+    // Delete allocation
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "alloc-1", status: "Reserved" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .delete("/events/event-1/allocations/alloc-1")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  // Checklist - Create
+  test("POST /events/:id/checklist adds checklist item", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1" }],
+      rowCount: 1,
+    });
+    // Insert checklist
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "check-1", title: "Setup Stage", status: "Todo" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/event-1/checklist")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        title: "Setup Stage",
+        owner_name: "Abebe",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.title).toBe("Setup Stage");
+  });
+
+  // Checklist - Patch
+  test("PATCH /events/:id/checklist/:itemId updates status or title", async () => {
+    // Event check
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1" }],
+      rowCount: 1,
+    });
+    // Update checklist
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "check-1", status: "Done" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .patch("/events/event-1/checklist/check-1")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        status: "Done",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("Done");
   });
 });

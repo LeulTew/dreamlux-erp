@@ -453,5 +453,37 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_expenses_event ON expenses(event_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
 
+-- 20. Event Allocations (inventory allocated to events)
+CREATE TABLE IF NOT EXISTS event_allocations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  quantity_allocated INTEGER NOT NULL CHECK (quantity_allocated > 0),
+  status TEXT NOT NULL CHECK (status IN ('Reserved', 'Pulled', 'Returned')) DEFAULT 'Reserved',
+  notes TEXT,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_allocations_event ON event_allocations(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_allocations_item ON event_allocations(item_id);
+
+-- 21. Event Checklist (operational task list)
+CREATE TABLE IF NOT EXISTS event_checklist (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('Todo', 'Done')) DEFAULT 'Todo',
+  due_date TIMESTAMP DEFAULT NULL,
+  owner_name TEXT,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_checklist_event ON event_checklist(event_id);
+
+
 
 

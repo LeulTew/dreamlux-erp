@@ -1,7 +1,15 @@
 import { Router, Response } from "express";
 import { pool } from "../db/pool";
 import { requireAdmin, AuthRequest } from "../middleware/auth";
-import { createEventSchema, updateEventSchema } from "../lib/validation";
+import {
+  createEventSchema,
+  updateEventSchema,
+  updateEventDesignSchema,
+  createEventAllocationSchema,
+  createEventChecklistItemSchema,
+  updateEventChecklistItemSchema,
+} from "../lib/validation";
+
 
 const router = Router();
 
@@ -61,11 +69,11 @@ router.get("/", requireAdmin, async (req: AuthRequest, res: Response) => {
     const offsetParam = `$${queryParams.length}`;
 
     const dataQuery = `
-      SELECT e.*, et.name as event_type_name 
-      FROM events e 
-      LEFT JOIN event_types et ON e.event_type_id = et.id 
-      WHERE ${whereClause} 
-      ORDER BY e.start_date ASC, e.created_at DESC 
+      SELECT e.*, et.name as event_type_name
+      FROM events e
+      LEFT JOIN event_types et ON e.event_type_id = et.id
+      WHERE ${whereClause}
+      ORDER BY e.start_date ASC, e.created_at DESC
       LIMIT ${limitParam} OFFSET ${offsetParam}
     `;
 
@@ -89,10 +97,10 @@ router.get("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
 
     const eventQuery = `
-      SELECT e.*, et.name as event_type_name, u.full_name as created_by_name 
-      FROM events e 
-      LEFT JOIN event_types et ON e.event_type_id = et.id 
-      LEFT JOIN users u ON e.created_by = u.id 
+      SELECT e.*, et.name as event_type_name, u.full_name as created_by_name
+      FROM events e
+      LEFT JOIN event_types et ON e.event_type_id = et.id
+      LEFT JOIN users u ON e.created_by = u.id
       WHERE e.id = $1 AND e.deleted_at IS NULL
     `;
     const eventResult = await pool.query(eventQuery, [id]);
@@ -105,10 +113,10 @@ router.get("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
     const event = eventResult.rows[0];
 
     const logsQuery = `
-      SELECT el.*, u.full_name as user_full_name, u.username as user_username 
-      FROM event_logs el 
-      LEFT JOIN users u ON el.user_id = u.id 
-      WHERE el.event_id = $1 
+      SELECT el.*, u.full_name as user_full_name, u.username as user_username
+      FROM event_logs el
+      LEFT JOIN users u ON el.user_id = u.id
+      WHERE el.event_id = $1
       ORDER BY el.changed_at DESC
     `;
     const logsResult = await pool.query(logsQuery, [id]);
@@ -309,9 +317,9 @@ router.put("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
       updateParams.push(id);
       const idPlaceholder = `$${updateParams.length}`;
       const updateQuery = `
-        UPDATE events 
-        SET ${setClauses.join(", ")}, updated_at = NOW() 
-        WHERE id = ${idPlaceholder} 
+        UPDATE events
+        SET ${setClauses.join(", ")}, updated_at = NOW()
+        WHERE id = ${idPlaceholder}
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
@@ -343,6 +351,400 @@ router.delete("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error("[delete-event] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/:id/workspace - Get event operational workspace data
+router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const eventQuery = `
+      SELECT e.*, et.name as event_type_name, u.full_name as created_by_name
+      FROM events e
+      LEFT JOIN event_types et ON e.event_type_id = et.id
+      LEFT JOIN users u ON e.created_by = u.id
+      WHERE e.id = $1 AND e.deleted_at IS NULL
+    `;
+    const eventResult = await pool.query(eventQuery, [id]);
+
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+
+    const allocationsQuery = `
+      SELECT
+        ea.id,
+        ea.event_id,
+        ea.item_id,
+        ea.quantity_allocated,
+        ea.status,
+        ea.notes,
+        ea.created_by,
+        ea.created_at,
+        ea.updated_at,
+        i.name AS item_name,
+        i.description AS item_description,
+        i.image_key,
+        s.name AS store_name,
+        COALESCE(
+          i.quantity - (
+            SELECT COALESCE(SUM(quantity_allocated), 0)
+            FROM event_allocations
+            WHERE item_id = ea.item_id AND status != 'Returned'
+          ),
+          0
+        ) AS available_quantity
+      FROM event_allocations ea
+      JOIN items i ON ea.item_id = i.id
+      LEFT JOIN stores s ON i.store_id = s.id
+      WHERE ea.event_id = $1
+    `;
+    const allocationsResult = await pool.query(allocationsQuery, [id]);
+
+    const checklistQuery = `
+      SELECT * FROM event_checklist
+      WHERE event_id = $1
+      ORDER BY created_at ASC
+    `;
+    const checklistResult = await pool.query(checklistQuery, [id]);
+
+    const assignmentsQuery = `
+      SELECT ea.*, emp.full_name as employee_name, emp.phone as employee_phone
+      FROM event_assignments ea
+      JOIN employees emp ON ea.employee_id = emp.id
+      WHERE ea.event_id = $1
+    `;
+    const assignmentsResult = await pool.query(assignmentsQuery, [id]);
+
+    res.json({
+      event,
+      allocations: allocationsResult.rows,
+      checklist: checklistResult.rows,
+      assignments: assignmentsResult.rows,
+    });
+  } catch (error: any) {
+    console.error("[get-event-workspace] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// PATCH /events/:id/design - Update package design details
+router.patch("/:id/design", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const currentEvent = eventResult.rows[0];
+
+    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
+      res.status(403).json({
+        error: "Completed events cannot be edited except by administrators or accountants",
+      });
+      return;
+    }
+
+    const validationResult = updateEventDesignSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { package_design_notes, estimated_design_cost } = validationResult.data;
+
+    const logPromises: Promise<any>[] = [];
+    if (package_design_notes !== undefined && package_design_notes !== currentEvent.package_design_notes) {
+      logPromises.push(
+        pool.query(
+          `INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value) VALUES ($1, $2, $3, $4, $5)`,
+          [id, req.user?.id || null, "package_design_notes", currentEvent.package_design_notes, package_design_notes]
+        )
+      );
+    }
+    if (estimated_design_cost !== undefined && Number(estimated_design_cost) !== Number(currentEvent.estimated_design_cost || 0)) {
+      logPromises.push(
+        pool.query(
+          `INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value) VALUES ($1, $2, $3, $4, $5)`,
+          [id, req.user?.id || null, "estimated_design_cost", currentEvent.estimated_design_cost ? String(currentEvent.estimated_design_cost) : "0", String(estimated_design_cost)]
+        )
+      );
+    }
+    await Promise.all(logPromises);
+
+    const setClauses: string[] = [];
+    const updateParams: any[] = [];
+
+    if (package_design_notes !== undefined) {
+      updateParams.push(package_design_notes);
+      setClauses.push(`package_design_notes = $${updateParams.length}`);
+    }
+
+    if (estimated_design_cost !== undefined) {
+      updateParams.push(estimated_design_cost);
+      setClauses.push(`estimated_design_cost = $${updateParams.length}`);
+    }
+
+    if (setClauses.length > 0) {
+      updateParams.push(id);
+      const updateQuery = `
+        UPDATE events
+        SET ${setClauses.join(", ")}, updated_at = NOW()
+        WHERE id = $${updateParams.length}
+        RETURNING *
+      `;
+      const result = await pool.query(updateQuery, updateParams);
+      res.json({ event: result.rows[0] });
+    } else {
+      res.json({ event: currentEvent });
+    }
+  } catch (error: any) {
+    console.error("[patch-event-design] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/allocations - Allocate a store item to the event
+router.post("/:id/allocations", requireAdmin, async (req: AuthRequest, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await client.query(eventQuery, [id]);
+
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const currentEvent = eventResult.rows[0];
+
+    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
+      res.status(403).json({
+        error: "Completed events cannot be edited except by administrators or accountants",
+      });
+      return;
+    }
+
+    const validationResult = createEventAllocationSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { item_id, quantity_allocated, notes } = validationResult.data;
+
+    await client.query("BEGIN");
+
+    const itemQuery = `SELECT * FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
+    const itemResult = await client.query(itemQuery, [item_id]);
+
+    if (itemResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Inventory item not found" });
+      return;
+    }
+
+    const item = itemResult.rows[0];
+
+    const activeAllocationsQuery = `
+      SELECT COALESCE(SUM(quantity_allocated), 0) as total_allocated
+      FROM event_allocations
+      WHERE item_id = $1 AND status != 'Returned'
+    `;
+    const activeAllocationsResult = await client.query(activeAllocationsQuery, [item_id]);
+    const totalAllocated = parseInt(activeAllocationsResult.rows[0].total_allocated, 10);
+
+    const availableQuantity = item.quantity - totalAllocated;
+
+    if (quantity_allocated > availableQuantity) {
+      await client.query("ROLLBACK");
+      res.status(400).json({ error: "Requested quantity exceeds available stock" });
+      return;
+    }
+
+    const insertAllocationQuery = `
+      INSERT INTO event_allocations (event_id, item_id, quantity_allocated, status, notes, created_by)
+      VALUES ($1, $2, $3, 'Reserved', $4, $5)
+      RETURNING *
+    `;
+    const allocationResult = await client.query(insertAllocationQuery, [
+      id,
+      item_id,
+      quantity_allocated,
+      notes || null,
+      req.user?.id || null,
+    ]);
+
+    await client.query("COMMIT");
+    res.status(201).json(allocationResult.rows[0]);
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    console.error("[post-event-allocation] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /events/:id/allocations/:allocationId - Release/delete allocated inventory item
+router.delete("/:id/allocations/:allocationId", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, allocationId } = req.params;
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const currentEvent = eventResult.rows[0];
+
+    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
+      res.status(403).json({
+        error: "Completed events cannot be edited except by administrators or accountants",
+      });
+      return;
+    }
+
+    const deleteQuery = `
+      DELETE FROM event_allocations
+      WHERE id = $1 AND event_id = $2
+      RETURNING *
+    `;
+    const result = await pool.query(deleteQuery, [allocationId, id]);
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Allocation not found" });
+      return;
+    }
+
+    res.json({ success: true, allocation: result.rows[0] });
+  } catch (error: any) {
+    console.error("[delete-event-allocation] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/checklist - Create a new checklist task item
+router.post("/:id/checklist", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const validationResult = createEventChecklistItemSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { title, due_date, owner_name } = validationResult.data;
+
+    const insertQuery = `
+      INSERT INTO event_checklist (event_id, title, status, due_date, owner_name, created_by)
+      VALUES ($1, $2, 'Todo', $3, $4, $5)
+      RETURNING *
+    `;
+    const result = await pool.query(insertQuery, [
+      id,
+      title,
+      due_date || null,
+      owner_name || null,
+      req.user?.id || null,
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("[post-event-checklist] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// PATCH /events/:id/checklist/:itemId - Update checklist item details or status
+router.patch("/:id/checklist/:itemId", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, itemId } = req.params;
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const validationResult = updateEventChecklistItemSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const updateData = validationResult.data;
+
+    const setClauses: string[] = [];
+    const updateParams: any[] = [];
+
+    for (const [key, val] of Object.entries(updateData)) {
+      if (val !== undefined) {
+        updateParams.push(val);
+        setClauses.push(`${key} = $${updateParams.length}`);
+      }
+    }
+
+    if (setClauses.length > 0) {
+      updateParams.push(itemId);
+      const itemIdPlaceholder = `$${updateParams.length}`;
+      updateParams.push(id);
+      const eventIdPlaceholder = `$${updateParams.length}`;
+
+      const updateQuery = `
+        UPDATE event_checklist
+        SET ${setClauses.join(", ")}, updated_at = NOW()
+        WHERE id = ${itemIdPlaceholder} AND event_id = ${eventIdPlaceholder}
+        RETURNING *
+      `;
+      const result = await pool.query(updateQuery, updateParams);
+
+      if (result.rowCount === 0) {
+        res.status(404).json({ error: "Checklist item not found" });
+        return;
+      }
+
+      res.json(result.rows[0]);
+    } else {
+      const checklistQuery = `SELECT * FROM event_checklist WHERE id = $1 AND event_id = $2`;
+      const checklistResult = await pool.query(checklistQuery, [itemId, id]);
+      if (checklistResult.rowCount === 0) {
+        res.status(404).json({ error: "Checklist item not found" });
+        return;
+      }
+      res.json(checklistResult.rows[0]);
+    }
+  } catch (error: any) {
+    console.error("[patch-event-checklist] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
