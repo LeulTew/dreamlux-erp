@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -168,6 +168,67 @@ function FieldRow({ label, value, icon: Icon }: { label: string; value: string; 
   );
 }
 
+function DesignPackagePanel({
+  eventId,
+  initialNotes,
+  initialCost,
+  t,
+}: {
+  eventId: string;
+  initialNotes: string;
+  initialCost: number;
+  t: (key: string) => string;
+}) {
+  const queryClient = useQueryClient();
+  const [designNotes, setDesignNotes] = useState(initialNotes);
+  const [designCost, setDesignCost] = useState(String(initialCost));
+
+  const saveDesignMutation = useMutation({
+    mutationFn: () =>
+      updateEventDesign(eventId, {
+        package_design_notes: designNotes,
+        estimated_design_cost: Number(designCost || 0),
+      }),
+    onSuccess: () => {
+      toast.success(t("Design details saved"));
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+  });
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-4">
+      <div className="mb-4 flex items-center gap-2">
+        <HiPaintBrush className="h-5 w-5 text-primary-dark" />
+        <h2 className="text-base font-bold text-foreground">{t("Design Package")}</h2>
+      </div>
+      <div className="space-y-3">
+        <label className="block text-xs font-semibold text-muted">{t("Design Notes")}</label>
+        <textarea
+          value={designNotes}
+          onChange={(eventChange) => setDesignNotes(eventChange.target.value)}
+          placeholder={t("No design notes yet. Add package, theme, color, or mockup direction.")}
+          className="min-h-32 w-full rounded-lg border border-input bg-card-alt px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-ring focus:ring-3 focus:ring-ring/30"
+        />
+        <label className="block text-xs font-semibold text-muted">{t("Estimated Design Cost")}</label>
+        <Input
+          type="number"
+          min="0"
+          value={designCost}
+          onChange={(eventChange) => setDesignCost(eventChange.target.value)}
+        />
+        <Button
+          type="button"
+          onClick={() => saveDesignMutation.mutate()}
+          disabled={saveDesignMutation.isPending}
+          className="w-full"
+        >
+          {t("Save Design")}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 export default function EventWorkspacePage() {
   const params = useParams<{ id: string }>();
   const eventId = params.id;
@@ -175,8 +236,6 @@ export default function EventWorkspacePage() {
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("details");
-  const [designNotes, setDesignNotes] = useState("");
-  const [designCost, setDesignCost] = useState("0");
   const [itemSearch, setItemSearch] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
   const [allocationQty, setAllocationQty] = useState("1");
@@ -191,13 +250,8 @@ export default function EventWorkspacePage() {
   });
 
   const event = workspaceQuery.data?.event;
-
-  useEffect(() => {
-    if (event) {
-      setDesignNotes(event.package_design_notes || "");
-      setDesignCost(String(event.estimated_design_cost || 0));
-    }
-  }, [event]);
+  const allocations = workspaceQuery.data?.allocations || [];
+  const checklist = workspaceQuery.data?.checklist || [];
 
   const itemsQuery = useQuery({
     queryKey: ["event-allocation-items", itemSearch],
@@ -206,22 +260,10 @@ export default function EventWorkspacePage() {
 
   const items = (itemsQuery.data?.items || []) as Item[];
   const selectedItem = items.find((item) => item.id === selectedItemId);
-  const alreadyAllocated = workspaceQuery.data?.allocations
+  const alreadyAllocated = allocations
     .filter((allocation) => allocation.item_id === selectedItemId && allocation.status !== "Returned")
     .reduce((sum, allocation) => sum + Number(allocation.quantity_allocated || 0), 0) || 0;
   const selectedAvailable = selectedItem ? Math.max(0, Number(selectedItem.quantity || 0) - alreadyAllocated) : 0;
-
-  const saveDesignMutation = useMutation({
-    mutationFn: () =>
-      updateEventDesign(eventId, {
-        package_design_notes: designNotes,
-        estimated_design_cost: Number(designCost || 0),
-      }),
-    onSuccess: () => {
-      toast.success(t("Design details saved"));
-      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
-    },
-  });
 
   const allocationMutation = useMutation({
     mutationFn: () =>
@@ -359,36 +401,13 @@ export default function EventWorkspacePage() {
                   </div>
                 </section>
 
-                <section className="rounded-lg border border-border bg-card p-4">
-                  <div className="mb-4 flex items-center gap-2">
-                    <HiPaintBrush className="h-5 w-5 text-primary-dark" />
-                    <h2 className="text-base font-bold text-foreground">{t("Design Package")}</h2>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="block text-xs font-semibold text-muted">{t("Design Notes")}</label>
-                    <textarea
-                      value={designNotes}
-                      onChange={(eventChange) => setDesignNotes(eventChange.target.value)}
-                      placeholder={t("No design notes yet. Add package, theme, color, or mockup direction.")}
-                      className="min-h-32 w-full rounded-lg border border-input bg-card-alt px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-ring focus:ring-3 focus:ring-ring/30"
-                    />
-                    <label className="block text-xs font-semibold text-muted">{t("Estimated Design Cost")}</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={designCost}
-                      onChange={(eventChange) => setDesignCost(eventChange.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => saveDesignMutation.mutate()}
-                      disabled={saveDesignMutation.isPending}
-                      className="w-full"
-                    >
-                      {t("Save Design")}
-                    </Button>
-                  </div>
-                </section>
+                <DesignPackagePanel
+                  key={`${event.id}:${event.updated_at}`}
+                  eventId={eventId}
+                  initialNotes={event.package_design_notes || ""}
+                  initialCost={Number(event.estimated_design_cost || 0)}
+                  t={t}
+                />
               </div>
             )}
 
@@ -445,11 +464,11 @@ export default function EventWorkspacePage() {
                 </section>
 
                 <section className="rounded-lg border border-border bg-card">
-                  {workspaceQuery.data.allocations.length === 0 ? (
+                  {allocations.length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted">{t("No allocations yet. Reserve inventory before event setup begins.")}</div>
                   ) : (
                     <div className="divide-y divide-border">
-                      {workspaceQuery.data.allocations.map((allocation) => (
+                      {allocations.map((allocation) => (
                         <div key={allocation.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
                             <div className="font-semibold text-foreground">{allocation.item_name}</div>
@@ -503,11 +522,11 @@ export default function EventWorkspacePage() {
                 </section>
 
                 <section className="rounded-lg border border-border bg-card">
-                  {workspaceQuery.data.checklist.length === 0 ? (
+                  {checklist.length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted">{t("No checklist tasks yet. Add the first preparation task.")}</div>
                   ) : (
                     <div className="divide-y divide-border">
-                      {workspaceQuery.data.checklist.map((item) => (
+                      {checklist.map((item) => (
                         <button
                           key={item.id}
                           type="button"
