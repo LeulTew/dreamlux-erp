@@ -2,6 +2,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { HiChevronRight } from "react-icons/hi2";
+import { useLanguage } from "@/hooks/use-language";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/": "Employees",
@@ -30,6 +31,65 @@ const ROUTE_LABELS: Record<string, string> = {
   "/login": "Login",
 };
 
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "HR": "HR",
+    "Inventory": "Inventory",
+    "Admin": "Admin",
+    "Reports": "Reports",
+    "Management": "Management",
+    "Items": "Items",
+    "Employees": "Employees",
+    "Add Employee": "Add Employee",
+    "Events": "Events",
+    "Payroll": "Payroll",
+    "Run Payroll": "Run Payroll",
+    "Salary Levels": "Salary Levels",
+    "Trash": "Trash",
+    "Event Types": "Event Types",
+    "Dashboard": "Dashboard",
+    "Add Item": "Add Item",
+    "New Item": "New Item",
+    "Reconcile": "Reconcile",
+    "Audit Log": "Audit Log",
+    "Low Stock": "Low Stock",
+    "Settings": "Settings",
+    "Users": "Users",
+    "Report": "Report",
+    "Employee Reports": "Employee Reports",
+    "Login": "Login",
+    "Page": "Page",
+  },
+  am: {
+    "HR": "የሰው ኃይል",
+    "Inventory": "ዕቃዎች",
+    "Admin": "አስተዳዳሪ",
+    "Reports": "ሪፖርቶች",
+    "Management": "አስተዳደር",
+    "Items": "ዕቃዎች",
+    "Employees": "ሠራተኞች",
+    "Add Employee": "ሠራተኛ መዝግብ",
+    "Events": "ዝግጅቶች",
+    "Payroll": "ደሞዝ",
+    "Run Payroll": "ደሞዝ ማስላት",
+    "Salary Levels": "የደሞዝ ደረጃዎች",
+    "Trash": "ቆሻሻ መጣያ",
+    "Event Types": "የዝግጅት ዓይነቶች",
+    "Dashboard": "ዳሽቦርድ",
+    "Add Item": "ዕቃ ጨምር",
+    "New Item": "አዲስ ዕቃ",
+    "Reconcile": "ቆጠራ ማመሳከሪያ",
+    "Audit Log": "የቆጠራ ታሪክ",
+    "Low Stock": "አነስተኛ ክምችት",
+    "Settings": "ቅንብሮች",
+    "Users": "ተጠቃሚዎች",
+    "Report": "ሪፖርት",
+    "Employee Reports": "የሠራተኞች ሪፖርት",
+    "Login": "ግባ",
+    "Page": "ገጽ",
+  }
+};
+
 function getSection(path: string): string {
   if (path === "/" || path === "/insert" || path === "/events" || path.startsWith("/hr")) return "HR";
   if (path.startsWith("/assets")) return "Inventory";
@@ -40,6 +100,8 @@ function getSection(path: string): string {
 
 export default function Breadcrumbs() {
   const pathname = usePathname();
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   if (!pathname || pathname === "/login") return null;
 
@@ -47,18 +109,18 @@ export default function Breadcrumbs() {
   const pageLabel = ROUTE_LABELS[pathname] || pathname.split("/").pop() || "Page";
 
   // Build breadcrumb trail
-  const crumbs: { label: string; href?: string }[] = [{ label: section }];
+  const crumbs: { label: string; href?: string }[] = [{ label: t(section) }];
 
   // Add intermediate paths for nested routes
   if (pathname.startsWith("/hr/")) {
-    crumbs.push({ label: "Management", href: "/" });
+    crumbs.push({ label: t("Management"), href: "/" });
   } else if (pathname.startsWith("/assets/") && pathname !== "/assets") {
-    crumbs.push({ label: "Items", href: "/assets" });
+    crumbs.push({ label: t("Items"), href: "/assets" });
   }
 
   // If section label != page label, add current page
   if (pageLabel !== section) {
-    crumbs.push({ label: pageLabel });
+    crumbs.push({ label: t(pageLabel) });
   }
 
   return (

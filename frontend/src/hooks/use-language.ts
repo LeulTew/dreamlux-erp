@@ -1,44 +1,31 @@
 "use client";
-import { useSyncExternalStore } from "react";
-
-const getSnapshot = () => {
-  if (typeof window === "undefined") return "en";
-  return localStorage.getItem("lang") || "en";
-};
-
-const getServerSnapshot = () => "en";
-
-const listeners = new Set<() => void>();
-
-const subscribe = (callback: () => void) => {
-  listeners.add(callback);
-  
-  const handleStorage = (e: StorageEvent) => {
-    if (e.key === "lang") {
-      callback();
-    }
-  };
-  
-  const handleCustomLang = () => {
-    callback();
-  };
-
-  if (typeof window !== "undefined") {
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("lang-change", handleCustomLang);
-  }
-  
-  return () => {
-    listeners.delete(callback);
-    if (typeof window !== "undefined") {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("lang-change", handleCustomLang);
-    }
-  };
-};
+import { useState, useEffect } from "react";
 
 export function useLanguage() {
-  const lang = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [lang, setLang] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("lang") || "en";
+    }
+    return "en";
+  });
+
+  useEffect(() => {
+    const handleLangChange = () => {
+      const current = localStorage.getItem("lang") || "en";
+      setLang(current);
+    };
+
+    window.addEventListener("lang-change", handleLangChange);
+    window.addEventListener("storage", handleLangChange);
+
+    // Initial check on mount to ensure synchronization
+    handleLangChange();
+
+    return () => {
+      window.removeEventListener("lang-change", handleLangChange);
+      window.removeEventListener("storage", handleLangChange);
+    };
+  }, []);
 
   const toggle = () => {
     const next = lang === "en" ? "am" : "en";
@@ -46,7 +33,6 @@ export function useLanguage() {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("lang-change"));
     }
-    listeners.forEach((listener) => listener());
   };
 
   return { lang, toggle };
