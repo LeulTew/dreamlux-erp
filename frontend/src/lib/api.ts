@@ -11,6 +11,7 @@ import {
   ReconcileRun,
   EventWorkspace,
   EventChecklistItem,
+  EventExpense,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1240,3 +1241,24 @@ export const deleteVehicleAssignment = (eventId: string, vehicleId: string) =>
 
 export const updateEmployeeAttendance = (eventId: string, employeeId: string, attended: boolean) =>
   api.patch(`/events/${eventId}/assignments/employees/${employeeId}/attendance`, { attended }).then((r) => r.data);
+
+export const createEventExpense = (
+  eventId: string,
+  data: { category: EventExpense["category"]; amount: number; description: string; receipt_image_key?: string | null }
+) => api.post(`/events/${eventId}/expenses`, data).then((r) => r.data);
+
+export const createEventTripLog = (
+  eventId: string,
+  data: { vehicle_assignment_id: string; destination: string; distance_km: number; fuel_price_etb: number }
+) => api.post(`/events/${eventId}/trips`, data).then((r) => r.data);
+
+export const generateEventLaborExpense = (eventId: string) =>
+  api.post(`/events/${eventId}/expenses/generate-labor`).then((r) => r.data);
+
+export const getPendingEventExpenses = (): Promise<EventExpense[]> =>
+  api.get("/events/expenses/pending").then((r) => r.data);
+
+export const reviewEventExpense = (
+  expenseId: string,
+  data: { status: "Approved" | "Rejected"; rejected_reason?: string | null }
+) => api.patch(`/events/expenses/${expenseId}/review`, data).then((r) => r.data);

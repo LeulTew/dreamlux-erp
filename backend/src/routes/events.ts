@@ -10,6 +10,9 @@ import {
   updateEventChecklistItemSchema,
   createEventAssignmentSchema,
   createVehicleAssignmentSchema,
+  createEventExpenseSchema,
+  reviewEventExpenseSchema,
+  createTripLogSchema,
 } from "../lib/validation";
 
 
@@ -17,6 +20,18 @@ const router = Router();
 
 // Helper to check if user has permission to edit completed events or transition backward
 function canOverrideCompleted(role?: string): boolean {
+  if (!role) return false;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
+  return allowed.includes(role.toUpperCase());
+}
+
+function canWriteExpenses(role?: string): boolean {
+  if (!role) return false;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT", "DRIVER"];
+  return allowed.includes(role.toUpperCase());
+}
+
+function canApproveExpenses(role?: string): boolean {
   if (!role) return false;
   const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
   return allowed.includes(role.toUpperCase());
@@ -89,6 +104,80 @@ router.get("/", requireAdmin, async (req: AuthRequest, res: Response) => {
     });
   } catch (error: any) {
     console.error("[get-events] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/expenses/pending - accountant approval queue
+router.get("/expenses/pending", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canApproveExpenses(req.user?.role)) {
+      res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
+      return;
+    }
+
+    const result = await pool.query(`
+      SELECT
+        exp.*,
+        e.name AS event_name,
+        e.client_name,
+        e.venue_location,
+        submitter.full_name AS submitted_by_name
+      FROM expenses exp
+      JOIN events e ON exp.event_id = e.id
+      LEFT JOIN users submitter ON exp.created_by = submitter.id
+      WHERE exp.status = 'Pending' AND e.deleted_at IS NULL
+      ORDER BY exp.created_at ASC
+    `);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error("[get-pending-expenses] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// PATCH /events/expenses/:expenseId/review - approve/reject pending expense
+router.patch("/expenses/:expenseId/review", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { expenseId } = req.params;
+    if (!canApproveExpenses(req.user?.role)) {
+      res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
+      return;
+    }
+
+    const validationResult = reviewEventExpenseSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const existingResult = await pool.query("SELECT * FROM expenses WHERE id = $1", [expenseId]);
+    if (existingResult.rowCount === 0) {
+      res.status(404).json({ error: "Expense not found" });
+      return;
+    }
+    if (existingResult.rows[0].status === "Approved") {
+      res.status(409).json({ error: "Approved expenses are locked" });
+      return;
+    }
+
+    const { status, rejected_reason } = validationResult.data;
+    const result = await pool.query(
+      `
+        UPDATE expenses
+        SET status = $1,
+            rejected_reason = $2,
+            approved_by = $3,
+            approved_at = NOW()
+        WHERE id = $4
+        RETURNING *
+      `,
+      [status, status === "Rejected" ? rejected_reason : null, req.user?.id || null, expenseId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error("[patch-expense-review] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
@@ -424,7 +513,7 @@ router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Respons
     const assignmentsResult = await pool.query(assignmentsQuery, [id]);
 
     const vehicleAssignmentsQuery = `
-      SELECT va.*, v.plate_number, v.vehicle_type, emp.full_name as driver_name
+      SELECT va.*, v.plate_number, v.vehicle_type, v.fuel_type, v.fuel_consumption_rate, emp.full_name as driver_name
       FROM vehicle_assignments va
       JOIN vehicles v ON va.vehicle_id = v.id
       LEFT JOIN employees emp ON va.driver_id = emp.id
@@ -432,12 +521,43 @@ router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Respons
     `;
     const vehicleAssignmentsResult = await pool.query(vehicleAssignmentsQuery, [id]);
 
+    const expensesQuery = `
+      SELECT exp.*, submitter.full_name AS submitted_by_name, approver.full_name AS approved_by_name
+      FROM expenses exp
+      LEFT JOIN users submitter ON exp.created_by = submitter.id
+      LEFT JOIN users approver ON exp.approved_by = approver.id
+      WHERE exp.event_id = $1
+      ORDER BY exp.created_at DESC
+    `;
+    const expensesResult = await pool.query(expensesQuery, [id]);
+
+    const tripsQuery = `
+      SELECT
+        t.*,
+        va.event_id,
+        va.vehicle_id,
+        v.plate_number,
+        v.vehicle_type,
+        v.fuel_type,
+        v.fuel_consumption_rate,
+        emp.full_name AS driver_name
+      FROM trips t
+      JOIN vehicle_assignments va ON t.vehicle_assignment_id = va.id
+      JOIN vehicles v ON va.vehicle_id = v.id
+      LEFT JOIN employees emp ON va.driver_id = emp.id
+      WHERE va.event_id = $1
+      ORDER BY t.created_at DESC
+    `;
+    const tripsResult = await pool.query(tripsQuery, [id]);
+
     res.json({
       event,
       allocations: allocationsResult.rows,
       checklist: checklistResult.rows,
       assignments: assignmentsResult.rows,
       vehicleAssignments: vehicleAssignmentsResult.rows,
+      expenses: expensesResult.rows,
+      trips: tripsResult.rows,
     });
   } catch (error: any) {
     console.error("[get-event-workspace] Error:", error);
@@ -1169,5 +1289,185 @@ router.patch("/:id/assignments/employees/:employeeId/attendance", requireAdmin, 
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
+
+// POST /events/:id/expenses - submit a pending event expense
+router.post("/:id/expenses", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!canWriteExpenses(req.user?.role)) {
+      res.status(403).json({ error: "Forbidden: Missing expense write permission" });
+      return;
+    }
+
+    const eventResult = await pool.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL", [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      res.status(403).json({ error: "Completed event expenses cannot be changed except by administrators or accountants" });
+      return;
+    }
+
+    const validationResult = createEventExpenseSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { category, amount, description, receipt_image_key } = validationResult.data;
+    const result = await pool.query(
+      `
+        INSERT INTO expenses (event_id, category, amount, description, receipt_image_key, status, created_by)
+        VALUES ($1, $2, $3, $4, $5, 'Pending', $6)
+        RETURNING *
+      `,
+      [id, category, amount, description, receipt_image_key || null, req.user?.id || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("[post-event-expense] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/trips - log trip and generate pending fuel expense
+router.post("/:id/trips", requireAdmin, async (req: AuthRequest, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    if (!canWriteExpenses(req.user?.role)) {
+      res.status(403).json({ error: "Forbidden: Missing expense write permission" });
+      return;
+    }
+
+    const validationResult = createTripLogSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { vehicle_assignment_id, destination, distance_km, fuel_price_etb } = validationResult.data;
+    await client.query("BEGIN");
+
+    const assignmentResult = await client.query(
+      `
+        SELECT va.*, v.plate_number, v.vehicle_type, v.fuel_consumption_rate, e.status AS event_status
+        FROM vehicle_assignments va
+        JOIN vehicles v ON va.vehicle_id = v.id
+        JOIN events e ON va.event_id = e.id
+        WHERE va.id = $1 AND va.event_id = $2 AND e.deleted_at IS NULL
+      `,
+      [vehicle_assignment_id, id]
+    );
+
+    if (assignmentResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Vehicle assignment not found for this event" });
+      return;
+    }
+
+    const assignment = assignmentResult.rows[0];
+    if (assignment.event_status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      await client.query("ROLLBACK");
+      res.status(403).json({ error: "Completed event trips cannot be changed except by administrators or accountants" });
+      return;
+    }
+
+    const fuelLitersUsed = Number((Number(distance_km) * Number(assignment.fuel_consumption_rate)).toFixed(2));
+    const fuelCostEtb = Number((fuelLitersUsed * Number(fuel_price_etb)).toFixed(2));
+
+    const tripResult = await client.query(
+      `
+        INSERT INTO trips (vehicle_assignment_id, destination, distance_km, fuel_liters_used, fuel_cost_etb)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `,
+      [vehicle_assignment_id, destination, distance_km, fuelLitersUsed, fuelCostEtb]
+    );
+
+    const description = `Fuel for ${destination} (${distance_km} km, ${assignment.fuel_consumption_rate} L/km, ${fuel_price_etb} ETB/L)`;
+    const expenseResult = await client.query(
+      `
+        INSERT INTO expenses (event_id, category, amount, description, status, created_by)
+        VALUES ($1, 'Fuel', $2, $3, 'Pending', $4)
+        RETURNING *
+      `,
+      [id, fuelCostEtb, description, req.user?.id || null]
+    );
+
+    await client.query("COMMIT");
+    res.status(201).json({
+      trip: tripResult.rows[0],
+      expense: expenseResult.rows[0],
+      fuel_liters_used: fuelLitersUsed,
+      fuel_cost_etb: fuelCostEtb,
+    });
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    console.error("[post-event-trip] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /events/:id/expenses/generate-labor - create pending labor expense from assignments
+router.post("/:id/expenses/generate-labor", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!canWriteExpenses(req.user?.role)) {
+      res.status(403).json({ error: "Forbidden: Missing expense write permission" });
+      return;
+    }
+
+    const eventResult = await pool.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL", [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+    if (eventResult.rows[0].status !== "Completed") {
+      res.status(400).json({ error: "Labor expense can only be generated after event completion" });
+      return;
+    }
+
+    const assignmentResult = await pool.query(
+      "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
+      [id]
+    );
+    const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
+    if (laborTotal <= 0) {
+      res.status(400).json({ error: "No attended labor assignments found for this event" });
+      return;
+    }
+
+    const existingResult = await pool.query(
+      "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
+      [id, "Auto-generated labor cost from attended event assignments"]
+    );
+    if ((existingResult.rowCount || 0) > 0) {
+      res.status(409).json({ error: "Labor expense has already been generated for this event" });
+      return;
+    }
+
+    const result = await pool.query(
+      `
+        INSERT INTO expenses (event_id, category, amount, description, status, created_by)
+        VALUES ($1, 'Labor', $2, $3, 'Pending', $4)
+        RETURNING *
+      `,
+      [id, laborTotal, "Auto-generated labor cost from attended event assignments", req.user?.id || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("[post-event-labor-expense] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
 
 export default router;

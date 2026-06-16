@@ -10,6 +10,7 @@ import {
   HiCalendarDays,
   HiCheckCircle,
   HiClipboardDocumentCheck,
+  HiCurrencyDollar,
   HiCube,
   HiMapPin,
   HiMinusCircle,
@@ -38,8 +39,11 @@ import {
   createVehicleAssignment,
   deleteVehicleAssignment,
   updateEmployeeAttendance,
+  createEventExpense,
+  createEventTripLog,
+  generateEventLaborExpense,
 } from "@/lib/api";
-import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Employee, Vehicle } from "@/lib/types";
+import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Employee, Vehicle, EventExpense, EventTripLog } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -113,6 +117,35 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Vehicle assigned": "Vehicle assigned",
     "Assignment removed": "Assignment removed",
     "Attendance updated": "Attendance updated",
+    "Expenses & Trips": "Expenses & Trips",
+    "Log Expense": "Log Expense",
+    "Trip Log": "Trip Log",
+    Category: "Category",
+    Amount: "Amount",
+    Description: "Description",
+    "Receipt Key": "Receipt Key",
+    "Submit Expense": "Submit Expense",
+    "Expense submitted": "Expense submitted",
+    "Generate Labor Expense": "Generate Labor Expense",
+    "Labor expense generated": "Labor expense generated",
+    "Choose vehicle assignment": "Choose vehicle assignment",
+    Destination: "Destination",
+    "Distance (km)": "Distance (km)",
+    "Fuel Price": "Fuel Price",
+    "Log Trip": "Log Trip",
+    "Trip logged": "Trip logged",
+    "Fuel cost preview": "Fuel cost preview",
+    "No expenses yet. Log event costs as they happen.": "No expenses yet. Log event costs as they happen.",
+    "No trips yet. Drivers can log distance after vehicle assignment.": "No trips yet. Drivers can log distance after vehicle assignment.",
+    Pending: "Pending",
+    Approved: "Approved",
+    Rejected: "Rejected",
+    Fuel: "Fuel",
+    Labor: "Labor",
+    Transportation: "Transportation",
+    "Equipment Rental": "Equipment Rental",
+    Consumables: "Consumables",
+    Other: "Other",
   },
   am: {
     "Back to Events": "ወደ ዝግጅቶች ተመለስ",
@@ -184,16 +217,46 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Vehicle assigned": "ተሽከርካሪ ተመድቧል",
     "Assignment removed": "ምደባ ተሰርዟል",
     "Attendance updated": "የመገኘት ሁኔታ ተዘምኗል",
+    "Expenses & Trips": "ወጪዎች እና ጉዞዎች",
+    "Log Expense": "ወጪ መዝግብ",
+    "Trip Log": "የጉዞ መዝገብ",
+    Category: "ምድብ",
+    Amount: "መጠን",
+    Description: "መግለጫ",
+    "Receipt Key": "የደረሰኝ ቁልፍ",
+    "Submit Expense": "ወጪ አስገባ",
+    "Expense submitted": "ወጪ ቀርቧል",
+    "Generate Labor Expense": "የሰራተኛ ወጪ አመንጭ",
+    "Labor expense generated": "የሰራተኛ ወጪ ተፈጥሯል",
+    "Choose vehicle assignment": "የተመደበ ተሽከርካሪ ምረጥ",
+    Destination: "መድረሻ",
+    "Distance (km)": "ርቀት (ኪ.ሜ)",
+    "Fuel Price": "የነዳጅ ዋጋ",
+    "Log Trip": "ጉዞ መዝግብ",
+    "Trip logged": "ጉዞ ተመዝግቧል",
+    "Fuel cost preview": "የነዳጅ ወጪ ቅድመ እይታ",
+    "No expenses yet. Log event costs as they happen.": "እስካሁን ወጪ የለም። የዝግጅት ወጪዎችን ሲፈጠሩ ይመዝግቡ።",
+    "No trips yet. Drivers can log distance after vehicle assignment.": "እስካሁን ጉዞ የለም። ሾፌሮች ተሽከርካሪ ከተመደበ በኋላ ርቀት መመዝገብ ይችላሉ።",
+    Pending: "በመጠባበቅ ላይ",
+    Approved: "ጸድቋል",
+    Rejected: "ውድቅ ተደርጓል",
+    Fuel: "ነዳጅ",
+    Labor: "ሰራተኛ",
+    Transportation: "ትራንስፖርት",
+    "Equipment Rental": "የመሳሪያ ኪራይ",
+    Consumables: "የሚጠቀሙ እቃዎች",
+    Other: "ሌላ",
   },
 };
 
-type TabKey = "details" | "inventory" | "checklist" | "scheduling";
+type TabKey = "details" | "inventory" | "checklist" | "scheduling" | "expenses";
 
 const tabs: Array<{ id: TabKey; label: string; icon: typeof HiUser }> = [
   { id: "details", label: "Details", icon: HiUser },
   { id: "inventory", label: "Inventory Allocation", icon: HiCube },
   { id: "checklist", label: "Checklist", icon: HiClipboardDocumentCheck },
   { id: "scheduling", label: "Team & Vehicles", icon: HiCalendarDays },
+  { id: "expenses", label: "Expenses & Trips", icon: HiCurrencyDollar },
 ];
 
 function formatDate(value?: string | null) {
@@ -376,9 +439,24 @@ export default function EventWorkspacePage() {
   const [selectedVehId, setSelectedVehId] = useState("");
   const [selectedDrvId, setSelectedDrvId] = useState("");
   const [nightShift, setNightShift] = useState(false);
+  const [expenseCategory, setExpenseCategory] = useState<EventExpense["category"]>("Other");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseDescription, setExpenseDescription] = useState("");
+  const [receiptKey, setReceiptKey] = useState("");
+  const [tripVehicleAssignmentId, setTripVehicleAssignmentId] = useState("");
+  const [tripDestination, setTripDestination] = useState("");
+  const [tripDistance, setTripDistance] = useState("");
+  const [fuelPrice, setFuelPrice] = useState("");
 
   const assignments = workspaceQuery.data?.assignments || [];
   const vehicleAssignments = workspaceQuery.data?.vehicleAssignments || [];
+  const expenses = workspaceQuery.data?.expenses || [];
+  const trips = workspaceQuery.data?.trips || [];
+  const selectedTripVehicle = vehicleAssignments.find((vehicleAssignment) => vehicleAssignment.id === tripVehicleAssignmentId);
+  const fuelCostPreview =
+    selectedTripVehicle && Number(tripDistance) > 0 && Number(fuelPrice) > 0
+      ? Number((Number(tripDistance) * Number(selectedTripVehicle.fuel_consumption_rate || 0) * Number(fuelPrice)).toFixed(2))
+      : 0;
 
   const availableEmployeesQuery = useQuery({
     queryKey: ["available-employees", eventId],
@@ -457,6 +535,59 @@ export default function EventWorkspacePage() {
     },
     onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
       toast.error(err.response?.data?.error || err.message || t("Update failed"));
+    },
+  });
+
+  const createExpenseMutation = useMutation({
+    mutationFn: () =>
+      createEventExpense(eventId, {
+        category: expenseCategory,
+        amount: Number(expenseAmount || 0),
+        description: expenseDescription,
+        receipt_image_key: receiptKey || null,
+      }),
+    onSuccess: () => {
+      toast.success(t("Expense submitted"));
+      setExpenseCategory("Other");
+      setExpenseAmount("");
+      setExpenseDescription("");
+      setReceiptKey("");
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      toast.error(err.response?.data?.error || err.message || t("Required"));
+    },
+  });
+
+  const createTripMutation = useMutation({
+    mutationFn: () =>
+      createEventTripLog(eventId, {
+        vehicle_assignment_id: tripVehicleAssignmentId,
+        destination: tripDestination,
+        distance_km: Number(tripDistance || 0),
+        fuel_price_etb: Number(fuelPrice || 0),
+      }),
+    onSuccess: () => {
+      toast.success(t("Trip logged"));
+      setTripVehicleAssignmentId("");
+      setTripDestination("");
+      setTripDistance("");
+      setFuelPrice("");
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      toast.error(err.response?.data?.error || err.message || t("Required"));
+    },
+  });
+
+  const generateLaborMutation = useMutation({
+    mutationFn: () => generateEventLaborExpense(eventId),
+    onSuccess: () => {
+      toast.success(t("Labor expense generated"));
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      toast.error(err.response?.data?.error || err.message || t("Required"));
     },
   });
 
@@ -919,6 +1050,130 @@ export default function EventWorkspacePage() {
                               <HiMinusCircle className="h-4 w-4" />
                               {t("Release")}
                             </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "expenses" && (
+              <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                <div className="space-y-4">
+                  <section className="rounded-lg border border-border bg-card p-4">
+                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Log Expense")}</h2>
+                    <div className="space-y-3">
+                      <select
+                        value={expenseCategory}
+                        onChange={(eventChange) => setExpenseCategory(eventChange.target.value as EventExpense["category"])}
+                        className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                      >
+                        {(["Transportation", "Equipment Rental", "Consumables", "Other", "Labor", "Fuel"] as EventExpense["category"][]).map((category) => (
+                          <option key={category} value={category}>{t(category)}</option>
+                        ))}
+                      </select>
+                      <Input type="number" min="0" value={expenseAmount} onChange={(eventChange) => setExpenseAmount(eventChange.target.value)} placeholder={t("Amount")} />
+                      <Input value={expenseDescription} onChange={(eventChange) => setExpenseDescription(eventChange.target.value)} placeholder={t("Description")} />
+                      <Input value={receiptKey} onChange={(eventChange) => setReceiptKey(eventChange.target.value)} placeholder={t("Receipt Key")} />
+                      <Button
+                        type="button"
+                        className="w-full"
+                        disabled={createExpenseMutation.isPending}
+                        onClick={() => {
+                          if (!expenseDescription.trim() || Number(expenseAmount) <= 0) {
+                            toast.error(t("Required"));
+                            return;
+                          }
+                          createExpenseMutation.mutate();
+                        }}
+                      >
+                        <HiPlus className="h-4 w-4" />
+                        {t("Submit Expense")}
+                      </Button>
+                      <Button type="button" variant="outline" className="w-full" disabled={generateLaborMutation.isPending} onClick={() => generateLaborMutation.mutate()}>
+                        {t("Generate Labor Expense")}
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-border bg-card p-4">
+                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Trip Log")}</h2>
+                    <div className="space-y-3">
+                      <select
+                        value={tripVehicleAssignmentId}
+                        onChange={(eventChange) => setTripVehicleAssignmentId(eventChange.target.value)}
+                        className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                      >
+                        <option value="">{t("Choose vehicle assignment")}</option>
+                        {vehicleAssignments.map((vehicleAssignment: VehicleAssignment) => (
+                          <option key={vehicleAssignment.id} value={vehicleAssignment.id}>
+                            {vehicleAssignment.plate_number} - {vehicleAssignment.driver_name || t("Driver")}
+                          </option>
+                        ))}
+                      </select>
+                      <Input value={tripDestination} onChange={(eventChange) => setTripDestination(eventChange.target.value)} placeholder={t("Destination")} />
+                      <Input type="number" min="0" value={tripDistance} onChange={(eventChange) => setTripDistance(eventChange.target.value)} placeholder={t("Distance (km)")} />
+                      <Input type="number" min="0" value={fuelPrice} onChange={(eventChange) => setFuelPrice(eventChange.target.value)} placeholder={t("Fuel Price")} />
+                      <div className="rounded-lg border border-border bg-card-alt/50 p-3 text-xs font-semibold text-muted">
+                        {t("Fuel cost preview")}: <span className="text-foreground">{formatCurrency(fuelCostPreview)}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        className="w-full"
+                        disabled={createTripMutation.isPending}
+                        onClick={() => {
+                          if (!tripVehicleAssignmentId || !tripDestination.trim() || Number(tripDistance) <= 0 || Number(fuelPrice) <= 0) {
+                            toast.error(t("Required"));
+                            return;
+                          }
+                          createTripMutation.mutate();
+                        }}
+                      >
+                        <HiPlus className="h-4 w-4" />
+                        {t("Log Trip")}
+                      </Button>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="space-y-4">
+                  <section className="rounded-lg border border-border bg-card">
+                    {expenses.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-muted">{t("No expenses yet. Log event costs as they happen.")}</div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {expenses.map((expense: EventExpense) => (
+                          <div key={expense.id} className="p-4">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-foreground">{t(expense.category)}</div>
+                                <div className="mt-1 text-xs text-muted">{expense.description}</div>
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <div className="text-sm font-bold text-foreground">{formatCurrency(expense.amount)}</div>
+                                <div className="mt-1 text-xs font-semibold text-muted">{t(expense.status)}</div>
+                              </div>
+                            </div>
+                            {expense.rejected_reason && <div className="mt-2 text-xs text-danger">{expense.rejected_reason}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="rounded-lg border border-border bg-card">
+                    {trips.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-muted">{t("No trips yet. Drivers can log distance after vehicle assignment.")}</div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {trips.map((trip: EventTripLog) => (
+                          <div key={trip.id} className="p-4">
+                            <div className="font-semibold text-foreground">{trip.destination}</div>
+                            <div className="mt-1 text-xs text-muted">
+                              {trip.plate_number || "-"} | {trip.distance_km} km | {trip.fuel_liters_used} L | {formatCurrency(trip.fuel_cost_etb)}
+                            </div>
                           </div>
                         ))}
                       </div>

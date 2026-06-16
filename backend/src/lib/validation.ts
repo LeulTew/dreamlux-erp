@@ -225,6 +225,32 @@ export const createVehicleAssignmentSchema = z.object({
   is_night_shift: z.boolean().optional().default(false),
 });
 
+export const createEventExpenseSchema = z.object({
+  category: z.enum(["Fuel", "Labor", "Transportation", "Equipment Rental", "Consumables", "Other"]),
+  amount: z.coerce.number().min(0.01, "Amount must be greater than zero"),
+  description: z.string().min(1, "Description is required").max(2000, "Description too long"),
+  receipt_image_key: z.string().max(1000, "Receipt key too long").optional().nullable(),
+});
+
+export const reviewEventExpenseSchema = z.object({
+  status: z.enum(["Approved", "Rejected"]),
+  rejected_reason: z.string().max(1000, "Review comment too long").optional().nullable(),
+}).refine((data) => {
+  return data.status === "Approved" || Boolean(data.rejected_reason?.trim());
+}, {
+  message: "Rejection reason is required",
+  path: ["rejected_reason"],
+});
+
+export const createTripLogSchema = z.object({
+  vehicle_assignment_id: z.string().uuid("Invalid vehicle assignment ID"),
+  destination: z.string().min(1, "Destination is required").max(1000, "Destination too long"),
+  distance_km: z.coerce.number().min(0.01, "Distance must be greater than zero"),
+  fuel_price_etb: z.coerce.number().min(0.01, "Fuel price must be greater than zero"),
+});
+
 export type CreateEventAssignmentInput = z.infer<typeof createEventAssignmentSchema>;
 export type CreateVehicleAssignmentInput = z.infer<typeof createVehicleAssignmentSchema>;
-
+export type CreateEventExpenseInput = z.infer<typeof createEventExpenseSchema>;
+export type ReviewEventExpenseInput = z.infer<typeof reviewEventExpenseSchema>;
+export type CreateTripLogInput = z.infer<typeof createTripLogSchema>;
