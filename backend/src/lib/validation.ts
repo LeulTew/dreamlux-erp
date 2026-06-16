@@ -203,3 +203,28 @@ export type UpdateEventDesignInput = z.infer<typeof updateEventDesignSchema>;
 export type CreateEventAllocationInput = z.infer<typeof createEventAllocationSchema>;
 export type CreateEventChecklistItemInput = z.infer<typeof createEventChecklistItemSchema>;
 export type UpdateEventChecklistItemInput = z.infer<typeof updateEventChecklistItemSchema>;
+
+export const createEventAssignmentSchema = z.object({
+  employee_id: z.string().uuid("Invalid employee ID"),
+  role: z.enum([
+    "Event Manager",
+    "Supervisor",
+    "Team Leader",
+    "Décor Professional",
+    "Assistant",
+    "Driver",
+    "Store Keeper"
+  ], { errorMap: () => ({ message: "Invalid role selected" }) }),
+  commission_amount: z.coerce.number().min(0, "Commission cannot be negative"),
+  attended: z.boolean().optional().default(true),
+});
+
+export const createVehicleAssignmentSchema = z.object({
+  vehicle_id: z.string().uuid("Invalid vehicle ID"),
+  driver_id: z.string().uuid("Invalid driver ID").optional().nullable(),
+  is_night_shift: z.boolean().optional().default(false),
+});
+
+export type CreateEventAssignmentInput = z.infer<typeof createEventAssignmentSchema>;
+export type CreateVehicleAssignmentInput = z.infer<typeof createVehicleAssignmentSchema>;
+

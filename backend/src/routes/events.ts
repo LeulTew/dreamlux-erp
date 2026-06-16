@@ -8,6 +8,8 @@ import {
   createEventAllocationSchema,
   createEventChecklistItemSchema,
   updateEventChecklistItemSchema,
+  createEventAssignmentSchema,
+  createVehicleAssignmentSchema,
 } from "../lib/validation";
 
 
@@ -421,11 +423,21 @@ router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Respons
     `;
     const assignmentsResult = await pool.query(assignmentsQuery, [id]);
 
+    const vehicleAssignmentsQuery = `
+      SELECT va.*, v.plate_number, v.vehicle_type, emp.full_name as driver_name
+      FROM vehicle_assignments va
+      JOIN vehicles v ON va.vehicle_id = v.id
+      LEFT JOIN employees emp ON va.driver_id = emp.id
+      WHERE va.event_id = $1
+    `;
+    const vehicleAssignmentsResult = await pool.query(vehicleAssignmentsQuery, [id]);
+
     res.json({
       event,
       allocations: allocationsResult.rows,
       checklist: checklistResult.rows,
       assignments: assignmentsResult.rows,
+      vehicleAssignments: vehicleAssignmentsResult.rows,
     });
   } catch (error: any) {
     console.error("[get-event-workspace] Error:", error);
@@ -745,6 +757,415 @@ router.patch("/:id/checklist/:itemId", requireAdmin, async (req: AuthRequest, re
     }
   } catch (error: any) {
     console.error("[patch-event-checklist] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// Helper functions for scheduling conflict checks
+async function hasEmployeeConflict(employeeId: string, eventId: string, startDate: string, endDate: string): Promise<boolean> {
+  const teamConflictQuery = `
+    SELECT COUNT(*) FROM event_assignments ea
+    JOIN events e ON ea.event_id = e.id
+    WHERE ea.employee_id = $1
+      AND e.deleted_at IS NULL
+      AND e.id != $2
+      AND e.start_date <= $3
+      AND e.end_date >= $4
+  `;
+  const teamResult = await pool.query(teamConflictQuery, [employeeId, eventId, endDate, startDate]);
+  if (parseInt(teamResult.rows[0].count, 10) > 0) return true;
+
+  const driverConflictQuery = `
+    SELECT COUNT(*) FROM vehicle_assignments va
+    JOIN events e ON va.event_id = e.id
+    WHERE va.driver_id = $1
+      AND e.deleted_at IS NULL
+      AND e.id != $2
+      AND e.start_date <= $3
+      AND e.end_date >= $4
+  `;
+  const driverResult = await pool.query(driverConflictQuery, [employeeId, eventId, endDate, startDate]);
+  return parseInt(driverResult.rows[0].count, 10) > 0;
+}
+
+async function hasVehicleConflict(vehicleId: string, eventId: string, startDate: string, endDate: string): Promise<boolean> {
+  const vehicleConflictQuery = `
+    SELECT COUNT(*) FROM vehicle_assignments va
+    JOIN events e ON va.event_id = e.id
+    WHERE va.vehicle_id = $1
+      AND e.deleted_at IS NULL
+      AND e.id != $2
+      AND e.start_date <= $3
+      AND e.end_date >= $4
+  `;
+  const result = await pool.query(vehicleConflictQuery, [vehicleId, eventId, endDate, startDate]);
+  return parseInt(result.rows[0].count, 10) > 0;
+}
+
+// GET /events/:id/assignments/available-employees - List employees available for this event's dates
+router.get("/:id/assignments/available-employees", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const { start_date, end_date } = eventResult.rows[0];
+
+    const availableEmployeesQuery = `
+      SELECT emp.*, SL.level_name as salary_level_name
+      FROM employees emp
+      LEFT JOIN salary_levels SL ON emp.salary_level_id = SL.id
+      WHERE emp.deleted_at IS NULL
+        AND emp.id NOT IN (
+          SELECT DISTINCT ea.employee_id FROM event_assignments ea
+          JOIN events e ON ea.event_id = e.id
+          WHERE e.deleted_at IS NULL AND e.id != $1 AND e.start_date <= $2 AND e.end_date >= $3
+        )
+        AND emp.id NOT IN (
+          SELECT DISTINCT va.driver_id FROM vehicle_assignments va
+          JOIN events e ON va.event_id = e.id
+          WHERE e.deleted_at IS NULL AND va.driver_id IS NOT NULL AND e.id != $1 AND e.start_date <= $2 AND e.end_date >= $3
+        )
+      ORDER BY emp.full_name ASC
+    `;
+    const result = await pool.query(availableEmployeesQuery, [id, end_date, start_date]);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error("[get-available-employees] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/:id/assignments/available-vehicles - List vehicles available for this event's dates
+router.get("/:id/assignments/available-vehicles", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const { start_date, end_date } = eventResult.rows[0];
+
+    const availableVehiclesQuery = `
+      SELECT v.* FROM vehicles v
+      WHERE v.deleted_at IS NULL AND v.is_active = TRUE
+        AND v.id NOT IN (
+          SELECT DISTINCT va.vehicle_id FROM vehicle_assignments va
+          JOIN events e ON va.event_id = e.id
+          WHERE e.deleted_at IS NULL AND e.id != $1 AND e.start_date <= $2 AND e.end_date >= $3
+        )
+      ORDER BY v.plate_number ASC
+    `;
+    const result = await pool.query(availableVehiclesQuery, [id, end_date, start_date]);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error("[get-available-vehicles] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/assignments/employees - Assign an employee
+router.post("/:id/assignments/employees", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Check permissions (Owner, Ops Manager, Event Manager)
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
+      return;
+    }
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+
+    // Enforce completed-event locking
+    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      res.status(400).json({
+        error: "Completed event assignments cannot be modified except by administrators or accountants",
+      });
+      return;
+    }
+
+    const validationResult = createEventAssignmentSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { employee_id, role, commission_amount, attended } = validationResult.data;
+
+    // Check for scheduling conflict
+    const conflict = await hasEmployeeConflict(employee_id, id, event.start_date, event.end_date);
+    if (conflict) {
+      res.status(400).json({
+        error: "Scheduling Conflict: This employee is already assigned to another event on these dates.",
+      });
+      return;
+    }
+
+    const insertQuery = `
+      INSERT INTO event_assignments (event_id, employee_id, role, commission_amount, attended)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (event_id, employee_id) DO UPDATE
+      SET role = EXCLUDED.role, commission_amount = EXCLUDED.commission_amount, attended = EXCLUDED.attended
+      RETURNING *
+    `;
+    const result = await pool.query(insertQuery, [
+      id,
+      employee_id,
+      role,
+      commission_amount,
+      attended,
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("[post-employee-assignment] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// DELETE /events/:id/assignments/employees/:employeeId - Remove employee assignment
+router.delete("/:id/assignments/employees/:employeeId", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, employeeId } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Check permissions
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
+      return;
+    }
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+
+    // Enforce completed-event locking
+    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      res.status(400).json({
+        error: "Completed event assignments cannot be modified except by administrators or accountants",
+      });
+      return;
+    }
+
+    const deleteQuery = `
+      DELETE FROM event_assignments
+      WHERE event_id = $1 AND employee_id = $2
+      RETURNING *
+    `;
+    const result = await pool.query(deleteQuery, [id, employeeId]);
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Assignment not found" });
+      return;
+    }
+
+    res.json({ message: "Employee assignment removed successfully" });
+  } catch (error: any) {
+    console.error("[delete-employee-assignment] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/assignments/vehicles - Assign a vehicle and optional driver
+router.post("/:id/assignments/vehicles", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Check permissions
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
+      return;
+    }
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+
+    // Enforce completed-event locking
+    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      res.status(400).json({
+        error: "Completed event assignments cannot be modified except by administrators or accountants",
+      });
+      return;
+    }
+
+    const validationResult = createVehicleAssignmentSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { vehicle_id, driver_id, is_night_shift } = validationResult.data;
+
+    // Check for vehicle scheduling conflict
+    const vehicleConflict = await hasVehicleConflict(vehicle_id, id, event.start_date, event.end_date);
+    if (vehicleConflict) {
+      res.status(400).json({
+        error: "Scheduling Conflict: This vehicle is already assigned to another event on these dates.",
+      });
+      return;
+    }
+
+    // Check for driver scheduling conflict (if driver is provided)
+    if (driver_id) {
+      const driverConflict = await hasEmployeeConflict(driver_id, id, event.start_date, event.end_date);
+      if (driverConflict) {
+        res.status(400).json({
+          error: "Scheduling Conflict: This driver is already assigned to another event on these dates.",
+        });
+        return;
+      }
+    }
+
+    const insertQuery = `
+      INSERT INTO vehicle_assignments (event_id, vehicle_id, driver_id, is_night_shift)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (event_id, vehicle_id) DO UPDATE
+      SET driver_id = EXCLUDED.driver_id, is_night_shift = EXCLUDED.is_night_shift
+      RETURNING *
+    `;
+    const result = await pool.query(insertQuery, [
+      id,
+      vehicle_id,
+      driver_id || null,
+      is_night_shift,
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("[post-vehicle-assignment] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// DELETE /events/:id/assignments/vehicles/:vehicleId - Remove vehicle assignment
+router.delete("/:id/assignments/vehicles/:vehicleId", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, vehicleId } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Check permissions
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges" });
+      return;
+    }
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+
+    // Enforce completed-event locking
+    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      res.status(400).json({
+        error: "Completed event assignments cannot be modified except by administrators or accountants",
+      });
+      return;
+    }
+
+    const deleteQuery = `
+      DELETE FROM vehicle_assignments
+      WHERE event_id = $1 AND vehicle_id = $2
+      RETURNING *
+    `;
+    const result = await pool.query(deleteQuery, [id, vehicleId]);
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Assignment not found" });
+      return;
+    }
+
+    res.json({ message: "Vehicle assignment removed successfully" });
+  } catch (error: any) {
+    console.error("[delete-vehicle-assignment] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// PATCH /events/:id/assignments/employees/:employeeId/attendance - Toggle attendance
+router.patch("/:id/assignments/employees/:employeeId/attendance", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, employeeId } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Check permissions
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges" });
+      return;
+    }
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+
+    // Enforce completed-event locking
+    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      res.status(400).json({
+        error: "Completed event assignments cannot be modified except by administrators or accountants",
+      });
+      return;
+    }
+
+    const { attended } = req.body;
+    if (attended === undefined) {
+      res.status(400).json({ error: "Attended field is required" });
+      return;
+    }
+
+    const updateQuery = `
+      UPDATE event_assignments
+      SET attended = $1
+      WHERE event_id = $2 AND employee_id = $3
+      RETURNING *
+    `;
+    const result = await pool.query(updateQuery, [attended, id, employeeId]);
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Assignment not found" });
+      return;
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error("[patch-employee-attendance] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });

@@ -31,8 +31,15 @@ import {
   getItems,
   updateEventChecklistItem,
   updateEventDesign,
+  getAvailableEmployees,
+  getAvailableVehicles,
+  createEmployeeAssignment,
+  deleteEmployeeAssignment,
+  createVehicleAssignment,
+  deleteVehicleAssignment,
+  updateEmployeeAttendance,
 } from "@/lib/api";
-import type { EventChecklistItem, Item } from "@/lib/types";
+import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Employee, Vehicle } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -83,6 +90,29 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Try again from the Events page.": "Try again from the Events page.",
     "Required": "Required",
     Status: "Status",
+    "Team & Vehicles": "Team & Vehicles",
+    "Assign Staff": "Assign Staff",
+    "Assign Vehicle": "Assign Vehicle",
+    "Role": "Role",
+    "Commission Amount": "Commission Amount",
+    "Driver": "Driver",
+    "Night Shift": "Night Shift",
+    "Staff Member": "Staff Member",
+    "Vehicle": "Vehicle",
+    "Choose staff": "Choose staff",
+    "Choose vehicle": "Choose vehicle",
+    "Choose driver": "Choose driver",
+    "Assign": "Assign",
+    "No staff assigned yet.": "No staff assigned yet.",
+    "No vehicles assigned yet.": "No vehicles assigned yet.",
+    "Attendance": "Attendance",
+    "Attended": "Attended",
+    "Did not attend": "Did not attend",
+    "Remove Assignment": "Remove Assignment",
+    "Staff assigned": "Staff assigned",
+    "Vehicle assigned": "Vehicle assigned",
+    "Assignment removed": "Assignment removed",
+    "Attendance updated": "Attendance updated",
   },
   am: {
     "Back to Events": "ወደ ዝግጅቶች ተመለስ",
@@ -131,15 +161,39 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Try again from the Events page.": "ከዝግጅቶች ገጽ እንደገና ይሞክሩ።",
     "Required": "ያስፈልጋል",
     Status: "ሁኔታ",
+    "Team & Vehicles": "ቡድን እና ተሽከርካሪዎች",
+    "Assign Staff": "ሠራተኛ መድብ",
+    "Assign Vehicle": "ተሽከርካሪ መድብ",
+    "Role": "ኃላፊነት",
+    "Commission Amount": "የኮሚሽን መጠን",
+    "Driver": "ሾፌር",
+    "Night Shift": "የሌሊት ፈረቃ",
+    "Staff Member": "የቡድን አባል",
+    "Vehicle": "ተሽከርካሪ",
+    "Choose staff": "ሠራተኛ ምረጥ",
+    "Choose vehicle": "ተሽከርካሪ ምረጥ",
+    "Choose driver": "ሾፌር ምረጥ",
+    "Assign": "መድብ",
+    "No staff assigned yet.": "እስካሁን ምንም ሠራተኛ አልተመደበም።",
+    "No vehicles assigned yet.": "እስካሁን ምንም ተሽከርካሪ አልተመደበም።",
+    "Attendance": "መገኘት",
+    "Attended": "ተገኝቷል",
+    "Did not attend": "አልተገኘም",
+    "Remove Assignment": "ምደባን ሰርዝ",
+    "Staff assigned": "ሠራተኛ ተመድቧል",
+    "Vehicle assigned": "ተሽከርካሪ ተመድቧል",
+    "Assignment removed": "ምደባ ተሰርዟል",
+    "Attendance updated": "የመገኘት ሁኔታ ተዘምኗል",
   },
 };
 
-type TabKey = "details" | "inventory" | "checklist";
+type TabKey = "details" | "inventory" | "checklist" | "scheduling";
 
 const tabs: Array<{ id: TabKey; label: string; icon: typeof HiUser }> = [
   { id: "details", label: "Details", icon: HiUser },
   { id: "inventory", label: "Inventory Allocation", icon: HiCube },
   { id: "checklist", label: "Checklist", icon: HiClipboardDocumentCheck },
+  { id: "scheduling", label: "Team & Vehicles", icon: HiCalendarDays },
 ];
 
 function formatDate(value?: string | null) {
@@ -313,6 +367,94 @@ export default function EventWorkspacePage() {
     onSuccess: () => {
       toast.success(t("Task updated"));
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+  const [selectedEmpId, setSelectedEmpId] = useState("");
+  const [assignRole, setAssignRole] = useState("");
+  const [commissionAmt, setCommissionAmt] = useState("");
+  const [selectedVehId, setSelectedVehId] = useState("");
+  const [selectedDrvId, setSelectedDrvId] = useState("");
+  const [nightShift, setNightShift] = useState(false);
+
+  const assignments = (workspaceQuery.data as any)?.assignments || [];
+  const vehicleAssignments = (workspaceQuery.data as any)?.vehicleAssignments || [];
+
+  const availableEmployeesQuery = useQuery({
+    queryKey: ["available-employees", eventId],
+    queryFn: () => getAvailableEmployees(eventId),
+    enabled: activeTab === "scheduling",
+  });
+
+  const availableVehiclesQuery = useQuery({
+    queryKey: ["available-vehicles", eventId],
+    queryFn: () => getAvailableVehicles(eventId),
+    enabled: activeTab === "scheduling",
+  });
+
+  const assignEmployeeMutation = useMutation({
+    mutationFn: (data: { employee_id: string; role: string; commission_amount: number }) =>
+      createEmployeeAssignment(eventId, data),
+    onSuccess: () => {
+      toast.success(t("Staff assigned"));
+      setSelectedEmpId("");
+      setAssignRole("");
+      setCommissionAmt("");
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["available-employees", eventId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || err.message || t("Assignment failed"));
+    },
+  });
+
+  const removeEmployeeMutation = useMutation({
+    mutationFn: (employeeId: string) => deleteEmployeeAssignment(eventId, employeeId),
+    onSuccess: () => {
+      toast.success(t("Assignment removed"));
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["available-employees", eventId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || err.message || t("Removal failed"));
+    },
+  });
+
+  const assignVehicleMutation = useMutation({
+    mutationFn: (data: { vehicle_id: string; driver_id?: string | null; is_night_shift?: boolean }) =>
+      createVehicleAssignment(eventId, data),
+    onSuccess: () => {
+      toast.success(t("Vehicle assigned"));
+      setSelectedVehId("");
+      setSelectedDrvId("");
+      setNightShift(false);
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["available-vehicles", eventId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || err.message || t("Assignment failed"));
+    },
+  });
+
+  const removeVehicleMutation = useMutation({
+    mutationFn: (vehicleId: string) => deleteVehicleAssignment(eventId, vehicleId),
+    onSuccess: () => {
+      toast.success(t("Assignment removed"));
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["available-vehicles", eventId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || err.message || t("Removal failed"));
+    },
+  });
+
+  const toggleAttendanceMutation = useMutation({
+    mutationFn: (payload: { employeeId: string; attended: boolean }) =>
+      updateEmployeeAttendance(eventId, payload.employeeId, payload.attended),
+    onSuccess: () => {
+      toast.success(t("Attendance updated"));
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || err.message || t("Update failed"));
     },
   });
 
@@ -555,6 +697,232 @@ export default function EventWorkspacePage() {
                     </div>
                   )}
                 </section>
+              </div>
+            )}
+
+            {activeTab === "scheduling" && (
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Team Assignment Panel */}
+                <div className="space-y-4">
+                  <section className="rounded-lg border border-border bg-card p-4">
+                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Assign Staff")}</h2>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-muted mb-1">{t("Staff Member")}</label>
+                        <select
+                          value={selectedEmpId}
+                          onChange={(e) => setSelectedEmpId(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                        >
+                          <option value="">{t("Choose staff")}</option>
+                          {(availableEmployeesQuery.data || []).map((emp: Employee) => (
+                            <option key={emp.id} value={emp.id}>
+                              {emp.full_name} ({emp.position || "Staff"})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-muted mb-1">{t("Role")}</label>
+                        <select
+                          value={assignRole}
+                          onChange={(e) => setAssignRole(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                        >
+                          <option value="">{t("Role")}</option>
+                          <option value="Event Manager">Event Manager</option>
+                          <option value="Supervisor">Supervisor</option>
+                          <option value="Team Leader">Team Leader</option>
+                          <option value="Décor Professional">Décor Professional</option>
+                          <option value="Assistant">Assistant</option>
+                          <option value="Driver">Driver</option>
+                          <option value="Store Keeper">Store Keeper</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-muted mb-1">{t("Commission Amount")}</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={commissionAmt}
+                          onChange={(e) => setCommissionAmt(e.target.value)}
+                          placeholder="ETB 0.00"
+                        />
+                      </div>
+
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (!selectedEmpId || !assignRole) {
+                            toast.error(t("Required"));
+                            return;
+                          }
+                          assignEmployeeMutation.mutate({
+                            employee_id: selectedEmpId,
+                            role: assignRole,
+                            commission_amount: Number(commissionAmt || 0),
+                          });
+                        }}
+                        disabled={assignEmployeeMutation.isPending}
+                        className="w-full"
+                      >
+                        <HiPlus className="h-4 w-4" />
+                        {t("Assign")}
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-border bg-card">
+                    {assignments.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-muted">{t("No staff assigned yet.")}</div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {assignments.map((asg: EventAssignment) => (
+                          <div key={asg.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="font-semibold text-foreground">{asg.employee_name}</div>
+                              <div className="mt-1 text-xs text-muted">
+                                {asg.role} | {formatCurrency(asg.commission_amount)}
+                              </div>
+                              <div className="mt-2 flex items-center gap-3">
+                                <label className="flex items-center gap-1.5 text-xs font-semibold text-muted cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={asg.attended}
+                                    onChange={(e) => toggleAttendanceMutation.mutate({ employeeId: asg.employee_id, attended: e.target.checked })}
+                                    className="rounded border-border focus:ring-0 cursor-pointer"
+                                  />
+                                  <span>{t("Attended")}</span>
+                                </label>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeEmployeeMutation.mutate(asg.employee_id)}
+                              disabled={removeEmployeeMutation.isPending}
+                            >
+                              <HiMinusCircle className="h-4 w-4" />
+                              {t("Release")}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+
+                {/* Vehicle Assignment Panel */}
+                <div className="space-y-4">
+                  <section className="rounded-lg border border-border bg-card p-4">
+                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Assign Vehicle")}</h2>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-muted mb-1">{t("Vehicle")}</label>
+                        <select
+                          value={selectedVehId}
+                          onChange={(e) => setSelectedVehId(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                        >
+                          <option value="">{t("Choose vehicle")}</option>
+                          {(availableVehiclesQuery.data || []).map((veh: Vehicle) => (
+                            <option key={veh.id} value={veh.id}>
+                              {veh.plate_number} - {veh.vehicle_type}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-muted mb-1">{t("Driver")}</label>
+                        <select
+                          value={selectedDrvId}
+                          onChange={(e) => setSelectedDrvId(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                        >
+                          <option value="">{t("Choose driver")}</option>
+                          {(availableEmployeesQuery.data || [])
+                            .filter((emp: Employee) => (emp.position || "").toLowerCase() === "driver" || (emp.department || "").toLowerCase() === "logistics")
+                            .map((emp: Employee) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.full_name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          id="nightShiftCheck"
+                          checked={nightShift}
+                          onChange={(e) => setNightShift(e.target.checked)}
+                          className="rounded border-border focus:ring-0 cursor-pointer"
+                        />
+                        <label htmlFor="nightShiftCheck" className="text-xs font-semibold text-muted cursor-pointer">
+                          {t("Night Shift")}
+                        </label>
+                      </div>
+
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (!selectedVehId) {
+                            toast.error(t("Required"));
+                            return;
+                          }
+                          assignVehicleMutation.mutate({
+                            vehicle_id: selectedVehId,
+                            driver_id: selectedDrvId || null,
+                            is_night_shift: nightShift,
+                          });
+                        }}
+                        disabled={assignVehicleMutation.isPending}
+                        className="w-full"
+                      >
+                        <HiPlus className="h-4 w-4" />
+                        {t("Assign")}
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-border bg-card">
+                    {vehicleAssignments.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-muted">{t("No vehicles assigned yet.")}</div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {vehicleAssignments.map((va: VehicleAssignment) => (
+                          <div key={va.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="font-semibold text-foreground">{va.plate_number}</div>
+                              <div className="mt-1 text-xs text-muted">
+                                {va.vehicle_type} | {va.driver_name ? `${t("Driver")}: ${va.driver_name}` : t("No Driver Assigned")}
+                              </div>
+                              {va.is_night_shift && (
+                                <span className="mt-1.5 inline-flex items-center rounded bg-primary-light px-2 py-0.5 text-[10px] font-semibold text-primary-dark">
+                                  {t("Night Shift")}
+                                </span>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeVehicleMutation.mutate(va.vehicle_id)}
+                              disabled={removeVehicleMutation.isPending}
+                            >
+                              <HiMinusCircle className="h-4 w-4" />
+                              {t("Release")}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
               </div>
             )}
           </>
