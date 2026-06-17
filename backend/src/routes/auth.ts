@@ -79,7 +79,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
          GROUP BY u.id, u.username, u.full_name, u.profile_image_url, u.is_active, r.name, r.permissions`,
         [queryUsername, queryPassword]
       );
-      rows = queryResult.rows;
+      rows = queryResult?.rows || [];
     } catch (queryError) {
       if (!isMissingColumnError(queryError) && !isMissingRelationError(queryError)) {
         throw queryError;
@@ -92,7 +92,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
          WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)`,
         [queryUsername, queryPassword]
       );
-      rows = queryResult.rows;
+      rows = queryResult?.rows || [];
     }
 
     if (rows.length === 0) {

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 function extractTranslations(filePath: string): { en: Record<string, string>; am: Record<string, string> } {
-  const absolutePath = path.resolve(filePath);
+  const absolutePath = path.resolve(__dirname, "..", filePath);
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`File does not exist: ${absolutePath}`);
   }
@@ -20,9 +20,9 @@ function extractTranslations(filePath: string): { en: Record<string, string>; am
 
 describe("Translation Symmetries & i18n Completeness", () => {
   const targets = [
-    "src/app/events/[id]/page.tsx",
-    "src/app/hr/expenses/approve/page.tsx",
-    "src/app/hr/reports/profit/page.tsx",
+    "app/events/[id]/page.tsx",
+    "app/hr/expenses/approve/page.tsx",
+    "app/hr/reports/profit/page.tsx",
   ];
 
   targets.forEach((target) => {
