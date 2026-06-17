@@ -42,6 +42,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Equipment Rental": "Equipment Rental",
     Consumables: "Consumables",
     Other: "Other",
+    "Aggregated profitability tracking, monthly category breakdowns, and print exports.": "Aggregated profitability tracking, monthly category breakdowns, and print exports.",
+    "Workspace unavailable": "Workspace unavailable",
   },
   am: {
     "Financial Dashboard & Reports": "የፋይናንስ ዳሽቦርድ እና ሪፖርቶች",
@@ -74,6 +76,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Equipment Rental": "የመሳሪያ ኪራይ",
     Consumables: "የሚጠቀሙ እቃዎች",
     Other: "ሌላ",
+    "Aggregated profitability tracking, monthly category breakdowns, and print exports.": "የተጠቃለለ የትርፋማነት ክትትል፣ ወርሃዊ የወጪ ዝርዝር በምድብ እና የህትመት ውጤቶች።",
+    "Workspace unavailable": "የስራ ቦታ አልተገኘም",
   },
 };
 

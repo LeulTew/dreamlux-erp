@@ -8,6 +8,8 @@ export interface Item {
   id: string;
   name: string;
   quantity: number;
+  allocated_quantity?: number;
+  available_quantity?: number;
   description: string | null;
   store: {
     id: string;

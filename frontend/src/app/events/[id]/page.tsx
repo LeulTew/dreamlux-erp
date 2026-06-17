@@ -154,6 +154,19 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Category Breakdown": "Category Breakdown",
     "No approved expenses yet. Profit is same as contract price.": "No approved expenses yet. Profit is same as contract price.",
     "Total Approved Expenses": "Total Approved Expenses",
+    "Event Manager": "Event Manager",
+    "Supervisor": "Supervisor",
+    "Team Leader": "Team Leader",
+    "Décor Professional": "Décor Professional",
+    "Assistant": "Assistant",
+    "Store Keeper": "Store Keeper",
+    "Reserved": "Reserved",
+    "Pulled": "Pulled",
+    "Returned": "Returned",
+    "Assignment failed": "Assignment failed",
+    "Removal failed": "Removal failed",
+    "Update failed": "Update failed",
+    "No Driver Assigned": "No Driver Assigned",
   },
   am: {
     "Back to Events": "ወደ ዝግጅቶች ተመለስ",
@@ -219,7 +232,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No vehicles assigned yet.": "እስካሁን ምንም ተሽከርካሪ አልተመደበም።",
     "Attendance": "መገኘት",
     "Attended": "ተገኝቷል",
-    "Did not attend": "አልተገኘም",
+    "Did not attend": "አልተገኝም",
     "Remove Assignment": "ምደባን ሰርዝ",
     "Staff assigned": "ሠራተኛ ተመድቧል",
     "Vehicle assigned": "ተሽከርካሪ ተመድቧል",
@@ -260,6 +273,19 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Category Breakdown": "የወጪ ዝርዝር በምድብ",
     "No approved expenses yet. Profit is same as contract price.": "እስካሁን የጸደቀ ወጪ የለም። ትርፉ ከውሉ ዋጋ ጋር እኩል ነው።",
     "Total Approved Expenses": "አጠቃላይ የጸደቁ ወጪዎች",
+    "Event Manager": "የዝግጅት ሥራ አስኪያጅ",
+    "Supervisor": "ሱፐርቫይዘር",
+    "Team Leader": "የቡድን መሪ",
+    "Décor Professional": "የዲኮር ባለሙያ",
+    "Assistant": "ረዳት",
+    "Store Keeper": "የመጋዘን ሠራተኛ",
+    "Reserved": "የተያዘ",
+    "Pulled": "የወጣ",
+    "Returned": "የተመለሰ",
+    "Assignment failed": "ምደባው አልተሳካም",
+    "Removal failed": "ማስወገድ አልተሳካም",
+    "Update failed": "ማዘመን አልተሳካም",
+    "No Driver Assigned": "ምንም ሾፌር አልተመደበም",
   },
 };
 
@@ -619,7 +645,7 @@ export default function EventWorkspacePage() {
   const alreadyAllocated = allocations
     .filter((allocation) => allocation.item_id === selectedItemId && allocation.status !== "Returned")
     .reduce((sum, allocation) => sum + Number(allocation.quantity_allocated || 0), 0) || 0;
-  const selectedAvailable = selectedItem ? Math.max(0, Number(selectedItem.quantity || 0) - alreadyAllocated) : 0;
+  const selectedAvailable = selectedItem ? Number(selectedItem.available_quantity ?? 0) : 0;
 
   const allocationMutation = useMutation({
     mutationFn: () =>
@@ -943,7 +969,7 @@ export default function EventWorkspacePage() {
                       <option value="">{t("Select item")}</option>
                       {items.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.name} - {t("Available")} {item.quantity}
+                          {item.name} - {t("Available")} {item.available_quantity ?? item.quantity}
                         </option>
                       ))}
                     </select>
@@ -987,7 +1013,7 @@ export default function EventWorkspacePage() {
                           <div className="min-w-0">
                             <div className="font-semibold text-foreground">{allocation.item_name}</div>
                             <div className="mt-1 text-xs text-muted">
-                              {allocation.store_name || "-"} | {t("Allocated")}: {allocation.quantity_allocated} | {allocation.status}
+                              {allocation.store_name || "-"} | {t("Allocated")}: {allocation.quantity_allocated} | {t(allocation.status)}
                             </div>
                             {allocation.notes && <div className="mt-1 text-xs text-muted">{allocation.notes}</div>}
                           </div>
@@ -1103,13 +1129,13 @@ export default function EventWorkspacePage() {
                           className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
                         >
                           <option value="">{t("Role")}</option>
-                          <option value="Event Manager">Event Manager</option>
-                          <option value="Supervisor">Supervisor</option>
-                          <option value="Team Leader">Team Leader</option>
-                          <option value="Décor Professional">Décor Professional</option>
-                          <option value="Assistant">Assistant</option>
-                          <option value="Driver">Driver</option>
-                          <option value="Store Keeper">Store Keeper</option>
+                          <option value="Event Manager">{t("Event Manager")}</option>
+                          <option value="Supervisor">{t("Supervisor")}</option>
+                          <option value="Team Leader">{t("Team Leader")}</option>
+                          <option value="Décor Professional">{t("Décor Professional")}</option>
+                          <option value="Assistant">{t("Assistant")}</option>
+                          <option value="Driver">{t("Driver")}</option>
+                          <option value="Store Keeper">{t("Store Keeper")}</option>
                         </select>
                       </div>
 
@@ -1156,7 +1182,7 @@ export default function EventWorkspacePage() {
                             <div className="min-w-0">
                               <div className="font-semibold text-foreground">{asg.employee_name}</div>
                               <div className="mt-1 text-xs text-muted">
-                                {asg.role} | {formatCurrency(asg.commission_amount)}
+                                {t(asg.role)} | {formatCurrency(asg.commission_amount)}
                               </div>
                               <div className="mt-2 flex items-center gap-3">
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-muted cursor-pointer">
