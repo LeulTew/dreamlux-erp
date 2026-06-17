@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { HiCheckCircle, HiXCircle } from "react-icons/hi2";
 
@@ -67,12 +68,34 @@ function formatCurrency(value?: number | string | null) {
 export default function ExpenseApprovalPage() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
+
+  const authStatus = useMemo<"authorized" | "unauthorized" | "no-user">(() => {
+    if (typeof window === "undefined") return "no-user";
+    const rawUser = localStorage.getItem("user");
+    if (!rawUser) return "no-user";
+    try {
+      const parsed = JSON.parse(rawUser) as { role?: string; role_name?: string };
+      const role = (parsed.role_name || parsed.role || "").toUpperCase();
+      return ["OWNER", "ACCOUNTANT", "SUPER_ADMIN", "ADMIN"].includes(role)
+        ? "authorized"
+        : "unauthorized";
+    } catch {
+      return "unauthorized";
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authStatus === "no-user") router.replace("/login");
+    else if (authStatus === "unauthorized") router.replace("/");
+  }, [authStatus, router]);
 
   const expensesQuery = useQuery({
     queryKey: ["pending-event-expenses"],
     queryFn: getPendingEventExpenses,
+    enabled: authStatus === "authorized",
   });
 
   const reviewMutation = useMutation({
@@ -91,6 +114,16 @@ export default function ExpenseApprovalPage() {
       toast.error(err.response?.data?.error || err.message || t("Reason required"));
     },
   });
+
+  if (authStatus !== "authorized") {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
 
   const expenses = expensesQuery.data || [];
 
