@@ -60,7 +60,7 @@ mock.module("pg", () => ({
 // Direct instance override to protect against module cache pollution
 import { pool } from "../db/pool";
 try {
-  pool.query = mock(() => Promise.resolve({ rows: [] }));
+  pool.query = mock(() => Promise.resolve({ rows: [] })) as any;
   pool.connect = mock(() => Promise.resolve({
     release: mock(() => {}),
     query: mock(() => Promise.resolve({ rows: [] }))
