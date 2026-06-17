@@ -26,21 +26,70 @@ Always interact with GitHub using the `gh` tool to maintain project hygiene:
 
 ---
 
-## 2. ⚠️ Zero-Warning Compilation Policy (`bun` Only)
+## 2. ⚠️ Shell Environment, Verification & Testing Commands
 
-We maintain a strict quality gate: **Exactly 0 Errors and 0 Warnings** are allowed across the codebase.
+### 🐚 WSL Fish Shell Wildcard Expansion
+- The developer's WSL environment runs the **fish shell** by default.
+- Fish shell handles wildcards/globbing differently from bash (e.g. `*.sql` without quotes will cause expansion errors).
+- **Rule**: When executing shell commands involving wildcards or file paths (like `find`, `grep`, `cp`), always wrap the wildcard arguments in single quotes, or wrap the entire execution via `bash -c` (e.g. `wsl bash -c "find . -name '*.sql'"`).
 
-Before any commit, pull request, or deployment, you must run local build and lint validation checks:
+### 🧪 QA Testing & Verification Commands
+Before submitting commits or creating pull requests, you must run quality assurance tests to ensure that everything is correct.
 
+#### Within Backend Module:
 ```bash
-# Frontend validation
-cd frontend && bun run lint && bun run build
+cd backend
+# Run test suite
+bun test
+# Run specific test file
+bun test src/__tests__/events.test.ts
+```
 
-# Backend validation
-cd backend && bun run lint && bun run build
+#### Within Frontend Module:
+```bash
+cd frontend
+# Run frontend unit tests
+bun test
+```
 
-# Entire repository validation
+#### From Repository Root (Outside both):
+```bash
+# Run all workspace test suites
+bun run test
+```
+
+### 🧹 Linter, Typecheck & Compiler Verification
+We enforce a strict **Zero-Warning and Zero-Error Policy**. All code must compile cleanly:
+
+#### Backend Lint & Typecheck:
+```bash
+cd backend
+bun run lint
+eslint . && tsc --noEmit
+bun run build
+```
+
+#### Frontend Lint & Typecheck:
+```bash
+cd frontend
+bun run lint
+next lint && tsc --noEmit
+bun run build
+```
+
+#### Workspace-wide Validation:
+```bash
 bun run lint && bun run build
+```
+
+### 🗄️ Database Setup & QA Commands
+When verifying schema adjustments or seeding the sample data for testing:
+```bash
+cd backend
+# Run database migrations
+bun run db:migrate
+# Seed DreamLux SRD sample data
+bun run db:seed
 ```
 
 - **Warning Resolution**: Any ESLint warnings (such as missing react hook dependencies, unused variables, un-escaped HTML characters, or improper callback memoization) must be fixed before proceeding.
