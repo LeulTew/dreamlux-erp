@@ -104,7 +104,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     const dataResult = await pool.query(dataQuery, queryParams);
 
     const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isFinancial = canAccessProfitReports(userRole);
     const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
 
     const events = dataResult.rows.map((row: any) => {
@@ -156,6 +156,7 @@ router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Respo
 
 // PATCH /events/expenses/:expenseId/review - approve/reject pending expense
 router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest, res: Response) => {
+  const client = await pool.connect();
   try {
     const { expenseId } = req.params;
     if (!canApproveExpenses(req.user?.role)) {
@@ -169,18 +170,31 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
       return;
     }
 
-    const existingResult = await pool.query("SELECT * FROM expenses WHERE id = $1", [expenseId]);
+    await client.query("BEGIN");
+
+    const existingResult = await client.query(
+      `
+        SELECT exp.*
+        FROM expenses exp
+        JOIN events e ON exp.event_id = e.id
+        WHERE exp.id = $1 AND e.deleted_at IS NULL
+      `,
+      [expenseId]
+    );
+
     if (existingResult.rowCount === 0) {
-      res.status(404).json({ error: "Expense not found" });
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Expense not found or associated event is deleted" });
       return;
     }
     if (existingResult.rows[0].status === "Approved") {
+      await client.query("ROLLBACK");
       res.status(409).json({ error: "Approved expenses are locked" });
       return;
     }
 
     const { status, rejected_reason } = validationResult.data;
-    const result = await pool.query(
+    const result = await client.query(
       `
         UPDATE expenses
         SET status = $1,
@@ -193,10 +207,29 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
       [status, status === "Rejected" ? rejected_reason : null, req.user?.id || null, expenseId]
     );
 
+    // Insert audit log
+    await client.query(
+      `
+        INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
+        VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        existingResult.rows[0].event_id,
+        req.user?.id || null,
+        "expense_status",
+        `Pending (ID: ${expenseId}, Category: ${existingResult.rows[0].category}, Amount: ${existingResult.rows[0].amount})`,
+        status
+      ]
+    );
+
+    await client.query("COMMIT");
     res.json(result.rows[0]);
   } catch (error: any) {
+    await client.query("ROLLBACK");
     console.error("[patch-expense-review] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 
@@ -458,7 +491,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     const logsResult = await pool.query(logsQuery, [id]);
 
     const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isFinancial = canAccessProfitReports(userRole);
     const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
 
     const filteredEvent = { ...event };
@@ -528,7 +561,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     // Redact contract_price/estimated_design_cost if user doesn't have privileges
     const event = result.rows[0];
-    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isFinancial = canAccessProfitReports(userRole);
     const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
     if (!isFinancial) delete event.contract_price;
     if (!isPrivileged) delete event.estimated_design_cost;
@@ -686,14 +719,14 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       `;
       const result = await pool.query(updateQuery, updateParams);
       const event = result.rows[0];
-      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      const isFinancial = canAccessProfitReports(userRole);
       const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
       if (!isFinancial) delete event.contract_price;
       if (!isPrivileged) delete event.estimated_design_cost;
       res.json({ event });
     } else {
       const event = { ...currentEvent };
-      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      const isFinancial = canAccessProfitReports(userRole);
       const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
       if (!isFinancial) delete event.contract_price;
       if (!isPrivileged) delete event.estimated_design_cost;
@@ -803,7 +836,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     const vehicleAssignmentsResult = await pool.query(vehicleAssignmentsQuery, [id]);
 
     const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isFinancial = canAccessProfitReports(userRole);
 
     let expenses: any[] = [];
     let trips: any[] = [];
@@ -949,12 +982,12 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
       `;
       const result = await pool.query(updateQuery, updateParams);
       const event = result.rows[0];
-      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      const isFinancial = canAccessProfitReports(userRole);
       if (!isFinancial) delete event.contract_price;
       res.json({ event });
     } else {
       const event = { ...currentEvent };
-      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      const isFinancial = canAccessProfitReports(userRole);
       if (!isFinancial) delete event.contract_price;
       res.json({ event });
     }
@@ -971,8 +1004,8 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
     const { id } = req.params;
     const userRole = req.user?.role?.toUpperCase();
 
-    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, INVENTORY_CONTROLLER, SUPER_ADMIN, ADMIN
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "INVENTORY_CONTROLLER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -1062,8 +1095,8 @@ router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthReq
     const { id, allocationId } = req.params;
     const userRole = req.user?.role?.toUpperCase();
 
-    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, INVENTORY_CONTROLLER, SUPER_ADMIN, ADMIN
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "INVENTORY_CONTROLLER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -1776,6 +1809,36 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
     }
 
     const assignment = assignmentResult.rows[0];
+    if (req.user?.role?.toUpperCase() === "DRIVER") {
+      const userResult = await client.query(
+        "SELECT email FROM users WHERE id = $1 AND deleted_at IS NULL",
+        [req.user.id]
+      );
+      const userEmail = userResult.rows[0]?.email;
+      if (!userEmail) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Forbidden: Driver has no linked email to resolve employee record" });
+        return;
+      }
+
+      const employeeResult = await client.query(
+        "SELECT id FROM employees WHERE email = $1 AND deleted_at IS NULL",
+        [userEmail]
+      );
+      const employeeId = employeeResult.rows[0]?.id;
+      if (!employeeId) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Forbidden: No linked employee record found for this driver" });
+        return;
+      }
+
+      if (assignment.driver_id !== employeeId) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Forbidden: You are not assigned as the driver for this vehicle assignment" });
+        return;
+      }
+    }
+
     if (assignment.event_status === "Completed" && !canOverrideCompleted(req.user?.role)) {
       await client.query("ROLLBACK");
       res.status(403).json({ error: "Completed event trips cannot be changed except by administrators or accountants" });

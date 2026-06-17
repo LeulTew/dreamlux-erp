@@ -793,14 +793,17 @@ describe("Events API", () => {
   });
 
   test("PATCH /events/expenses/:expenseId/review approves pending expense", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "expense-1", status: "Pending" }],
+      rows: [{ id: "expense-1", event_id: "event-1", category: "Fuel", amount: 1200, status: "Pending" }],
       rowCount: 1,
-    });
+    }); // JOIN select query
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "expense-1", status: "Approved" }],
       rowCount: 1,
-    });
+    }); // UPDATE query
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // INSERT event_logs
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
 
     const res = await request(app)
       .patch("/events/expenses/expense-1/review")
@@ -822,10 +825,12 @@ describe("Events API", () => {
   });
 
   test("PATCH /events/expenses/:expenseId/review locks approved expenses", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "expense-1", status: "Approved" }],
       rowCount: 1,
-    });
+    }); // JOIN select query
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
 
     const res = await request(app)
       .patch("/events/expenses/expense-1/review")
@@ -1053,48 +1058,68 @@ describe("Events API", () => {
     });
 
     test("POST /events/:id/expenses/generate-labor prevents double-generation under concurrency", async () => {
-      // First call setup
-      // BEGIN
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-      // Lock/Event select
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 }); // Lock/Event select
-      // Labor sum
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "3500" }], rowCount: 1 }); // Labor sum
-      // Check active expense
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // Check active expense
-      // Insert
-      mockQuery.mockResolvedValueOnce({
-        rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
-        rowCount: 1,
-      }); // Insert
-      // COMMIT
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+      let activeTransaction = false;
+      let laborExpenseCreated = false;
 
-      const res1 = await request(app)
-        .post("/events/event-1/expenses/generate-labor")
-        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+      mockQuery.mockImplementation(async (sql: string, _params?: any[]) => {
+        const sqlStr = sql.trim();
+        if (sqlStr === "BEGIN") {
+          return { rows: [], rowCount: 1 };
+        }
+        if (sqlStr === "COMMIT" || sqlStr === "ROLLBACK") {
+          activeTransaction = false;
+          return { rows: [], rowCount: 1 };
+        }
+        if (sqlStr.includes("FROM events") && sqlStr.includes("FOR UPDATE")) {
+          // If a transaction is already active, wait (simulating FOR UPDATE lock contention)
+          let waitTime = 0;
+          while (activeTransaction && waitTime < 1000) {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            waitTime += 5;
+          }
+          activeTransaction = true;
+          return { rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 };
+        }
+        if (sqlStr.includes("SUM(commission_amount)")) {
+          return { rows: [{ total: "3500" }], rowCount: 1 };
+        }
+        if (sqlStr.includes("FROM expenses") && sqlStr.includes("'Labor'")) {
+          if (laborExpenseCreated) {
+            return { rows: [{ id: "expense-labor-1" }], rowCount: 1 };
+          }
+          return { rows: [], rowCount: 0 };
+        }
+        if (sqlStr.includes("INSERT INTO expenses")) {
+          laborExpenseCreated = true;
+          return {
+            rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
+            rowCount: 1,
+          };
+        }
+        return { rows: [], rowCount: 0 };
+      });
 
-      expect(res1.status).toBe(201);
-      expect(res1.body.status).toBe("Pending");
+      // Fire both requests concurrently
+      const [res1, res2] = await Promise.all([
+        request(app)
+          .post("/events/event-1/expenses/generate-labor")
+          .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`),
+        request(app)
+          .post("/events/event-1/expenses/generate-labor")
+          .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+      ]);
 
-      // Second call setup (finds existing)
-      // BEGIN
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-      // Lock/Event select
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 }); // Lock/Event select
-      // Labor sum
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "3500" }], rowCount: 1 }); // Labor sum
-      // Already exists!
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "expense-labor-1" }], rowCount: 1 }); // Already exists!
-      // ROLLBACK
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+      // Assert that one succeeds (201) and the other fails (409) due to concurrency lock/idempotency check
+      const statuses = [res1.status, res2.status];
+      expect(statuses).toContain(201);
+      expect(statuses).toContain(409);
 
-      const res2 = await request(app)
-        .post("/events/event-1/expenses/generate-labor")
-        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
-
-      expect(res2.status).toBe(409);
-      expect(res2.body.error).toContain("already been generated");
+      // Verify that the query used FOR UPDATE for locking
+      const queryCalls = mockQuery.mock.calls;
+      const selectForUpdateCall = queryCalls.find((call) =>
+        String(call[0]).includes("FOR UPDATE")
+      );
+      expect(selectForUpdateCall).toBeDefined();
     });
 
     test("POST /events blocks low-privilege roles", async () => {
@@ -1156,6 +1181,28 @@ describe("Events API", () => {
       expect(res.body.assignments[0].commission_amount).toBeUndefined();
     });
 
+    test("GET /events/:id/workspace redacts financial fields for OPS_MANAGER", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // allocations
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // checklist
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "assign-1", employee_name: "John Doe", employee_phone: "+251911111111", commission_amount: "5000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // vehicle assignments
+
+      const res = await request(app)
+        .get("/events/event-1/workspace")
+        .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.event.contract_price).toBeUndefined();
+      expect(res.body.event.estimated_design_cost).toBeDefined();
+    });
+
     test("GET /events/:id and GET /events redact financial fields for DRIVER", async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],
@@ -1192,6 +1239,147 @@ describe("Events API", () => {
         .get("/export/xlsx")
         .set("Authorization", `Bearer ${getToken("DRIVER")}`);
       expect(exportRes.status).toBe(403);
+    });
+
+    test("POST /events/:id/trips BOLA check allows assigned driver and blocks unassigned drivers", async () => {
+      const validAssignmentId = "7891594c-ecc0-4f66-a51f-a29d530587a2";
+
+      // Test Case 1: Driver has no linked email -> block
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: validAssignmentId, driver_id: "7891594c-ecc0-4f66-a51f-a29d530587a3", fuel_consumption_rate: 0.15, event_status: "Ongoing" }],
+        rowCount: 1,
+      }); // vehicle_assignment lookup
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // SELECT email FROM users (not found)
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res1 = await request(app)
+        .post("/events/event-1/trips")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({
+          vehicle_assignment_id: validAssignmentId,
+          destination: "Bole",
+          distance_km: 15,
+          fuel_price_etb: 80,
+        });
+      expect(res1.status).toBe(403);
+      expect(res1.body.error).toContain("no linked email");
+
+      // Test Case 2: Driver has email but no employee record -> block
+      mockQuery.mockReset();
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: validAssignmentId, driver_id: "7891594c-ecc0-4f66-a51f-a29d530587a3", fuel_consumption_rate: 0.15, event_status: "Ongoing" }],
+        rowCount: 1,
+      }); // vehicle_assignment lookup
+      mockQuery.mockResolvedValueOnce({ rows: [{ email: "driver@example.com" }], rowCount: 1 }); // users lookup
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // employees lookup (not found)
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res2 = await request(app)
+        .post("/events/event-1/trips")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({
+          vehicle_assignment_id: validAssignmentId,
+          destination: "Bole",
+          distance_km: 15,
+          fuel_price_etb: 80,
+        });
+      expect(res2.status).toBe(403);
+      expect(res2.body.error).toContain("No linked employee record");
+
+      // Test Case 3: Driver is not assigned to the vehicle assignment -> block
+      mockQuery.mockReset();
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: validAssignmentId, driver_id: "7891594c-ecc0-4f66-a51f-a29d530587a3", fuel_consumption_rate: 0.15, event_status: "Ongoing" }],
+        rowCount: 1,
+      }); // vehicle_assignment lookup
+      mockQuery.mockResolvedValueOnce({ rows: [{ email: "driver@example.com" }], rowCount: 1 }); // users lookup
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "7891594c-ecc0-4f66-a51f-a29d530587a4" }], rowCount: 1 }); // employees lookup (wrong driver)
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res3 = await request(app)
+        .post("/events/event-1/trips")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({
+          vehicle_assignment_id: validAssignmentId,
+          destination: "Bole",
+          distance_km: 15,
+          fuel_price_etb: 80,
+        });
+      expect(res3.status).toBe(403);
+      expect(res3.body.error).toContain("not assigned as the driver");
+
+      // Test Case 4: Driver is correctly assigned -> allow
+      mockQuery.mockReset();
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: validAssignmentId, driver_id: "7891594c-ecc0-4f66-a51f-a29d530587a3", fuel_consumption_rate: 0.15, event_status: "Ongoing" }],
+        rowCount: 1,
+      }); // vehicle_assignment lookup
+      mockQuery.mockResolvedValueOnce({ rows: [{ email: "driver@example.com" }], rowCount: 1 }); // users lookup
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "7891594c-ecc0-4f66-a51f-a29d530587a3" }], rowCount: 1 }); // employees lookup (correct driver)
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "trip-1" }], rowCount: 1 }); // insert trip
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "expense-1" }], rowCount: 1 }); // insert expense
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res4 = await request(app)
+        .post("/events/event-1/trips")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({
+          vehicle_assignment_id: validAssignmentId,
+          destination: "Bole",
+          distance_km: 15,
+          fuel_price_etb: 80,
+        });
+      expect(res4.status).toBe(201);
+      expect(res4.body.trip).toBeDefined();
+    });
+
+    test("PATCH /events/expenses/:expenseId/review blocks reviews on soft-deleted events", async () => {
+      // Test Case 1: Expense or event doesn't exist/deleted -> 404
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // JOIN select query (not found or deleted)
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res1 = await request(app)
+        .patch("/events/expenses/expense-1/review")
+        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+        .send({ status: "Approved" });
+
+      expect(res1.status).toBe(404);
+      expect(res1.body.error).toContain("Expense not found or associated event is deleted");
+
+      // Test Case 2: Success case - approves active event expense and inserts audit log
+      mockQuery.mockReset();
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "expense-1", event_id: "event-1", category: "Fuel", amount: 1200, status: "Pending" }],
+        rowCount: 1,
+      }); // JOIN select query
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "expense-1", status: "Approved" }],
+        rowCount: 1,
+      }); // update expense status
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // insert audit log
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res2 = await request(app)
+        .patch("/events/expenses/expense-1/review")
+        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+        .send({ status: "Approved" });
+
+      expect(res2.status).toBe(200);
+      expect(res2.body.status).toBe("Approved");
+
+      // Verify audit log query was made
+      const auditLogCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes("INSERT INTO event_logs")
+      );
+      expect(auditLogCall).toBeDefined();
+      expect(auditLogCall?.[1]?.[0]).toBe("event-1"); // event_id
+      expect(auditLogCall?.[1]?.[2]).toBe("expense_status"); // field_changed
     });
   });
 });
