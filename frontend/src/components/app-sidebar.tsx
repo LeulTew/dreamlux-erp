@@ -57,6 +57,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Search: "Search",
     "List Events": "List Events",
     Finance: "Finance",
+    "Profit Reports": "Profit Reports",
   },
   am: {
     Employees: "ሰራተኞች",
@@ -80,6 +81,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Search: "ፈልግ",
     "List Events": "የዝግጅቶች ዝርዝር",
     Finance: "ፋይናንስ",
+    "Profit Reports": "የትርፍ ሪፖርቶች",
   },
 };
 
@@ -350,6 +352,7 @@ export function AppSidebar() {
   const financeLinks = [
     { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN", "ACCOUNTANT", "accountant"]) },
     { href: "/hr/expenses/approve", label: t("Expense Approvals"), active: pathname === "/hr/expenses/approve", show: hasAccess(["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "OWNER", "owner", "ACCOUNTANT", "accountant"]) },
+    { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasAccess(["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "OWNER", "owner", "ACCOUNTANT", "accountant"]) },
     { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
   ].filter(l => l.show);
 
@@ -523,7 +526,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiOutlineBanknotes}
                         label={t("Finance")}
-                        isActive={isActive("/hr/payments") || isActive("/hr/salary-levels")}
+                        isActive={isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses")}
                         links={financeLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
                       />
                     ) : (
@@ -531,7 +534,7 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setFinanceOpen(!financeOpen)}
                           className={`w-full justify-between rounded-xl h-10 ${
-                            isActive("/hr/payments") || isActive("/hr/salary-levels") ? "text-primary font-semibold" : ""
+                            isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary font-semibold" : ""
                           }`}
                         >
                           <span className="flex items-center gap-3">
