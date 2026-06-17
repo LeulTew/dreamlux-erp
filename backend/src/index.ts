@@ -12,7 +12,7 @@ import salaryLevelsRouter from "./routes/salary-levels";
 import eventTypesRouter from "./routes/event-types";
 import payrollRouter from "./routes/payroll";
 import eventsRouter from "./routes/events";
-import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
+import { requireAuth, requirePermissionSlugs, requireRole } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
 import { runStartupMigrations } from "./db/startup-migration";
 import { pool } from "./db/pool";
@@ -107,10 +107,10 @@ app.use("/stores", requireAuth, officeRoutes); // Compatibility for old inventor
 app.use("/employees", requireAuth, employeesRouter);
 app.use("/export", requireAuth, exportRoutes);
 app.use("/settings", requireAuth, requirePermissionSlugs(["settings:write", "users:manage"]), settingsRouter);
-app.use("/departments", requireAuth, departmentsRouter);
-app.use("/salary-levels", requireAuth, salaryLevelsRouter);
+app.use("/departments", requireAuth, requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), departmentsRouter);
+app.use("/salary-levels", requireAuth, requireRole(["OWNER", "HR_MANAGER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), salaryLevelsRouter);
 app.use("/event-types", requireAuth, eventTypesRouter);
-app.use("/payroll", requireAuth, payrollRouter);
+app.use("/payroll", requireAuth, requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), payrollRouter);
 app.use("/events", requireAuth, eventsRouter);
 
 // Error handler

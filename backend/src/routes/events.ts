@@ -103,8 +103,19 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const dataResult = await pool.query(dataQuery, queryParams);
 
+    const userRole = req.user?.role?.toUpperCase();
+    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+
+    const events = dataResult.rows.map((row: any) => {
+      const cloned = { ...row };
+      if (!isFinancial) delete cloned.contract_price;
+      if (!isPrivileged) delete cloned.estimated_design_cost;
+      return cloned;
+    });
+
     res.json({
-      events: dataResult.rows,
+      events,
       total,
       page,
       limit,
@@ -446,8 +457,16 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     `;
     const logsResult = await pool.query(logsQuery, [id]);
 
+    const userRole = req.user?.role?.toUpperCase();
+    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+
+    const filteredEvent = { ...event };
+    if (!isFinancial) delete filteredEvent.contract_price;
+    if (!isPrivileged) delete filteredEvent.estimated_design_cost;
+
     res.json({
-      event,
+      event: filteredEvent,
       logs: logsResult.rows,
     });
   } catch (error: any) {
@@ -459,6 +478,12 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // POST /events - Create a new event
 router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    const userRole = req.user?.role?.toUpperCase();
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges to create events" });
+      return;
+    }
+
     const validationResult = createEventSchema.safeParse(req.body);
     if (!validationResult.success) {
       res.status(400).json({ error: validationResult.error.errors[0].message });
@@ -501,7 +526,14 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
       req.user?.id || null,
     ]);
 
-    res.status(201).json({ event: result.rows[0] });
+    // Redact contract_price/estimated_design_cost if user doesn't have privileges
+    const event = result.rows[0];
+    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+    if (!isFinancial) delete event.contract_price;
+    if (!isPrivileged) delete event.estimated_design_cost;
+
+    res.status(201).json({ event });
   } catch (error: any) {
     console.error("[create-event] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
@@ -512,6 +544,11 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges to update events" });
+      return;
+    }
 
     // Fetch existing event
     const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
@@ -648,9 +685,19 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      res.json({ event: result.rows[0] });
+      const event = result.rows[0];
+      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+      if (!isFinancial) delete event.contract_price;
+      if (!isPrivileged) delete event.estimated_design_cost;
+      res.json({ event });
     } else {
-      res.json({ event: currentEvent });
+      const event = { ...currentEvent };
+      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+      if (!isFinancial) delete event.contract_price;
+      if (!isPrivileged) delete event.estimated_design_cost;
+      res.json({ event });
     }
   } catch (error: any) {
     console.error("[update-event] Error:", error);
@@ -794,11 +841,26 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
       trips = tripsResult.rows;
     }
 
+    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+
+    const filteredEvent = { ...event };
+    if (!isFinancial) delete filteredEvent.contract_price;
+    if (!isPrivileged) delete filteredEvent.estimated_design_cost;
+
+    const filteredAssignments = assignmentsResult.rows.map((asg: any) => {
+      const cloned = { ...asg };
+      if (!isPrivileged) {
+        delete cloned.commission_amount;
+        delete cloned.employee_phone;
+      }
+      return cloned;
+    });
+
     res.json({
-      event,
+      event: filteredEvent,
       allocations: allocationsResult.rows,
       checklist: checklistResult.rows,
-      assignments: assignmentsResult.rows,
+      assignments: filteredAssignments,
       vehicleAssignments: vehicleAssignmentsResult.rows,
       expenses,
       trips,
@@ -813,6 +875,11 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
 router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges to update event design" });
+      return;
+    }
 
     const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
     const eventResult = await pool.query(eventQuery, [id]);
@@ -881,9 +948,15 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      res.json({ event: result.rows[0] });
+      const event = result.rows[0];
+      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      if (!isFinancial) delete event.contract_price;
+      res.json({ event });
     } else {
-      res.json({ event: currentEvent });
+      const event = { ...currentEvent };
+      const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
+      if (!isFinancial) delete event.contract_price;
+      res.json({ event });
     }
   } catch (error: any) {
     console.error("[patch-event-design] Error:", error);

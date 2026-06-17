@@ -1096,5 +1096,102 @@ describe("Events API", () => {
       expect(res2.status).toBe(409);
       expect(res2.body.error).toContain("already been generated");
     });
+
+    test("POST /events blocks low-privilege roles", async () => {
+      const res = await request(app)
+        .post("/events")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({
+          name: "Fake Event",
+          client_name: "Client",
+          start_date: "2026-06-20",
+          end_date: "2026-06-22",
+          venue_location: "Venue",
+          contract_price: 1000,
+        });
+      expect(res.status).toBe(403);
+    });
+
+    test("PUT /events/:id blocks low-privilege roles", async () => {
+      const res = await request(app)
+        .put("/events/event-1")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({
+          name: "Updated Name",
+        });
+      expect(res.status).toBe(403);
+    });
+
+    test("PATCH /events/:id/design blocks low-privilege roles", async () => {
+      const res = await request(app)
+        .patch("/events/event-1/design")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({
+          package_design_notes: "New Design",
+        });
+      expect(res.status).toBe(403);
+    });
+
+    test("GET /events/:id/workspace redacts commission_amount and employee_phone for DRIVER", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // allocations
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // checklist
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "assign-1", employee_name: "John Doe", employee_phone: "+251911111111", commission_amount: "5000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // vehicle assignments
+
+      const res = await request(app)
+        .get("/events/event-1/workspace")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.event.contract_price).toBeUndefined();
+      expect(res.body.event.estimated_design_cost).toBeUndefined();
+      expect(res.body.assignments[0].employee_phone).toBeUndefined();
+      expect(res.body.assignments[0].commission_amount).toBeUndefined();
+    });
+
+    test("GET /events/:id and GET /events redact financial fields for DRIVER", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // logs
+
+      const res = await request(app)
+        .get("/events/event-1")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.event.contract_price).toBeUndefined();
+      expect(res.body.event.estimated_design_cost).toBeUndefined();
+    });
+
+    test("GET /payroll, /salary-levels, /departments and export routes block DRIVER", async () => {
+      const payrollRes = await request(app)
+        .get("/payroll/runs")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+      expect(payrollRes.status).toBe(403);
+
+      const salaryRes = await request(app)
+        .get("/salary-levels")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+      expect(salaryRes.status).toBe(403);
+
+      const deptRes = await request(app)
+        .get("/departments")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+      expect(deptRes.status).toBe(403);
+
+      const exportRes = await request(app)
+        .get("/export/xlsx")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+      expect(exportRes.status).toBe(403);
+    });
   });
 });
