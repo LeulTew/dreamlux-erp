@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS event_assignments (
 
 CREATE INDEX IF NOT EXISTS idx_event_assignments_event ON event_assignments(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_assignments_employee ON event_assignments(employee_id);
+CREATE INDEX IF NOT EXISTS idx_event_assignments_employee_event ON event_assignments(employee_id, event_id);
 
 -- 5. Create Vehicle Assignments Table (links vehicles/drivers to events)
 CREATE TABLE IF NOT EXISTS vehicle_assignments (
@@ -63,6 +64,10 @@ CREATE TABLE IF NOT EXISTS vehicle_assignments (
 
 CREATE INDEX IF NOT EXISTS idx_vehicle_assignments_event ON vehicle_assignments(event_id);
 CREATE INDEX IF NOT EXISTS idx_vehicle_assignments_vehicle ON vehicle_assignments(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_assignments_vehicle_event ON vehicle_assignments(vehicle_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_vehicle_assignments_driver
+  ON vehicle_assignments(driver_id)
+  WHERE driver_id IS NOT NULL;
 
 -- 6. Create Trips Table (tracks mileage and fuel for vehicle assignments)
 CREATE TABLE IF NOT EXISTS trips (
@@ -95,3 +100,4 @@ CREATE TABLE IF NOT EXISTS expenses (
 
 CREATE INDEX IF NOT EXISTS idx_expenses_event ON expenses(event_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
+CREATE INDEX IF NOT EXISTS idx_expenses_event_status_category ON expenses(event_id, status, category);

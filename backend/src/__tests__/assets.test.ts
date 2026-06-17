@@ -89,26 +89,28 @@ describe("Assets", () => {
 
   describe("GET /assets", () => {
     test("returns paginated items with defaults", async () => {
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          {
-            id: "1",
-            name: "Item 1",
-            quantity: 10,
-            store_id: VALID_UUID,
-            stores: { name: "Store 1" },
-            count: "25",
-          },
-          {
-            id: "2",
-            name: "Item 2",
-            quantity: 5,
-            store_id: VALID_UUID,
-            stores: { name: "Store 1" },
-            count: "25",
-          },
-        ],
-      });
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: "1",
+              name: "Item 1",
+              quantity: 10,
+              store_id: VALID_UUID,
+              stores: { name: "Store 1" },
+              count: "25",
+            },
+            {
+              id: "2",
+              name: "Item 2",
+              quantity: 5,
+              store_id: VALID_UUID,
+              stores: { name: "Store 1" },
+              count: "25",
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] });
 
       const res = await request(app)
         .get("/assets")
@@ -119,6 +121,8 @@ describe("Assets", () => {
       expect(res.body.total).toBe(25);
       expect(res.body.page).toBe(1);
       expect(res.body.limit).toBe(50);
+      expect(res.body.items[0].allocated_quantity).toBe(0);
+      expect(res.body.items[0].available_quantity).toBe(10);
     });
 
     test("returns empty items list", async () => {
@@ -133,6 +137,76 @@ describe("Assets", () => {
       expect(res.body.total).toBe(0);
     });
 
+    test("returns allocation availability from all active event allocations", async () => {
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: "white-rose",
+              name: "White Rose Arrangement",
+              quantity: 20,
+              store_id: VALID_UUID,
+              stores: { name: "Central Store" },
+              count: "2",
+            },
+            {
+              id: "gold-chair",
+              name: "Gold Chiavari Chair",
+              quantity: 4,
+              store_id: VALID_UUID,
+              stores: { name: "Central Store" },
+              count: "2",
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            { item_id: "white-rose", quantity_allocated: 6 },
+            { item_id: "white-rose", quantity_allocated: "3" },
+            { item_id: "gold-chair", quantity_allocated: 8 },
+          ],
+        });
+
+      const res = await request(app)
+        .get("/assets")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.items[0].allocated_quantity).toBe(9);
+      expect(res.body.items[0].available_quantity).toBe(11);
+      expect(res.body.items[1].allocated_quantity).toBe(8);
+      expect(res.body.items[1].available_quantity).toBe(0);
+    });
+
+    test("falls back to full quantity when event allocation table is unavailable", async () => {
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: "legacy-item",
+              name: "Legacy Item",
+              quantity: 12,
+              store_id: VALID_UUID,
+              stores: { name: "Legacy Store" },
+              count: "1",
+            },
+          ],
+        })
+        .mockRejectedValueOnce({
+          code: "42P01",
+          message: 'relation "event_allocations" does not exist',
+        });
+
+      const res = await request(app)
+        .get("/assets")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items[0].allocated_quantity).toBe(0);
+      expect(res.body.items[0].available_quantity).toBe(12);
+    });
+
     test("filters by store", async () => {
       mockQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -144,9 +218,11 @@ describe("Assets", () => {
     });
 
     test("paginates correctly", async () => {
-      mockQuery.mockResolvedValueOnce({
-        rows: Array(5).fill({ id: "id", count: "50" }),
-      });
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: Array(5).fill({ id: "id", quantity: 1, count: "50" }),
+        })
+        .mockResolvedValueOnce({ rows: [] });
 
       const res = await request(app)
         .get("/assets?page=3&limit=5")
@@ -186,7 +262,8 @@ describe("Assets", () => {
               count: "1",
             },
           ],
-        });
+        })
+        .mockResolvedValueOnce({ rows: [] });
 
       const res = await request(app)
         .get("/assets")
@@ -215,7 +292,8 @@ describe("Assets", () => {
               count: "1",
             },
           ],
-        });
+        })
+        .mockResolvedValueOnce({ rows: [] });
 
       const res = await request(app)
         .get("/assets")
@@ -244,7 +322,8 @@ describe("Assets", () => {
               count: "1",
             },
           ],
-        });
+        })
+        .mockResolvedValueOnce({ rows: [] });
 
       const res = await request(app)
         .get("/assets?status=trash")

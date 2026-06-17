@@ -67,4 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date);
 CREATE INDEX IF NOT EXISTS idx_event_logs_event_id ON event_logs(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_allocations_event ON event_allocations(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_allocations_item ON event_allocations(item_id);
+CREATE INDEX IF NOT EXISTS idx_event_allocations_active_item
+  ON event_allocations(item_id, status)
+  WHERE status <> 'Returned';
 CREATE INDEX IF NOT EXISTS idx_event_checklist_event ON event_checklist(event_id);

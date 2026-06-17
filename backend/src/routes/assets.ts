@@ -209,6 +209,11 @@ interface ItemRow {
   stores: { name: string } | null;
 }
 
+function normalizeQuantity(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -302,6 +307,38 @@ function isMissingTableError(error: unknown, tableName?: string): boolean {
   }
 
   return message.includes(tableName.toLowerCase());
+}
+
+async function getActiveAllocationQuantities(itemIds: string[]): Promise<Map<string, number>> {
+  if (itemIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("event_allocations")
+    .select("item_id, quantity_allocated")
+    .in("item_id", itemIds)
+    .neq("status", "Returned");
+
+  if (error) {
+    if (isMissingTableError(error, "event_allocations")) {
+      return new Map();
+    }
+    throw error;
+  }
+
+  const allocatedByItem = new Map<string, number>();
+  for (const row of (data || []) as Array<{ item_id?: string | null; quantity_allocated?: number | string | null }>) {
+    if (!row.item_id) {
+      continue;
+    }
+    allocatedByItem.set(
+      row.item_id,
+      (allocatedByItem.get(row.item_id) || 0) + normalizeQuantity(row.quantity_allocated)
+    );
+  }
+
+  return allocatedByItem;
 }
 
 function isMissingColumnError(error: unknown, columnName?: string): boolean {
@@ -971,25 +1008,36 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
       }
     }
 
+    const rows = (resultData || []) as unknown as ItemRow[];
+    const itemIds = rows.map((row) => row.id).filter((id): id is string => typeof id === "string");
+    const allocatedByItem = await getActiveAllocationQuantities(itemIds);
+
     // Resolve image URLs
-    const items = (resultData as unknown as ItemRow[]).map((row) => ({
-      id: row.id,
-      name: row.name,
-      quantity: row.quantity,
-      description: row.description,
-      store: {
-        id: row.store_id,
-        name: row.stores?.name,
-      },
-      image_url: row.image_key ? getPublicUrl(row.image_key) : null,
-      last_counted_at: row.last_counted_at ?? null,
-      last_counted_by:
-        row.last_counted_by && typeof row.last_counted_by === "object"
-          ? { full_name: row.last_counted_by.full_name }
-          : null,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    const items = rows.map((row) => {
+      const quantity = normalizeQuantity(row.quantity);
+      const allocatedQuantity = allocatedByItem.get(row.id) || 0;
+
+      return {
+        id: row.id,
+        name: row.name,
+        quantity: row.quantity,
+        allocated_quantity: allocatedQuantity,
+        available_quantity: Math.max(0, quantity - allocatedQuantity),
+        description: row.description,
+        store: {
+          id: row.store_id,
+          name: row.stores?.name,
+        },
+        image_url: row.image_key ? getPublicUrl(row.image_key) : null,
+        last_counted_at: row.last_counted_at ?? null,
+        last_counted_by:
+          row.last_counted_by && typeof row.last_counted_by === "object"
+            ? { full_name: row.last_counted_by.full_name }
+            : null,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      };
+    });
 
     res.json({ items, total: count || 0, page, limit });
   } catch (error: unknown) {
