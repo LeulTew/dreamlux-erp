@@ -1,6 +1,7 @@
 import express from "express";
 import { supabase } from "../db/supabase";
 import { createEventTypeSchema, updateEventTypeSchema } from "../lib/validation";
+import { requireRole, AuthRequest } from "../middleware/auth";
 
 const router = express.Router();
 
@@ -74,7 +75,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // CREATE event type
-router.post("/", async (req, res) => {
+router.post("/", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
   try {
     const result = createEventTypeSchema.safeParse(req.body);
     if (!result.success) {
@@ -105,7 +106,7 @@ router.post("/", async (req, res) => {
 });
 
 // UPDATE event type
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const result = updateEventTypeSchema.safeParse(req.body);
@@ -152,7 +153,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE (soft delete) event type
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -181,7 +182,7 @@ router.delete("/:id", async (req, res) => {
 });
 
 // GET TRASH
-router.get("/trash/list", async (_req, res) => {
+router.get("/trash/list", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (_req: AuthRequest, res) => {
   try {
     const { data, error } = await supabase
       .from("event_types")
@@ -202,7 +203,7 @@ router.get("/trash/list", async (_req, res) => {
 });
 
 // RESTORE FROM TRASH
-router.post("/:id/restore", async (req, res) => {
+router.post("/:id/restore", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -230,7 +231,7 @@ router.post("/:id/restore", async (req, res) => {
 });
 
 // DELETE (permanent hard delete) event type
-router.delete("/:id/permanent", async (req, res) => {
+router.delete("/:id/permanent", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
