@@ -165,7 +165,7 @@ function buildColumns(
       id: "image",
       header: t("Photo"),
       cell: ({ row }) => (
-        <ImageCell src={row.original.profile_photo_url} alt={row.original.full_name} />
+        <ImageCell src={row.original.profile_photo_url} alt={row.original.full_name} size={40} />
       ),
       size: 80,
     })
@@ -510,31 +510,31 @@ function EmployeesPageContent() {
 
   return (
     <AuthLayout>
-      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-primary/10 dark:bg-primary/20 rounded-xl text-primary shadow-sm">
-            <HiUsers className="w-6 h-6 md:w-7 md:h-7" />
+      <div className="page-container pt-3 md:py-5 2xl:py-8 px-4 sm:px-5 2xl:px-8">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 2xl:gap-4 mb-5 2xl:mb-8">
+        <div className="flex items-center gap-2.5 2xl:gap-3">
+          <div className="p-2 2xl:p-2.5 bg-primary/10 dark:bg-primary/20 rounded-xl text-primary shadow-sm">
+            <HiUsers className="w-5 h-5 2xl:w-7 2xl:h-7" />
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
+            <h1 className="text-xl 2xl:text-2xl font-bold text-foreground tracking-tight">
               {t("Employees")}
             </h1>
-            <p className="text-xs md:text-sm text-muted font-medium">
+            <p className="text-xs 2xl:text-sm text-muted font-medium">
               {total} {showTrash ? t("Deleted Records") : t("Total Records")}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-37.5 md:max-w-sm">
+        <div className="flex flex-wrap items-center gap-1.5 2xl:gap-2">
+          <div className="relative flex-1 min-w-36 md:max-w-xs 2xl:max-w-sm">
              <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
              <input
                 type="text"
                 placeholder={t("Search")}
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="w-full pl-10 pr-4 h-11 rounded-xl bg-card-alt border border-border/20 focus:ring-2 focus:ring-primary/20 transition-all text-sm outline-none shadow-sm"
+                className="w-full pl-9 2xl:pl-10 pr-3 2xl:pr-4 h-10 2xl:h-11 rounded-lg 2xl:rounded-xl bg-card-alt border border-border/20 focus:ring-2 focus:ring-primary/20 transition-all text-xs 2xl:text-sm outline-none shadow-sm"
              />
           </div>
 
@@ -545,7 +545,7 @@ function EmployeesPageContent() {
             ]}
             value={officeId}
             onChange={(val) => { setOfficeId(val); setPage(1); }}
-            className="min-w-35"
+            className="min-w-32 2xl:min-w-35 [&>button]:h-10 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-lg [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-xl 2xl:[&>button]:text-sm"
           />
 
           <Select
@@ -555,7 +555,7 @@ function EmployeesPageContent() {
             ]}
             value={departmentId}
             onChange={(val) => { setDepartmentId(val); setPage(1); }}
-            className="min-w-35"
+            className="min-w-32 2xl:min-w-35 [&>button]:h-10 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-lg [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-xl 2xl:[&>button]:text-sm"
           />
 
           <Select
@@ -566,12 +566,12 @@ function EmployeesPageContent() {
             ]}
             value={sortBy}
             onChange={(val) => { setSortBy(val); setPage(1); }}
-            className="min-w-35"
+            className="min-w-32 2xl:min-w-35 [&>button]:h-10 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-lg [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-xl 2xl:[&>button]:text-sm"
           />
 
           <button
             onClick={() => { setSortOrder(sortOrder === "asc" ? "desc" : "asc"); setPage(1); }}
-            className="flex items-center justify-center w-11 h-11 rounded-xl bg-card-alt border border-border text-muted hover:text-foreground transition-all"
+            className="flex items-center justify-center w-10 h-10 2xl:w-11 2xl:h-11 rounded-lg 2xl:rounded-xl bg-card-alt border border-border text-muted hover:text-foreground transition-all"
             title={sortOrder === "asc" ? "Sort Ascending" : "Sort Descending"}
           >
             {sortOrder === "asc" ? "↑" : "↓"}
@@ -579,7 +579,7 @@ function EmployeesPageContent() {
           
           <button
             onClick={() => { setShowTrash(!showTrash); setPage(1); }}
-            className={`flex items-center gap-1.5 h-11 px-4 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center gap-1.5 h-10 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all ${
               showTrash ? "bg-red-500 text-white shadow-sm" : "bg-card-alt text-foreground border border-border hover:bg-border/50"
             }`}
           >
@@ -590,7 +590,7 @@ function EmployeesPageContent() {
           {!showTrash && (
             <button
               onClick={() => router.push("/insert")}
-              className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-sm font-semibold bg-primary text-background shadow-sm hover:opacity-90 active:scale-[0.98] transition-all"
+              className="flex items-center gap-1.5 h-10 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold bg-primary text-background shadow-sm hover:opacity-90 active:scale-[0.98] transition-all"
             >
               <HiPlus className="w-4 h-4" />
               {t("Add Employee")}
@@ -600,7 +600,7 @@ function EmployeesPageContent() {
           {!showTrash && (
             <button
               onClick={() => setEditMode(!editMode)}
-              className={`flex items-center gap-1.5 h-11 px-4 rounded-xl text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 h-10 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all ${
                 editMode ? "bg-primary text-on-primary shadow-sm" : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
@@ -616,7 +616,7 @@ function EmployeesPageContent() {
                   setSelectMode(!selectMode);
                   if (selectMode) setSelectedIds(new Set());
                 }}
-                className={`flex items-center gap-1.5 h-11 px-4 rounded-xl text-sm font-semibold transition-all border ${
+                className={`flex items-center gap-1.5 h-10 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all border ${
                   selectMode ? "bg-primary/10 text-primary border-primary/30" : "bg-card-alt text-foreground border-border hover:bg-border/50"
                 }`}
               >
@@ -628,7 +628,7 @@ function EmployeesPageContent() {
               {selectMode && selectedIds.size > 0 && (
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center gap-1.5 h-11 px-4 rounded-xl bg-red-600 text-white text-sm font-semibold shadow-sm hover:bg-red-700 active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 h-10 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl bg-red-600 text-white text-xs 2xl:text-sm font-semibold shadow-sm hover:bg-red-700 active:scale-95 transition-all"
                 >
                   <HiTrash className="w-4 h-4" />
                   {t("Delete")} {selectedIds.size}
@@ -639,9 +639,9 @@ function EmployeesPageContent() {
 
           {!showTrash && (
             <div className="relative">
-              <button
-                onClick={() => setExportMenuOpen(!exportMenuOpen)}
-                className={`flex items-center gap-2 h-11 px-4 rounded-xl text-sm font-semibold transition-all border ${exportMenuOpen ? "bg-primary text-on-primary border-primary" : "bg-card-alt text-foreground border-border hover:bg-border/50"}`}
+	              <button
+	                onClick={() => setExportMenuOpen(!exportMenuOpen)}
+	                className={`flex items-center gap-1.5 2xl:gap-2 h-10 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all border ${exportMenuOpen ? "bg-primary text-on-primary border-primary" : "bg-card-alt text-foreground border-border hover:bg-border/50"}`}
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                 {t("Export")}
@@ -742,24 +742,24 @@ function EmployeesPageContent() {
         </div>
       ) : (
         <>
-          <div className="hidden md:block overflow-hidden glass-card rounded-4xl">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-card-alt/30 border-b border-border/50 text-[10px] uppercase tracking-wider text-muted-foreground/80 font-semibold">
-                  {table.getHeaderGroups()[0].headers.map((header) => (
-                    <th key={header.id} className="px-6 py-5" style={{ width: header.getSize() }}>
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                    </th>
-                  ))}
+	          <div className="hidden md:block overflow-hidden glass-card rounded-2xl 2xl:rounded-4xl">
+	            <table className="w-full text-left border-collapse">
+	              <thead>
+	                <tr className="bg-card-alt/30 border-b border-border/50 text-[10px] uppercase tracking-wider text-muted-foreground/80 font-semibold">
+	                  {table.getHeaderGroups()[0].headers.map((header) => (
+	                    <th key={header.id} className="px-4 2xl:px-6 py-3 2xl:py-5" style={{ width: header.getSize() }}>
+	                      {flexRender(header.column.columnDef.header, header.getContext())}
+	                    </th>
+	                  ))}
                 </tr>
               </thead>
               <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="border-b border-border/30 hover:bg-primary-light/5 transition-all">
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-6 py-4">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+	                {table.getRowModel().rows.map((row) => (
+	                  <tr key={row.id} className="border-b border-border/30 hover:bg-primary-light/5 transition-all">
+	                    {row.getVisibleCells().map((cell) => (
+	                      <td key={cell.id} className="px-4 2xl:px-6 py-2.5 2xl:py-4 text-sm">
+	                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+	                      </td>
                     ))}
                   </tr>
                 ))}

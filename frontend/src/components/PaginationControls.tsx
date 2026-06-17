@@ -40,11 +40,11 @@ export default function PaginationControls({
   const pageItems = buildPageItems(page, totalPages);
 
   return (
-    <div className="mt-8 flex flex-wrap items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
+    <div className="mt-5 2xl:mt-8 flex flex-wrap items-center justify-between gap-3 bg-card p-3 2xl:p-4 rounded-xl 2xl:rounded-2xl border border-border">
       <button
         onClick={() => onPageChange(Math.max(1, page - 1))}
         disabled={page === 1}
-        className="px-4 py-2 rounded-xl bg-card-alt border border-border text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-border transition-all"
+        className="px-3 2xl:px-4 py-2 rounded-lg 2xl:rounded-xl bg-card-alt border border-border text-xs 2xl:text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-border transition-all"
       >
         Previous
       </button>
@@ -65,7 +65,7 @@ export default function PaginationControls({
             <button
               key={item}
               onClick={() => onPageChange(item)}
-              className={`min-w-9 h-9 px-2 rounded-lg text-sm font-bold transition-all ${
+              className={`min-w-8 2xl:min-w-9 h-8 2xl:h-9 px-2 rounded-lg text-xs 2xl:text-sm font-bold transition-all ${
                 isActive
                   ? "bg-primary text-on-primary shadow-premium"
                   : "bg-card-alt border border-border text-foreground hover:bg-border"
@@ -80,7 +80,7 @@ export default function PaginationControls({
       <button
         onClick={() => onPageChange(Math.min(totalPages, page + 1))}
         disabled={page >= totalPages}
-        className="px-4 py-2 rounded-xl bg-card-alt border border-border text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-border transition-all"
+        className="px-3 2xl:px-4 py-2 rounded-lg 2xl:rounded-xl bg-card-alt border border-border text-xs 2xl:text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-border transition-all"
       >
         Next
       </button>
