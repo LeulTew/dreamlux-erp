@@ -23,7 +23,7 @@ Use Bun only for project validation. Do not use npm or yarn.
 Before giving a verdict:
 
 1. Read `RULES.md`, `AGENTS.md`, and any explicitly mentioned skill files.
-2. Ground product requirements in `DreamLux_SRD.txt` and, when needed, `DreamLux_SRD_v1.0.docx`.
+2. Ground product requirements primarily in `DreamLux_SRD_v1.0.docx`; use `DreamLux_SRD.txt` as a searchable companion, not as a replacement for the source document.
 3. Read the relevant GitHub issue with `gh issue view <number>`.
 4. Read the relevant PRs with `gh pr view <number> --json ...`.
 5. Inspect merged commits and diffs with `git show`, `git diff`, and `git log`.
@@ -39,6 +39,9 @@ Review at least these areas:
 - Does the implementation satisfy every issue checklist item?
 - Does it match the SRD wording and role matrix?
 - Are sample-data/table-field requirements implemented exactly when relevant?
+- Are tests and QA scenarios using data from `DreamLux_SRD_v1.0.docx` where the document provides examples, tables, or role-specific values?
+- For inventory/items and employee lists, use SRD data first, then add similar realistic DreamLux data only when the SRD does not provide enough coverage.
+- For salary, pay grade, commission, payroll, and compensation logic, use `DreamLux_SRD_v1.0.docx` values only. Do not invent salary-related amounts unless the user explicitly authorizes a synthetic test case.
 - Are PR claims true, including test counts and validation commands?
 - Are all issue/PR checkboxes actually complete, or only described as complete?
 
@@ -126,7 +129,8 @@ Where practical, add or request tests for:
 - invalid status transitions
 - boundary dates and overlapping assignments
 - concurrency/double-submit behavior
-- SRD sample-data scenarios
+- SRD sample-data scenarios from `DreamLux_SRD_v1.0.docx`, including documented event, inventory/item, employee, expense, trip, payroll, and role examples
+- similar realistic non-salary data for items and employee lists when needed to stress-test scale, filtering, and edge cases
 - bilingual UI snapshots or translation-key coverage
 
 ## Required Output Format
