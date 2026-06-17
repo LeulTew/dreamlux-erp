@@ -690,4 +690,141 @@ describe("Events API", () => {
     expect(res.status).toBe(200);
     expect(res.body.attended).toBe(false);
   });
+
+  test("POST /events/:id/expenses creates pending manual expense", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Ongoing" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-1", category: "Consumables", amount: 1500, status: "Pending" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/event-1/expenses")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        category: "Consumables",
+        amount: 1500,
+        description: "Water and cleaning material",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe("Pending");
+  });
+
+  test("POST /events/:id/trips calculates fuel cost and creates pending fuel expense", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "va-1", fuel_consumption_rate: "0.10", plate_number: "AA-3-A12345" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "trip-1", fuel_liters_used: 5, fuel_cost_etb: 500 }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-fuel-1", category: "Fuel", amount: 500, status: "Pending" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/event-1/trips")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        vehicle_assignment_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        destination: "Friendship Hotel",
+        distance_km: 50,
+        fuel_price_etb: 100,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.fuel_liters_used).toBe(5);
+    expect(res.body.fuel_cost_etb).toBe(500);
+    expect(res.body.expense.status).toBe("Pending");
+  });
+
+  test("GET /events/expenses/pending returns accountant approval queue", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-1", event_name: "Wedding", status: "Pending" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/expenses/pending")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+  });
+
+  test("PATCH /events/expenses/:expenseId/review approves pending expense", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-1", status: "Pending" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-1", status: "Approved" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .patch("/events/expenses/expense-1/review")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+      .send({ status: "Approved" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("Approved");
+  });
+
+  test("PATCH /events/expenses/:expenseId/review requires rejection reason", async () => {
+    const res = await request(app)
+      .patch("/events/expenses/expense-1/review")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+      .send({ status: "Rejected" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Rejection reason is required");
+  });
+
+  test("PATCH /events/expenses/:expenseId/review locks approved expenses", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-1", status: "Approved" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .patch("/events/expenses/expense-1/review")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+      .send({ status: "Rejected", rejected_reason: "Duplicate" });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("Approved expenses are locked");
+  });
+
+  test("POST /events/:id/expenses/generate-labor creates labor expense from attended assignments", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Completed" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ total: "3500" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/event-1/expenses/generate-labor")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+    expect(res.status).toBe(201);
+    expect(res.body.category).toBe("Labor");
+    expect(res.body.status).toBe("Pending");
+  });
 });

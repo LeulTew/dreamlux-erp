@@ -39,6 +39,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Employees: "Employees",
     Payroll: "Payroll",
     Salary: "Salary Levels",
+    "Expense Approvals": "Expense Approvals",
     "Event Types": "Event Types",
     "Add Employee": "Add Employee",
     "List Employees": "List Employees",
@@ -61,6 +62,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Employees: "ሰራተኞች",
     Payroll: "ደመወዝ",
     Salary: "ደረጃዎች",
+    "Expense Approvals": "የወጪ ማጽደቂያ",
     "Event Types": "የዝግጅት አይነቶች",
     "Add Employee": "ሰራተኛ መዝግብ",
     "List Employees": "የሰራተኞች ዝርዝር",
@@ -347,6 +349,7 @@ export function AppSidebar() {
 
   const financeLinks = [
     { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN", "ACCOUNTANT", "accountant"]) },
+    { href: "/hr/expenses/approve", label: t("Expense Approvals"), active: pathname === "/hr/expenses/approve", show: hasAccess(["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "OWNER", "owner", "ACCOUNTANT", "accountant"]) },
     { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
   ].filter(l => l.show);
 

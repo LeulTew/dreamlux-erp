@@ -64,6 +64,7 @@ const SEARCH_ITEMS = [
   { label: "Add Employee", amLabel: "ሰራተኛ መዝግብ", href: "/insert", category: "HR" },
   { label: "Events Calendar", amLabel: "ዝግጅቶች", href: "/events", category: "Events" },
   { label: "Payroll Dashboard", amLabel: "ደመወዝ", href: "/hr/payments", category: "HR" },
+  { label: "Expense Approval Queue", amLabel: "የወጪ ማጽደቂያ", href: "/hr/expenses/approve", category: "Finance" },
   { label: "Salary Levels", amLabel: "የደመወዝ ደረጃዎች", href: "/hr/salary-levels", category: "HR" },
   { label: "Event Types Settings", amLabel: "የዝግጅት አይነቶች", href: "/hr/event-types", category: "Events" },
   { label: "Inventory Dashboard", amLabel: "የዕቃዎች ዋና ገጽ", href: "/assets/dashboard", category: "Inventory" },

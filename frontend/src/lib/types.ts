@@ -347,9 +347,48 @@ export interface VehicleAssignment {
   vehicle_id: string;
   plate_number?: string;
   vehicle_type?: string;
+  fuel_type?: string;
+  fuel_consumption_rate?: number;
   driver_id: string | null;
   driver_name?: string | null;
   is_night_shift: boolean;
+  created_at: string;
+}
+
+export interface EventExpense {
+  id: string;
+  event_id: string;
+  category: "Fuel" | "Labor" | "Transportation" | "Equipment Rental" | "Consumables" | "Other";
+  amount: number;
+  description: string;
+  receipt_image_key: string | null;
+  status: "Pending" | "Approved" | "Rejected";
+  rejected_reason: string | null;
+  created_by: string | null;
+  approved_by: string | null;
+  created_at: string;
+  approved_at: string | null;
+  event_name?: string;
+  client_name?: string;
+  venue_location?: string;
+  submitted_by_name?: string | null;
+  approved_by_name?: string | null;
+}
+
+export interface EventTripLog {
+  id: string;
+  vehicle_assignment_id: string;
+  event_id?: string;
+  vehicle_id?: string;
+  destination: string;
+  distance_km: number;
+  fuel_liters_used: number;
+  fuel_cost_etb: number;
+  plate_number?: string;
+  vehicle_type?: string;
+  fuel_type?: string;
+  fuel_consumption_rate?: number;
+  driver_name?: string | null;
   created_at: string;
 }
 
@@ -359,5 +398,7 @@ export interface EventWorkspace {
   checklist: EventChecklistItem[];
   assignments: EventAssignment[];
   vehicleAssignments: VehicleAssignment[];
+  expenses: EventExpense[];
+  trips: EventTripLog[];
 }
 
