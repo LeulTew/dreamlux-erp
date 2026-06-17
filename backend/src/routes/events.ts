@@ -1,6 +1,7 @@
+import { Pool, PoolClient } from "pg";
 import { Router, Response } from "express";
 import { pool } from "../db/pool";
-import { requireAdmin, AuthRequest } from "../middleware/auth";
+import { requireAdmin, requireAuth, AuthRequest } from "../middleware/auth";
 import {
   createEventSchema,
   updateEventSchema,
@@ -44,7 +45,7 @@ function canApproveExpenses(role?: string): boolean {
 }
 
 // GET /events - List events (filtered, paginated)
-router.get("/", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string || "1", 10));
     const limit = Math.max(1, parseInt(req.query.limit as string || "20", 10));
@@ -115,7 +116,7 @@ router.get("/", requireAdmin, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /events/expenses/pending - accountant approval queue
-router.get("/expenses/pending", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     if (!canApproveExpenses(req.user?.role)) {
       res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
@@ -143,7 +144,7 @@ router.get("/expenses/pending", requireAdmin, async (req: AuthRequest, res: Resp
 });
 
 // PATCH /events/expenses/:expenseId/review - approve/reject pending expense
-router.patch("/expenses/:expenseId/review", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { expenseId } = req.params;
     if (!canApproveExpenses(req.user?.role)) {
@@ -189,7 +190,7 @@ router.patch("/expenses/:expenseId/review", requireAdmin, async (req: AuthReques
 });
 
 // GET /events/reports/profit - Monthly/Yearly event profitability report
-router.get("/reports/profit", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/reports/profit", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     if (!canAccessProfitReports(req.user?.role)) {
       res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
@@ -351,7 +352,7 @@ router.get("/reports/profit", requireAdmin, async (req: AuthRequest, res: Respon
 });
 
 // GET /events/:id/profit - Profit calculations for a single event
-router.get("/:id/profit", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/:id/profit", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -416,7 +417,7 @@ router.get("/:id/profit", requireAdmin, async (req: AuthRequest, res: Response) 
 });
 
 // GET /events/:id - Get specific event with history logs
-router.get("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -456,7 +457,7 @@ router.get("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /events - Create a new event
-router.post("/", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const validationResult = createEventSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -508,7 +509,7 @@ router.post("/", requireAdmin, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /events/:id - Update event details & status transitions
-router.put("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -680,7 +681,7 @@ router.delete("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
 });
 
 // GET /events/:id/workspace - Get event operational workspace data
-router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -754,34 +755,44 @@ router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Respons
     `;
     const vehicleAssignmentsResult = await pool.query(vehicleAssignmentsQuery, [id]);
 
-    const expensesQuery = `
-      SELECT exp.*, submitter.full_name AS submitted_by_name, approver.full_name AS approved_by_name
-      FROM expenses exp
-      LEFT JOIN users submitter ON exp.created_by = submitter.id
-      LEFT JOIN users approver ON exp.approved_by = approver.id
-      WHERE exp.event_id = $1
-      ORDER BY exp.created_at DESC
-    `;
-    const expensesResult = await pool.query(expensesQuery, [id]);
+    const userRole = req.user?.role?.toUpperCase();
+    const isFinancial = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "ACCOUNTANT"].includes(userRole);
 
-    const tripsQuery = `
-      SELECT
-        t.*,
-        va.event_id,
-        va.vehicle_id,
-        v.plate_number,
-        v.vehicle_type,
-        v.fuel_type,
-        v.fuel_consumption_rate,
-        emp.full_name AS driver_name
-      FROM trips t
-      JOIN vehicle_assignments va ON t.vehicle_assignment_id = va.id
-      JOIN vehicles v ON va.vehicle_id = v.id
-      LEFT JOIN employees emp ON va.driver_id = emp.id
-      WHERE va.event_id = $1
-      ORDER BY t.created_at DESC
-    `;
-    const tripsResult = await pool.query(tripsQuery, [id]);
+    let expenses: any[] = [];
+    let trips: any[] = [];
+
+    if (isFinancial) {
+      const expensesQuery = `
+        SELECT exp.*, submitter.full_name AS submitted_by_name, approver.full_name AS approved_by_name
+        FROM expenses exp
+        LEFT JOIN users submitter ON exp.created_by = submitter.id
+        LEFT JOIN users approver ON exp.approved_by = approver.id
+        WHERE exp.event_id = $1
+        ORDER BY exp.created_at DESC
+      `;
+      const expensesResult = await pool.query(expensesQuery, [id]);
+      expenses = expensesResult.rows;
+
+      const tripsQuery = `
+        SELECT
+          t.*,
+          va.event_id,
+          va.vehicle_id,
+          v.plate_number,
+          v.vehicle_type,
+          v.fuel_type,
+          v.fuel_consumption_rate,
+          emp.full_name AS driver_name
+        FROM trips t
+        JOIN vehicle_assignments va ON t.vehicle_assignment_id = va.id
+        JOIN vehicles v ON va.vehicle_id = v.id
+        LEFT JOIN employees emp ON va.driver_id = emp.id
+        WHERE va.event_id = $1
+        ORDER BY t.created_at DESC
+      `;
+      const tripsResult = await pool.query(tripsQuery, [id]);
+      trips = tripsResult.rows;
+    }
 
     res.json({
       event,
@@ -789,8 +800,8 @@ router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Respons
       checklist: checklistResult.rows,
       assignments: assignmentsResult.rows,
       vehicleAssignments: vehicleAssignmentsResult.rows,
-      expenses: expensesResult.rows,
-      trips: tripsResult.rows,
+      expenses,
+      trips,
     });
   } catch (error: any) {
     console.error("[get-event-workspace] Error:", error);
@@ -799,7 +810,7 @@ router.get("/:id/workspace", requireAdmin, async (req: AuthRequest, res: Respons
 });
 
 // PATCH /events/:id/design - Update package design details
-router.patch("/:id/design", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -881,10 +892,17 @@ router.patch("/:id/design", requireAdmin, async (req: AuthRequest, res: Response
 });
 
 // POST /events/:id/allocations - Allocate a store item to the event
-router.post("/:id/allocations", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const { id } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, SUPER_ADMIN, ADMIN
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
+      return;
+    }
 
     const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
     const eventResult = await client.query(eventQuery, [id]);
@@ -966,9 +984,16 @@ router.post("/:id/allocations", requireAdmin, async (req: AuthRequest, res: Resp
 });
 
 // DELETE /events/:id/allocations/:allocationId - Release/delete allocated inventory item
-router.delete("/:id/allocations/:allocationId", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, allocationId } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, SUPER_ADMIN, ADMIN
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
+      return;
+    }
 
     const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
     const eventResult = await pool.query(eventQuery, [id]);
@@ -1008,9 +1033,16 @@ router.delete("/:id/allocations/:allocationId", requireAdmin, async (req: AuthRe
 });
 
 // POST /events/:id/checklist - Create a new checklist task item
-router.post("/:id/checklist", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/:id/checklist", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Restrict to OWNER, OPS_MANAGER, EVENT_MANAGER, SUPER_ADMIN, ADMIN
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient checklist privileges" });
+      return;
+    }
 
     const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
     const eventResult = await pool.query(eventQuery, [id]);
@@ -1049,9 +1081,16 @@ router.post("/:id/checklist", requireAdmin, async (req: AuthRequest, res: Respon
 });
 
 // PATCH /events/:id/checklist/:itemId - Update checklist item details or status
-router.patch("/:id/checklist/:itemId", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.patch("/:id/checklist/:itemId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, itemId } = req.params;
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Restrict to OWNER, OPS_MANAGER, EVENT_MANAGER, SUPER_ADMIN, ADMIN
+    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient checklist privileges" });
+      return;
+    }
 
     const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
     const eventResult = await pool.query(eventQuery, [id]);
@@ -1115,7 +1154,7 @@ router.patch("/:id/checklist/:itemId", requireAdmin, async (req: AuthRequest, re
 });
 
 // Helper functions for scheduling conflict checks
-async function hasEmployeeConflict(employeeId: string, eventId: string, startDate: string, endDate: string): Promise<boolean> {
+async function hasEmployeeConflict(employeeId: string, eventId: string, startDate: string, endDate: string, dbClient: Pool | PoolClient = pool): Promise<boolean> {
   const teamConflictQuery = `
     SELECT COUNT(*) FROM event_assignments ea
     JOIN events e ON ea.event_id = e.id
@@ -1125,7 +1164,7 @@ async function hasEmployeeConflict(employeeId: string, eventId: string, startDat
       AND e.start_date <= $3
       AND e.end_date >= $4
   `;
-  const teamResult = await pool.query(teamConflictQuery, [employeeId, eventId, endDate, startDate]);
+  const teamResult = await dbClient.query(teamConflictQuery, [employeeId, eventId, endDate, startDate]);
   if (parseInt(teamResult.rows[0].count, 10) > 0) return true;
 
   const driverConflictQuery = `
@@ -1137,11 +1176,11 @@ async function hasEmployeeConflict(employeeId: string, eventId: string, startDat
       AND e.start_date <= $3
       AND e.end_date >= $4
   `;
-  const driverResult = await pool.query(driverConflictQuery, [employeeId, eventId, endDate, startDate]);
+  const driverResult = await dbClient.query(driverConflictQuery, [employeeId, eventId, endDate, startDate]);
   return parseInt(driverResult.rows[0].count, 10) > 0;
 }
 
-async function hasVehicleConflict(vehicleId: string, eventId: string, startDate: string, endDate: string): Promise<boolean> {
+async function hasVehicleConflict(vehicleId: string, eventId: string, startDate: string, endDate: string, dbClient: Pool | PoolClient = pool): Promise<boolean> {
   const vehicleConflictQuery = `
     SELECT COUNT(*) FROM vehicle_assignments va
     JOIN events e ON va.event_id = e.id
@@ -1151,12 +1190,12 @@ async function hasVehicleConflict(vehicleId: string, eventId: string, startDate:
       AND e.start_date <= $3
       AND e.end_date >= $4
   `;
-  const result = await pool.query(vehicleConflictQuery, [vehicleId, eventId, endDate, startDate]);
+  const result = await dbClient.query(vehicleConflictQuery, [vehicleId, eventId, endDate, startDate]);
   return parseInt(result.rows[0].count, 10) > 0;
 }
 
 // GET /events/:id/assignments/available-employees - List employees available for this event's dates
-router.get("/:id/assignments/available-employees", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/:id/assignments/available-employees", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -1195,7 +1234,7 @@ router.get("/:id/assignments/available-employees", requireAdmin, async (req: Aut
 });
 
 // GET /events/:id/assignments/available-vehicles - List vehicles available for this event's dates
-router.get("/:id/assignments/available-vehicles", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get("/:id/assignments/available-vehicles", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -1227,7 +1266,8 @@ router.get("/:id/assignments/available-vehicles", requireAdmin, async (req: Auth
 });
 
 // POST /events/:id/assignments/employees - Assign an employee
-router.post("/:id/assignments/employees", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, res: Response) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1238,9 +1278,12 @@ router.post("/:id/assignments/employees", requireAdmin, async (req: AuthRequest,
       return;
     }
 
-    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
-    const eventResult = await pool.query(eventQuery, [id]);
+    await client.query("BEGIN");
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
+    const eventResult = await client.query(eventQuery, [id]);
     if (eventResult.rowCount === 0) {
+      await client.query("ROLLBACK");
       res.status(404).json({ error: "Event not found" });
       return;
     }
@@ -1249,6 +1292,7 @@ router.post("/:id/assignments/employees", requireAdmin, async (req: AuthRequest,
 
     // Enforce completed-event locking
     if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      await client.query("ROLLBACK");
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1257,15 +1301,26 @@ router.post("/:id/assignments/employees", requireAdmin, async (req: AuthRequest,
 
     const validationResult = createEventAssignmentSchema.safeParse(req.body);
     if (!validationResult.success) {
+      await client.query("ROLLBACK");
       res.status(400).json({ error: validationResult.error.errors[0].message });
       return;
     }
 
     const { employee_id, role, commission_amount, attended } = validationResult.data;
 
+    // Lock employee row FOR UPDATE to serialize parallel assignment conflicts checks
+    const empLockQuery = `SELECT id FROM employees WHERE id = $1 FOR UPDATE`;
+    const empLockResult = await client.query(empLockQuery, [employee_id]);
+    if (empLockResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Employee not found" });
+      return;
+    }
+
     // Check for scheduling conflict
-    const conflict = await hasEmployeeConflict(employee_id, id, event.start_date, event.end_date);
+    const conflict = await hasEmployeeConflict(employee_id, id, event.start_date, event.end_date, client);
     if (conflict) {
+      await client.query("ROLLBACK");
       res.status(400).json({
         error: "Scheduling Conflict: This employee is already assigned to another event on these dates.",
       });
@@ -1279,7 +1334,7 @@ router.post("/:id/assignments/employees", requireAdmin, async (req: AuthRequest,
       SET role = EXCLUDED.role, commission_amount = EXCLUDED.commission_amount, attended = EXCLUDED.attended
       RETURNING *
     `;
-    const result = await pool.query(insertQuery, [
+    const result = await client.query(insertQuery, [
       id,
       employee_id,
       role,
@@ -1287,15 +1342,19 @@ router.post("/:id/assignments/employees", requireAdmin, async (req: AuthRequest,
       attended,
     ]);
 
+    await client.query("COMMIT");
     res.status(201).json(result.rows[0]);
   } catch (error: any) {
+    await client.query("ROLLBACK");
     console.error("[post-employee-assignment] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 
 // DELETE /events/:id/assignments/employees/:employeeId - Remove employee assignment
-router.delete("/:id/assignments/employees/:employeeId", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, employeeId } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1343,7 +1402,8 @@ router.delete("/:id/assignments/employees/:employeeId", requireAdmin, async (req
 });
 
 // POST /events/:id/assignments/vehicles - Assign a vehicle and optional driver
-router.post("/:id/assignments/vehicles", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, res: Response) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1354,9 +1414,12 @@ router.post("/:id/assignments/vehicles", requireAdmin, async (req: AuthRequest, 
       return;
     }
 
-    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
-    const eventResult = await pool.query(eventQuery, [id]);
+    await client.query("BEGIN");
+
+    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
+    const eventResult = await client.query(eventQuery, [id]);
     if (eventResult.rowCount === 0) {
+      await client.query("ROLLBACK");
       res.status(404).json({ error: "Event not found" });
       return;
     }
@@ -1365,6 +1428,7 @@ router.post("/:id/assignments/vehicles", requireAdmin, async (req: AuthRequest, 
 
     // Enforce completed-event locking
     if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      await client.query("ROLLBACK");
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1373,15 +1437,37 @@ router.post("/:id/assignments/vehicles", requireAdmin, async (req: AuthRequest, 
 
     const validationResult = createVehicleAssignmentSchema.safeParse(req.body);
     if (!validationResult.success) {
+      await client.query("ROLLBACK");
       res.status(400).json({ error: validationResult.error.errors[0].message });
       return;
     }
 
     const { vehicle_id, driver_id, is_night_shift } = validationResult.data;
 
+    // Lock vehicle row FOR UPDATE to serialize conflicts
+    const vehLockQuery = `SELECT id FROM vehicles WHERE id = $1 FOR UPDATE`;
+    const vehLockResult = await client.query(vehLockQuery, [vehicle_id]);
+    if (vehLockResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Vehicle not found" });
+      return;
+    }
+
+    // Lock driver row FOR UPDATE if provided
+    if (driver_id) {
+      const drvLockQuery = `SELECT id FROM employees WHERE id = $1 FOR UPDATE`;
+      const drvLockResult = await client.query(drvLockQuery, [driver_id]);
+      if (drvLockResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Driver not found" });
+        return;
+      }
+    }
+
     // Check for vehicle scheduling conflict
-    const vehicleConflict = await hasVehicleConflict(vehicle_id, id, event.start_date, event.end_date);
+    const vehicleConflict = await hasVehicleConflict(vehicle_id, id, event.start_date, event.end_date, client);
     if (vehicleConflict) {
+      await client.query("ROLLBACK");
       res.status(400).json({
         error: "Scheduling Conflict: This vehicle is already assigned to another event on these dates.",
       });
@@ -1390,8 +1476,9 @@ router.post("/:id/assignments/vehicles", requireAdmin, async (req: AuthRequest, 
 
     // Check for driver scheduling conflict (if driver is provided)
     if (driver_id) {
-      const driverConflict = await hasEmployeeConflict(driver_id, id, event.start_date, event.end_date);
+      const driverConflict = await hasEmployeeConflict(driver_id, id, event.start_date, event.end_date, client);
       if (driverConflict) {
+        await client.query("ROLLBACK");
         res.status(400).json({
           error: "Scheduling Conflict: This driver is already assigned to another event on these dates.",
         });
@@ -1406,22 +1493,26 @@ router.post("/:id/assignments/vehicles", requireAdmin, async (req: AuthRequest, 
       SET driver_id = EXCLUDED.driver_id, is_night_shift = EXCLUDED.is_night_shift
       RETURNING *
     `;
-    const result = await pool.query(insertQuery, [
+    const result = await client.query(insertQuery, [
       id,
       vehicle_id,
       driver_id || null,
       is_night_shift,
     ]);
 
+    await client.query("COMMIT");
     res.status(201).json(result.rows[0]);
   } catch (error: any) {
+    await client.query("ROLLBACK");
     console.error("[post-vehicle-assignment] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 
 // DELETE /events/:id/assignments/vehicles/:vehicleId - Remove vehicle assignment
-router.delete("/:id/assignments/vehicles/:vehicleId", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, vehicleId } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1469,7 +1560,7 @@ router.delete("/:id/assignments/vehicles/:vehicleId", requireAdmin, async (req: 
 });
 
 // PATCH /events/:id/assignments/employees/:employeeId/attendance - Toggle attendance
-router.patch("/:id/assignments/employees/:employeeId/attendance", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, employeeId } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1524,10 +1615,18 @@ router.patch("/:id/assignments/employees/:employeeId/attendance", requireAdmin, 
 });
 
 // POST /events/:id/expenses - submit a pending event expense
-router.post("/:id/expenses", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!canWriteExpenses(req.user?.role)) {
+    const userRole = req.user?.role?.toUpperCase();
+
+    const canWriteManualExpenses = (role?: string): boolean => {
+      if (!role) return false;
+      const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"];
+      return allowed.includes(role.toUpperCase());
+    };
+
+    if (!canWriteManualExpenses(userRole)) {
       res.status(403).json({ error: "Forbidden: Missing expense write permission" });
       return;
     }
@@ -1568,7 +1667,7 @@ router.post("/:id/expenses", requireAdmin, async (req: AuthRequest, res: Respons
 });
 
 // POST /events/:id/trips - log trip and generate pending fuel expense
-router.post("/:id/trips", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const { id } = req.params;
@@ -1649,44 +1748,55 @@ router.post("/:id/trips", requireAdmin, async (req: AuthRequest, res: Response) 
 });
 
 // POST /events/:id/expenses/generate-labor - create pending labor expense from assignments
-router.post("/:id/expenses/generate-labor", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest, res: Response) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-    if (!canWriteExpenses(req.user?.role)) {
-      res.status(403).json({ error: "Forbidden: Missing expense write permission" });
+    const userRole = req.user?.role?.toUpperCase();
+
+    // Restrict to OWNER, ACCOUNTANT, OPS_MANAGER, SUPER_ADMIN, ADMIN
+    if (userRole !== "OWNER" && userRole !== "ACCOUNTANT" && userRole !== "OPS_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+      res.status(403).json({ error: "Forbidden: Insufficient labor expense privileges" });
       return;
     }
 
-    const eventResult = await pool.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL", [id]);
+    await client.query("BEGIN");
+
+    // Lock parent event record FOR UPDATE to serialize concurrent generation calls
+    const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
     if (eventResult.rowCount === 0) {
+      await client.query("ROLLBACK");
       res.status(404).json({ error: "Event not found" });
       return;
     }
     if (eventResult.rows[0].status !== "Completed") {
+      await client.query("ROLLBACK");
       res.status(400).json({ error: "Labor expense can only be generated after event completion" });
       return;
     }
 
-    const assignmentResult = await pool.query(
+    const assignmentResult = await client.query(
       "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
       [id]
     );
     const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
     if (laborTotal <= 0) {
+      await client.query("ROLLBACK");
       res.status(400).json({ error: "No attended labor assignments found for this event" });
       return;
     }
 
-    const existingResult = await pool.query(
+    const existingResult = await client.query(
       "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
       [id, "Auto-generated labor cost from attended event assignments"]
     );
     if ((existingResult.rowCount || 0) > 0) {
+      await client.query("ROLLBACK");
       res.status(409).json({ error: "Labor expense has already been generated for this event" });
       return;
     }
 
-    const result = await pool.query(
+    const result = await client.query(
       `
         INSERT INTO expenses (event_id, category, amount, description, status, created_by)
         VALUES ($1, 'Labor', $2, $3, 'Pending', $4)
@@ -1695,10 +1805,14 @@ router.post("/:id/expenses/generate-labor", requireAdmin, async (req: AuthReques
       [id, laborTotal, "Auto-generated labor cost from attended event assignments", req.user?.id || null]
     );
 
+    await client.query("COMMIT");
     res.status(201).json(result.rows[0]);
   } catch (error: any) {
+    await client.query("ROLLBACK");
     console.error("[post-event-labor-expense] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 
