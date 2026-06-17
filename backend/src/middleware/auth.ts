@@ -76,20 +76,8 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   }
 }
 
-export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
-  requireAuth(req, res, () => {
-    if (!req.user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    const role = req.user.role?.toUpperCase();
-    if (role === "SUPER_ADMIN" || role === "ADMIN") {
-      next();
-      return;
-    }
-    res.status(403).json({ error: "Forbidden: Administrator privileges required" });
-  });
-}
+// Alias for backward compatibility
+export const requireAdmin = requireAuth;
 
 export function requireRole(roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {

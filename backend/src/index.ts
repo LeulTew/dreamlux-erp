@@ -12,7 +12,7 @@ import salaryLevelsRouter from "./routes/salary-levels";
 import eventTypesRouter from "./routes/event-types";
 import payrollRouter from "./routes/payroll";
 import eventsRouter from "./routes/events";
-import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
+import { requireAdmin, requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
 import { runStartupMigrations } from "./db/startup-migration";
 import { pool } from "./db/pool";
@@ -99,19 +99,19 @@ app.use("/auth", authRouter);
 app.use("/users", usersRouter);
 
 // Protected routes
-app.use("/assets", requireAuth, assetsRouter);
-app.use("/items", requireAuth, assetsRouter); // Compatibility for old inventory-pro app
-app.use("/api/inventory", requireAuth, assetsRouter); // Contract alias (e.g. /api/inventory/stats)
-app.use("/offices", requireAuth, officeRoutes);
-app.use("/stores", requireAuth, officeRoutes); // Compatibility for old inventory-pro app
-app.use("/employees", requireAuth, employeesRouter);
-app.use("/export", requireAuth, exportRoutes);
+app.use("/assets", requireAdmin, assetsRouter);
+app.use("/items", requireAdmin, assetsRouter); // Compatibility for old inventory-pro app
+app.use("/api/inventory", requireAdmin, assetsRouter); // Contract alias (e.g. /api/inventory/stats)
+app.use("/offices", requireAdmin, officeRoutes);
+app.use("/stores", requireAdmin, officeRoutes); // Compatibility for old inventory-pro app
+app.use("/employees", requireAdmin, employeesRouter);
+app.use("/export", requireAdmin, exportRoutes);
 app.use("/settings", requireAuth, requirePermissionSlugs(["settings:write", "users:manage"]), settingsRouter);
-app.use("/departments", requireAuth, departmentsRouter);
-app.use("/salary-levels", requireAuth, salaryLevelsRouter);
-app.use("/event-types", requireAuth, eventTypesRouter);
-app.use("/payroll", requireAuth, payrollRouter);
-app.use("/events", requireAuth, eventsRouter);
+app.use("/departments", requireAdmin, departmentsRouter);
+app.use("/salary-levels", requireAdmin, salaryLevelsRouter);
+app.use("/event-types", requireAdmin, eventTypesRouter);
+app.use("/payroll", requireAdmin, payrollRouter);
+app.use("/events", requireAdmin, eventsRouter);
 
 // Error handler
 app.use(

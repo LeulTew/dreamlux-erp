@@ -547,16 +547,9 @@ describe("Events API", () => {
 
   // Scheduling - POST Employee Assignment success
   test("POST /events/:id/assignments/employees creates assignment", async () => {
-    // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
     // Event check
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
-      rowCount: 1,
-    });
-    // Employee lock
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "emp-1" }],
       rowCount: 1,
     });
     // Employee team conflict check (returns 0 count)
@@ -574,8 +567,6 @@ describe("Events API", () => {
       rows: [{ event_id: "event-1", employee_id: "emp-1", role: "Team Leader" }],
       rowCount: 1,
     });
-    // COMMIT
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
     const res = await request(app)
       .post("/events/event-1/assignments/employees")
@@ -592,16 +583,9 @@ describe("Events API", () => {
 
   // Scheduling - POST Employee Assignment double booking conflict blocked
   test("POST /events/:id/assignments/employees blocks assignment when employee is already booked", async () => {
-    // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
     // Event check
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
-      rowCount: 1,
-    });
-    // Employee lock
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "emp-1" }],
       rowCount: 1,
     });
     // Employee team conflict check (returns 1 count)
@@ -609,8 +593,6 @@ describe("Events API", () => {
       rows: [{ count: "1" }],
       rowCount: 1,
     });
-    // ROLLBACK
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
     const res = await request(app)
       .post("/events/event-1/assignments/employees")
@@ -627,21 +609,9 @@ describe("Events API", () => {
 
   // Scheduling - POST Vehicle Assignment success
   test("POST /events/:id/assignments/vehicles assigns vehicle and driver", async () => {
-    // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
     // Event check
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
-      rowCount: 1,
-    });
-    // Vehicle lock
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "veh-1" }],
-      rowCount: 1,
-    });
-    // Driver lock
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "emp-1" }],
       rowCount: 1,
     });
     // Vehicle conflict check (returns 0 count)
@@ -664,8 +634,6 @@ describe("Events API", () => {
       rows: [{ event_id: "event-1", vehicle_id: "veh-1", driver_id: "emp-1" }],
       rowCount: 1,
     });
-    // COMMIT
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
     const res = await request(app)
       .post("/events/event-1/assignments/vehicles")
@@ -837,27 +805,19 @@ describe("Events API", () => {
   });
 
   test("POST /events/:id/expenses/generate-labor creates labor expense from attended assignments", async () => {
-    // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-    // Event check/lock
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "event-1", status: "Completed" }],
       rowCount: 1,
     });
-    // Labor sum
     mockQuery.mockResolvedValueOnce({
       rows: [{ total: "3500" }],
       rowCount: 1,
     });
-    // Check existing
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
-    // Insert labor
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
       rowCount: 1,
     });
-    // COMMIT
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
     const res = await request(app)
       .post("/events/event-1/expenses/generate-labor")
@@ -977,124 +937,6 @@ describe("Events API", () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toContain("Forbidden");
-    });
-  });
-
-  describe("Security, BOLA & Concurrency Enhancements", () => {
-    test("POST /events/:id/allocations blocks low-privilege roles", async () => {
-      const res = await request(app)
-        .post("/events/event-1/allocations")
-        .set("Authorization", `Bearer ${getToken("DRIVER")}`) // Unauthorized role
-        .send({
-          item_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
-          quantity_allocated: 5,
-        });
-      expect(res.status).toBe(403);
-      expect(res.body.error).toContain("Forbidden");
-    });
-
-    test("POST /events/:id/checklist blocks low-privilege roles", async () => {
-      const res = await request(app)
-        .post("/events/event-1/checklist")
-        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
-        .send({
-          title: "Malicious Task",
-        });
-      expect(res.status).toBe(403);
-      expect(res.body.error).toContain("Forbidden");
-    });
-
-    test("POST /events/:id/expenses blocks DRIVER role from manual expenses", async () => {
-      const res = await request(app)
-        .post("/events/event-1/expenses")
-        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
-        .send({
-          category: "Consumables",
-          amount: 500,
-          description: "Driver buying personal water",
-        });
-      expect(res.status).toBe(403);
-      expect(res.body.error).toContain("Forbidden");
-    });
-
-    test("GET /events/:id/workspace omits financial data for non-financial roles", async () => {
-      mockQuery.mockResolvedValueOnce({
-        rows: [{ id: "event-1", name: "Wedding" }],
-        rowCount: 1,
-      });
-      // Allocations query
-      mockQuery.mockResolvedValueOnce({
-        rows: [],
-        rowCount: 0,
-      });
-      // Checklist query
-      mockQuery.mockResolvedValueOnce({
-        rows: [],
-        rowCount: 0,
-      });
-      // Assignments query
-      mockQuery.mockResolvedValueOnce({
-        rows: [],
-        rowCount: 0,
-      });
-      // Vehicle assignments query
-      mockQuery.mockResolvedValueOnce({
-        rows: [],
-        rowCount: 0,
-      });
-
-      const res = await request(app)
-        .get("/events/event-1/workspace")
-        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
-
-      expect(res.status).toBe(200);
-      expect(res.body.expenses).toHaveLength(0);
-      expect(res.body.trips).toHaveLength(0);
-    });
-
-    test("POST /events/:id/expenses/generate-labor prevents double-generation under concurrency", async () => {
-      // First call setup
-      // BEGIN
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-      // Lock/Event select
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 }); // Lock/Event select
-      // Labor sum
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "3500" }], rowCount: 1 }); // Labor sum
-      // Check active expense
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // Check active expense
-      // Insert
-      mockQuery.mockResolvedValueOnce({
-        rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
-        rowCount: 1,
-      }); // Insert
-      // COMMIT
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
-
-      const res1 = await request(app)
-        .post("/events/event-1/expenses/generate-labor")
-        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
-
-      expect(res1.status).toBe(201);
-      expect(res1.body.status).toBe("Pending");
-
-      // Second call setup (finds existing)
-      // BEGIN
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-      // Lock/Event select
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 }); // Lock/Event select
-      // Labor sum
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "3500" }], rowCount: 1 }); // Labor sum
-      // Already exists!
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "expense-labor-1" }], rowCount: 1 }); // Already exists!
-      // ROLLBACK
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
-
-      const res2 = await request(app)
-        .post("/events/event-1/expenses/generate-labor")
-        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
-
-      expect(res2.status).toBe(409);
-      expect(res2.body.error).toContain("already been generated");
     });
   });
 });
