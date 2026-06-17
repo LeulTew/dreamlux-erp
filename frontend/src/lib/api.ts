@@ -12,6 +12,8 @@ import {
   EventWorkspace,
   EventChecklistItem,
   EventExpense,
+  EventProfitSummary,
+  ProfitReportSummary,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1262,3 +1264,10 @@ export const reviewEventExpense = (
   expenseId: string,
   data: { status: "Approved" | "Rejected"; rejected_reason?: string | null }
 ) => api.patch(`/events/expenses/${expenseId}/review`, data).then((r) => r.data);
+
+export const getEventProfit = (id: string): Promise<EventProfitSummary> =>
+  api.get(`/events/${id}/profit`).then((r) => r.data);
+
+export const getProfitReport = (start_date?: string, end_date?: string): Promise<ProfitReportSummary> =>
+  api.get("/events/reports/profit", { params: { start_date, end_date } }).then((r) => r.data);
+

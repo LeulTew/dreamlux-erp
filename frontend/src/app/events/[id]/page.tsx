@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import toast from "react-hot-toast";
@@ -17,6 +17,7 @@ import {
   HiPaintBrush,
   HiPhone,
   HiPlus,
+  HiArrowTrendingUp,
   HiUser,
 } from "react-icons/hi2";
 
@@ -39,11 +40,12 @@ import {
   createVehicleAssignment,
   deleteVehicleAssignment,
   updateEmployeeAttendance,
-  createEventExpense,
   createEventTripLog,
+  createEventExpense,
   generateEventLaborExpense,
+  getEventProfit,
 } from "@/lib/api";
-import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Employee, Vehicle, EventExpense, EventTripLog } from "@/lib/types";
+import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Employee, Vehicle, EventExpense, EventTripLog, EventProfitSummary, CategoryCost } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -146,6 +148,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Equipment Rental": "Equipment Rental",
     Consumables: "Consumables",
     Other: "Other",
+    "Profit": "Profit",
+    "Net Profit": "Net Profit",
+    "Profit Margin": "Profit Margin",
+    "Category Breakdown": "Category Breakdown",
+    "No approved expenses yet. Profit is same as contract price.": "No approved expenses yet. Profit is same as contract price.",
+    "Total Approved Expenses": "Total Approved Expenses",
   },
   am: {
     "Back to Events": "ወደ ዝግጅቶች ተመለስ",
@@ -246,10 +254,16 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Equipment Rental": "የመሳሪያ ኪራይ",
     Consumables: "የሚጠቀሙ እቃዎች",
     Other: "ሌላ",
+    "Profit": "ትርፍ",
+    "Net Profit": "የተጣራ ትርፍ",
+    "Profit Margin": "የትርፍ ህዳግ",
+    "Category Breakdown": "የወጪ ዝርዝር በምድብ",
+    "No approved expenses yet. Profit is same as contract price.": "እስካሁን የጸደቀ ወጪ የለም። ትርፉ ከውሉ ዋጋ ጋር እኩል ነው።",
+    "Total Approved Expenses": "አጠቃላይ የጸደቁ ወጪዎች",
   },
 };
 
-type TabKey = "details" | "inventory" | "checklist" | "scheduling" | "expenses";
+type TabKey = "details" | "inventory" | "checklist" | "scheduling" | "expenses" | "profit";
 
 const tabs: Array<{ id: TabKey; label: string; icon: typeof HiUser }> = [
   { id: "details", label: "Details", icon: HiUser },
@@ -257,6 +271,7 @@ const tabs: Array<{ id: TabKey; label: string; icon: typeof HiUser }> = [
   { id: "checklist", label: "Checklist", icon: HiClipboardDocumentCheck },
   { id: "scheduling", label: "Team & Vehicles", icon: HiCalendarDays },
   { id: "expenses", label: "Expenses & Trips", icon: HiCurrencyDollar },
+  { id: "profit", label: "Profit", icon: HiArrowTrendingUp },
 ];
 
 function formatDate(value?: string | null) {
@@ -346,6 +361,204 @@ function DesignPackagePanel({
   );
 }
 
+function EventProfitPanel({
+  profitQuery,
+  t,
+}: {
+  eventId: string;
+  profitQuery: UseQueryResult<EventProfitSummary, Error>;
+  t: (key: string) => string;
+}) {
+  const { data: profit, isLoading, isError } = profitQuery;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (isError || !profit) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-8 text-center text-muted">
+        {t("Workspace unavailable")}
+      </div>
+    );
+  }
+
+  const formatCurrency = (value: number) => {
+    return `ETB ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const colors = {
+    Fuel: "bg-amber-500",
+    Labor: "bg-blue-500",
+    Transportation: "bg-emerald-500",
+    "Equipment Rental": "bg-indigo-500",
+    Consumables: "bg-pink-500",
+    Other: "bg-slate-500",
+  };
+
+  const svgColors = {
+    Fuel: "#f59e0b",
+    Labor: "#3b82f6",
+    Transportation: "#10b981",
+    "Equipment Rental": "#6366f1",
+    Consumables: "#ec4899",
+    Other: "#64748b",
+  };
+
+  const chartSegments: Array<{ category: string; amount: number; percentage: number; start: number; color: string }> = [];
+  let tempSum = 0;
+  for (const c of profit.categoryBreakdown) {
+    if (c.amount > 0) {
+      const percentage = profit.totalExpenses > 0 ? (c.amount / profit.totalExpenses) * 100 : 0;
+      chartSegments.push({
+        category: c.category,
+        amount: c.amount,
+        percentage,
+        start: tempSum,
+        color: svgColors[c.category as keyof typeof svgColors] || "#64748b",
+      });
+      tempSum += percentage;
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Contract Price")}</div>
+          <div className="mt-2 text-xl font-black text-foreground">{formatCurrency(profit.contractPrice)}</div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Total Approved Expenses")}</div>
+          <div className="mt-2 text-xl font-black text-foreground">{formatCurrency(profit.totalExpenses)}</div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Net Profit")}</div>
+          <div className={`mt-2 text-xl font-black ${profit.netProfit >= 0 ? "text-emerald-500" : "text-danger"}`}>
+            {formatCurrency(profit.netProfit)}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Profit Margin")}</div>
+          <div className={`mt-2 text-xl font-black ${profit.profitMargin >= 0 ? "text-emerald-500" : "text-danger"}`}>
+            {profit.profitMargin.toFixed(1)}%
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <section className="rounded-lg border border-border bg-card p-4">
+          <h2 className="mb-4 text-base font-bold text-foreground">{t("Category Breakdown")}</h2>
+          
+          {profit.totalExpenses === 0 ? (
+            <div className="p-8 text-center text-sm text-muted">
+              {t("No approved expenses yet. Profit is same as contract price.")}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted uppercase">
+                    <th className="py-2 font-bold">{t("Category")}</th>
+                    <th className="py-2 text-right font-bold">{t("Amount")}</th>
+                    <th className="py-2 text-right font-bold">%</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {profit.categoryBreakdown.map((row: CategoryCost) => {
+                    const percentage = profit.totalExpenses > 0 ? (row.amount / profit.totalExpenses) * 100 : 0;
+                    const colorClass = colors[row.category as keyof typeof colors] || "bg-slate-500";
+                    return (
+                      <tr key={row.category} className="text-foreground">
+                        <td className="py-3 flex items-center gap-2 font-semibold">
+                          <span className={`h-2.5 w-2.5 rounded-full ${colorClass}`} />
+                          {t(row.category)}
+                        </td>
+                        <td className="py-3 text-right font-mono font-bold">
+                          {formatCurrency(row.amount)}
+                        </td>
+                        <td className="py-3 text-right font-mono text-muted">
+                          {percentage.toFixed(1)}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
+          <div>
+            <h2 className="mb-4 text-base font-bold text-foreground">{t("Category Breakdown")}</h2>
+            
+            {profit.totalExpenses === 0 ? (
+              <div className="flex h-48 items-center justify-center text-sm text-muted">
+                {t("No approved expenses yet. Profit is same as contract price.")}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="relative pt-1">
+                  <div className="flex mb-2 items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-primary-dark bg-primary-light">
+                        {t("Total Approved Expenses")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold inline-block text-foreground">
+                        100%
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <svg width="100%" height="24" className="rounded-md overflow-hidden bg-muted">
+                    {chartSegments.map((seg, idx: number) => (
+                      <rect
+                        key={idx}
+                        x={`${seg.start}%`}
+                        y="0"
+                        width={`${seg.percentage}%`}
+                        height="24"
+                        fill={seg.color}
+                      />
+                    ))}
+                  </svg>
+                </div>
+
+                <div className="space-y-3">
+                  {profit.categoryBreakdown.map((row: CategoryCost) => {
+                    if (row.amount === 0) return null;
+                    const percentage = profit.totalExpenses > 0 ? (row.amount / profit.totalExpenses) * 100 : 0;
+                    const colorClass = colors[row.category as keyof typeof colors] || "bg-slate-500";
+                    return (
+                      <div key={row.category} className="space-y-1">
+                        <div className="flex justify-between text-xs font-semibold text-foreground">
+                          <span>{t(row.category)}</span>
+                          <span className="text-muted">{percentage.toFixed(1)}%</span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div className={`h-full ${colorClass}`} style={{ width: `${percentage}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export default function EventWorkspacePage() {
   const params = useParams<{ id: string }>();
   const eventId = params.id;
@@ -360,6 +573,32 @@ export default function EventWorkspacePage() {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskOwner, setTaskOwner] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
+
+  const [userRole] = useState(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          const payloadBase64 = token.split(".")[1];
+          const payloadDecoded = JSON.parse(atob(payloadBase64));
+          return payloadDecoded.role || "";
+        } catch (e) {
+          console.error("Failed to decode token:", e);
+        }
+      }
+    }
+    return "";
+  });
+
+  const hasProfitAccess = !!(userRole && ["OWNER", "ACCOUNTANT", "SUPER_ADMIN", "ADMIN"].includes(userRole.toUpperCase()));
+
+  const profitQuery = useQuery({
+    queryKey: ["event-profit", eventId],
+    queryFn: () => getEventProfit(eventId),
+    enabled: hasProfitAccess,
+  });
+
+  const visibleTabs = tabs.filter((t) => t.id !== "profit" || hasProfitAccess);
 
   const workspaceQuery = useQuery({
     queryKey: ["event-workspace", eventId],
@@ -641,7 +880,7 @@ export default function EventWorkspacePage() {
         ) : (
           <>
             <div className="flex gap-2 overflow-x-auto border-b border-border">
-              {tabs.map((tab) => {
+              {visibleTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
@@ -1181,6 +1420,10 @@ export default function EventWorkspacePage() {
                   </section>
                 </div>
               </div>
+            )}
+
+            {activeTab === "profit" && hasProfitAccess && (
+              <EventProfitPanel eventId={eventId} profitQuery={profitQuery} t={t} />
             )}
           </>
         )}

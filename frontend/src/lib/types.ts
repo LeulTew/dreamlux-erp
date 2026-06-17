@@ -402,3 +402,40 @@ export interface EventWorkspace {
   trips: EventTripLog[];
 }
 
+export interface CategoryCost {
+  category: "Fuel" | "Labor" | "Transportation" | "Equipment Rental" | "Consumables" | "Other";
+  amount: number;
+}
+
+export interface EventProfitSummary {
+  eventId: string;
+  name: string;
+  contractPrice: number;
+  totalExpenses: number;
+  netProfit: number;
+  profitMargin: number;
+  categoryBreakdown: CategoryCost[];
+}
+
+export interface MonthProfitSummary {
+  month: string;
+  eventCount: number;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  margin: number;
+}
+
+export interface ProfitReportSummary {
+  summary: {
+    totalEvents: number;
+    totalRevenue: number;
+    totalExpenses: number;
+    netProfit: number;
+    profitMargin: number;
+  };
+  categoryBreakdown: CategoryCost[];
+  monthlyData: MonthProfitSummary[];
+}
+
+

@@ -827,4 +827,116 @@ describe("Events API", () => {
     expect(res.body.category).toBe("Labor");
     expect(res.body.status).toBe("Pending");
   });
+
+  describe("Profitability Reports & Dashboards API", () => {
+    test("GET /events/:id/profit calculates single event profit correctly", async () => {
+      // First query: event lookup
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Corporate Gala", contract_price: "100000.00" }],
+        rowCount: 1,
+      });
+      // Second query: expenses breakdown
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { category: "Labor", amount: 20000.00 },
+          { category: "Fuel", amount: 5000.00 },
+          { category: "Other", amount: 15000.00 },
+        ],
+        rowCount: 3,
+      });
+
+      const res = await request(app)
+        .get("/events/event-1/profit")
+        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.eventId).toBe("event-1");
+      expect(res.body.contractPrice).toBe(100000.00);
+      expect(res.body.totalExpenses).toBe(40000.00);
+      expect(res.body.netProfit).toBe(60000.00);
+      expect(res.body.profitMargin).toBe(60.00);
+      expect(res.body.categoryBreakdown).toContainEqual({ category: "Labor", amount: 20000.00 });
+      expect(res.body.categoryBreakdown).toContainEqual({ category: "Fuel", amount: 5000.00 });
+      expect(res.body.categoryBreakdown).toContainEqual({ category: "Other", amount: 15000.00 });
+    });
+
+    test("GET /events/:id/profit returns 404 if event not found", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [],
+        rowCount: 0,
+      });
+
+      const res = await request(app)
+        .get("/events/event-not-exists/profit")
+        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toContain("Event not found");
+    });
+
+    test("GET /events/:id/profit enforces role-based access", async () => {
+      const res = await request(app)
+        .get("/events/event-1/profit")
+        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("Forbidden");
+    });
+
+    test("GET /events/reports/profit aggregates monthly/yearly reports correctly with date filtering", async () => {
+      // First query: events list
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { id: "event-1", name: "Corporate Gala", contract_price: "100000.00", start_date: "2026-06-10" },
+          { id: "event-2", name: "Private Birthday", contract_price: "50000.00", start_date: "2026-07-15" },
+        ],
+        rowCount: 2,
+      });
+      // Second query: approved expenses
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { event_id: "event-1", category: "Labor", total_amount: 20000.00 },
+          { event_id: "event-1", category: "Fuel", total_amount: 5000.00 },
+          { event_id: "event-2", category: "Other", total_amount: 10000.00 },
+        ],
+        rowCount: 3,
+      });
+
+      const res = await request(app)
+        .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-07-31")
+        .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.summary.totalEvents).toBe(2);
+      expect(res.body.summary.totalRevenue).toBe(150000.00);
+      expect(res.body.summary.totalExpenses).toBe(35000.00);
+      expect(res.body.summary.netProfit).toBe(115000.00);
+      expect(res.body.summary.profitMargin).toBe(76.67);
+      
+      expect(res.body.categoryBreakdown).toContainEqual({ category: "Labor", amount: 20000.00 });
+      expect(res.body.categoryBreakdown).toContainEqual({ category: "Fuel", amount: 5000.00 });
+      expect(res.body.categoryBreakdown).toContainEqual({ category: "Other", amount: 10000.00 });
+
+      const juneData = res.body.monthlyData.find((m: any) => m.month === "2026-06");
+      const julyData = res.body.monthlyData.find((m: any) => m.month === "2026-07");
+      expect(juneData).toBeDefined();
+      expect(juneData.revenue).toBe(100000.00);
+      expect(juneData.expenses).toBe(25000.00);
+      expect(juneData.profit).toBe(75000.00);
+
+      expect(julyData).toBeDefined();
+      expect(julyData.revenue).toBe(50000.00);
+      expect(julyData.expenses).toBe(10000.00);
+      expect(julyData.profit).toBe(40000.00);
+    });
+
+    test("GET /events/reports/profit restricts access to non-financial roles", async () => {
+      const res = await request(app)
+        .get("/events/reports/profit")
+        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("Forbidden");
+    });
+  });
 });

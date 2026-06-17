@@ -18,6 +18,12 @@ import {
 
 const router = Router();
 
+function canAccessProfitReports(role?: string): boolean {
+  if (!role) return false;
+  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
+  return allowed.includes(role.toUpperCase());
+}
+
 // Helper to check if user has permission to edit completed events or transition backward
 function canOverrideCompleted(role?: string): boolean {
   if (!role) return false;
@@ -178,6 +184,233 @@ router.patch("/expenses/:expenseId/review", requireAdmin, async (req: AuthReques
     res.json(result.rows[0]);
   } catch (error: any) {
     console.error("[patch-expense-review] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/reports/profit - Monthly/Yearly event profitability report
+router.get("/reports/profit", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canAccessProfitReports(req.user?.role)) {
+      res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
+      return;
+    }
+
+    const currentYear = new Date().getFullYear();
+    const start = (req.query.start_date as string) || `${currentYear}-01-01`;
+    const end = (req.query.end_date as string) || `${currentYear}-12-31`;
+
+    // Fetch all events start_date in range
+    const eventsQuery = `
+      SELECT id, name, contract_price, start_date
+      FROM events
+      WHERE start_date >= $1 AND start_date <= $2 AND deleted_at IS NULL
+      ORDER BY start_date ASC
+    `;
+    const eventsResult = await pool.query(eventsQuery, [start, end]);
+    const events = eventsResult.rows;
+
+    // Fetch approved expenses for events in range
+    const expensesQuery = `
+      SELECT exp.event_id, exp.category, COALESCE(SUM(exp.amount), 0)::float AS total_amount
+      FROM expenses exp
+      JOIN events e ON exp.event_id = e.id
+      WHERE e.start_date >= $1 AND e.start_date <= $2 AND e.deleted_at IS NULL AND exp.status = 'Approved'
+      GROUP BY exp.event_id, exp.category
+    `;
+    const expensesResult = await pool.query(expensesQuery, [start, end]);
+    const expenses = expensesResult.rows;
+
+    // Group expenses by event_id
+    const eventExpensesMap: Record<string, Record<string, number>> = {};
+    for (const row of expenses) {
+      const { event_id, category, total_amount } = row;
+      if (!eventExpensesMap[event_id]) {
+        eventExpensesMap[event_id] = {};
+      }
+      eventExpensesMap[event_id][category] = total_amount;
+    }
+
+    // Generate contiguous months list between start and end (max 36 months to prevent loops)
+    const monthlyMap: Record<string, {
+      month: string;
+      eventCount: number;
+      revenue: number;
+      expenses: number;
+      profit: number;
+      margin: number;
+    }> = {};
+
+    const startYear = new Date(start).getFullYear();
+    const startMonth = new Date(start).getMonth();
+    const endYear = new Date(end).getFullYear();
+    const endMonth = new Date(end).getMonth();
+
+    const monthsList: string[] = [];
+    let currYear = startYear;
+    let currMonth = startMonth;
+
+    while (currYear < endYear || (currYear === endYear && currMonth <= endMonth)) {
+      const monthKey = `${currYear}-${String(currMonth + 1).padStart(2, "0")}`;
+      monthsList.push(monthKey);
+      currMonth++;
+      if (currMonth > 11) {
+        currMonth = 0;
+        currYear++;
+      }
+      if (monthsList.length > 36) {
+        break;
+      }
+    }
+
+    for (const monthKey of monthsList) {
+      monthlyMap[monthKey] = {
+        month: monthKey,
+        eventCount: 0,
+        revenue: 0,
+        expenses: 0,
+        profit: 0,
+        margin: 0,
+      };
+    }
+
+    const categoriesList = ["Fuel", "Labor", "Transportation", "Equipment Rental", "Consumables", "Other"];
+    const categoryTotals: Record<string, number> = {};
+    for (const cat of categoriesList) {
+      categoryTotals[cat] = 0;
+    }
+
+    for (const event of events) {
+      const eventId = event.id;
+      const revenue = Number(event.contract_price || 0);
+      const eventExpenses = eventExpensesMap[eventId] || {};
+
+      let totalEventExpense = 0;
+      for (const [cat, amt] of Object.entries(eventExpenses)) {
+        totalEventExpense += amt;
+        const normalizedCat = categoriesList.includes(cat) ? cat : "Other";
+        categoryTotals[normalizedCat] += amt;
+      }
+
+      const profit = revenue - totalEventExpense;
+
+      const dateObj = new Date(event.start_date);
+      const year = dateObj.getFullYear();
+      const monthIndex = dateObj.getMonth();
+      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = {
+          month: monthKey,
+          eventCount: 0,
+          revenue: 0,
+          expenses: 0,
+          profit: 0,
+          margin: 0,
+        };
+      }
+
+      monthlyMap[monthKey].eventCount += 1;
+      monthlyMap[monthKey].revenue += revenue;
+      monthlyMap[monthKey].expenses += totalEventExpense;
+      monthlyMap[monthKey].profit += profit;
+    }
+
+    let totalRevenue = 0;
+    let totalExpenses = 0;
+
+    for (const mData of Object.values(monthlyMap)) {
+      totalRevenue += mData.revenue;
+      totalExpenses += mData.expenses;
+      mData.margin = mData.revenue > 0 ? Number(((mData.profit / mData.revenue) * 100).toFixed(2)) : 0;
+    }
+
+    const netProfit = totalRevenue - totalExpenses;
+    const profitMargin = totalRevenue > 0 ? Number(((netProfit / totalRevenue) * 100).toFixed(2)) : 0;
+
+    const categoryBreakdown = categoriesList.map(cat => ({
+      category: cat,
+      amount: Number((categoryTotals[cat] || 0).toFixed(2))
+    }));
+
+    res.json({
+      summary: {
+        totalEvents: events.length,
+        totalRevenue: Number(totalRevenue.toFixed(2)),
+        totalExpenses: Number(totalExpenses.toFixed(2)),
+        netProfit: Number(netProfit.toFixed(2)),
+        profitMargin
+      },
+      categoryBreakdown,
+      monthlyData: Object.values(monthlyMap)
+    });
+  } catch (error: any) {
+    console.error("[get-profit-report] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/:id/profit - Profit calculations for a single event
+router.get("/:id/profit", requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!canAccessProfitReports(req.user?.role)) {
+      res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
+      return;
+    }
+
+    const eventQuery = `SELECT id, name, contract_price FROM events WHERE id = $1 AND deleted_at IS NULL`;
+    const eventResult = await pool.query(eventQuery, [id]);
+    if (eventResult.rowCount === 0) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+
+    const event = eventResult.rows[0];
+    const contractPrice = Number(event.contract_price || 0);
+
+    const expensesQuery = `
+      SELECT category, SUM(amount)::float AS amount
+      FROM expenses
+      WHERE event_id = $1 AND status = 'Approved'
+      GROUP BY category
+    `;
+    const expensesResult = await pool.query(expensesQuery, [id]);
+    
+    const categoriesList = ["Fuel", "Labor", "Transportation", "Equipment Rental", "Consumables", "Other"];
+    const eventExpenses: Record<string, number> = {};
+    for (const cat of categoriesList) {
+      eventExpenses[cat] = 0;
+    }
+
+    let totalExpenses = 0;
+    for (const row of expensesResult.rows) {
+      const { category, amount } = row;
+      const normalizedCat = categoriesList.includes(category) ? category : "Other";
+      eventExpenses[normalizedCat] = (eventExpenses[normalizedCat] || 0) + amount;
+      totalExpenses += amount;
+    }
+
+    const netProfit = contractPrice - totalExpenses;
+    const profitMargin = contractPrice > 0 ? Number(((netProfit / contractPrice) * 100).toFixed(2)) : 0;
+
+    const categoryBreakdown = categoriesList.map(cat => ({
+      category: cat,
+      amount: Number((eventExpenses[cat] || 0).toFixed(2))
+    }));
+
+    res.json({
+      eventId: event.id,
+      name: event.name,
+      contractPrice: Number(contractPrice.toFixed(2)),
+      totalExpenses: Number(totalExpenses.toFixed(2)),
+      netProfit: Number(netProfit.toFixed(2)),
+      profitMargin,
+      categoryBreakdown
+    });
+  } catch (error: any) {
+    console.error("[get-event-profit] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
