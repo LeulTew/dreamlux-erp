@@ -56,3 +56,16 @@ mock.module("pg", () => ({
     connect: mock(() => Promise.resolve({ release: mock(() => {}), query: mock(() => Promise.resolve({ rows: [] })) })),
   })),
 }));
+
+// Direct instance override to protect against module cache pollution
+import { pool } from "../db/pool";
+try {
+  pool.query = mock(() => Promise.resolve({ rows: [] }));
+  pool.connect = mock(() => Promise.resolve({
+    release: mock(() => {}),
+    query: mock(() => Promise.resolve({ rows: [] }))
+  })) as any;
+} catch (e) {
+  console.warn("Failed to override pool instance methods directly:", e);
+}
+
