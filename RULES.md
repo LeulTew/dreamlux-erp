@@ -14,7 +14,7 @@ Always interact with GitHub using the `gh` tool to maintain project hygiene:
    - Properly label the issue (e.g. `bug`, `enhancement`) and assign it to yourself (`assign @self`).
 
 2. **Branching Strategy**:
-   - Create a clean feature branch from `main` or `develop` using a standard naming pattern: `feature/<issue-id>-short-name` (e.g. `feature/6-amharic-fix`).
+   - Create a clean feature branch from `main` using a standard naming pattern: `feature/<issue-id>-short-name` (e.g. `feature/6-amharic-fix`).
    - Work must never be done directly on `main` unless it is a simple diagnostic/hotfix check.
 
 3. **Pull Request (PR) Lifecycle**:

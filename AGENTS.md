@@ -53,7 +53,7 @@ These rules apply to all AI agents working in this repository.
 
 - **Issue Assignment**: Do not start coding until a GitHub issue exists and is moved to "In Progress" on the Scrum board.
 - **Feature Branching**:
-  - Main branches: `main` (production), `develop` (integration).
+  - Main branch: `main` (production and integration).
   - Feature branches: `feature/<issue-number>-short-name` (e.g. `feature/3-event-creation`).
 - **Commit Messages**: Commits must be prefix-based:
   - `feat(<scope>): ...` for new features.
