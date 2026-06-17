@@ -32,7 +32,7 @@ function canOverrideCompleted(role?: string): boolean {
   return allowed.includes(role.toUpperCase());
 }
 
-function canWriteExpenses(role?: string): boolean {
+function canLogTrips(role?: string): boolean {
   if (!role) return false;
   const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT", "DRIVER"];
   return allowed.includes(role.toUpperCase());
@@ -156,7 +156,6 @@ router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Respo
 
 // PATCH /events/expenses/:expenseId/review - approve/reject pending expense
 router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest, res: Response) => {
-  const client = await pool.connect();
   try {
     const { expenseId } = req.params;
     if (!canApproveExpenses(req.user?.role)) {
@@ -170,66 +169,71 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
       return;
     }
 
-    await client.query("BEGIN");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    const existingResult = await client.query(
-      `
-        SELECT exp.*
-        FROM expenses exp
-        JOIN events e ON exp.event_id = e.id
-        WHERE exp.id = $1 AND e.deleted_at IS NULL
-      `,
-      [expenseId]
-    );
+      const existingResult = await client.query(
+        `
+          SELECT exp.*
+          FROM expenses exp
+          JOIN events e ON exp.event_id = e.id
+          WHERE exp.id = $1 AND e.deleted_at IS NULL
+        `,
+        [expenseId]
+      );
 
-    if (existingResult.rowCount === 0) {
+      if (existingResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Expense not found or associated event is deleted" });
+        return;
+      }
+      if (existingResult.rows[0].status === "Approved") {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Approved expenses are locked" });
+        return;
+      }
+
+      const { status, rejected_reason } = validationResult.data;
+      const result = await client.query(
+        `
+          UPDATE expenses
+          SET status = $1,
+              rejected_reason = $2,
+              approved_by = $3,
+              approved_at = NOW()
+          WHERE id = $4
+          RETURNING *
+        `,
+        [status, status === "Rejected" ? rejected_reason : null, req.user?.id || null, expenseId]
+      );
+
+      // Insert audit log
+      await client.query(
+        `
+          INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        [
+          existingResult.rows[0].event_id,
+          req.user?.id || null,
+          "expense_status",
+          `Pending (ID: ${expenseId}, Category: ${existingResult.rows[0].category}, Amount: ${existingResult.rows[0].amount})`,
+          status
+        ]
+      );
+
+      await client.query("COMMIT");
+      res.json(result.rows[0]);
+    } catch (error: any) {
       await client.query("ROLLBACK");
-      res.status(404).json({ error: "Expense not found or associated event is deleted" });
-      return;
+      throw error;
+    } finally {
+      client.release();
     }
-    if (existingResult.rows[0].status === "Approved") {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: "Approved expenses are locked" });
-      return;
-    }
-
-    const { status, rejected_reason } = validationResult.data;
-    const result = await client.query(
-      `
-        UPDATE expenses
-        SET status = $1,
-            rejected_reason = $2,
-            approved_by = $3,
-            approved_at = NOW()
-        WHERE id = $4
-        RETURNING *
-      `,
-      [status, status === "Rejected" ? rejected_reason : null, req.user?.id || null, expenseId]
-    );
-
-    // Insert audit log
-    await client.query(
-      `
-        INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [
-        existingResult.rows[0].event_id,
-        req.user?.id || null,
-        "expense_status",
-        `Pending (ID: ${expenseId}, Category: ${existingResult.rows[0].category}, Amount: ${existingResult.rows[0].amount})`,
-        status
-      ]
-    );
-
-    await client.query("COMMIT");
-    res.json(result.rows[0]);
   } catch (error: any) {
-    await client.query("ROLLBACK");
     console.error("[patch-expense-review] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
   }
 });
 
@@ -999,7 +1003,6 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
 
 // POST /events/:id/allocations - Allocate a store item to the event
 router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Response) => {
-  const client = await pool.connect();
   try {
     const { id } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1011,7 +1014,7 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
     }
 
     const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
-    const eventResult = await client.query(eventQuery, [id]);
+    const eventResult = await pool.query(eventQuery, [id]);
 
     if (eventResult.rowCount === 0) {
       res.status(404).json({ error: "Event not found" });
@@ -1036,56 +1039,61 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
 
     const { item_id, quantity_allocated, notes } = validationResult.data;
 
-    await client.query("BEGIN");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    const itemQuery = `SELECT * FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
-    const itemResult = await client.query(itemQuery, [item_id]);
+      const itemQuery = `SELECT * FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
+      const itemResult = await client.query(itemQuery, [item_id]);
 
-    if (itemResult.rowCount === 0) {
+      if (itemResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Inventory item not found" });
+        return;
+      }
+
+      const item = itemResult.rows[0];
+
+      const activeAllocationsQuery = `
+        SELECT COALESCE(SUM(quantity_allocated), 0) as total_allocated
+        FROM event_allocations
+        WHERE item_id = $1 AND status != 'Returned'
+      `;
+      const activeAllocationsResult = await client.query(activeAllocationsQuery, [item_id]);
+      const totalAllocated = parseInt(activeAllocationsResult.rows[0].total_allocated, 10);
+
+      const availableQuantity = item.quantity - totalAllocated;
+
+      if (quantity_allocated > availableQuantity) {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "Requested quantity exceeds available stock" });
+        return;
+      }
+
+      const insertAllocationQuery = `
+        INSERT INTO event_allocations (event_id, item_id, quantity_allocated, status, notes, created_by)
+        VALUES ($1, $2, $3, 'Reserved', $4, $5)
+        RETURNING *
+      `;
+      const allocationResult = await client.query(insertAllocationQuery, [
+        id,
+        item_id,
+        quantity_allocated,
+        notes || null,
+        req.user?.id || null,
+      ]);
+
+      await client.query("COMMIT");
+      res.status(201).json(allocationResult.rows[0]);
+    } catch (error: any) {
       await client.query("ROLLBACK");
-      res.status(404).json({ error: "Inventory item not found" });
-      return;
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const item = itemResult.rows[0];
-
-    const activeAllocationsQuery = `
-      SELECT COALESCE(SUM(quantity_allocated), 0) as total_allocated
-      FROM event_allocations
-      WHERE item_id = $1 AND status != 'Returned'
-    `;
-    const activeAllocationsResult = await client.query(activeAllocationsQuery, [item_id]);
-    const totalAllocated = parseInt(activeAllocationsResult.rows[0].total_allocated, 10);
-
-    const availableQuantity = item.quantity - totalAllocated;
-
-    if (quantity_allocated > availableQuantity) {
-      await client.query("ROLLBACK");
-      res.status(400).json({ error: "Requested quantity exceeds available stock" });
-      return;
-    }
-
-    const insertAllocationQuery = `
-      INSERT INTO event_allocations (event_id, item_id, quantity_allocated, status, notes, created_by)
-      VALUES ($1, $2, $3, 'Reserved', $4, $5)
-      RETURNING *
-    `;
-    const allocationResult = await client.query(insertAllocationQuery, [
-      id,
-      item_id,
-      quantity_allocated,
-      notes || null,
-      req.user?.id || null,
-    ]);
-
-    await client.query("COMMIT");
-    res.status(201).json(allocationResult.rows[0]);
   } catch (error: any) {
-    await client.query("ROLLBACK");
     console.error("[post-event-allocation] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
   }
 });
 
@@ -1373,7 +1381,6 @@ router.get("/:id/assignments/available-vehicles", requireAuth, async (req: AuthR
 
 // POST /events/:id/assignments/employees - Assign an employee
 router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, res: Response) => {
-  const client = await pool.connect();
   try {
     const { id } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1384,78 +1391,82 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
       return;
     }
 
-    await client.query("BEGIN");
-
-    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
-    const eventResult = await client.query(eventQuery, [id]);
-    if (eventResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Event not found" });
-      return;
-    }
-
-    const event = eventResult.rows[0];
-
-    // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
-      await client.query("ROLLBACK");
-      res.status(400).json({
-        error: "Completed event assignments cannot be modified except by administrators or accountants",
-      });
-      return;
-    }
-
     const validationResult = createEventAssignmentSchema.safeParse(req.body);
     if (!validationResult.success) {
-      await client.query("ROLLBACK");
       res.status(400).json({ error: validationResult.error.errors[0].message });
       return;
     }
 
     const { employee_id, role, commission_amount, attended } = validationResult.data;
 
-    // Lock employee row FOR UPDATE to serialize parallel assignment conflicts checks
-    const empLockQuery = `SELECT id FROM employees WHERE id = $1 FOR UPDATE`;
-    const empLockResult = await client.query(empLockQuery, [employee_id]);
-    if (empLockResult.rowCount === 0) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
+      const eventResult = await client.query(eventQuery, [id]);
+      if (eventResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+
+      const event = eventResult.rows[0];
+
+      // Enforce completed-event locking
+      if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+        await client.query("ROLLBACK");
+        res.status(400).json({
+          error: "Completed event assignments cannot be modified except by administrators or accountants",
+        });
+        return;
+      }
+
+      // Lock employee row FOR UPDATE to serialize parallel assignment conflicts checks
+      const empLockQuery = `SELECT id FROM employees WHERE id = $1 FOR UPDATE`;
+      const empLockResult = await client.query(empLockQuery, [employee_id]);
+      if (empLockResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Employee not found" });
+        return;
+      }
+
+      // Check for scheduling conflict
+      const conflict = await hasEmployeeConflict(employee_id, id, event.start_date, event.end_date, client);
+      if (conflict) {
+        await client.query("ROLLBACK");
+        res.status(400).json({
+          error: "Scheduling Conflict: This employee is already assigned to another event on these dates.",
+        });
+        return;
+      }
+
+      const insertQuery = `
+        INSERT INTO event_assignments (event_id, employee_id, role, commission_amount, attended)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (event_id, employee_id) DO UPDATE
+        SET role = EXCLUDED.role, commission_amount = EXCLUDED.commission_amount, attended = EXCLUDED.attended
+        RETURNING *
+      `;
+      const result = await client.query(insertQuery, [
+        id,
+        employee_id,
+        role,
+        commission_amount,
+        attended,
+      ]);
+
+      await client.query("COMMIT");
+      res.status(201).json(result.rows[0]);
+    } catch (error: any) {
       await client.query("ROLLBACK");
-      res.status(404).json({ error: "Employee not found" });
-      return;
+      throw error;
+    } finally {
+      client.release();
     }
-
-    // Check for scheduling conflict
-    const conflict = await hasEmployeeConflict(employee_id, id, event.start_date, event.end_date, client);
-    if (conflict) {
-      await client.query("ROLLBACK");
-      res.status(400).json({
-        error: "Scheduling Conflict: This employee is already assigned to another event on these dates.",
-      });
-      return;
-    }
-
-    const insertQuery = `
-      INSERT INTO event_assignments (event_id, employee_id, role, commission_amount, attended)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (event_id, employee_id) DO UPDATE
-      SET role = EXCLUDED.role, commission_amount = EXCLUDED.commission_amount, attended = EXCLUDED.attended
-      RETURNING *
-    `;
-    const result = await client.query(insertQuery, [
-      id,
-      employee_id,
-      role,
-      commission_amount,
-      attended,
-    ]);
-
-    await client.query("COMMIT");
-    res.status(201).json(result.rows[0]);
   } catch (error: any) {
-    await client.query("ROLLBACK");
     console.error("[post-employee-assignment] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
   }
 });
 
@@ -1509,7 +1520,6 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
 
 // POST /events/:id/assignments/vehicles - Assign a vehicle and optional driver
 router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, res: Response) => {
-  const client = await pool.connect();
   try {
     const { id } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1520,100 +1530,104 @@ router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, r
       return;
     }
 
-    await client.query("BEGIN");
-
-    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
-    const eventResult = await client.query(eventQuery, [id]);
-    if (eventResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Event not found" });
-      return;
-    }
-
-    const event = eventResult.rows[0];
-
-    // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
-      await client.query("ROLLBACK");
-      res.status(400).json({
-        error: "Completed event assignments cannot be modified except by administrators or accountants",
-      });
-      return;
-    }
-
     const validationResult = createVehicleAssignmentSchema.safeParse(req.body);
     if (!validationResult.success) {
-      await client.query("ROLLBACK");
       res.status(400).json({ error: validationResult.error.errors[0].message });
       return;
     }
 
     const { vehicle_id, driver_id, is_night_shift } = validationResult.data;
 
-    // Lock vehicle row FOR UPDATE to serialize conflicts
-    const vehLockQuery = `SELECT id FROM vehicles WHERE id = $1 FOR UPDATE`;
-    const vehLockResult = await client.query(vehLockQuery, [vehicle_id]);
-    if (vehLockResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Vehicle not found" });
-      return;
-    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    // Lock driver row FOR UPDATE if provided
-    if (driver_id) {
-      const drvLockQuery = `SELECT id FROM employees WHERE id = $1 FOR UPDATE`;
-      const drvLockResult = await client.query(drvLockQuery, [driver_id]);
-      if (drvLockResult.rowCount === 0) {
+      const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`;
+      const eventResult = await client.query(eventQuery, [id]);
+      if (eventResult.rowCount === 0) {
         await client.query("ROLLBACK");
-        res.status(404).json({ error: "Driver not found" });
+        res.status(404).json({ error: "Event not found" });
         return;
       }
-    }
 
-    // Check for vehicle scheduling conflict
-    const vehicleConflict = await hasVehicleConflict(vehicle_id, id, event.start_date, event.end_date, client);
-    if (vehicleConflict) {
-      await client.query("ROLLBACK");
-      res.status(400).json({
-        error: "Scheduling Conflict: This vehicle is already assigned to another event on these dates.",
-      });
-      return;
-    }
+      const event = eventResult.rows[0];
 
-    // Check for driver scheduling conflict (if driver is provided)
-    if (driver_id) {
-      const driverConflict = await hasEmployeeConflict(driver_id, id, event.start_date, event.end_date, client);
-      if (driverConflict) {
+      // Enforce completed-event locking
+      if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
         await client.query("ROLLBACK");
         res.status(400).json({
-          error: "Scheduling Conflict: This driver is already assigned to another event on these dates.",
+          error: "Completed event assignments cannot be modified except by administrators or accountants",
         });
         return;
       }
+
+      // Lock vehicle row FOR UPDATE to serialize conflicts
+      const vehLockQuery = `SELECT id FROM vehicles WHERE id = $1 FOR UPDATE`;
+      const vehLockResult = await client.query(vehLockQuery, [vehicle_id]);
+      if (vehLockResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Vehicle not found" });
+        return;
+      }
+
+      // Lock driver row FOR UPDATE if provided
+      if (driver_id) {
+        const drvLockQuery = `SELECT id FROM employees WHERE id = $1 FOR UPDATE`;
+        const drvLockResult = await client.query(drvLockQuery, [driver_id]);
+        if (drvLockResult.rowCount === 0) {
+          await client.query("ROLLBACK");
+          res.status(404).json({ error: "Driver not found" });
+          return;
+        }
+      }
+
+      // Check for vehicle scheduling conflict
+      const vehicleConflict = await hasVehicleConflict(vehicle_id, id, event.start_date, event.end_date, client);
+      if (vehicleConflict) {
+        await client.query("ROLLBACK");
+        res.status(400).json({
+          error: "Scheduling Conflict: This vehicle is already assigned to another event on these dates.",
+        });
+        return;
+      }
+
+      // Check for driver scheduling conflict (if driver is provided)
+      if (driver_id) {
+        const driverConflict = await hasEmployeeConflict(driver_id, id, event.start_date, event.end_date, client);
+        if (driverConflict) {
+          await client.query("ROLLBACK");
+          res.status(400).json({
+            error: "Scheduling Conflict: This driver is already assigned to another event on these dates.",
+          });
+          return;
+        }
+      }
+
+      const insertQuery = `
+        INSERT INTO vehicle_assignments (event_id, vehicle_id, driver_id, is_night_shift)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (event_id, vehicle_id) DO UPDATE
+        SET driver_id = EXCLUDED.driver_id, is_night_shift = EXCLUDED.is_night_shift
+        RETURNING *
+      `;
+      const result = await client.query(insertQuery, [
+        id,
+        vehicle_id,
+        driver_id || null,
+        is_night_shift,
+      ]);
+
+      await client.query("COMMIT");
+      res.status(201).json(result.rows[0]);
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const insertQuery = `
-      INSERT INTO vehicle_assignments (event_id, vehicle_id, driver_id, is_night_shift)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (event_id, vehicle_id) DO UPDATE
-      SET driver_id = EXCLUDED.driver_id, is_night_shift = EXCLUDED.is_night_shift
-      RETURNING *
-    `;
-    const result = await client.query(insertQuery, [
-      id,
-      vehicle_id,
-      driver_id || null,
-      is_night_shift,
-    ]);
-
-    await client.query("COMMIT");
-    res.status(201).json(result.rows[0]);
   } catch (error: any) {
-    await client.query("ROLLBACK");
     console.error("[post-vehicle-assignment] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
   }
 });
 
@@ -1774,10 +1788,9 @@ router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response
 
 // POST /events/:id/trips - log trip and generate pending fuel expense
 router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) => {
-  const client = await pool.connect();
   try {
     const { id } = req.params;
-    if (!canWriteExpenses(req.user?.role)) {
+    if (!canLogTrips(req.user?.role)) {
       res.status(403).json({ error: "Forbidden: Missing expense write permission" });
       return;
     }
@@ -1789,103 +1802,108 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
     }
 
     const { vehicle_assignment_id, destination, distance_km, fuel_price_etb } = validationResult.data;
-    await client.query("BEGIN");
 
-    const assignmentResult = await client.query(
-      `
-        SELECT va.*, v.plate_number, v.vehicle_type, v.fuel_consumption_rate, e.status AS event_status
-        FROM vehicle_assignments va
-        JOIN vehicles v ON va.vehicle_id = v.id
-        JOIN events e ON va.event_id = e.id
-        WHERE va.id = $1 AND va.event_id = $2 AND e.deleted_at IS NULL
-      `,
-      [vehicle_assignment_id, id]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (assignmentResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Vehicle assignment not found for this event" });
-      return;
-    }
-
-    const assignment = assignmentResult.rows[0];
-    if (req.user?.role?.toUpperCase() === "DRIVER") {
-      const userResult = await client.query(
-        "SELECT email FROM users WHERE id = $1 AND deleted_at IS NULL",
-        [req.user.id]
+      const assignmentResult = await client.query(
+        `
+          SELECT va.*, v.plate_number, v.vehicle_type, v.fuel_consumption_rate, e.status AS event_status
+          FROM vehicle_assignments va
+          JOIN vehicles v ON va.vehicle_id = v.id
+          JOIN events e ON va.event_id = e.id
+          WHERE va.id = $1 AND va.event_id = $2 AND e.deleted_at IS NULL
+        `,
+        [vehicle_assignment_id, id]
       );
-      const userEmail = userResult.rows[0]?.email;
-      if (!userEmail) {
+
+      if (assignmentResult.rowCount === 0) {
         await client.query("ROLLBACK");
-        res.status(403).json({ error: "Forbidden: Driver has no linked email to resolve employee record" });
+        res.status(404).json({ error: "Vehicle assignment not found for this event" });
         return;
       }
 
-      const employeeResult = await client.query(
-        "SELECT id FROM employees WHERE email = $1 AND deleted_at IS NULL",
-        [userEmail]
+      const assignment = assignmentResult.rows[0];
+      if (req.user?.role?.toUpperCase() === "DRIVER") {
+        const userResult = await client.query(
+          "SELECT email FROM users WHERE id = $1 AND deleted_at IS NULL",
+          [req.user.id]
+        );
+        const userEmail = userResult.rows[0]?.email;
+        if (!userEmail) {
+          await client.query("ROLLBACK");
+          res.status(403).json({ error: "Forbidden: Driver has no linked email to resolve employee record" });
+          return;
+        }
+
+        const employeeResult = await client.query(
+          "SELECT id FROM employees WHERE email = $1 AND deleted_at IS NULL",
+          [userEmail]
+        );
+        const employeeId = employeeResult.rows[0]?.id;
+        if (!employeeId) {
+          await client.query("ROLLBACK");
+          res.status(403).json({ error: "Forbidden: No linked employee record found for this driver" });
+          return;
+        }
+
+        if (assignment.driver_id !== employeeId) {
+          await client.query("ROLLBACK");
+          res.status(403).json({ error: "Forbidden: You are not assigned as the driver for this vehicle assignment" });
+          return;
+        }
+      }
+
+      if (assignment.event_status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Completed event trips cannot be changed except by administrators or accountants" });
+        return;
+      }
+
+      const fuelLitersUsed = Number((Number(distance_km) * Number(assignment.fuel_consumption_rate)).toFixed(2));
+      const fuelCostEtb = Number((fuelLitersUsed * Number(fuel_price_etb)).toFixed(2));
+
+      const tripResult = await client.query(
+        `
+          INSERT INTO trips (vehicle_assignment_id, destination, distance_km, fuel_liters_used, fuel_cost_etb)
+          VALUES ($1, $2, $3, $4, $5)
+          RETURNING *
+        `,
+        [vehicle_assignment_id, destination, distance_km, fuelLitersUsed, fuelCostEtb]
       );
-      const employeeId = employeeResult.rows[0]?.id;
-      if (!employeeId) {
-        await client.query("ROLLBACK");
-        res.status(403).json({ error: "Forbidden: No linked employee record found for this driver" });
-        return;
-      }
 
-      if (assignment.driver_id !== employeeId) {
-        await client.query("ROLLBACK");
-        res.status(403).json({ error: "Forbidden: You are not assigned as the driver for this vehicle assignment" });
-        return;
-      }
-    }
+      const description = `Fuel for ${destination} (${distance_km} km, ${assignment.fuel_consumption_rate} L/km, ${fuel_price_etb} ETB/L)`;
+      const expenseResult = await client.query(
+        `
+          INSERT INTO expenses (event_id, category, amount, description, status, created_by)
+          VALUES ($1, 'Fuel', $2, $3, 'Pending', $4)
+          RETURNING *
+        `,
+        [id, fuelCostEtb, description, req.user?.id || null]
+      );
 
-    if (assignment.event_status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      await client.query("COMMIT");
+      res.status(201).json({
+        trip: tripResult.rows[0],
+        expense: expenseResult.rows[0],
+        fuel_liters_used: fuelLitersUsed,
+        fuel_cost_etb: fuelCostEtb,
+      });
+    } catch (error: any) {
       await client.query("ROLLBACK");
-      res.status(403).json({ error: "Completed event trips cannot be changed except by administrators or accountants" });
-      return;
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const fuelLitersUsed = Number((Number(distance_km) * Number(assignment.fuel_consumption_rate)).toFixed(2));
-    const fuelCostEtb = Number((fuelLitersUsed * Number(fuel_price_etb)).toFixed(2));
-
-    const tripResult = await client.query(
-      `
-        INSERT INTO trips (vehicle_assignment_id, destination, distance_km, fuel_liters_used, fuel_cost_etb)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-      `,
-      [vehicle_assignment_id, destination, distance_km, fuelLitersUsed, fuelCostEtb]
-    );
-
-    const description = `Fuel for ${destination} (${distance_km} km, ${assignment.fuel_consumption_rate} L/km, ${fuel_price_etb} ETB/L)`;
-    const expenseResult = await client.query(
-      `
-        INSERT INTO expenses (event_id, category, amount, description, status, created_by)
-        VALUES ($1, 'Fuel', $2, $3, 'Pending', $4)
-        RETURNING *
-      `,
-      [id, fuelCostEtb, description, req.user?.id || null]
-    );
-
-    await client.query("COMMIT");
-    res.status(201).json({
-      trip: tripResult.rows[0],
-      expense: expenseResult.rows[0],
-      fuel_liters_used: fuelLitersUsed,
-      fuel_cost_etb: fuelCostEtb,
-    });
   } catch (error: any) {
-    await client.query("ROLLBACK");
     console.error("[post-event-trip] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
   }
 });
 
 // POST /events/:id/expenses/generate-labor - create pending labor expense from assignments
 router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest, res: Response) => {
-  const client = await pool.connect();
   try {
     const { id } = req.params;
     const userRole = req.user?.role?.toUpperCase();
@@ -1896,59 +1914,64 @@ router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest
       return;
     }
 
-    await client.query("BEGIN");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    // Lock parent event record FOR UPDATE to serialize concurrent generation calls
-    const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
-    if (eventResult.rowCount === 0) {
+      // Lock parent event record FOR UPDATE to serialize concurrent generation calls
+      const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
+      if (eventResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+      if (eventResult.rows[0].status !== "Completed") {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "Labor expense can only be generated after event completion" });
+        return;
+      }
+
+      const assignmentResult = await client.query(
+        "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
+        [id]
+      );
+      const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
+      if (laborTotal <= 0) {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "No attended labor assignments found for this event" });
+        return;
+      }
+
+      const existingResult = await client.query(
+        "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
+        [id, "Auto-generated labor cost from attended event assignments"]
+      );
+      if ((existingResult.rowCount || 0) > 0) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Labor expense has already been generated for this event" });
+        return;
+      }
+
+      const result = await client.query(
+        `
+          INSERT INTO expenses (event_id, category, amount, description, status, created_by)
+          VALUES ($1, 'Labor', $2, $3, 'Pending', $4)
+          RETURNING *
+        `,
+        [id, laborTotal, "Auto-generated labor cost from attended event assignments", req.user?.id || null]
+      );
+
+      await client.query("COMMIT");
+      res.status(201).json(result.rows[0]);
+    } catch (error: any) {
       await client.query("ROLLBACK");
-      res.status(404).json({ error: "Event not found" });
-      return;
+      throw error;
+    } finally {
+      client.release();
     }
-    if (eventResult.rows[0].status !== "Completed") {
-      await client.query("ROLLBACK");
-      res.status(400).json({ error: "Labor expense can only be generated after event completion" });
-      return;
-    }
-
-    const assignmentResult = await client.query(
-      "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
-      [id]
-    );
-    const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
-    if (laborTotal <= 0) {
-      await client.query("ROLLBACK");
-      res.status(400).json({ error: "No attended labor assignments found for this event" });
-      return;
-    }
-
-    const existingResult = await client.query(
-      "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
-      [id, "Auto-generated labor cost from attended event assignments"]
-    );
-    if ((existingResult.rowCount || 0) > 0) {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: "Labor expense has already been generated for this event" });
-      return;
-    }
-
-    const result = await client.query(
-      `
-        INSERT INTO expenses (event_id, category, amount, description, status, created_by)
-        VALUES ($1, 'Labor', $2, $3, 'Pending', $4)
-        RETURNING *
-      `,
-      [id, laborTotal, "Auto-generated labor cost from attended event assignments", req.user?.id || null]
-    );
-
-    await client.query("COMMIT");
-    res.status(201).json(result.rows[0]);
   } catch (error: any) {
-    await client.query("ROLLBACK");
     console.error("[post-event-labor-expense] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
   }
 });
 

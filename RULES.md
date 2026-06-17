@@ -134,7 +134,7 @@ When implementing the dynamic role-permission manager (#24) and permission-aware
 - **Mindfulness of Stack & Existing Codebase**:
   - Reference the actual DreamLux backend/frontend architecture split.
   - Leverage and build upon the schema entities already present: `roles`, `permissions`, `role_permissions`, and `users.role_id` / `users.role_ids`.
-  - Acknowledge and refactor existing hardcoded backend role checks (e.g. `canAccessProfitReports`, `canOverrideCompleted`, and `canWriteExpenses`) rather than assuming dynamic RBAC is pre-configured.
+  - Acknowledge and refactor existing hardcoded backend role checks (e.g. `canAccessProfitReports`, `canOverrideCompleted`, and `canLogTrips`) rather than assuming dynamic RBAC is pre-configured.
   - Conform to the existing Next.js frontend + Express backend route structure.
   - Maintain the rule that backend authorization must be real and secure; do not rely on frontend control hiding as a security barrier.
   - Include validation under Bun runtime and ensure both frontend/backend test expectations are explicitly verified.
@@ -148,3 +148,12 @@ When implementing the dynamic role-permission manager (#24) and permission-aware
   4. **Phase 4**: Permission-aware sidebar filtering and Next.js route protection.
   5. **Phase 5**: UX consistency polish, Amharic spacing adjustments, and mobile QA pass.
 
+---
+
+## 7. 🔍 Senior Issue / PR Review Prompt
+
+When the user says a short instruction such as `use docs/SENIOR_ISSUE_REVIEW_PROMPT.md on issue #20`, `review PR #26 with the review doc`, or `use the senior prompt on issue #y`, agents must load and follow:
+
+[docs/SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md)
+
+This prompt expands the short request into a full senior engineering, architecture, OWASP/API security, performance, QA, SRD-grounded, git-diff-grounded, scope-hygiene, localization, UI/UX, and verification review. The agent must not treat the short user request as a casual opinion check; it is a directive to perform the full review process unless the user explicitly asks for a concise summary only.
