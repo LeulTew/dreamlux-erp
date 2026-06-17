@@ -43,3 +43,16 @@ mock.module("sharp", () => ({
 mock.module("file-type", () => ({
   fromBuffer: mock(() => Promise.resolve({ mime: "image/jpeg", ext: "jpg" })),
 }));
+
+// Mock pg.Client to prevent real connection attempts in startup migrations
+mock.module("pg", () => ({
+  Client: mock(() => ({
+    connect: mock(() => Promise.resolve()),
+    query: mock(() => Promise.resolve({ rows: [], rowCount: 0 })),
+    end: mock(() => Promise.resolve()),
+  })),
+  Pool: mock(() => ({
+    query: mock(() => Promise.resolve({ rows: [] })),
+    connect: mock(() => Promise.resolve({ release: mock(() => {}), query: mock(() => Promise.resolve({ rows: [] })) })),
+  })),
+}));
