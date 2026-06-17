@@ -75,3 +75,27 @@ bun run deploy
 ```
 
 This ensures that both the backend and frontend services are compiled, packaged, and published successfully. Always record the resulting production URLs in your final status report.
+
+---
+
+## 6. 🛡️ Dynamic RBAC & UI/UX Consistency Implementation Rules (#24 & #25)
+
+When implementing the dynamic role-permission manager (#24) and permission-aware UI/UX access polish (#25), all developers and agent instances must strictly adhere to the following stack-aware guidelines:
+
+- **Mindfulness of Stack & Existing Codebase**:
+  - Reference the actual DreamLux backend/frontend architecture split.
+  - Leverage and build upon the schema entities already present: `roles`, `permissions`, `role_permissions`, and `users.role_id` / `users.role_ids`.
+  - Acknowledge and refactor existing hardcoded backend role checks (e.g. `canAccessProfitReports`, `canOverrideCompleted`, and `canWriteExpenses`) rather than assuming dynamic RBAC is pre-configured.
+  - Conform to the existing Next.js frontend + Express backend route structure.
+  - Maintain the rule that backend authorization must be real and secure; do not rely on frontend control hiding as a security barrier.
+  - Include validation under Bun runtime and ensure both frontend/backend test expectations are explicitly verified.
+  - Ground all UI features in our core design guidelines: premium aesthetics (warm gold accents, dark slate borders), bilingual English/Amharic switcher, 320px mobile responsiveness, and clean layout spacing.
+
+- **Incremental Execution Strategy**:
+  Because #24 and #25 are broad epic-level architectures, they must be developed and reviewed incrementally through smaller, focused PRs. Do not submit a single monolithic PR. Follow this sequence:
+  1. **Phase 1**: RBAC database schema extension + seed canonical permissions.
+  2. **Phase 2**: Backend permission middleware replacement (e.g., transition from role strings to permission slug guards).
+  3. **Phase 3**: User/role administrative dashboard UI.
+  4. **Phase 4**: Permission-aware sidebar filtering and Next.js route protection.
+  5. **Phase 5**: UX consistency polish, Amharic spacing adjustments, and mobile QA pass.
+
