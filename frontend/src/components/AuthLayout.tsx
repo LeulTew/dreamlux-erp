@@ -674,17 +674,17 @@ export default function AuthLayout({
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 w-full overflow-hidden">
           {/* Header - Flat borderless design */}
-          <header className="flex h-16 shrink-0 items-center gap-3 px-4 md:px-6 bg-transparent select-none">
+          <header className="flex h-12 2xl:h-16 shrink-0 items-center gap-2 2xl:gap-3 px-3 md:px-5 2xl:px-6 bg-transparent select-none">
             <SidebarTrigger className="text-muted hover:text-foreground transition-all cursor-pointer" />
             <div className="h-4 w-px bg-border/50 shrink-0" />
             <Breadcrumbs />
             
             {/* Top Right Controls */}
-            <div className="ml-auto shrink-0 flex items-center gap-3">
+            <div className="ml-auto shrink-0 flex items-center gap-2 2xl:gap-3">
               {/* Search Trigger Button */}
               <button
                 onClick={() => setShowSearch(true)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card-alt/50 text-muted hover:text-foreground hover:bg-card-alt hover:border-primary/30 transition-all cursor-pointer text-xs font-semibold shrink-0"
+                className="flex items-center gap-2 px-2.5 2xl:px-3 py-1 2xl:py-1.5 rounded-lg 2xl:rounded-xl border border-border bg-card-alt/50 text-muted hover:text-foreground hover:bg-card-alt hover:border-primary/30 transition-all cursor-pointer text-xs font-semibold shrink-0"
                 title="Search (Ctrl+K)"
               >
                 <HiMagnifyingGlass className="w-3.5 h-3.5" />
@@ -708,8 +708,8 @@ export default function AuthLayout({
           </header>
 
           {/* Main View Area - page content in a curved container on desktop */}
-          <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 md:pl-0 md:pr-6 md:pb-6">
-            <div className="flex-1 flex flex-col min-h-0 bg-background md:bg-card md:border md:border-border/10 md:rounded-[2rem] p-4 md:p-8 overflow-y-auto">
+          <main className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 md:pl-0 md:pr-4 md:pb-4 2xl:md:pr-6 2xl:md:pb-6">
+            <div className="flex-1 flex flex-col min-h-0 bg-background md:bg-card md:border md:border-border/10 md:rounded-[1.5rem] 2xl:md:rounded-[2rem] p-3 md:p-5 2xl:p-8 overflow-y-auto">
               <div className="flex-1 flex flex-col min-h-0 w-full">
                 {children}
               </div>
