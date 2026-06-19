@@ -97,13 +97,71 @@ bun run db:seed
 
 ---
 
-## 3. 🎨 Design Aesthetics & Visual Quality (No AI Slop)
+## 3. Design Aesthetics, Visual Quality & UI Engineering Standards
 
-All UI elements must look premium, modern, and aligned with standard high-quality styling principles:
+### 3.1 Mandatory Skill Load — Any New or Updated UI
 
-- **Impeccable Style Standards**: Refer to the style guidelines and rules defined in the [Impeccable Style Guide](file:///.agents/skills/impeccable/SKILL.md) and apply the visual hygiene rules listed in [AGENTS.md](file:///AGENTS.md).
-- **Anti-AI Slop**: Do not generate basic, raw, or unpolished layouts. Maintain balanced contrast ratios (meeting WCAG 4.5:1 standards), smooth modern transitions, and elegant styling tokens (e.g. warm elegant gold `#D4AF37` and dark slate gradients).
-- **Radius & Borders**: Keep container roundness clean and minimal (`rounded-lg` or `rounded-xl`). Avoid huge round shapes or extreme drop shadows; favor sharp, elegant high-contrast borders.
+**This rule fires unconditionally on every task that creates or modifies UI output.**
+
+Triggers include (but are not limited to):
+- Creating a new React or Next.js component, page, or layout
+- Editing any existing component, page, or layout file
+- Modifying CSS, Tailwind classes, design tokens, or `globals.css`
+- Adding or changing iconography, typography, color usage, or spacing
+- Building or refactoring a design system primitive (button, card, badge, table, input, modal, sheet)
+- Touching any file under `components/`, `app/`, `pages/`, `styles/`, `tokens/`, or `theme/`
+
+**Required action**: Before writing any UI code, read the full skill file:
+
+```
+.agents/skills/enforce_senior_frontend_engineering_and_anti_slop_design_systems/SKILL.md
+```
+
+Use the `view_file` tool to read it. It is non-optional. Proceeding without reading it is a policy violation.
+
+The skill enforces six groups of standards that apply to all UI work in this project:
+
+| Group | Topic | Core mandate |
+|---|---|---|
+| A | Typographic hierarchy | Metrics ≥ 2.5× label size; `tabular-nums` on all live data |
+| B | Iconography & anti-slop | `lucide-react` for new code; no raw SVG dumps; no blur/gradient decorations |
+| C | Color & redundancy | 90% neutrals / 10% gold accent; no double-labeling |
+| D | Native mobile physics | Spring gestures, haptics, permission gates (RN/Expo only) |
+| E | Responsive web | Hover isolation, CLS containment, fluid grid safety |
+| F | Mobile touch UX | Lower-third primary actions; 48×48px targets; bottom sheets |
+
+### 3.2 When to Also Use the `impeccable` Skill
+
+The `impeccable` skill (`.agents/skills/impeccable/SKILL.md`) is a full craft system for major UI work. Use it **in addition to** the skill above (never instead of it) when:
+
+- Building a **new feature surface from scratch** — run `$impeccable shape [feature]` before writing code
+- Conducting a **formal quality audit** before shipping — run `$impeccable audit [target]`
+- Doing a **final polish pass** — run `$impeccable polish [target]`
+
+Do **not** invoke `impeccable` for small scoped changes (a label fix, a spacing tweak, a color token correction). Apply the senior skill's checklist directly and ship.
+
+**Precedence**: if `impeccable` ever suggests a pattern that conflicts with the senior skill's hard bans (gradient text, blur > 8px shadows, floating gradient blobs, bare `hover:` utilities), the **senior skill wins**. DreamLux committed brand tokens in `globals.css` must never be overridden by `impeccable`'s palette generator.
+
+### 3.3 Hard Bans — Refuse and Rewrite Without Exception
+
+- `box-shadow` blur > 8px as the primary element separator
+- `background-clip: text` gradient text on any value or heading
+- Floating decorative background gradient blobs
+- Raw multi-line SVG path dumps inside component files
+- Bare `hover:` Tailwind utilities without `@media (hover: hover)` guard
+- `Alert.alert()` or `window.confirm()` / `window.alert()` for any product UX
+- Labels and metrics at equal visual weight on data surfaces
+- More than 2 elements per viewport using the gold accent simultaneously
+- `rounded-2xl` or higher on structural containers (cards, panels, inputs)
+- `react-icons` imports in files that already use `lucide-react` (never mix packages in one file)
+
+### 3.4 Anti-AI Slop & DreamLux Identity
+
+- **Brand tokens** (do not invent new colors): gold `oklch(78% 0.12 82)` / `#D4AF37`, obsidian `#050506`, slate-gray neutrals. All defined in `globals.css`.
+- **WCAG AA minimum**: 4.5:1 for body text, 3:1 for large text, 4.5:1 for placeholder text. Verify all new and modified text.
+- **Radius ceiling**: `--radius-sm: 8px` / `--radius-md: 10px`. Never exceed `--radius-lg: 14px` on structural containers.
+- **No AI tells**: no identical card grids, no eyebrow labels on every section, no numbered section markers as scaffolding, no hero-metric SaaS templates.
+- **Viewport verification**: check every UI change at 320px, 390px, 768px, 1366px, 1920px. Document results in PR verification notes.
 
 ---
 
