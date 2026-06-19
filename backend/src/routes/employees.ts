@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { fromBuffer } from "file-type";
 import { supabase } from "../db/supabase";
 import { uploadImage, deleteImage, getPublicUrl } from "../storage/storage";
-import { AuthRequest, requireRole } from "../middleware/auth";
+import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
@@ -83,7 +83,7 @@ const cpUpload = upload.fields([
 // POST /employees — create employee with images
 router.post(
   "/",
-  requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]),
+  requirePermissionSlugs(["hr:write"]),
   cpUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const keysToCleanup: string[] = [];
@@ -474,7 +474,7 @@ router.get("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 // PATCH /employees/:id — update employee
 router.patch(
   "/:id",
-  requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]),
+  requirePermissionSlugs(["hr:write"]),
   cpUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -674,7 +674,7 @@ router.patch(
 );
 
 // POST /employees/:id/recover — recover soft-deleted employee
-router.post("/:id/recover", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/:id/recover", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { error } = await supabase
@@ -693,7 +693,7 @@ router.post("/:id/recover", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_
 });
 
 // DELETE /employees/:id — Soft delete
-router.delete("/:id", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete("/:id", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { error: deleteError } = await supabase
@@ -712,7 +712,7 @@ router.delete("/:id", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"
 });
 
 // DELETE /employees/:id/permanent — Hard delete
-router.delete("/:id/permanent", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete("/:id/permanent", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { error: deleteError } = await supabase

@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../db/supabase";
-import { requireAdmin } from "../middleware/auth";
+import { requirePermissionSlugs } from "../middleware/auth";
 
 const router = Router();
 
 // Get all departments
-router.get("/", requireAdmin, async (req, res) => {
+router.get("/", requirePermissionSlugs(["departments:manage"]), async (req, res) => {
   const { data, error } = await supabase
     .from("departments")
     .select("*")
@@ -16,7 +16,7 @@ router.get("/", requireAdmin, async (req, res) => {
 });
 
 // Create department
-router.post("/", requireAdmin, async (req, res) => {
+router.post("/", requirePermissionSlugs(["departments:manage"]), async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: "Name is required" });
 

@@ -7,6 +7,7 @@ import sharp from "sharp";
 // @ts-expect-error -- uuid types friction in ESM/CJS
 import { v4 as uuidv4 } from "uuid";
 import { getEnv } from "../lib/env";
+import { PERMISSION_DEFINITIONS, normalizePermissionSlugs } from "../lib/permissions";
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
 import { getPublicUrl, uploadImage } from "../storage/storage";
 
@@ -573,8 +574,15 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 router.get("/roles", async (req: AuthRequest, res: Response) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, name, description
-       FROM roles
+      `SELECT
+        r.id,
+        r.name,
+        r.description,
+        COALESCE(array_agg(p.slug ORDER BY p.slug) FILTER (WHERE p.slug IS NOT NULL), '{}') AS permission_slugs
+       FROM roles r
+       LEFT JOIN role_permissions rp ON rp.role_id = r.id
+       LEFT JOIN permissions p ON p.id = rp.permission_id
+       GROUP BY r.id, r.name, r.description
        ORDER BY name ASC`
     );
     res.json(rows);
@@ -595,6 +603,94 @@ router.get("/roles", async (req: AuthRequest, res: Response) => {
     } catch {
       res.status(500).json({ error: "Failed to fetch roles" });
     }
+  }
+});
+
+router.get("/permissions", async (_req: AuthRequest, res: Response) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT slug, description FROM permissions ORDER BY slug ASC`,
+    );
+    res.json(rows);
+  } catch (error) {
+    if (!isPoolUnreachable(error)) {
+      res.status(500).json({ error: "Failed to fetch permissions" });
+      return;
+    }
+
+    try {
+      const { data, error: permissionsError } = await supabase
+        .from("permissions")
+        .select("slug, description")
+        .order("slug", { ascending: true });
+
+      if (permissionsError) throw permissionsError;
+      res.json(data || PERMISSION_DEFINITIONS);
+    } catch {
+      res.json(PERMISSION_DEFINITIONS);
+    }
+  }
+});
+
+router.put("/roles/:id/permissions", async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const permissionSlugs = normalizePermissionSlugs(req.body?.permission_slugs);
+
+  try {
+    await pool.query("BEGIN");
+    await pool.query(`DELETE FROM role_permissions WHERE role_id = $1`, [id]);
+
+    if (permissionSlugs.length > 0) {
+      const { rowCount } = await pool.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT $1::uuid, p.id
+         FROM permissions p
+         WHERE p.slug = ANY($2::text[])
+         ON CONFLICT DO NOTHING`,
+        [id, permissionSlugs],
+      );
+
+      if (rowCount !== permissionSlugs.length) {
+        throw new Error("One or more permission slugs are invalid");
+      }
+    }
+
+    const { rows } = await pool.query(
+      `SELECT
+        r.id,
+        r.name,
+        r.description,
+        COALESCE(array_agg(p.slug ORDER BY p.slug) FILTER (WHERE p.slug IS NOT NULL), '{}') AS permission_slugs
+       FROM roles r
+       LEFT JOIN role_permissions rp ON rp.role_id = r.id
+       LEFT JOIN permissions p ON p.id = rp.permission_id
+       WHERE r.id = $1
+       GROUP BY r.id, r.name, r.description`,
+      [id],
+    );
+
+    if (rows.length === 0) {
+      await pool.query("ROLLBACK");
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+
+    await pool.query("COMMIT");
+    res.json(rows[0]);
+  } catch (error) {
+    try {
+      await pool.query("ROLLBACK");
+    } catch {
+      // ignore rollback failures
+    }
+
+    if ((error as Error).message.includes("invalid")) {
+      res.status(400).json({ error: "Invalid permission slug" });
+      return;
+    }
+
+    console.error("Update role permissions error:", error);
+    res.status(500).json({ error: "Failed to update role permissions" });
   }
 });
 

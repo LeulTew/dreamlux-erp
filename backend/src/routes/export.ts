@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { supabase } from "../db/supabase";
 
 import { getPublicUrl, downloadImage } from "../storage/storage";
-import { AuthRequest, requireRole } from "../middleware/auth";
+import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 
 interface ItemRow {
   id: string;
@@ -93,7 +93,7 @@ router.get("/pdf", (req, res) => {
 });
 
 // GET /export/xlsx — Excel with embedded images
-router.get("/xlsx", requireRole(["OWNER", "OPS_MANAGER", "INVENTORY_OFFICER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/xlsx", requirePermissionSlugs(["exports:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const storeFilter = req.query.store as string | undefined;
     const items = await fetchItemsForExport(storeFilter);
@@ -200,7 +200,7 @@ router.get("/xlsx", requireRole(["OWNER", "OPS_MANAGER", "INVENTORY_OFFICER", "A
 });
 
 // GET /export/csv — CSV with image URLs
-router.get("/csv", requireRole(["OWNER", "OPS_MANAGER", "INVENTORY_OFFICER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/csv", requirePermissionSlugs(["exports:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const storeFilter = req.query.store as string | undefined;
     const items = await fetchItemsForExport(storeFilter);
@@ -350,7 +350,7 @@ function buildEmployeeExportRow(
   return row;
 }
 
-router.get("/employees/csv", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/employees/csv", requirePermissionSlugs(["exports:read", "hr:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const officeFilter = req.query.office as string | undefined;
     const [employees, eventTypes] = await Promise.all([
@@ -391,7 +391,7 @@ router.get("/employees/csv", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER
   }
 });
 
-router.get("/employees/xlsx", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/employees/xlsx", requirePermissionSlugs(["exports:read", "hr:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const officeFilter = req.query.office as string | undefined;
     const [employees, eventTypes] = await Promise.all([
@@ -454,7 +454,7 @@ router.get("/employees/xlsx", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPE
 // HR EXPORTS (PAYROLL RUN)
 // ====================================================
 
-router.get("/payroll/:id/csv", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     
@@ -526,7 +526,7 @@ router.get("/payroll/:id/csv", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUP
   }
 });
 
-router.get("/payroll/:id/xlsx", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     

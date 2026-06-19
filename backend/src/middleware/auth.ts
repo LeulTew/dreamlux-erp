@@ -4,8 +4,10 @@ import { getEnv } from "../lib/env";
 import {
   hasPermissionSlug,
   normalizePermissionMap,
+  normalizeRoleName,
   normalizePermissionSlugs,
   permissionMapToSlugs,
+  roleNamesToPermissionSlugs,
 } from "../lib/permissions";
 
 export interface AuthRequest extends Request {
@@ -13,37 +15,29 @@ export interface AuthRequest extends Request {
     id?: string;
     username: string;
     role: string;
+    roles?: string[];
     permissions?: Record<string, unknown>;
     permission_slugs?: string[];
   };
   admin?: boolean; // legacy flag
 }
 
-const ROLE_PERMISSION_FALLBACK: Record<string, string[]> = {
-  super_admin: ["*"],
-  admin: ["*"],
-  system_manager: ["users:manage", "settings:write"],
-  inventory_controller: ["assets:read", "assets:write", "assets:reconcile", "assets:delete"],
-  viewer: ["assets:read"],
-  sales_rep: ["assets:read"],
-  hr_manager: ["hr:read", "hr:write"],
-};
+export function getEffectivePermissionSlugsFromUser(user: AuthRequest["user"]): string[] {
+  if (!user) return [];
+
+  const explicit = normalizePermissionSlugs(user.permission_slugs);
+  const mapDerived = permissionMapToSlugs(normalizePermissionMap(user.permissions));
+  const roleDerived = roleNamesToPermissionSlugs([user.role, ...(user.roles || [])]);
+  return [...new Set([...explicit, ...mapDerived, ...roleDerived])];
+}
 
 function getEffectivePermissionSlugs(req: AuthRequest): string[] {
-  const explicit = normalizePermissionSlugs(req.user?.permission_slugs);
-  const mapDerived = permissionMapToSlugs(normalizePermissionMap(req.user?.permissions));
-  const roleKey = req.user?.role?.toLowerCase?.() || "";
-  const roleDerived = ROLE_PERMISSION_FALLBACK[roleKey] || [];
-  return [...new Set([...explicit, ...mapDerived, ...roleDerived])];
+  return getEffectivePermissionSlugsFromUser(req.user);
 }
 
 function requestHasPermission(req: AuthRequest, requiredSlug: string): boolean {
   if (!req.user) {
     return false;
-  }
-
-  if (req.user.role === "SUPER_ADMIN" || req.user.role === "admin") {
-    return true;
   }
 
   return hasPermissionSlug(getEffectivePermissionSlugs(req), requiredSlug);
@@ -69,7 +63,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   try {
     const payload = jwt.verify(token, secret) as any;
     req.user = payload;
-    req.admin = payload.role === "SUPER_ADMIN" || payload.role === "admin";
+    req.admin = getEffectivePermissionSlugsFromUser(payload).includes("*");
     next();
   } catch {
     res.status(401).json({ error: "Invalid token" });
@@ -82,8 +76,7 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    const role = req.user.role?.toUpperCase();
-    if (role === "SUPER_ADMIN" || role === "ADMIN") {
+    if (requestHasPermission(req, "users:manage")) {
       next();
       return;
     }
@@ -98,16 +91,15 @@ export function requireRole(roles: string[]) {
       return;
     }
 
-    const roleMatch = roles.includes(req.user.role) || req.user.role === "SUPER_ADMIN";
-    if (roleMatch) {
+    const userRoles = [req.user.role, ...(req.user.roles || [])].map(normalizeRoleName);
+    const requestedRoles = roles.map(normalizeRoleName);
+    const roleMatch = requestedRoles.some((roleName) => userRoles.includes(roleName));
+    if (roleMatch && requestHasPermission(req, "*")) {
       next();
       return;
     }
 
-    const mappedSlugs = roles.flatMap((roleName) => {
-      const key = roleName.toLowerCase();
-      return ROLE_PERMISSION_FALLBACK[key] || [];
-    });
+    const mappedSlugs = roleNamesToPermissionSlugs(roles);
 
     if (mappedSlugs.some((slug) => requestHasPermission(req, slug))) {
       next();
