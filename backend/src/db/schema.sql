@@ -22,7 +22,12 @@ INSERT INTO roles (name, description, permissions) VALUES
   ('SYSTEM_MANAGER', 'Can manage users and settings', '{"users": ["manage"], "settings": ["write"]}'),
   ('system_manager', 'Can manage users and settings', '{"users": ["manage"], "settings": ["write"]}'),
   ('SALES_REP', 'Can view inventory but not modify', '{"assets": ["read"]}'),
-  ('viewer', 'Read-only access to assets', '{"assets": ["read"]}')
+  ('viewer', 'Read-only access to assets', '{"assets": ["read"]}'),
+  ('OWNER', 'Business owner with full system access', '{"all": true}'),
+  ('OPS_MANAGER', 'Can manage event operations', '{"events": ["read", "write", "delete"], "assets": ["read"]}'),
+  ('EVENT_MANAGER', 'Can manage assigned event operations', '{"events": ["read", "write"], "assets": ["read"]}'),
+  ('INVENTORY_OFFICER', 'Can manage inventory operations', '{"assets": ["read", "write", "reconcile"]}'),
+  ('ACCOUNTANT', 'Can manage payroll, approvals, and profitability reports', '{"payroll": ["read", "write"], "reports": ["profit:read"]}')
 ON CONFLICT (name) DO NOTHING;
 
 -- 1b. Fine-grained permission catalog
@@ -48,7 +53,18 @@ INSERT INTO permissions (slug, description) VALUES
   ('users:manage', 'Manage users and role assignments'),
   ('settings:write', 'Manage system settings'),
   ('hr:read', 'View HR records'),
-  ('hr:write', 'Create and update HR records')
+  ('hr:write', 'Create and update HR records'),
+  ('departments:manage', 'Manage departments'),
+  ('salary-levels:manage', 'Manage salary levels'),
+  ('payroll:read', 'View payroll runs and payroll exports'),
+  ('payroll:write', 'Create and update payroll runs'),
+  ('events:read', 'View events, event types, and operational schedules'),
+  ('events:write', 'Create and update events and event types'),
+  ('events:delete', 'Delete, restore, and permanently remove events or event types'),
+  ('exports:read', 'Export inventory, employee, and payroll data'),
+  ('reports:profit:read', 'View profit and profitability reports'),
+  ('expenses:approve', 'Approve expenses'),
+  ('approvals:history:read', 'View approval history')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Role-to-permission mappings
@@ -56,13 +72,13 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
 JOIN permissions p ON TRUE
-WHERE LOWER(r.name) IN ('super_admin', 'admin')
+WHERE LOWER(r.name) IN ('super_admin', 'admin', 'owner')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'exports:read')
 WHERE LOWER(r.name) IN ('inventory_controller')
 ON CONFLICT DO NOTHING;
 
@@ -76,8 +92,43 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read')
 WHERE LOWER(r.name) IN ('viewer', 'sales_rep')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('hr:read', 'hr:write', 'departments:manage', 'salary-levels:manage', 'exports:read')
+WHERE LOWER(r.name) IN ('hr_manager')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'exports:read')
+WHERE LOWER(r.name) IN ('inventory_officer')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'exports:read', 'approvals:history:read')
+WHERE LOWER(r.name) IN ('ops_manager')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write')
+WHERE LOWER(r.name) IN ('event_manager')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'expenses:approve', 'approvals:history:read')
+WHERE LOWER(r.name) IN ('accountant')
 ON CONFLICT DO NOTHING;
 
 -- 2. App Users
