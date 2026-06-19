@@ -1271,3 +1271,17 @@ export const getEventProfit = (id: string): Promise<EventProfitSummary> =>
 export const getProfitReport = (start_date?: string, end_date?: string): Promise<ProfitReportSummary> =>
   api.get("/events/reports/profit", { params: { start_date, end_date } }).then((r) => r.data);
 
+export const getPermissionsCatalog = (): Promise<{ slug: string; description: string }[]> =>
+  api.get("/users/permissions").then((r) => r.data);
+
+export const updateRolePermissions = (roleId: string, permissionSlugs: string[]): Promise<Role> =>
+  api.put(`/users/roles/${roleId}/permissions`, { permission_slugs: permissionSlugs }).then((r) => r.data);
+
+export const getEffectivePermissions = (): Promise<{
+  user_id: string | null;
+  role: string | null;
+  roles: string[];
+  permission_slugs: string[];
+  is_superuser: boolean;
+  catalog: { slug: string; description: string }[];
+}> => api.get("/auth/permissions").then((r) => r.data);

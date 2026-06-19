@@ -70,6 +70,7 @@ export interface Role {
   id: string;
   name: string;
   description: string | null;
+  permission_slugs?: string[];
 }
 
 export interface User {
