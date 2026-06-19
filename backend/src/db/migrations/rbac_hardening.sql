@@ -38,8 +38,16 @@ INSERT INTO permissions (slug, description) VALUES
     ('events:read', 'Can view events and event types'),
     ('events:write', 'Can create and update events and event types'),
     ('events:delete', 'Can delete, restore, and permanently remove events or event types'),
+    ('events:override_completed', 'Can modify completed events and restricted status transitions'),
+    ('event_allocations:write', 'Can create and release event inventory allocations'),
+    ('event_checklist:write', 'Can create and update event checklist items'),
+    ('event_assignments:write', 'Can assign employees to events and manage attendance'),
+    ('vehicle_assignments:write', 'Can assign vehicles and drivers to events'),
     ('exports:read', 'Can export inventory, employee, and payroll data'),
     ('reports:profit:read', 'Can view profit and profitability reports'),
+    ('trips:create', 'Can create event trip logs and generated fuel expenses'),
+    ('expenses:write', 'Can create manual event expenses'),
+    ('expenses:labor_generate', 'Can generate labor expenses from attended event assignments'),
     ('expenses:approve', 'Can approve expenses'),
     ('approvals:history:read', 'Can view approval history')
 ON CONFLICT (slug) DO NOTHING;
@@ -59,7 +67,8 @@ INSERT INTO roles (name, description, permissions) VALUES
     ('OPS_MANAGER', 'Can manage event operations', '{"events": ["read", "write", "delete"], "assets": ["read"]}'),
     ('EVENT_MANAGER', 'Can manage assigned event operations', '{"events": ["read", "write"], "assets": ["read"]}'),
     ('INVENTORY_OFFICER', 'Can manage inventory operations', '{"assets": ["read", "write", "reconcile"]}'),
-    ('ACCOUNTANT', 'Can manage payroll, approvals, and profitability reports', '{"payroll": ["read", "write"], "reports": ["profit:read"]}')
+    ('ACCOUNTANT', 'Can manage payroll, approvals, and profitability reports', '{"payroll": ["read", "write"], "reports": ["profit:read"]}'),
+    ('DRIVER', 'Can view assigned events and log trips', '{"events": ["read"], "trips": ["create"]}')
 ON CONFLICT (name) DO NOTHING;
 
 -- Upgrade legacy inventory permission payloads to assets namespace
@@ -118,20 +127,27 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'exports:read', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
 WHERE LOWER(r.name) IN ('ops_manager')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write')
 WHERE LOWER(r.name) IN ('event_manager')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'expenses:approve', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read')
 WHERE LOWER(r.name) IN ('accountant')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('events:read', 'trips:create')
+WHERE LOWER(r.name) IN ('driver')
 ON CONFLICT DO NOTHING;

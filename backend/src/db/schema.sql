@@ -27,7 +27,8 @@ INSERT INTO roles (name, description, permissions) VALUES
   ('OPS_MANAGER', 'Can manage event operations', '{"events": ["read", "write", "delete"], "assets": ["read"]}'),
   ('EVENT_MANAGER', 'Can manage assigned event operations', '{"events": ["read", "write"], "assets": ["read"]}'),
   ('INVENTORY_OFFICER', 'Can manage inventory operations', '{"assets": ["read", "write", "reconcile"]}'),
-  ('ACCOUNTANT', 'Can manage payroll, approvals, and profitability reports', '{"payroll": ["read", "write"], "reports": ["profit:read"]}')
+  ('ACCOUNTANT', 'Can manage payroll, approvals, and profitability reports', '{"payroll": ["read", "write"], "reports": ["profit:read"]}'),
+  ('DRIVER', 'Can view assigned events and log trips', '{"events": ["read"], "trips": ["create"]}')
 ON CONFLICT (name) DO NOTHING;
 
 -- 1b. Fine-grained permission catalog
@@ -61,8 +62,16 @@ INSERT INTO permissions (slug, description) VALUES
   ('events:read', 'View events, event types, and operational schedules'),
   ('events:write', 'Create and update events and event types'),
   ('events:delete', 'Delete, restore, and permanently remove events or event types'),
+  ('events:override_completed', 'Modify completed events and restricted status transitions'),
+  ('event_allocations:write', 'Create and release event inventory allocations'),
+  ('event_checklist:write', 'Create and update event checklist items'),
+  ('event_assignments:write', 'Assign employees to events and manage attendance'),
+  ('vehicle_assignments:write', 'Assign vehicles and drivers to events'),
   ('exports:read', 'Export inventory, employee, and payroll data'),
   ('reports:profit:read', 'View profit and profitability reports'),
+  ('trips:create', 'Create event trip logs and generated fuel expenses'),
+  ('expenses:write', 'Create manual event expenses'),
+  ('expenses:labor_generate', 'Generate labor expenses from attended event assignments'),
   ('expenses:approve', 'Approve expenses'),
   ('approvals:history:read', 'View approval history')
 ON CONFLICT (slug) DO NOTHING;
@@ -113,22 +122,29 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'exports:read', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
 WHERE LOWER(r.name) IN ('ops_manager')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write')
 WHERE LOWER(r.name) IN ('event_manager')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'expenses:approve', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read')
 WHERE LOWER(r.name) IN ('accountant')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('events:read', 'trips:create')
+WHERE LOWER(r.name) IN ('driver')
 ON CONFLICT DO NOTHING;
 
 -- 2. App Users
