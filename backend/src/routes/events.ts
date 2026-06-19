@@ -1,7 +1,8 @@
 import { Pool, PoolClient } from "pg";
 import { Router, Response } from "express";
 import { pool } from "../db/pool";
-import { requireAdmin, requireAuth, AuthRequest } from "../middleware/auth";
+import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
+import { hasPermissionSlug } from "../lib/permissions";
 import {
   createEventSchema,
   updateEventSchema,
@@ -19,29 +20,43 @@ import {
 
 const router = Router();
 
-function canAccessProfitReports(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
-  return allowed.includes(role.toUpperCase());
+function hasPermission(req: AuthRequest, slug: string): boolean {
+  return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), slug);
 }
 
-// Helper to check if user has permission to edit completed events or transition backward
-function canOverrideCompleted(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
-  return allowed.includes(role.toUpperCase());
+function hasAnyPermission(req: AuthRequest, slugs: string[]): boolean {
+  return slugs.some((slug) => hasPermission(req, slug));
 }
 
-function canLogTrips(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT", "DRIVER"];
-  return allowed.includes(role.toUpperCase());
+function canAccessProfitReports(req: AuthRequest): boolean {
+  return hasPermission(req, "reports:profit:read");
 }
 
-function canApproveExpenses(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
-  return allowed.includes(role.toUpperCase());
+function canOverrideCompleted(req: AuthRequest): boolean {
+  return hasPermission(req, "events:override_completed");
+}
+
+function canViewEventFinancials(req: AuthRequest): boolean {
+  return canAccessProfitReports(req);
+}
+
+function canViewEventOperations(req: AuthRequest): boolean {
+  return hasAnyPermission(req, ["events:write", "event_assignments:write", "vehicle_assignments:write", "events:delete", "expenses:approve"]);
+}
+
+function canLogTrips(req: AuthRequest): boolean {
+  return hasPermission(req, "trips:create");
+}
+
+function canApproveExpenses(req: AuthRequest): boolean {
+  return hasPermission(req, "expenses:approve");
+}
+
+function redactEventForPermissions<T extends Record<string, any>>(event: T, req: AuthRequest): T {
+  const redacted = { ...event };
+  if (!canViewEventFinancials(req)) delete redacted.contract_price;
+  if (!canViewEventOperations(req)) delete redacted.estimated_design_cost;
+  return redacted;
 }
 
 // GET /events - List events (filtered, paginated)
@@ -103,16 +118,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const dataResult = await pool.query(dataQuery, queryParams);
 
-    const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = canAccessProfitReports(userRole);
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-
-    const events = dataResult.rows.map((row: any) => {
-      const cloned = { ...row };
-      if (!isFinancial) delete cloned.contract_price;
-      if (!isPrivileged) delete cloned.estimated_design_cost;
-      return cloned;
-    });
+    const events = dataResult.rows.map((row: any) => redactEventForPermissions(row, req));
 
     res.json({
       events,
@@ -129,7 +135,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /events/expenses/pending - accountant approval queue
 router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    if (!canApproveExpenses(req.user?.role)) {
+    if (!canApproveExpenses(req)) {
       res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
       return;
     }
@@ -158,7 +164,7 @@ router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Respo
 router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { expenseId } = req.params;
-    if (!canApproveExpenses(req.user?.role)) {
+    if (!canApproveExpenses(req)) {
       res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
       return;
     }
@@ -240,7 +246,7 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
 // GET /events/reports/profit - Monthly/Yearly event profitability report
 router.get("/reports/profit", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    if (!canAccessProfitReports(req.user?.role)) {
+    if (!canAccessProfitReports(req)) {
       res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
       return;
     }
@@ -404,7 +410,7 @@ router.get("/:id/profit", requireAuth, async (req: AuthRequest, res: Response) =
   try {
     const { id } = req.params;
 
-    if (!canAccessProfitReports(req.user?.role)) {
+    if (!canAccessProfitReports(req)) {
       res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
       return;
     }
@@ -426,7 +432,7 @@ router.get("/:id/profit", requireAuth, async (req: AuthRequest, res: Response) =
       GROUP BY category
     `;
     const expensesResult = await pool.query(expensesQuery, [id]);
-    
+
     const categoriesList = ["Fuel", "Labor", "Transportation", "Equipment Rental", "Consumables", "Other"];
     const eventExpenses: Record<string, number> = {};
     for (const cat of categoriesList) {
@@ -494,13 +500,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     `;
     const logsResult = await pool.query(logsQuery, [id]);
 
-    const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = canAccessProfitReports(userRole);
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-
-    const filteredEvent = { ...event };
-    if (!isFinancial) delete filteredEvent.contract_price;
-    if (!isPrivileged) delete filteredEvent.estimated_design_cost;
+    const filteredEvent = redactEventForPermissions(event, req);
 
     res.json({
       event: filteredEvent,
@@ -515,8 +515,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // POST /events - Create a new event
 router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const userRole = req.user?.role?.toUpperCase();
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "events:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to create events" });
       return;
     }
@@ -564,11 +563,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
     ]);
 
     // Redact contract_price/estimated_design_cost if user doesn't have privileges
-    const event = result.rows[0];
-    const isFinancial = canAccessProfitReports(userRole);
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-    if (!isFinancial) delete event.contract_price;
-    if (!isPrivileged) delete event.estimated_design_cost;
+    const event = redactEventForPermissions(result.rows[0], req);
 
     res.status(201).json({ event });
   } catch (error: any) {
@@ -581,8 +576,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "events:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to update events" });
       return;
     }
@@ -599,7 +593,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     const currentEvent = eventResult.rows[0];
 
     // Auth validation: Completed event locking
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -722,18 +716,10 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      const event = result.rows[0];
-      const isFinancial = canAccessProfitReports(userRole);
-      const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-      if (!isFinancial) delete event.contract_price;
-      if (!isPrivileged) delete event.estimated_design_cost;
+      const event = redactEventForPermissions(result.rows[0], req);
       res.json({ event });
     } else {
-      const event = { ...currentEvent };
-      const isFinancial = canAccessProfitReports(userRole);
-      const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-      if (!isFinancial) delete event.contract_price;
-      if (!isPrivileged) delete event.estimated_design_cost;
+      const event = redactEventForPermissions(currentEvent, req);
       res.json({ event });
     }
   } catch (error: any) {
@@ -743,7 +729,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /events/:id - Soft delete event
-router.delete("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -839,8 +825,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     `;
     const vehicleAssignmentsResult = await pool.query(vehicleAssignmentsQuery, [id]);
 
-    const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = canAccessProfitReports(userRole);
+    const isFinancial = canViewEventFinancials(req);
 
     let expenses: any[] = [];
     let trips: any[] = [];
@@ -878,7 +863,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
       trips = tripsResult.rows;
     }
 
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isPrivileged = canViewEventOperations(req);
 
     const filteredEvent = { ...event };
     if (!isFinancial) delete filteredEvent.contract_price;
@@ -912,8 +897,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
 router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "events:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to update event design" });
       return;
     }
@@ -928,7 +912,7 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
 
     const currentEvent = eventResult.rows[0];
 
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -985,14 +969,10 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      const event = result.rows[0];
-      const isFinancial = canAccessProfitReports(userRole);
-      if (!isFinancial) delete event.contract_price;
+      const event = redactEventForPermissions(result.rows[0], req);
       res.json({ event });
     } else {
-      const event = { ...currentEvent };
-      const isFinancial = canAccessProfitReports(userRole);
-      if (!isFinancial) delete event.contract_price;
+      const event = redactEventForPermissions(currentEvent, req);
       res.json({ event });
     }
   } catch (error: any) {
@@ -1005,10 +985,7 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
 router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, INVENTORY_CONTROLLER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "INVENTORY_CONTROLLER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -1023,7 +1000,7 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
 
     const currentEvent = eventResult.rows[0];
 
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -1101,10 +1078,7 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
 router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, allocationId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, INVENTORY_CONTROLLER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "INVENTORY_CONTROLLER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -1119,7 +1093,7 @@ router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthReq
 
     const currentEvent = eventResult.rows[0];
 
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -1150,10 +1124,7 @@ router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthReq
 router.post("/:id/checklist", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, EVENT_MANAGER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_checklist:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient checklist privileges" });
       return;
     }
@@ -1198,10 +1169,7 @@ router.post("/:id/checklist", requireAuth, async (req: AuthRequest, res: Respons
 router.patch("/:id/checklist/:itemId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, itemId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, EVENT_MANAGER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_checklist:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient checklist privileges" });
       return;
     }
@@ -1383,10 +1351,7 @@ router.get("/:id/assignments/available-vehicles", requireAuth, async (req: AuthR
 router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions (Owner, Ops Manager, Event Manager)
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "vehicle_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -1414,7 +1379,7 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
       const event = eventResult.rows[0];
 
       // Enforce completed-event locking
-      if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      if (event.status === "Completed" && !canOverrideCompleted(req)) {
         await client.query("ROLLBACK");
         res.status(400).json({
           error: "Completed event assignments cannot be modified except by administrators or accountants",
@@ -1474,10 +1439,7 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
 router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, employeeId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -1492,7 +1454,7 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
     const event = eventResult.rows[0];
 
     // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1522,10 +1484,7 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
 router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -1553,7 +1512,7 @@ router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, r
       const event = eventResult.rows[0];
 
       // Enforce completed-event locking
-      if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      if (event.status === "Completed" && !canOverrideCompleted(req)) {
         await client.query("ROLLBACK");
         res.status(400).json({
           error: "Completed event assignments cannot be modified except by administrators or accountants",
@@ -1635,10 +1594,7 @@ router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, r
 router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, vehicleId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_assignments:write", "vehicle_assignments:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges" });
       return;
     }
@@ -1653,7 +1609,7 @@ router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: A
     const event = eventResult.rows[0];
 
     // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1683,10 +1639,7 @@ router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: A
 router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, employeeId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_assignments:write", "vehicle_assignments:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges" });
       return;
     }
@@ -1701,7 +1654,7 @@ router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, a
     const event = eventResult.rows[0];
 
     // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1738,15 +1691,7 @@ router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, a
 router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    const canWriteManualExpenses = (role?: string): boolean => {
-      if (!role) return false;
-      const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"];
-      return allowed.includes(role.toUpperCase());
-    };
-
-    if (!canWriteManualExpenses(userRole)) {
+    if (!hasPermission(req, "expenses:write")) {
       res.status(403).json({ error: "Forbidden: Missing expense write permission" });
       return;
     }
@@ -1758,7 +1703,7 @@ router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response
     }
 
     const event = eventResult.rows[0];
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(403).json({ error: "Completed event expenses cannot be changed except by administrators or accountants" });
       return;
     }
@@ -1790,7 +1735,7 @@ router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response
 router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!canLogTrips(req.user?.role)) {
+    if (!canLogTrips(req)) {
       res.status(403).json({ error: "Forbidden: Missing expense write permission" });
       return;
     }
@@ -1855,10 +1800,122 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
         }
       }
 
-      if (assignment.event_status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      if (assignment.event_status === "Completed" && !canOverrideCompleted(req)) {
         await client.query("ROLLBACK");
         res.status(403).json({ error: "Completed event trips cannot be changed except by administrators or accountants" });
         return;
       }
 
-      const fuelLitersUsed = Number((Nu                                                                                                                                                                        
+      const fuelLitersUsed = Number((Number(distance_km) * Number(assignment.fuel_consumption_rate)).toFixed(2));
+      const fuelCostEtb = Number((fuelLitersUsed * Number(fuel_price_etb)).toFixed(2));
+
+      const tripResult = await client.query(
+        `
+          INSERT INTO trips (vehicle_assignment_id, destination, distance_km, fuel_liters_used, fuel_cost_etb)
+          VALUES ($1, $2, $3, $4, $5)
+          RETURNING *
+        `,
+        [vehicle_assignment_id, destination, distance_km, fuelLitersUsed, fuelCostEtb]
+      );
+
+      const description = `Fuel for ${destination} (${distance_km} km, ${assignment.fuel_consumption_rate} L/km, ${fuel_price_etb} ETB/L)`;
+      const expenseResult = await client.query(
+        `
+          INSERT INTO expenses (event_id, category, amount, description, status, created_by)
+          VALUES ($1, 'Fuel', $2, $3, 'Pending', $4)
+          RETURNING *
+        `,
+        [id, fuelCostEtb, description, req.user?.id || null]
+      );
+
+      await client.query("COMMIT");
+      res.status(201).json({
+        trip: tripResult.rows[0],
+        expense: expenseResult.rows[0],
+        fuel_liters_used: fuelLitersUsed,
+        fuel_cost_etb: fuelCostEtb,
+      });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error("[post-event-trip] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/expenses/generate-labor - create pending labor expense from assignments
+router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!hasPermission(req, "expenses:labor_generate")) {
+      res.status(403).json({ error: "Forbidden: Insufficient labor expense privileges" });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Lock parent event record FOR UPDATE to serialize concurrent generation calls
+      const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
+      if (eventResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+      if (eventResult.rows[0].status !== "Completed") {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "Labor expense can only be generated after event completion" });
+        return;
+      }
+
+      const assignmentResult = await client.query(
+        "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
+        [id]
+      );
+      const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
+      if (laborTotal <= 0) {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "No attended labor assignments found for this event" });
+        return;
+      }
+
+      const existingResult = await client.query(
+        "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
+        [id, "Auto-generated labor cost from attended event assignments"]
+      );
+      if ((existingResult.rowCount || 0) > 0) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Labor expense has already been generated for this event" });
+        return;
+      }
+
+      const result = await client.query(
+        `
+          INSERT INTO expenses (event_id, category, amount, description, status, created_by)
+          VALUES ($1, 'Labor', $2, $3, 'Pending', $4)
+          RETURNING *
+        `,
+        [id, laborTotal, "Auto-generated labor cost from attended event assignments", req.user?.id || null]
+      );
+
+      await client.query("COMMIT");
+      res.status(201).json(result.rows[0]);
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error("[post-event-labor-expense] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+
+export default router;
