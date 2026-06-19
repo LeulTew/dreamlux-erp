@@ -5,6 +5,8 @@ Use this prompt when the user says something short like:
 - `Use docs/SENIOR_ISSUE_REVIEW_PROMPT.md on issue #20`
 - `Review PR #26 with the senior prompt`
 - `Use the review doc on issue #y`
+- `Use docs/SENIOR_ISSUE_REVIEW_PROMPT.md on the whole project`
+- `Senior review the whole project against the SRD`
 
 ## Operating Contract
 
@@ -24,11 +26,69 @@ Before giving a verdict:
 
 1. Read `RULES.md`, `AGENTS.md`, and any explicitly mentioned skill files.
 2. Ground product requirements primarily in `DreamLux_SRD_v1.0.docx`; use `DreamLux_SRD.txt` as a searchable companion, not as a replacement for the source document.
-3. Read the relevant GitHub issue with `gh issue view <number>`.
-4. Read the relevant PRs with `gh pr view <number> --json ...`.
-5. Inspect merged commits and diffs with `git show`, `git diff`, and `git log`.
-6. Read the actual changed source files at HEAD, not only the PR description.
-7. Check local worktree status and clearly separate unrelated local dirty files from reviewed changes.
+3. For an issue/PR review, read the relevant GitHub issue with `gh issue view <number>`.
+4. For an issue/PR review, read the relevant PRs with `gh pr view <number> --json ...`.
+5. For an issue/PR review, inspect merged commits and diffs with `git show`, `git diff`, and `git log`.
+6. For a whole-project review, inspect open/closed issue coverage with `gh issue list --state all`, recent merged PRs, current `main`, and the existing audit reports under `docs/`.
+7. Read the actual source files at HEAD for every reviewed area, not only issue/PR descriptions.
+8. Check local worktree status and clearly separate unrelated local dirty files from reviewed changes.
+
+## Whole-Project Review Mode
+
+Use this mode when the user asks to review the entire DreamLux ERP, asks whether the project is 100%, or references this prompt without a specific issue/PR.
+
+### Required Whole-Project Scope
+
+Review the current `main` branch against the SRD and current issue tracker across these pillars:
+
+- Auth, users, role assignment, dynamic RBAC, direct URL/API authorization, and permission-aware UI.
+- HR employee records, employee media, salary levels, payroll, attendance, commission, and compensation logic.
+- Inventory/store, item metadata, condition/color/unit/purchase fields, recounts, allocation, import/export, and audit history.
+- Event lifecycle, event list, event detail workspace, design package, checklist, client details, event proposals/intake, approval workflows, and status transitions.
+- Team/vehicle assignment, driver ownership, date-overlap conflict logic, assignment concurrency, and database-level integrity.
+- Expenses, trip logs, fuel costing, manual expenses, accountant approval queue, approval history, and audit logs.
+- Profitability reports, financial dashboards, exports/print, KPI correctness, approved-expense math, and financial role redaction.
+- Seed/demo data parity with `DreamLux_SRD_v1.0.docx`, including SRD salary anchors only for salary/payroll tests.
+- UI/UX consistency, button/table/status systems, responsive behavior, Amharic coverage, and accessibility.
+- Deployment, environment assumptions, Vercel production status, CI, and validation scripts.
+
+### Whole-Project Evidence Gathering
+
+Run or inspect:
+
+```bash
+git status --short --branch
+git log --oneline --decorate -30
+gh issue list --state all --limit 200 --json number,title,state,labels,url
+gh pr list --state merged --limit 50 --json number,title,mergedAt,baseRefName,headRefName,url
+bun run test
+bun run lint
+bun run build
+cd backend && bun test && bun run lint && bun run build
+cd frontend && bun test && bun run lint && bun run build
+```
+
+If production status is part of the question, also inspect the current Vercel deployments and backend health endpoint. Do not claim production is healthy unless it was checked in the current review or the user explicitly accepts a prior result.
+
+### Whole-Project Output Additions
+
+In addition to the standard output format, include:
+
+```markdown
+**Overall SRD Completion**
+| Pillar / Area | Completion | Evidence | Remaining Work / Tracking Issue |
+|---|---:|---|---|
+
+**Open Issue Coverage**
+| Gap | Covered By | Adequate? | Action |
+|---|---|---:|---|
+
+**Untracked Gaps**
+| Gap | Severity | Suggested Issue |
+|---|---:|---|
+```
+
+If a remaining gap is real and not covered by any open issue, create or recommend a GitHub issue before declaring the review complete, unless the user explicitly says not to touch GitHub.
 
 ## Review Dimensions
 
