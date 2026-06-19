@@ -379,32 +379,6 @@ function AssetsContent() {
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
   const [itemToRecover, setItemToRecover] = useState<Item | null>(null);
   const [showReconcileReview, setShowReconcileReview] = useState(false);
-  const [cachedRoleName, setCachedRoleName] = useState("");
-  const [cachedPermissionSlugs, setCachedPermissionSlugs] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const rawUser = localStorage.getItem("user");
-    if (!rawUser) return;
-    try {
-      const parsed = JSON.parse(rawUser) as {
-        role?: string;
-        role_name?: string;
-        permission_slugs?: string[];
-      };
-      const nextRoleName = (parsed.role_name || parsed.role || "").toUpperCase();
-      const nextPermissionSlugs = Array.isArray(parsed.permission_slugs) ? parsed.permission_slugs : [];
-      Promise.resolve().then(() => {
-        setCachedRoleName(nextRoleName);
-        setCachedPermissionSlugs(nextPermissionSlugs);
-      });
-    } catch {
-      Promise.resolve().then(() => {
-        setCachedRoleName("");
-        setCachedPermissionSlugs([]);
-      });
-    }
-  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -624,23 +598,11 @@ function AssetsContent() {
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
 
-  const { isAdmin, isInventoryController, hasPermission, isLoading: authLoading } = useAuth();
-  const cachedIsManager =
-    cachedRoleName === "SUPER_ADMIN" ||
-    cachedRoleName === "ADMIN" ||
-    cachedRoleName === "SYSTEM_MANAGER" ||
-    cachedRoleName === "INVENTORY_CONTROLLER";
-  const cachedCanManageAssets =
-    cachedIsManager ||
-    cachedPermissionSlugs.includes("assets:write") ||
-    cachedPermissionSlugs.includes("assets:delete") ||
-    cachedPermissionSlugs.includes("assets:reconcile");
+  const { hasPermission, isLoading: authLoading } = useAuth();
   const canManageAssets =
-    isAdmin ||
-    isInventoryController ||
     hasPermission("assets:write") ||
     hasPermission("assets:delete") ||
-    cachedCanManageAssets;
+    hasPermission("assets:reconcile");
 
   const handleExportPDF = () => {
     if (total === 0) {

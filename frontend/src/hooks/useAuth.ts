@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, getEffectivePermissions } from "@/lib/api";
 import { User } from "@/lib/types";
 import { useEffect, useState } from "react";
 
@@ -32,25 +32,47 @@ export function useAuth() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  const { data: permissionsData, isLoading: permissionsLoading } = useQuery({
+    queryKey: ["permissions"],
+    queryFn: getEffectivePermissions,
+    enabled: !!token,
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const user = data?.user;
-  
+  const permissionSlugs = permissionsData?.permission_slugs || [];
+  const isSuperuser = !!permissionsData?.is_superuser;
+
   const hasPermission = (slug: string) => {
-    if (!user) return false;
-    // Admins have all permissions
-    if (user.role_name === "SUPER_ADMIN" || user.role_name === "admin" || user.role_name === "SYSTEM_MANAGER") return true;
-    return user.permission_slugs?.includes(slug);
+    if (isSuperuser) return true;
+    if (permissionSlugs.includes("*")) return true;
+    if (permissionSlugs.includes(slug)) return true;
+
+    const moduleName = slug.split(":")[0];
+    if (moduleName && permissionSlugs.includes(`${moduleName}:*`)) return true;
+
+    return false;
   };
 
-  const isAdmin = user?.role_name === "SUPER_ADMIN" || user?.role_name === "admin" || user?.role_name === "SYSTEM_MANAGER";
-  const isInventoryController = isAdmin || user?.role_name === "INVENTORY_CONTROLLER";
+  const hasAnyPermission = (slugs: string[]) => {
+    return slugs.some((slug) => hasPermission(slug));
+  };
+
+  const isAdmin = isSuperuser || hasPermission("users:manage") || hasPermission("settings:write");
+  const isInventoryController = isAdmin || hasPermission("assets:read") || hasPermission("assets:write") || hasPermission("assets:reconcile");
 
   return {
     user,
-    isLoading: isLoading || (!!token && !data && !error),
+    permissionSlugs,
+    isSuperuser,
+    isLoading: isLoading || permissionsLoading || (!!token && !data && !error),
     isAuthenticated: !!user,
     isAdmin,
     isInventoryController,
     hasPermission,
+    hasAnyPermission,
     error,
   };
 }
+

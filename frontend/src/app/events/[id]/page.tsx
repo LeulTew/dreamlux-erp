@@ -47,6 +47,7 @@ import {
 } from "@/lib/api";
 import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Employee, Vehicle, EventExpense, EventTripLog, EventProfitSummary, CategoryCost } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -600,23 +601,8 @@ export default function EventWorkspacePage() {
   const [taskOwner, setTaskOwner] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
 
-  const [userRole] = useState(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const payloadBase64 = token.split(".")[1];
-          const payloadDecoded = JSON.parse(atob(payloadBase64));
-          return payloadDecoded.role || "";
-        } catch (e) {
-          console.error("Failed to decode token:", e);
-        }
-      }
-    }
-    return "";
-  });
-
-  const hasProfitAccess = !!(userRole && ["OWNER", "ACCOUNTANT", "SUPER_ADMIN", "ADMIN"].includes(userRole.toUpperCase()));
+  const { hasPermission } = useAuth();
+  const hasProfitAccess = hasPermission("reports:profit:read");
 
   const profitQuery = useQuery({
     queryKey: ["event-profit", eventId],

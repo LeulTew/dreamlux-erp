@@ -40,6 +40,7 @@ import {
   HiUsers,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -135,12 +136,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 type TabId = "overview" | "users" | "system" | "database";
 type UserModalTab = "identity" | "contact" | "access" | "security";
 
-const ALLOWED_SETTINGS_ROLES = new Set([
-  "SUPER_ADMIN",
-  "admin",
-  "SYSTEM_MANAGER",
-  "system_manager",
-]);
+// Removed hardcoded ALLOWED_SETTINGS_ROLES mapping. Access is now gated dynamically via useAuth.
 
 function extractErrorMessage(err: unknown, fallback: string): string {
   const maybeError = err as {
@@ -162,8 +158,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [prefix, setPrefix] = useState("");
 
-  const [roleReady, setRoleReady] = useState(false);
-  const [currentRole, setCurrentRole] = useState<string>("");
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const canAccessAdmin = hasPermission("users:manage") || hasPermission("settings:write");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userModalTab, setUserModalTab] = useState<UserModalTab>("identity");
@@ -176,22 +172,6 @@ export default function SettingsPage() {
   const [profileImageStatus, setProfileImageStatus] = useState("");
   const [profileImageBusy, setProfileImageBusy] = useState(false);
   const [pendingImageSaveAction, setPendingImageSaveAction] = useState<"none" | "upload" | "remove">("none");
-
-  useEffect(() => {
-    try {
-      const rawUser = localStorage.getItem("user");
-      if (rawUser) {
-        const parsed = JSON.parse(rawUser) as { role?: string };
-        setCurrentRole(parsed.role || "");
-      }
-    } catch {
-      setCurrentRole("");
-    } finally {
-      setRoleReady(true);
-    }
-  }, []);
-
-  const canAccessAdmin = ALLOWED_SETTINGS_ROLES.has(currentRole);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["appSettings"],
@@ -628,7 +608,7 @@ export default function SettingsPage() {
   const isSystemSaveDisabled = !isSystemSavePending && prefix === settings?.employee_id_prefix;
   const isUserSavePending = createMutation.isPending || updateUserMutation.isPending;
 
-  if (!roleReady) {
+  if (authLoading) {
     return (
       <AuthLayout>
         <div className="max-w-3xl mx-auto py-20">
@@ -638,7 +618,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (!canAccessAdmin) {
+  if (!isAuthenticated || !canAccessAdmin) {
     return (
       <AuthLayout>
         <div className="max-w-3xl mx-auto py-20">

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport } from "@/lib/api";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -89,28 +90,14 @@ export default function FinancialDashboardPage() {
   const [startDate, setStartDate] = useState(`${currentYear}-01-01`);
   const [endDate, setEndDate] = useState(`${currentYear}-12-31`);
 
-  const [userRole] = useState(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const payloadBase64 = token.split(".")[1];
-          const payloadDecoded = JSON.parse(atob(payloadBase64));
-          return payloadDecoded.role || "";
-        } catch (e) {
-          console.error("Failed to decode token:", e);
-        }
-      }
-    }
-    return "";
-  });
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
 
-  const hasProfitAccess = !!(userRole && ["OWNER", "ACCOUNTANT", "SUPER_ADMIN", "ADMIN"].includes(userRole.toUpperCase()));
+  const hasProfitAccess = hasPermission("reports:profit:read");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["profit-report", startDate, endDate],
     queryFn: () => getProfitReport(startDate, endDate),
-    enabled: hasProfitAccess,
+    enabled: !authLoading && isAuthenticated && hasProfitAccess,
   });
 
   const formatCurrency = (value: number) => {
@@ -120,8 +107,17 @@ export default function FinancialDashboardPage() {
   const handlePrint = () => {
     window.print();
   };
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
 
-  if (userRole && !hasProfitAccess) {
+  if (!isAuthenticated || !hasProfitAccess) {
     return (
       <AuthLayout>
         <div className="flex flex-col items-center justify-center py-20 text-center">

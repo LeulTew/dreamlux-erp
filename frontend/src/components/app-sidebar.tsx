@@ -17,6 +17,7 @@ import {
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Sidebar,
   SidebarContent,
@@ -326,34 +327,36 @@ export function AppSidebar() {
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
-  const userRole = currentUser.role;
-
-  const hasAccess = (roles?: string[]) => {
-    if (!roles) return true;
-    return roles.includes(userRole);
-  };
+  const { hasPermission, hasAnyPermission } = useAuth();
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const hrRoles = [
-    "SUPER_ADMIN", "super_admin", "admin", "ADMIN", "HR_ADMIN",
-    "EVENT_MANAGER", "event_manager", "OWNER", "owner",
-    "OPS_MANAGER", "ops_manager", "ACCOUNTANT", "accountant",
-  ];
+  const showHRGroup = hasAnyPermission([
+    "hr:read",
+    "hr:write",
+    "events:read",
+    "events:write",
+    "payroll:read",
+    "payroll:write",
+    "expenses:approve",
+    "reports:profit:read",
+    "salary-levels:manage",
+    "departments:manage"
+  ]);
 
   const eventLinks = [
-    { href: "/events", label: t("List Events"), active: pathname === "/events", show: hasAccess(hrRoles) },
-    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
+    { href: "/events", label: t("List Events"), active: pathname === "/events", show: hasPermission("events:read") },
+    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasPermission("events:write") },
   ].filter(l => l.show);
 
   const financeLinks = [
-    { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN", "ACCOUNTANT", "accountant"]) },
-    { href: "/hr/expenses/approve", label: t("Expense Approvals"), active: pathname === "/hr/expenses/approve", show: hasAccess(["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "OWNER", "owner", "ACCOUNTANT", "accountant"]) },
-    { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasAccess(["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "OWNER", "owner", "ACCOUNTANT", "accountant"]) },
-    { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
+    { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAnyPermission(["payroll:read", "payroll:write"]) },
+    { href: "/hr/expenses/approve", label: t("Expense Approvals"), active: pathname === "/hr/expenses/approve", show: hasPermission("expenses:approve") },
+    { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasPermission("reports:profit:read") },
+    { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
   ].filter(l => l.show);
 
   return (
@@ -405,7 +408,7 @@ export function AppSidebar() {
       {/* Content Groupings */}
       <SidebarContent className="py-2">
         {/* HR Management Section */}
-        {hasAccess(hrRoles) && (
+        {showHRGroup && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
               {t("HR Management")}
@@ -413,7 +416,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
                 {/* Employees (Nested) — expanded vs collapsed */}
-                {hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) && (
+                {hasAnyPermission(["hr:read", "hr:write"]) && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     {isCollapsed ? (
                       <CollapsedPopout
@@ -573,7 +576,7 @@ export function AppSidebar() {
         )}
 
         {/* Inventory Management Section */}
-        {hasAccess(["SUPER_ADMIN", "INVENTORY_CONTROLLER", "admin"]) && (
+        {hasPermission("assets:read") && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
               {t("Inventory Management")}
@@ -685,7 +688,7 @@ export function AppSidebar() {
         )}
 
         {/* Admin Settings Section */}
-        {hasAccess(["SUPER_ADMIN", "admin", "SYSTEM_MANAGER", "system_manager"]) && (
+        {hasAnyPermission(["users:manage", "settings:write"]) && (
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
