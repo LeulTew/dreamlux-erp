@@ -73,6 +73,153 @@ describe("Events API", () => {
     expect(res.body.events[0].name).toBe("Lux Wedding");
   });
 
+  test("GET /events applies allowlisted advanced filters, sorting, summaries, and pagination", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "1" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Corporate Gala",
+          client_name: "Aster",
+          status: "Planned",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: "100000.00",
+          approved_expense_total: 40000,
+          estimated_cost_total: 5000,
+          net_profit: 60000,
+          margin_percentage: 60,
+          vehicle_count: 2,
+          assigned_staff_count: 8,
+          allocation_count: 5,
+          checklist_completion_percentage: 75,
+          pending_expense_count: 1,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "client_name", operator: "contains", value: "Ast" },
+      { field: "net_profit", operator: "greater_than_or_equal", value: 50000 },
+      { field: "vehicle_count", operator: "greater_than", value: 1 },
+    ]));
+
+    const res = await request(app)
+      .get(`/events?filters=${filters}&sortBy=margin_percentage&sortOrder=desc&page=2&limit=25`)
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(2);
+    expect(res.body.limit).toBe(25);
+    expect(res.body.events[0].net_profit).toBe(60000);
+    expect(res.body.events[0].vehicle_count).toBe(2);
+
+    const countSql = String(mockQuery.mock.calls[0][0]);
+    const dataSql = String(mockQuery.mock.calls[1][0]);
+    const dataParams = mockQuery.mock.calls[1][1] as unknown[];
+    expect(countSql).toContain("LEFT JOIN event_types et");
+    expect(dataSql).toContain("ORDER BY CASE WHEN e.contract_price > 0");
+    expect(dataSql).toContain("LIMIT $4 OFFSET $5");
+    expect(dataParams).toEqual(["%Ast%", 50000, 1, 25, 25]);
+  });
+
+  test("GET /events rejects unsupported filter fields instead of interpolating SQL", async () => {
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "name; DROP TABLE events; --", operator: "equals", value: "x" },
+    ]));
+
+    const res = await request(app)
+      .get(`/events?filters=${filters}`)
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Unsupported event filter field");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events rejects unsupported sort fields instead of interpolating SQL", async () => {
+    const res = await request(app)
+      .get("/events?sortBy=name%3B%20DROP%20TABLE%20events")
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Unsupported event sort field");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events blocks financial filters and sorting for non-financial users", async () => {
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "net_profit", operator: "greater_than", value: 1 },
+    ]));
+
+    const filterRes = await request(app)
+      .get(`/events?filters=${filters}`)
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(filterRes.status).toBe(403);
+
+    const sortRes = await request(app)
+      .get("/events?sortBy=margin_percentage")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(sortRes.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events enforces pagination bounds", async () => {
+    const res = await request(app)
+      .get("/events?limit=101")
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Number must be less than or equal to 100");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events redacts derived financial summary fields for non-financial users", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "1" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Wedding",
+          contract_price: "50000.00",
+          estimated_design_cost: "5000.00",
+          approved_expense_total: 20000,
+          estimated_cost_total: 5000,
+          net_profit: 30000,
+          margin_percentage: 60,
+          pending_expense_count: 1,
+          vehicle_count: 1,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    const res = await request(app)
+      .get("/events")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.events[0].contract_price).toBeUndefined();
+    expect(res.body.events[0].approved_expense_total).toBeUndefined();
+    expect(res.body.events[0].estimated_cost_total).toBeUndefined();
+    expect(res.body.events[0].net_profit).toBeUndefined();
+    expect(res.body.events[0].margin_percentage).toBeUndefined();
+    expect(res.body.events[0].pending_expense_count).toBeUndefined();
+    expect(res.body.events[0].vehicle_count).toBe(1);
+  });
+
   // Test single event retrieval
   test("GET /events/:id returns event details and audit logs", async () => {
     mockQuery.mockResolvedValueOnce({

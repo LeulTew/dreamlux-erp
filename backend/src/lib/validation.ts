@@ -175,6 +175,64 @@ export const updateEventSchema = eventBaseSchema.partial().extend({
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 
+const eventAdvancedFilterValueSchema = z.union([
+  z.string().max(500),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.union([z.string().max(500), z.number(), z.boolean(), z.null()])).max(50),
+]);
+
+const parseEventFilters = (value: unknown) => {
+  if (value === undefined || value === null || value === "") return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
+export const eventListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  search: z.string().max(200).optional(),
+  status: z.string().max(80).optional(),
+  start_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid start_date"),
+  end_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid end_date"),
+  sortBy: z.string().max(80).optional().default("start_date"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("asc"),
+  filterLogic: z.enum(["and", "or"]).optional().default("and"),
+  filters: z.preprocess(parseEventFilters, z.array(z.object({
+    field: z.string().min(1).max(80),
+    operator: z.enum([
+      "equals",
+      "not_equals",
+      "contains",
+      "starts_with",
+      "in",
+      "not_in",
+      "greater_than",
+      "greater_than_or_equal",
+      "less_than",
+      "less_than_or_equal",
+      "between",
+      "is_empty",
+      "is_not_empty",
+    ]),
+    value: eventAdvancedFilterValueSchema.optional(),
+  })).max(25)).optional().default([]),
+}).refine((data) => {
+  if (!data.start_date || !data.end_date) return true;
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "end_date must be on or after start_date",
+  path: ["end_date"],
+});
+
+export type EventListQueryInput = z.infer<typeof eventListQuerySchema>;
+
 export const updateEventDesignSchema = z.object({
   package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable(),
   estimated_design_cost: z.coerce.number().min(0, "Estimated cost cannot be negative").optional().nullable(),

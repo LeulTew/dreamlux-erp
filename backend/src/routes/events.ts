@@ -16,6 +16,7 @@ import {
   createEventExpenseSchema,
   reviewEventExpenseSchema,
   createTripLogSchema,
+  eventListQuerySchema,
 } from "../lib/validation";
 
 
@@ -68,7 +69,14 @@ async function getHiddenEventFields(req: AuthRequest): Promise<string[]> {
 
 async function redactEventForPermissions<T extends Record<string, any>>(event: T, req: AuthRequest): Promise<T> {
   const redacted = { ...event };
-  if (!canViewEventFinancials(req)) delete redacted.contract_price;
+  if (!canViewEventFinancials(req)) {
+    delete redacted.contract_price;
+    delete redacted.approved_expense_total;
+    delete redacted.estimated_cost_total;
+    delete redacted.net_profit;
+    delete redacted.margin_percentage;
+    delete redacted.pending_expense_count;
+  }
   if (!canViewEventOperations(req)) delete redacted.estimated_design_cost;
   for (const fieldName of await getHiddenEventFields(req)) {
     delete redacted[fieldName];
@@ -76,14 +84,130 @@ async function redactEventForPermissions<T extends Record<string, any>>(event: T
   return redacted;
 }
 
+type EventFilterField = {
+  sql: string;
+  type: "text" | "number" | "date" | "uuid";
+  financial?: boolean;
+};
+
+const EVENT_FILTER_FIELDS: Record<string, EventFilterField> = {
+  name: { sql: "e.name", type: "text" },
+  title: { sql: "e.name", type: "text" },
+  event_type: { sql: "et.name", type: "text" },
+  event_type_id: { sql: "e.event_type_id", type: "uuid" },
+  client_name: { sql: "e.client_name", type: "text" },
+  client_phone: { sql: "e.client_phone", type: "text" },
+  status: { sql: "e.status", type: "text" },
+  start_date: { sql: "e.start_date", type: "date" },
+  end_date: { sql: "e.end_date", type: "date" },
+  venue_location: { sql: "e.venue_location", type: "text" },
+  location: { sql: "e.venue_location", type: "text" },
+  created_by: { sql: "e.created_by", type: "uuid" },
+  created_date: { sql: "e.created_at", type: "date" },
+  updated_date: { sql: "e.updated_at", type: "date" },
+  contract_price: { sql: "e.contract_price", type: "number", financial: true },
+  revenue: { sql: "e.contract_price", type: "number", financial: true },
+  approved_expense_total: { sql: "COALESCE(expenses.approved_expense_total, 0)", type: "number", financial: true },
+  estimated_cost_total: { sql: "COALESCE(e.estimated_design_cost, 0)", type: "number", financial: true },
+  net_profit: { sql: "e.contract_price - COALESCE(expenses.approved_expense_total, 0)", type: "number", financial: true },
+  margin_percentage: {
+    sql: "CASE WHEN e.contract_price > 0 THEN ((e.contract_price - COALESCE(expenses.approved_expense_total, 0)) / e.contract_price) * 100 ELSE 0 END",
+    type: "number",
+    financial: true,
+  },
+  vehicle_count: { sql: "COALESCE(vehicles.vehicle_count, 0)", type: "number" },
+  assigned_staff_count: { sql: "COALESCE(assignments.assigned_staff_count, 0)", type: "number" },
+  allocation_count: { sql: "COALESCE(allocations.allocation_count, 0)", type: "number" },
+  checklist_completion_percentage: {
+    sql: "CASE WHEN COALESCE(checklist.total_items, 0) = 0 THEN 0 ELSE (COALESCE(checklist.done_items, 0)::numeric / checklist.total_items) * 100 END",
+    type: "number",
+  },
+  pending_expense_count: { sql: "COALESCE(expenses.pending_expense_count, 0)", type: "number", financial: true },
+};
+
+function normalizeFilterValue(value: unknown, field: EventFilterField): string | number | boolean | null {
+  if (value === null || value === undefined) return null;
+  if (field.type === "number") {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new Error("Filter value must be a number");
+    return parsed;
+  }
+  if (field.type === "date") {
+    if (typeof value !== "string" || isNaN(Date.parse(value))) throw new Error("Filter value must be a valid date");
+    return value;
+  }
+  if (field.type === "uuid") {
+    if (typeof value !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+      throw new Error("Filter value must be a valid UUID");
+    }
+    return value;
+  }
+  return String(value);
+}
+
+function buildEventFilterCondition(
+  field: EventFilterField,
+  operator: string,
+  value: unknown,
+  params: any[],
+): string {
+  const sql = field.sql;
+  const addParam = (raw: unknown) => {
+    const normalized = normalizeFilterValue(raw, field);
+    params.push(normalized);
+    return `$${params.length}`;
+  };
+
+  switch (operator) {
+    case "equals":
+      return `${sql} = ${addParam(value)}`;
+    case "not_equals":
+      return `${sql} IS DISTINCT FROM ${addParam(value)}`;
+    case "contains":
+      if (field.type !== "text") throw new Error("contains is only supported for text fields");
+      return `${sql} ILIKE ${addParam(`%${String(value ?? "")}%`)}`;
+    case "starts_with":
+      if (field.type !== "text") throw new Error("starts_with is only supported for text fields");
+      return `${sql} ILIKE ${addParam(`${String(value ?? "")}%`)}`;
+    case "greater_than":
+      return `${sql} > ${addParam(value)}`;
+    case "greater_than_or_equal":
+      return `${sql} >= ${addParam(value)}`;
+    case "less_than":
+      return `${sql} < ${addParam(value)}`;
+    case "less_than_or_equal":
+      return `${sql} <= ${addParam(value)}`;
+    case "between": {
+      if (!Array.isArray(value) || value.length !== 2) throw new Error("between requires exactly two values");
+      return `(${sql} >= ${addParam(value[0])} AND ${sql} <= ${addParam(value[1])})`;
+    }
+    case "in":
+    case "not_in": {
+      if (!Array.isArray(value) || value.length === 0) throw new Error(`${operator} requires a non-empty value list`);
+      const placeholders = value.map((entry) => addParam(entry));
+      return `${sql} ${operator === "not_in" ? "NOT " : ""}IN (${placeholders.join(", ")})`;
+    }
+    case "is_empty":
+      return field.type === "text" ? `(${sql} IS NULL OR ${sql} = '')` : `${sql} IS NULL`;
+    case "is_not_empty":
+      return field.type === "text" ? `(${sql} IS NOT NULL AND ${sql} <> '')` : `${sql} IS NOT NULL`;
+    default:
+      throw new Error("Unsupported filter operator");
+  }
+}
+
 // GET /events - List events (filtered, paginated)
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string || "1", 10));
-    const limit = Math.max(1, parseInt(req.query.limit as string || "20", 10));
-    const offset = (page - 1) * limit;
+    const validationResult = eventListQuerySchema.safeParse(req.query);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
 
-    const { status, start_date, end_date, search } = req.query;
+    const { page, limit, status, start_date, end_date, search, sortBy, sortOrder, filterLogic, filters } = validationResult.data;
+    const offset = (page - 1) * limit;
+    const canSeeFinancials = canViewEventFinancials(req);
 
     const conditions: string[] = ["e.deleted_at IS NULL"];
     const params: any[] = [];
@@ -103,17 +227,91 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       conditions.push(`e.end_date <= $${params.length}`);
     }
 
-    if (search) {
-      params.push(`%${search}%`);
+    if (search?.trim()) {
+      params.push(`%${search.trim()}%`);
       conditions.push(
         `(e.name ILIKE $${params.length} OR e.client_name ILIKE $${params.length} OR e.venue_location ILIKE $${params.length})`
       );
     }
 
+    const advancedConditions: string[] = [];
+    for (const filter of filters) {
+      const field = EVENT_FILTER_FIELDS[filter.field];
+      if (!field) {
+        res.status(400).json({ error: `Unsupported event filter field: ${filter.field}` });
+        return;
+      }
+      if (field.financial && !canSeeFinancials) {
+        res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
+        return;
+      }
+      try {
+        advancedConditions.push(buildEventFilterCondition(field, filter.operator, filter.value, params));
+      } catch (error: any) {
+        res.status(400).json({ error: error.message || "Invalid event filter" });
+        return;
+      }
+    }
+
+    if (advancedConditions.length > 0) {
+      conditions.push(`(${advancedConditions.join(filterLogic === "or" ? " OR " : " AND ")})`);
+    }
+
     const whereClause = conditions.join(" AND ");
+    const sortField = EVENT_FILTER_FIELDS[sortBy];
+    if (!sortField) {
+      res.status(400).json({ error: `Unsupported event sort field: ${sortBy}` });
+      return;
+    }
+    if (sortField.financial && !canSeeFinancials) {
+      res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
+      return;
+    }
+    const sortSql = sortField.sql;
+    const sortDirection = sortOrder === "desc" ? "DESC" : "ASC";
+    const summaryJoins = `
+      LEFT JOIN (
+        SELECT
+          event_id,
+          COALESCE(SUM(amount) FILTER (WHERE status = 'Approved'), 0)::numeric AS approved_expense_total,
+          COALESCE(COUNT(*) FILTER (WHERE status = 'Pending'), 0)::int AS pending_expense_count
+        FROM expenses
+        GROUP BY event_id
+      ) expenses ON expenses.event_id = e.id
+      LEFT JOIN (
+        SELECT event_id, COUNT(*)::int AS assigned_staff_count
+        FROM event_assignments
+        GROUP BY event_id
+      ) assignments ON assignments.event_id = e.id
+      LEFT JOIN (
+        SELECT event_id, COUNT(*)::int AS vehicle_count
+        FROM vehicle_assignments
+        GROUP BY event_id
+      ) vehicles ON vehicles.event_id = e.id
+      LEFT JOIN (
+        SELECT event_id, COUNT(*)::int AS allocation_count
+        FROM event_allocations
+        WHERE status <> 'Returned'
+        GROUP BY event_id
+      ) allocations ON allocations.event_id = e.id
+      LEFT JOIN (
+        SELECT
+          event_id,
+          COUNT(*)::int AS total_items,
+          COUNT(*) FILTER (WHERE status = 'Done')::int AS done_items
+        FROM event_checklist
+        GROUP BY event_id
+      ) checklist ON checklist.event_id = e.id
+    `;
 
     // Get total count
-    const countQuery = `SELECT COUNT(*) FROM events e WHERE ${whereClause}`;
+    const countQuery = `
+      SELECT COUNT(*)
+      FROM events e
+      LEFT JOIN event_types et ON e.event_type_id = et.id
+      ${summaryJoins}
+      WHERE ${whereClause}
+    `;
     const countResult = await pool.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count, 10);
 
@@ -125,11 +323,29 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     const offsetParam = `$${queryParams.length}`;
 
     const dataQuery = `
-      SELECT e.*, et.name as event_type_name
+      SELECT
+        e.*,
+        et.name as event_type_name,
+        COALESCE(expenses.approved_expense_total, 0)::float AS approved_expense_total,
+        COALESCE(e.estimated_design_cost, 0)::float AS estimated_cost_total,
+        (e.contract_price - COALESCE(expenses.approved_expense_total, 0))::float AS net_profit,
+        CASE
+          WHEN e.contract_price > 0 THEN ROUND((((e.contract_price - COALESCE(expenses.approved_expense_total, 0)) / e.contract_price) * 100)::numeric, 2)
+          ELSE 0
+        END::float AS margin_percentage,
+        COALESCE(vehicles.vehicle_count, 0)::int AS vehicle_count,
+        COALESCE(assignments.assigned_staff_count, 0)::int AS assigned_staff_count,
+        COALESCE(allocations.allocation_count, 0)::int AS allocation_count,
+        CASE
+          WHEN COALESCE(checklist.total_items, 0) = 0 THEN 0
+          ELSE ROUND(((COALESCE(checklist.done_items, 0)::numeric / checklist.total_items) * 100)::numeric, 2)
+        END::float AS checklist_completion_percentage,
+        COALESCE(expenses.pending_expense_count, 0)::int AS pending_expense_count
       FROM events e
       LEFT JOIN event_types et ON e.event_type_id = et.id
+      ${summaryJoins}
       WHERE ${whereClause}
-      ORDER BY e.start_date ASC, e.created_at DESC
+      ORDER BY ${sortSql} ${sortDirection}, e.created_at DESC
       LIMIT ${limitParam} OFFSET ${offsetParam}
     `;
 
