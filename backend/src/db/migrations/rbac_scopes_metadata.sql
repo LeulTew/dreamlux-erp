@@ -8,6 +8,12 @@ CREATE TABLE IF NOT EXISTS user_access_scopes (
     UNIQUE (user_id, scope_type, scope_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_user_access_scopes_user_id
+    ON user_access_scopes(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_access_scopes_scope
+    ON user_access_scopes(scope_type, scope_id);
+
 -- 2. Field Permissions Metadata Table (Gaps 1.6)
 CREATE TABLE IF NOT EXISTS field_permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -18,6 +24,12 @@ CREATE TABLE IF NOT EXISTS field_permissions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE (role_id, module, field_name)
 );
+
+CREATE INDEX IF NOT EXISTS idx_field_permissions_role_module
+    ON field_permissions(role_id, module);
+
+CREATE INDEX IF NOT EXISTS idx_field_permissions_module_field
+    ON field_permissions(module, field_name);
 
 -- 3. Seed Default Field Permissions matching current hardcoded redaction logic
 -- For DRIVER role, hide sensitive event/department fields

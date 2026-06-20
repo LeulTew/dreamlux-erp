@@ -56,7 +56,7 @@ export function useAuth() {
 
   const user = data?.user;
   const rawPermissionSlugs = permissionsData?.permission_slugs || [];
-  
+
   const isPreviewActive = !!previewRole && !!previewSlugs;
   const permissionSlugs = isPreviewActive ? previewSlugs! : rawPermissionSlugs;
   const isSuperuser = isPreviewActive
@@ -117,4 +117,3 @@ export function useAuth() {
     rawIsAdmin,
   };
 }
-

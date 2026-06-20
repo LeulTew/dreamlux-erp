@@ -35,7 +35,7 @@ export function normalizeRoleIds(roleId: unknown, roleIdsRaw: unknown): string[]
 }
 
 export async function fetchUserRoleContext(userId: string, primaryRoleId?: string) {
-  let rows: any[] = [];
+  let rows: any[];
   try {
     const res = await pool.query(
       `SELECT role_ids, role_id FROM users WHERE id = $1 LIMIT 1`,
@@ -95,14 +95,14 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
         .from("role_permissions")
         .select("role_id, permission_id")
         .in("role_id", roleIds);
-      
+
       if (!rpError && rpData && rpData.length > 0) {
         const permIds = rpData.map((rp: any) => rp.permission_id);
         const { data: permsData, error: permsError } = await supabase
           .from("permissions")
           .select("id, slug")
           .in("id", permIds);
-        
+
         if (!permsError && permsData) {
           const slugById = new Map<string, string>();
           for (const p of permsData) {
@@ -110,7 +110,7 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
           }
           roleRows = (rolesData || []).map((r: any) => {
             const rolePermIds = rpData.filter((rp: any) => rp.role_id === r.id).map((rp: any) => rp.permission_id);
-            const slugs = rolePermIds.map((pid: string) => slugById.get(pid)).filter((s): s is string => Boolean(s));
+            const slugs = rolePermIds.map((pid: string) => slugById.get(pid)).filter((s: string | undefined): s is string => Boolean(s));
             return {
               name: r.name,
               permissions: r.permissions,
@@ -140,4 +140,49 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
     permissions: roleRows[0]?.permissions || {},
     permissionSlugs: [...new Set(permissionSlugs)],
   };
+}
+
+export async function fetchHiddenFieldsForRoles(roleNames: string[], moduleName: string): Promise<string[]> {
+  if (roleNames.length === 0) {
+    return [];
+  }
+
+  let rows: any[];
+  try {
+    const res = await pool.query(
+      `SELECT fp.field_name
+       FROM field_permissions fp
+       JOIN roles r ON r.id = fp.role_id
+       WHERE LOWER(r.name) = ANY($1::text[])
+         AND fp.module = $2
+         AND fp.is_visible = FALSE`,
+      [roleNames.map((name) => name.toLowerCase()), moduleName],
+    );
+    rows = res.rows;
+  } catch (error) {
+    if (isPoolUnreachable(error)) {
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("roles")
+        .select("id, name")
+        .in("name", roleNames);
+
+      if (rolesError) throw rolesError;
+      const roleIds = (rolesData || []).map((role: any) => role.id);
+      if (roleIds.length === 0) return [];
+
+      const { data, error: fieldError } = await supabase
+        .from("field_permissions")
+        .select("field_name")
+        .in("role_id", roleIds)
+        .eq("module", moduleName)
+        .eq("is_visible", false);
+
+      if (fieldError) throw fieldError;
+      rows = data || [];
+    } else {
+      throw error;
+    }
+  }
+
+  return [...new Set(rows.map((row) => row.field_name).filter((field): field is string => typeof field === "string"))];
 }

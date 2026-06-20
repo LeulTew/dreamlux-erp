@@ -498,28 +498,28 @@ export const permanentlyDeleteItem = (id: string) =>
   api.delete(`/assets/${id}/permanent`).then((r) => r.data);
 
 // Reconcile
-export const getReconcilePreview = (params: { 
-  store?: string; 
-  page?: number; 
-  limit?: number; 
+export const getReconcilePreview = (params: {
+  store?: string;
+  page?: number;
+  limit?: number;
   filter?: string;
   search?: string;
-} = {}) => 
+} = {}) =>
   getWithAliasFallback<{ items: Item[]; total: number; page: number; limit: number }>("/assets/reconcile/preview", { params });
 
-export const submitReconcile = (data: { 
+export const submitReconcile = (data: {
   items: Array<{
     id: string;
     quantity: number;
     expected_current_quantity?: number;
     source_run_id?: string;
-  }>; 
-  store_id?: string | null; 
+  }>;
+  store_id?: string | null;
   notes?: string;
-}) => 
+}) =>
   postWithAliasFallback<ReconcileSummary>("/assets/reconcile", data);
 
-export const undoReconcileHistoryItem = (params: { 
+export const undoReconcileHistoryItem = (params: {
   runId: string;
   itemId: string;
   quantity: number;
@@ -645,9 +645,9 @@ export const undoReconcileHistoryRun = async (runId: string): Promise<ReconcileS
   return result;
 };
 
-export const getReconcileHistory = (params: { 
-  page?: number; 
-  limit?: number; 
+export const getReconcileHistory = (params: {
+  page?: number;
+  limit?: number;
   store?: string;
   startDate?: string;
   endDate?: string;
@@ -1139,7 +1139,7 @@ export const deleteEventTypePermanent = (id: string) => api.delete(`/event-types
 // ====================================================
 // PAYROLL RUNS
 // ====================================================
-export const getPayrollRuns = (params?: { 
+export const getPayrollRuns = (params?: {
   view?: "active" | "trash",
   status?: string,
   year?: string,

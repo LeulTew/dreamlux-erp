@@ -1027,7 +1027,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="space-y-3">
                     <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider block">Profile Image</label>
- 
+
                     <input
                       id="profile-image-input"
                       type="file"
@@ -1035,7 +1035,7 @@ export default function SettingsPage() {
                       onChange={(e) => handleProfileImageChange(e.target.files?.[0] || null)}
                       className="hidden"
                     />
- 
+
                     <label
                       htmlFor="profile-image-input"
                       className="block rounded-xl border border-dashed border-border bg-card-alt p-3 cursor-pointer hover:border-primary/50 transition-colors"
@@ -1053,7 +1053,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     </label>
- 
+
                     {formData.profileImagePreviewUrl && (
                       <button
                         type="button"
@@ -1063,7 +1063,7 @@ export default function SettingsPage() {
                         Remove Image
                       </button>
                     )}
- 
+
                     {(profileImageStatus || profileImageBusy) && (
                       <div className="rounded-lg border border-border bg-card-alt p-3 space-y-2">
                         <div className="h-2 rounded-full bg-border overflow-hidden">
@@ -1076,7 +1076,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
- 
+
                   <div>
                     <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Username *</label>
                     <input
@@ -1088,7 +1088,7 @@ export default function SettingsPage() {
                       className="w-full h-11 px-4 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium disabled:opacity-50"
                     />
                   </div>
- 
+
                   <div>
                     <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Full Name *</label>
                     <input

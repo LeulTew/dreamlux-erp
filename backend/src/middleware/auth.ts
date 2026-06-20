@@ -4,7 +4,6 @@ import { getEnv } from "../lib/env";
 import {
   hasPermissionSlug,
   normalizePermissionMap,
-  normalizeRoleName,
   normalizePermissionSlugs,
   permissionMapToSlugs,
   roleNamesToPermissionSlugs,
@@ -22,6 +21,7 @@ export interface AuthRequest extends Request {
     permission_slugs?: string[];
   };
   admin?: boolean; // legacy flag
+  permissionLookupFailed?: boolean;
 }
 
 export function getEffectivePermissionSlugsFromUser(user: AuthRequest["user"]): string[] {
@@ -64,7 +64,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
 
   try {
     const payload = jwt.verify(token, secret) as any;
-    
+
     if (payload && payload.id) {
       let cached = getCachedUserPermissions(payload.id);
       const shouldQueryDB = process.env.NODE_ENV !== "test" || (typeof payload.id === "string" && payload.id.startsWith("verify-db-"));
@@ -79,7 +79,8 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
             setCachedUserPermissions(payload.id, cached);
           }
         } catch (dbError) {
-          console.error("[AuthMiddleware] DB lookup failed, falling back to JWT claims:", dbError);
+          console.error("[AuthMiddleware] DB permission lookup failed:", dbError);
+          req.permissionLookupFailed = true;
         }
       }
 
@@ -119,10 +120,7 @@ export function requireRole(roles: string[]) {
       return;
     }
 
-    const userRoles = [req.user.role, ...(req.user.roles || [])].map(normalizeRoleName);
-    const requestedRoles = roles.map(normalizeRoleName);
-    const roleMatch = requestedRoles.some((roleName) => userRoles.includes(roleName));
-    if (roleMatch || requestHasPermission(req, "*")) {
+    if (requestHasPermission(req, "*")) {
       next();
       return;
     }
@@ -140,6 +138,11 @@ export function requireRole(roles: string[]) {
 
 export function requirePermissionSlugs(slugs: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (req.permissionLookupFailed) {
+      res.status(503).json({ error: "Permission lookup unavailable" });
+      return;
+    }
+
     const allowed = slugs.some((slug) => requestHasPermission(req, slug));
     if (!allowed) {
       res.status(403).json({ error: "Forbidden: Missing required permission" });
@@ -151,6 +154,11 @@ export function requirePermissionSlugs(slugs: string[]) {
 
 export function requirePermissions(module: string, action: string) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (req.permissionLookupFailed) {
+      res.status(503).json({ error: "Permission lookup unavailable" });
+      return;
+    }
+
     const requiredSlug = `${module}:${action}`;
     if (requestHasPermission(req, requiredSlug)) {
       next();

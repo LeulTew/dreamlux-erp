@@ -11,13 +11,13 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
-import { 
-  HiOutlineSun, 
-  HiOutlineMoon, 
-  HiChevronDown, 
-  HiArrowRightOnRectangle, 
-  HiOutlineUser, 
-  HiOutlineInformationCircle, 
+import {
+  HiOutlineSun,
+  HiOutlineMoon,
+  HiChevronDown,
+  HiArrowRightOnRectangle,
+  HiOutlineUser,
+  HiOutlineInformationCircle,
   HiArrowsRightLeft,
   HiMagnifyingGlass
 } from "react-icons/hi2";
@@ -705,7 +705,7 @@ export default function AuthLayout({
             <SidebarTrigger className="text-muted hover:text-foreground transition-all cursor-pointer" />
             <div className="h-4 w-px bg-border/50 shrink-0" />
             <Breadcrumbs />
-            
+
             {/* Top Right Controls */}
             <div className="ml-auto shrink-0 flex items-center gap-2 2xl:gap-3">
               {/* Search Trigger Button */}
@@ -722,11 +722,11 @@ export default function AuthLayout({
               </button>
 
               <PayrollReminder />
-              
+
               <div className="h-4 w-px bg-border/50 shrink-0 mx-0.5" />
 
               {/* User Dropdown */}
-              <HeaderUserMenu 
+              <HeaderUserMenu
                 pageWidth={pageWidth}
                 togglePageWidth={togglePageWidth}
                 setShowAbout={setShowAbout}
@@ -763,11 +763,11 @@ export default function AuthLayout({
               <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-3">
                 {t("Version")} 1.0.0 (Gold Release)
               </p>
-              
+
               <p className="text-xs text-muted leading-relaxed mb-6 px-2">
                 {t("Dream Lux ERP Description")}
               </p>
-              
+
               <div className="bg-card-alt border border-border rounded-xl p-3 text-left space-y-2 mb-6 text-xs text-foreground font-medium">
                 <div className="flex justify-between">
                   <span className="text-muted">Architecture:</span>

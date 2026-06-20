@@ -166,10 +166,10 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         permissions,
         permission_slugs: permissionSlugs,
       },
-      jwtSecret, 
+      jwtSecret,
       { expiresIn: "7d" }
     );
-    
+
     res.json({
       token,
       user: {

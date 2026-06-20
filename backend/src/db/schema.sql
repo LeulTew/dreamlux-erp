@@ -307,7 +307,7 @@ CREATE TABLE IF NOT EXISTS salary_levels (
 
 -- Seed default levels if table is empty
 INSERT INTO salary_levels (code, amount_etb, sort_order)
-VALUES 
+VALUES
   ('L1', 5000.00, 1),
   ('L2', 7000.00, 2),
   ('L3', 9000.00, 3),
@@ -372,7 +372,7 @@ CREATE TABLE IF NOT EXISTS event_types (
 
 -- Seed default event types
 INSERT INTO event_types (name)
-VALUES 
+VALUES
   ('Wedding'),
   ('Mels'),
   ('Birthday'),

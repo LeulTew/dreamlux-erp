@@ -10,6 +10,10 @@ let lastAdminTest = false;
 const mockQuery = mock((sql: string, params?: any[]) => {
   const safeParams = params || [];
 
+  if (safeParams[0] === "verify-db-error") {
+    return Promise.reject(new Error("permission database unavailable"));
+  }
+
   if (sql.includes("SELECT name FROM roles WHERE id = $1")) {
     const roleId = safeParams[0];
     if (roleId === "role-admin") return Promise.resolve({ rows: [{ name: "SUPER_ADMIN" }], rowCount: 1 });
@@ -17,7 +21,7 @@ const mockQuery = mock((sql: string, params?: any[]) => {
     if (roleId === "role-custom") return Promise.resolve({ rows: [{ name: "CUSTOM" }], rowCount: 1 });
     return Promise.resolve({ rows: [{ name: "CUSTOM_ROLE" }], rowCount: 1 });
   }
-  
+
   if (sql.includes("SELECT id FROM users") && sql.includes("role_id = $1")) {
     const roleId = safeParams[0];
     if (roleId === "role-custom") {
@@ -61,6 +65,10 @@ const mockQuery = mock((sql: string, params?: any[]) => {
 
   if (sql.includes("SELECT\n       r.name,\n       r.permissions")) {
     return Promise.resolve({ rows: [{ name: "STORE_MANAGER", permissions: {}, permission_slugs: ["users:manage", "assets:read"] }], rowCount: 1 });
+  }
+
+  if (sql.includes("FROM field_permissions fp")) {
+    return Promise.resolve({ rows: [{ field_name: "contract_price" }], rowCount: 1 });
   }
 
   return Promise.resolve({ rows: [], rowCount: 1 });
@@ -228,5 +236,32 @@ describe("RBAC Caching & Guardrails", () => {
     expect(cached).not.toBeNull();
     expect(cached?.roleNames).toContain("STORE_MANAGER");
     expect(cached?.permissionSlugs).toContain("users:manage");
+  });
+
+  test("permission middleware fails closed when fresh DB permission lookup fails", async () => {
+    const verifyToken = jwt.sign(
+      {
+        id: "verify-db-error",
+        role: "SUPER_ADMIN",
+        username: "admin",
+        permission_slugs: ["users:manage"],
+      },
+      JWT_SECRET,
+      { expiresIn: "1h" },
+    );
+
+    const res = await request(app)
+      .get("/users/roles")
+      .set("Authorization", `Bearer ${verifyToken}`);
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toContain("Permission lookup unavailable");
+  });
+
+  test("field permission metadata resolves hidden fields for role names", async () => {
+    const { fetchHiddenFieldsForRoles } = await import("../lib/permissions-db");
+    const hiddenFields = await fetchHiddenFieldsForRoles(["DRIVER"], "events");
+
+    expect(hiddenFields).toContain("contract_price");
   });
 });
