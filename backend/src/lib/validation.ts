@@ -233,6 +233,34 @@ export const eventListQuerySchema = z.object({
 
 export type EventListQueryInput = z.infer<typeof eventListQuerySchema>;
 
+const savedViewScopeSchema = z.enum(["personal", "role", "global"]);
+
+export const eventSavedViewPayloadSchema = z.object({
+  name: z.string().min(1, "Saved view name is required").max(120, "Saved view name too long"),
+  scope: savedViewScopeSchema.optional().default("personal"),
+  role_name: z.string().min(1).max(120).optional().nullable(),
+  is_default: z.coerce.boolean().optional().default(false),
+  columns: z.array(z.string().min(1).max(80)).max(50).optional().default([]),
+  filters: z.array(z.object({
+    field: z.string().min(1).max(80),
+    operator: z.string().min(1).max(40),
+    value: eventAdvancedFilterValueSchema.optional(),
+  })).max(25).optional().default([]),
+  sort: z.object({
+    sortBy: z.string().min(1).max(80),
+    sortOrder: z.enum(["asc", "desc"]),
+  }).optional().nullable(),
+  page_size: z.coerce.number().int().min(1).max(100).optional().default(20),
+}).refine((data) => data.scope !== "role" || Boolean(data.role_name?.trim()), {
+  message: "role_name is required for role-scoped saved views",
+  path: ["role_name"],
+}).refine((data) => data.scope === "role" || !data.role_name, {
+  message: "role_name is only allowed for role-scoped saved views",
+  path: ["role_name"],
+});
+
+export type EventSavedViewPayloadInput = z.infer<typeof eventSavedViewPayloadSchema>;
+
 export const updateEventDesignSchema = z.object({
   package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable(),
   estimated_design_cost: z.coerce.number().min(0, "Estimated cost cannot be negative").optional().nullable(),

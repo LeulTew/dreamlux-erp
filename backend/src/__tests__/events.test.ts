@@ -220,6 +220,153 @@ describe("Events API", () => {
     expect(res.body.events[0].vehicle_count).toBe(1);
   });
 
+  test("GET /events/saved-views returns personal, matching role, and global views only", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { id: "view-personal", name: "Mine", scope: "personal", user_id: "user-1" },
+        { id: "view-role", name: "Ops Queue", scope: "role", role_name: "EVENT_MANAGER" },
+        { id: "view-global", name: "All Events", scope: "global" },
+      ],
+      rowCount: 3,
+    });
+
+    const res = await request(app)
+      .get("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.savedViews).toHaveLength(3);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("LOWER(role_name) = ANY");
+    expect(params).toEqual(["user-1", ["event_manager"]]);
+  });
+
+  test("POST /events/saved-views creates a personal default view in a transaction", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // clear defaults
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1", name: "My Event View", scope: "personal", user_id: "user-1", is_default: true }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        name: "My Event View",
+        is_default: true,
+        columns: ["name", "status"],
+        filters: [{ field: "status", operator: "equals", value: "Planned" }],
+        sort: { sortBy: "start_date", sortOrder: "asc" },
+        page_size: 50,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.savedView.name).toBe("My Event View");
+    const insertParams = mockQuery.mock.calls[2][1] as unknown[];
+    expect(insertParams[1]).toBe("user-1");
+    expect(insertParams[2]).toBe("personal");
+    expect(insertParams[8]).toBe(true);
+  });
+
+  test("POST /events/saved-views blocks role/global sharing without permission", async () => {
+    const res = await request(app)
+      .post("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        name: "Role View",
+        scope: "role",
+        role_name: "EVENT_MANAGER",
+      });
+
+    expect(res.status).toBe(403);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test("POST /events/saved-views allows shared role view with audit log for permitted users", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-role", name: "Ops Shared", scope: "role", role_name: "EVENT_MANAGER" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`)
+      .send({
+        name: "Ops Shared",
+        scope: "role",
+        role_name: "EVENT_MANAGER",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.savedView.scope).toBe("role");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
+  });
+
+  test("PUT /events/saved-views/:viewId blocks editing another user's personal view", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-other", name: "Other", scope: "personal", user_id: "other-user" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+    const res = await request(app)
+      .put("/events/saved-views/view-other")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({ name: "Nope" });
+
+    expect(res.status).toBe(403);
+  });
+
+  test("POST /events/saved-views/:viewId/duplicate duplicates only visible views as personal", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-global", name: "Global", scope: "global", columns: ["name"], filters: [], page_size: 20 }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "copy-1", name: "My Copy", scope: "personal", user_id: "user-1" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/saved-views/view-global/duplicate")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+      .send({ name: "My Copy" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.savedView.scope).toBe("personal");
+    const insertParams = mockQuery.mock.calls[1][1] as unknown[];
+    expect(insertParams[1]).toBe("user-1");
+  });
+
+  test("PATCH /events/saved-views/:viewId/default clears sibling defaults before setting selected view", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1", scope: "personal", user_id: "user-1", role_name: null }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // clear defaults
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1", scope: "personal", user_id: "user-1", is_default: true }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .patch("/events/saved-views/view-1/default")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.savedView.is_default).toBe(true);
+    expect(String(mockQuery.mock.calls[2][0])).toContain("SET is_default = FALSE");
+  });
+
   // Test single event retrieval
   test("GET /events/:id returns event details and audit logs", async () => {
     mockQuery.mockResolvedValueOnce({
