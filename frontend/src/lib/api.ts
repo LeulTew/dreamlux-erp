@@ -1285,3 +1285,12 @@ export const getEffectivePermissions = (): Promise<{
   is_superuser: boolean;
   catalog: { slug: string; description: string }[];
 }> => api.get("/auth/permissions").then((r) => r.data);
+
+export const createRole = (data: { name: string; description: string; cloneFromRoleId?: string }) =>
+  api.post<Role>("/users/roles", data).then((r) => r.data);
+
+export const updateRole = (id: string, data: { name: string; description: string }) =>
+  api.put<Role>(`/users/roles/${id}`, data).then((r) => r.data);
+
+export const deleteRole = (id: string) =>
+  api.delete(`/users/roles/${id}`).then((r) => r.data);

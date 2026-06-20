@@ -1200,3 +1200,342 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
 });
 
 export default router;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 ds, isActive, rawPassword, phone, profileImageDataUrl, removeProfileImage } = req.body;
+  const roleSelection = normalizeRoleIds(roleId, roleIds);
+  const shouldRemoveProfileImage = removeProfileImage === true;
+
+  const normalizedPhone = normalizeEthiopianPhone(phone);
+  if (normalizedPhone.error) {
+    res.status(400).json({ error: normalizedPhone.error });
+    return;
+  }
+
+  let profileImageUrl: string | null | undefined;
+  if (typeof profileImageDataUrl === "string" && profileImageDataUrl.trim()) {
+    try {
+      profileImageUrl = await uploadUserProfileWebp(fullName || "user", profileImageDataUrl);
+    } catch {
+      res.status(400).json({ error: "Invalid profile image payload" });
+      return;
+    }
+  }
+  
+  try {
+    let result;
+    if (rawPassword) {
+      result = await pool.query(
+        `UPDATE users
+         SET full_name = $1, email = $2, phone = $3, profile_image_url = CASE WHEN $8 THEN NULL WHEN $4 IS NOT NULL THEN $4 ELSE profile_image_url END, role_id = $5, is_active = $6, password_hash = crypt($7, gen_salt('bf')), updated_at = NOW()
+         WHERE id = $9
+         RETURNING id, username, full_name, email, phone, profile_image_url, is_active, updated_at`,
+         [fullName, getStringOrNull(email), normalizedPhone.value, profileImageUrl || null, roleSelection.primaryRoleId, getBooleanOrDefault(isActive, true), rawPassword, shouldRemoveProfileImage, id]
+      );
+    } else {
+      result = await pool.query(
+        `UPDATE users
+         SET full_name = $1, email = $2, phone = $3, profile_image_url = CASE WHEN $7 THEN NULL WHEN $4 IS NOT NULL THEN $4 ELSE profile_image_url END, role_id = $5, is_active = $6, updated_at = NOW()
+         WHERE id = $8
+         RETURNING id, username, full_name, email, phone, profile_image_url, is_active, updated_at`,
+         [fullName, getStringOrNull(email), normalizedPhone.value, profileImageUrl || null, roleSelection.primaryRoleId, getBooleanOrDefault(isActive, true), shouldRemoveProfileImage, id]
+      );
+    }
+
+    try {
+      await pool.query(
+        `UPDATE users SET role_ids = $1::jsonb WHERE id = $2`,
+        [JSON.stringify(roleSelection.roleIds), id],
+      );
+    } catch {
+      // role_ids is optional, ignore when column does not exist
+    }
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    
+    invalidateUserCache(id);
+    res.json(result.rows[0]);
+  } catch (error) {
+    let effectiveError: unknown = error;
+
+    if (isMissingColumnError(effectiveError)) {
+      try {
+        let result;
+        if (rawPassword) {
+          result = await pool.query(
+            `UPDATE users
+             SET full_name = $1, email = $2, role_id = $3, is_active = $4, password_hash = crypt($5, gen_salt('bf')), updated_at = NOW()
+             WHERE id = $6
+             RETURNING id, username, full_name, email, NULL::text AS phone, NULL::text AS profile_image_url, is_active, updated_at`,
+            [fullName, getStringOrNull(email), roleSelection.primaryRoleId, getBooleanOrDefault(isActive, true), rawPassword, id]
+          );
+        } else {
+          result = await pool.query(
+            `UPDATE users
+             SET full_name = $1, email = $2, role_id = $3, is_active = $4, updated_at = NOW()
+             WHERE id = $5
+             RETURNING id, username, full_name, email, NULL::text AS phone, NULL::text AS profile_image_url, is_active, updated_at`,
+            [fullName, getStringOrNull(email), roleSelection.primaryRoleId, getBooleanOrDefault(isActive, true), id]
+          );
+        }
+
+        if (result.rows.length === 0) {
+          res.status(404).json({ error: "User not found" });
+          return;
+        }
+
+        invalidateUserCache(id);
+        res.json(result.rows[0]);
+        return;
+      } catch (innerError) {
+        if (!isPoolUnreachable(innerError)) {
+          console.error("Update user error:", innerError);
+          res.status(500).json({ error: "Failed to update user" });
+          return;
+        }
+
+        effectiveError = innerError;
+      }
+    }
+
+    if (isPoolUnreachable(effectiveError)) {
+      try {
+        const updates: Record<string, unknown> = {
+          full_name: fullName,
+          email: getStringOrNull(email),
+          phone: normalizedPhone.value,
+          role_id: roleSelection.primaryRoleId,
+          role_ids: roleSelection.roleIds,
+          is_active: getBooleanOrDefault(isActive, true),
+          updated_at: new Date().toISOString(),
+        };
+
+        if (shouldRemoveProfileImage) {
+          updates.profile_image_url = null;
+        } else if (profileImageUrl) {
+          updates.profile_image_url = profileImageUrl;
+        }
+
+        if (rawPassword) {
+          updates.password_hash = await hash(rawPassword, 10);
+        }
+
+        let data: UserRecord | null = null;
+        let updateError: unknown = null;
+
+        const withExtended = await supabase
+          .from("users")
+          .update(updates)
+          .eq("id", id)
+          .select("id, username, full_name, email, phone, profile_image_url, is_active, updated_at")
+          .single();
+
+        if (!withExtended.error) {
+          data = withExtended.data as UserRecord;
+        } else if (isMissingColumnError(withExtended.error)) {
+          const withoutRoleIdsUpdates = { ...updates };
+          delete withoutRoleIdsUpdates.role_ids;
+          const withoutRoleIds = await supabase
+            .from("users")
+            .update(withoutRoleIdsUpdates)
+            .eq("id", id)
+            .select("id, username, full_name, email, phone, profile_image_url, is_active, updated_at")
+            .single();
+
+          if (!withoutRoleIds.error) {
+            data = withoutRoleIds.data as UserRecord;
+          } else if (isMissingColumnError(withoutRoleIds.error)) {
+            const minimalUpdates = { ...withoutRoleIdsUpdates };
+            delete minimalUpdates.phone;
+            delete minimalUpdates.profile_image_url;
+            const minimal = await supabase
+              .from("users")
+              .update(minimalUpdates)
+              .eq("id", id)
+              .select("id, username, full_name, email, is_active, updated_at")
+              .single();
+            updateError = minimal.error;
+            data = (minimal.data ? { ...minimal.data, phone: null, profile_image_url: null } : null) as UserRecord | null;
+          } else {
+            updateError = withoutRoleIds.error;
+          }
+        } else {
+          updateError = withExtended.error;
+        }
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        if (!data) {
+          res.status(404).json({ error: "User not found" });
+          return;
+        }
+
+        invalidateUserCache(id);
+        res.json(data);
+        return;
+      } catch (fallbackError) {
+        console.error("Update user fallback error:", fallbackError);
+        res.status(500).json({ error: "Failed to update user" });
+        return;
+      }
+    }
+    console.error("Update user error:", effectiveError);
+    res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// Delete (soft or hard depending on your preference. We'll hard delete for simplicity unless logs complain, but we usually soft-disable. Deleting is fine if unlinked)
+router.delete("/:id", async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  
+  // Prevent deleting oneself
+  if (req.user?.id === id) {
+    res.status(400).json({ error: "Cannot delete your own account" });
+    return;
+  }
+
+  // Guardrail: check if deleting the last active SUPER_ADMIN/admin/owner
+  try {
+    const { rows: superAdmins } = await pool.query(
+      `SELECT u.id, u.username FROM users u
+       JOIN roles r ON u.role_id = r.id
+       WHERE (r.name = 'SUPER_ADMIN' OR LOWER(r.name) = 'admin' OR r.name = 'OWNER')
+         AND u.is_active = TRUE`
+    );
+    const isTargetSuper = superAdmins.some((sa) => sa.id === id);
+    if (isTargetSuper && superAdmins.length <= 1) {
+      res.status(400).json({ error: "Cannot delete the last active administrator" });
+      return;
+    }
+  } catch (err) {
+    if (isPoolUnreachable(err)) {
+      try {
+        const { data: usersData, error: uErr } = await supabase
+          .from("users")
+          .select("id, is_active, role_id")
+          .eq("is_active", true);
+        if (!uErr && usersData) {
+          const { data: rolesData, error: rErr } = await supabase
+            .from("roles")
+            .select("id, name");
+          if (!rErr && rolesData) {
+            const adminRoles = rolesData.filter((r: any) =>
+              ["SUPER_ADMIN", "ADMIN", "OWNER"].includes(r.name.toUpperCase())
+            ).map((r: any) => r.id);
+            const activeAdmins = usersData.filter((u: any) => adminRoles.includes(u.role_id));
+            const isTargetSuper = activeAdmins.some((sa: any) => sa.id === id);
+            if (isTargetSuper && activeAdmins.length <= 1) {
+              res.status(400).json({ error: "Cannot delete the last active administrator" });
+              return;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  try {
+    let currentProfileKey: string | null = null;
+    let targetUsername: string | null = null;
+    try {
+      let currentRows: Array<{ username?: string; profile_image_url?: string | null }> = [];
+
+      try {
+        const queryResult = await pool.query(
+          `SELECT username, profile_image_url FROM users WHERE id = $1 LIMIT 1`,
+          [id]
+        );
+        currentRows = queryResult.rows;
+      } catch (queryError) {
+        if (!isMissingColumnError(queryError)) {
+          throw queryError;
+        }
+
+        const queryResult = await pool.query(
+          `SELECT username, NULL::text AS profile_image_url FROM users WHERE id = $1 LIMIT 1`,
+          [id]
+        );
+        currentRows = queryResult.rows;
+      }
+
+      targetUsername = currentRows[0]?.username || null;
+      currentProfileKey = getStorageKeyFromPublicUrl(currentRows[0]?.profile_image_url || null);
+    } catch {
+      currentProfileKey = null;
+      targetUsername = null;
+    }
+
+    if (targetUsername?.toLowerCase() === "admin") {
+      res.status(400).json({ error: "Cannot delete default admin account" });
+      return;
+    }
+
+    const { rowCount } = await pool.query(`DELETE FROM users WHERE id = $1`, [id]);
+    if (rowCount === 0) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    if (currentProfileKey) {
+      const { deleteImage } = await import("../storage/storage");
+      await deleteImage(currentProfileKey);
+    }
+
+    invalidateUserCache(id);
+    res.status(204).send();
+  } catch (error) {
+    if (isPoolUnreachable(error)) {
+      try {
+        const { data: existingRows } = await supabase
+          .from("users")
+          .select("username, profile_image_url")
+          .eq("id", id)
+          .limit(1);
+
+        if (existingRows?.[0]?.username?.toLowerCase() === "admin") {
+          res.status(400).json({ error: "Cannot delete default admin account" });
+          return;
+        }
+
+        const { data, error: deleteError } = await supabase
+          .from("users")
+          .delete()
+          .eq("id", id)
+          .select("id");
+
+        if (deleteError) {
+          throw deleteError;
+        }
+
+        if (!data || data.length === 0) {
+          res.status(404).json({ error: "User not found" });
+          return;
+        }
+
+        const profileKey = getStorageKeyFromPublicUrl(existingRows?.[0]?.profile_image_url || null);
+        if (profileKey) {
+          const { deleteImage } = await import("../storage/storage");
+          await deleteImage(profileKey);
+        }
+
+        invalidateUserCache(id);
+        res.status(204).send();
+        return;
+      } catch (fallbackError) {
+        console.error("Delete user fallback error:", fallbackError);
+        res.status(500).json({ error: "Failed to delete user. Check dependencies." });
+        return;
+      }
+    }
+    console.error("Delete user error:", error);
+    res.status(500).json({ error: "Failed to delete user. Check dependencies." });
+  }
+});
+
+export default router;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  

@@ -10,9 +10,6 @@ import {
   PERMISSION_DEFINITIONS,
   normalizePermissionMap,
   normalizeRoleName,
-  normalizePermissionSlugs,
-  permissionMapToSlugs,
-  roleNamesToPermissionSlugs,
 } from "../lib/permissions";
 
 const router = Router();
@@ -32,57 +29,10 @@ function isMissingRelationError(error: unknown): boolean {
   return err?.code === "42P01" || (err?.message || "").toLowerCase().includes("relation") && (err?.message || "").toLowerCase().includes("does not exist");
 }
 
-function resolvePermissionSlugs(rawSlugs: unknown, rawMap: unknown): string[] {
-  const explicit = normalizePermissionSlugs(rawSlugs);
-  const mapDerived = permissionMapToSlugs(normalizePermissionMap(rawMap));
-  return [...new Set([...explicit, ...mapDerived])];
-}
-
-function resolveEffectivePermissionSlugs(rawSlugs: unknown, rawMap: unknown, roleNames: string[]): string[] {
-  return [...new Set([...resolvePermissionSlugs(rawSlugs, rawMap), ...roleNamesToPermissionSlugs(roleNames)])];
-}
-
-function normalizeRoleIds(raw: unknown, primaryRoleId?: string): string[] {
-  const ids = Array.isArray(raw)
-    ? raw.filter((v): v is string => typeof v === "string" && v.trim().length > 0).map((v) => v.trim())
-    : [];
-  if (primaryRoleId) ids.push(primaryRoleId);
-  return [...new Set(ids)];
-}
-
-async function fetchUserRoleContext(userId: string, primaryRoleId?: string) {
-  const { rows } = await pool.query(
-    `SELECT role_ids FROM users WHERE id = $1 LIMIT 1`,
-    [userId],
-  );
-  const roleIds = normalizeRoleIds(rows[0]?.role_ids, primaryRoleId);
-
-  if (roleIds.length === 0) {
-    return { roleNames: [] as string[], permissions: {} as Record<string, unknown>, permissionSlugs: [] as string[] };
-  }
-
-  const { rows: roleRows } = await pool.query(
-    `SELECT
-       r.name,
-       r.permissions,
-       COALESCE(array_agg(p.slug) FILTER (WHERE p.slug IS NOT NULL), '{}') AS permission_slugs
-     FROM roles r
-     LEFT JOIN role_permissions rp ON rp.role_id = r.id
-     LEFT JOIN permissions p ON p.id = rp.permission_id
-     WHERE r.id = ANY($1::uuid[])
-     GROUP BY r.id, r.name, r.permissions`,
-    [roleIds],
-  );
-
-  const roleNames = roleRows.map((row) => row.name as string);
-  const permissionSlugs = roleRows.flatMap((row) => resolveEffectivePermissionSlugs(row.permission_slugs, row.permissions, [row.name]));
-
-  return {
-    roleNames,
-    permissions: roleRows[0]?.permissions || {},
-    permissionSlugs: [...new Set(permissionSlugs)],
-  };
-}
+import {
+  fetchUserRoleContext,
+  resolveEffectivePermissionSlugs,
+} from "../lib/permissions-db";
 
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body;

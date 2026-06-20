@@ -11,6 +11,8 @@ interface AuthResponse {
 
 export function useAuth() {
   const [token, setToken] = useState<string | null>(null);
+  const [previewRole, setPreviewRole] = useState<string | null>(null);
+  const [previewSlugs, setPreviewSlugs] = useState<string[] | null>(null);
 
   useEffect(() => {
     // Read from localStorage once mounted
@@ -18,6 +20,18 @@ export function useAuth() {
     if (stored) {
       // Defer to avoid "synchronous setState in effect" lint error
       Promise.resolve().then(() => setToken(stored));
+    }
+    const pRole = localStorage.getItem("previewRole");
+    const pSlugs = localStorage.getItem("previewPermissionSlugs");
+    if (pRole && pSlugs) {
+      Promise.resolve().then(() => {
+        setPreviewRole(pRole);
+        try {
+          setPreviewSlugs(JSON.parse(pSlugs));
+        } catch {
+          // ignore
+        }
+      });
     }
   }, []);
 
@@ -41,8 +55,20 @@ export function useAuth() {
   });
 
   const user = data?.user;
-  const permissionSlugs = permissionsData?.permission_slugs || [];
-  const isSuperuser = !!permissionsData?.is_superuser;
+  const rawPermissionSlugs = permissionsData?.permission_slugs || [];
+  
+  const isPreviewActive = !!previewRole && !!previewSlugs;
+  const permissionSlugs = isPreviewActive ? previewSlugs! : rawPermissionSlugs;
+  const isSuperuser = isPreviewActive
+    ? (previewRole!.toUpperCase() === "SUPER_ADMIN" || previewRole!.toUpperCase() === "OWNER" || previewRole!.toUpperCase() === "ADMIN" || previewSlugs!.includes("*"))
+    : !!permissionsData?.is_superuser;
+
+  const displayUser = isPreviewActive && user ? {
+    ...user,
+    role: previewRole!,
+    roles: [previewRole!],
+    username: `${user.username} (Preview: ${previewRole})`,
+  } : user;
 
   const hasPermission = (slug: string) => {
     if (isSuperuser) return true;
@@ -59,11 +85,23 @@ export function useAuth() {
     return slugs.some((slug) => hasPermission(slug));
   };
 
-  const isAdmin = isSuperuser || hasPermission("users:manage") || hasPermission("settings:write");
-  const isInventoryController = isAdmin || hasPermission("assets:read") || hasPermission("assets:write") || hasPermission("assets:reconcile");
+  const clearPreview = () => {
+    localStorage.removeItem("previewRole");
+    localStorage.removeItem("previewPermissionSlugs");
+    window.location.reload();
+  };
+
+  const rawIsAdmin = !!permissionsData?.is_superuser || rawPermissionSlugs.includes("users:manage") || rawPermissionSlugs.includes("settings:write");
+  const isAdmin = isPreviewActive
+    ? (isSuperuser || permissionSlugs.includes("users:manage") || permissionSlugs.includes("settings:write"))
+    : (isSuperuser || permissionSlugs.includes("users:manage") || permissionSlugs.includes("settings:write"));
+
+  const isInventoryController = isPreviewActive
+    ? (isSuperuser || permissionSlugs.includes("assets:read") || permissionSlugs.includes("assets:write") || permissionSlugs.includes("assets:reconcile"))
+    : (isSuperuser || permissionSlugs.includes("assets:read") || permissionSlugs.includes("assets:write") || permissionSlugs.includes("assets:reconcile"));
 
   return {
-    user,
+    user: displayUser,
     permissionSlugs,
     isSuperuser,
     isLoading: isLoading || permissionsLoading || (!!token && !data && !error),
@@ -73,6 +111,10 @@ export function useAuth() {
     hasPermission,
     hasAnyPermission,
     error,
+    isPreviewActive,
+    previewRoleName: previewRole,
+    clearPreview,
+    rawIsAdmin,
   };
 }
 

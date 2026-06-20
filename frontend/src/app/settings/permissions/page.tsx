@@ -17,7 +17,7 @@ import {
 import AuthLayout from "@/components/AuthLayout";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
-import { getRoles, getPermissionsCatalog, updateRolePermissions } from "@/lib/api";
+import { getRoles, getPermissionsCatalog, updateRolePermissions, createRole, updateRole, deleteRole } from "@/lib/api";
 import type { Role } from "@/lib/types";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -35,6 +35,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Only System Managers and Administrators can access permission settings.":
       "Only System Managers and Administrators can access permission settings.",
     "Go back": "Go back",
+    "Preview as Role": "Preview as Role",
     "System Role (Immutable)": "System Role (Immutable)",
     "This is a system role (SUPER_ADMIN / admin / owner) with full system permissions and cannot be modified.":
       "This is a system role (SUPER_ADMIN / admin / owner) with full system permissions and cannot be modified.",
@@ -88,6 +89,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Only System Managers and Administrators can access permission settings.":
       "የፈቃድ ቅንብሮችን ማግኘት የሚችሉት የስርዓት አስተዳዳሪዎች ብቻ ናቸው።",
     "Go back": "ተመለስ",
+    "Preview as Role": "በዚህ ድርሻ አስቀድመህ እይ",
     "System Role (Immutable)": "የስርዓት ሚና (ሊሻሻል የማይችል)",
     "This is a system role (SUPER_ADMIN / admin / owner) with full system permissions and cannot be modified.":
       "ይህ ሙሉ የስርዓት ፈቃዶች ያሉት እና ሊሻሻል የማይችል የስርዓት ሚና (SUPER_ADMIN / admin / owner) ነው።",
@@ -168,6 +170,15 @@ export default function RolePermissionsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  // CRUD state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDesc, setNewRoleDesc] = useState("");
+  const [cloneRoleId, setCloneRoleId] = useState("");
+  const [editRoleName, setEditRoleName] = useState("");
+  const [editRoleDesc, setEditRoleDesc] = useState("");
+
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const canAccessPermissions = hasPermission("users:manage") || hasPermission("settings:write");
 
@@ -231,6 +242,16 @@ export default function RolePermissionsPage() {
     });
   };
 
+  const handlePreviewAsRole = () => {
+    if (!selectedRole) return;
+    localStorage.setItem("previewRole", selectedRole.name);
+    localStorage.setItem("previewPermissionSlugs", JSON.stringify(Array.from(assignedSlugs)));
+    toast.success(`Activating preview mode for ${selectedRole.name}...`);
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
+  };
+
   const handleRevert = () => {
     if (!selectedRole) return;
     setAssignedSlugs(new Set(selectedRole.permission_slugs || []));
@@ -262,6 +283,79 @@ export default function RolePermissionsPage() {
       roleId: selectedRoleId,
       slugs: Array.from(assignedSlugs),
     });
+  };
+
+  const handleCreateRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRoleName.trim()) {
+      toast.error("Role name is required");
+      return;
+    }
+    try {
+      const created = await createRole({
+        name: newRoleName.trim(),
+        description: newRoleDesc.trim(),
+        cloneFromRoleId: cloneRoleId || undefined,
+      });
+      toast.success("Role created successfully");
+      setIsCreateModalOpen(false);
+      setNewRoleName("");
+      setNewRoleDesc("");
+      setCloneRoleId("");
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+      setSelectedRoleId(created.id);
+    } catch (err: unknown) {
+      let msg = "Failed to create role";
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.error || err.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      toast.error(msg);
+    }
+  };
+
+  const handleUpdateRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editRoleName.trim()) {
+      toast.error("Role name is required");
+      return;
+    }
+    if (!selectedRoleId) return;
+    try {
+      await updateRole(selectedRoleId, {
+        name: editRoleName.trim(),
+        description: editRoleDesc.trim(),
+      });
+      toast.success("Role updated successfully");
+      setIsEditModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+    } catch (err: unknown) {
+      let msg = "Failed to update role";
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.error || err.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      toast.error(msg);
+    }
+  };
+
+  const handleDeleteRole = async (roleId: string) => {
+    try {
+      await deleteRole(roleId);
+      toast.success("Role deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
+      setSelectedRoleId("");
+    } catch (err: unknown) {
+      let msg = "Failed to delete role";
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.error || err.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      toast.error(msg);
+    }
   };
 
   // Check if anything has changed compared to cached database role configuration
@@ -343,6 +437,12 @@ export default function RolePermissionsPage() {
             {/* Roles Sidebar List */}
             <aside className="bg-card border border-border/80 rounded-2xl p-4 space-y-3 shadow-sm select-none">
               <h3 className="text-xs font-bold text-muted uppercase tracking-wider px-2">{t("Select Role")}</h3>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl border border-dashed border-border text-xs font-bold text-primary hover:border-primary/50 hover:bg-primary/[0.02] transition-all cursor-pointer mb-2"
+              >
+                + Create Custom Role
+              </button>
               <nav className="flex flex-col gap-1">
                 {roles.map((role) => {
                   const isSelected = role.id === selectedRoleId;
@@ -375,41 +475,79 @@ export default function RolePermissionsPage() {
             {/* Permission checklist groups */}
             <main className="bg-card border border-border/80 rounded-2xl p-6 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-4 gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-foreground">{selectedRole?.name}</h2>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-foreground">{selectedRole?.name}</h2>
+                    {!isSystemRole && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            if (selectedRole) {
+                              setEditRoleName(selectedRole.name);
+                              setEditRoleDesc(selectedRole.description || "");
+                              setIsEditModalOpen(true);
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded bg-card-alt border border-border text-[10px] font-bold text-muted hover:text-foreground cursor-pointer"
+                        >
+                          Rename/Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (selectedRole && confirm(`Are you sure you want to delete role "${selectedRole.name}"?`)) {
+                              handleDeleteRole(selectedRole.id);
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded bg-danger/10 border border-danger/20 text-[10px] font-bold text-danger hover:bg-danger/20 cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-xs text-muted mt-0.5">{selectedRole?.description || "No description provided"}</p>
                 </div>
 
-                {!isSystemRole && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      disabled={!isDirty || updateMutation.isPending}
-                      onClick={handleRevert}
-                      className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold transition-all cursor-pointer ${
-                        isDirty
-                          ? "bg-card-alt text-foreground hover:bg-border"
-                          : "bg-card-alt/50 text-muted cursor-not-allowed"
-                      }`}
-                    >
-                      <HiXMark className="w-3.5 h-3.5" />
-                      {t("Revert Changes")}
-                    </button>
-                    <button
-                      disabled={!isDirty || updateMutation.isPending}
-                      onClick={handleSave}
-                      className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-bold text-white transition-all cursor-pointer bg-primary hover:opacity-90 ${
-                        isDirty ? "opacity-100" : "opacity-50 cursor-not-allowed"
-                      }`}
-                    >
-                      {updateMutation.isPending ? (
-                        <span className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <HiCheck className="w-3.5 h-3.5" />
-                      )}
-                      {t("Save Changes")}
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePreviewAsRole}
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <HiShieldCheck className="w-3.5 h-3.5" />
+                    {t("Preview as Role")}
+                  </button>
+                  
+                  {!isSystemRole && (
+                    <>
+                      <button
+                        disabled={!isDirty || updateMutation.isPending}
+                        onClick={handleRevert}
+                        className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold transition-all cursor-pointer ${
+                          isDirty
+                            ? "bg-card-alt text-foreground hover:bg-border"
+                            : "bg-card-alt/50 text-muted cursor-not-allowed"
+                        }`}
+                      >
+                        <HiXMark className="w-3.5 h-3.5" />
+                        {t("Revert Changes")}
+                      </button>
+                      <button
+                        disabled={!isDirty || updateMutation.isPending}
+                        onClick={handleSave}
+                        className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-bold text-white transition-all cursor-pointer bg-primary hover:opacity-90 ${
+                          isDirty ? "opacity-100" : "opacity-50 cursor-not-allowed"
+                        }`}
+                      >
+                        {updateMutation.isPending ? (
+                          <span className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <HiCheck className="w-3.5 h-3.5" />
+                        )}
+                        {t("Save Changes")}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {isSystemRole ? (
@@ -477,6 +615,111 @@ export default function RolePermissionsPage() {
           </div>
         )}
       </div>
+      
+      {/* Create Role Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 className="text-lg font-bold text-foreground">Create Custom Role</h3>
+            <form onSubmit={handleCreateRole} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Role Name *</label>
+                <input
+                  type="text"
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  required
+                  placeholder="e.g. OPERATIONS_COORDINATOR"
+                  className="w-full h-10 px-3 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium text-foreground bg-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Description</label>
+                <input
+                  type="text"
+                  value={newRoleDesc}
+                  onChange={(e) => setNewRoleDesc(e.target.value)}
+                  placeholder="e.g. Coordinates logistics and team scheduling"
+                  className="w-full h-10 px-3 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium text-foreground bg-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Clone Permissions From</label>
+                <select
+                  value={cloneRoleId}
+                  onChange={(e) => setCloneRoleId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium text-foreground bg-transparent"
+                >
+                  <option value="">-- Empty Permissions --</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="h-9 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold text-muted hover:text-foreground cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 cursor-pointer"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Role Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 className="text-lg font-bold text-foreground">Edit Role Metadata</h3>
+            <form onSubmit={handleUpdateRole} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Role Name *</label>
+                <input
+                  type="text"
+                  value={editRoleName}
+                  onChange={(e) => setEditRoleName(e.target.value)}
+                  required
+                  className="w-full h-10 px-3 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium text-foreground bg-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">Description</label>
+                <input
+                  type="text"
+                  value={editRoleDesc}
+                  onChange={(e) => setEditRoleDesc(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium text-foreground bg-transparent"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="h-9 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold text-muted hover:text-foreground cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AuthLayout>
   );
 }
