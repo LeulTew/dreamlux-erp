@@ -6,7 +6,7 @@
     "dev": "bun --watch src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun",
     "start": "bun dist/index.js",
-    "db:migrate": "bun src/db/migrate-hr-payments.ts && bun src/db/migrate.ts && bun src/db/migrate-phase3.ts && bun src/db/migrate-rbac.ts && bun src/db/migrate-performance.ts && bun src/db/migrate-reconciliation-audit.ts && bun src/db/migrate-reconciliation-audit-hardening.ts && bun src/db/migrate-events.ts",
+    "db:migrate": "bun src/db/migrate-hr-payments.ts && bun src/db/migrate.ts && bun src/db/migrate-phase3.ts && bun src/db/migrate-rbac.ts && bun src/db/migrate-performance.ts && bun src/db/migrate-reconciliation-audit.ts && bun src/db/migrate-reconciliation-audit-hardening.ts && bun src/db/migrate-events.ts && bun src/db/migrate-db-rls.ts",
     "test": "bun test",
     "lint": "eslint . && tsc --noEmit"
   },
