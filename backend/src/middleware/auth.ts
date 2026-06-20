@@ -4,11 +4,12 @@ import { getEnv } from "../lib/env";
 import {
   hasPermissionSlug,
   normalizePermissionMap,
-  normalizeRoleName,
   normalizePermissionSlugs,
   permissionMapToSlugs,
   roleNamesToPermissionSlugs,
 } from "../lib/permissions";
+import { getCachedUserPermissions, setCachedUserPermissions } from "../lib/permissions-cache";
+import { fetchUserRoleContext } from "../lib/permissions-db";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -20,6 +21,7 @@ export interface AuthRequest extends Request {
     permission_slugs?: string[];
   };
   admin?: boolean; // legacy flag
+  permissionLookupFailed?: boolean;
 }
 
 export function getEffectivePermissionSlugsFromUser(user: AuthRequest["user"]): string[] {
@@ -43,7 +45,7 @@ function requestHasPermission(req: AuthRequest, requiredSlug: string): boolean {
   return hasPermissionSlug(getEffectivePermissionSlugs(req), requiredSlug);
 }
 
-export function requireAuth(req: AuthRequest, res: Response, next: NextFunction): void {
+export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   // Allow OPTIONS (preflight) requests
   if (req.method === "OPTIONS") {
     next();
@@ -62,6 +64,33 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
 
   try {
     const payload = jwt.verify(token, secret) as any;
+
+    if (payload && payload.id) {
+      let cached = getCachedUserPermissions(payload.id);
+      const shouldQueryDB = process.env.NODE_ENV !== "test" || (typeof payload.id === "string" && payload.id.startsWith("verify-db-"));
+      if (!cached && shouldQueryDB) {
+        try {
+          const roleContext = await fetchUserRoleContext(payload.id);
+          if (roleContext.roleNames.length > 0) {
+            cached = {
+              permissionSlugs: roleContext.permissionSlugs,
+              roleNames: roleContext.roleNames,
+            };
+            setCachedUserPermissions(payload.id, cached);
+          }
+        } catch (dbError) {
+          console.error("[AuthMiddleware] DB permission lookup failed:", dbError);
+          req.permissionLookupFailed = true;
+        }
+      }
+
+      if (cached) {
+        payload.roles = cached.roleNames;
+        payload.role = cached.roleNames[0] || payload.role;
+        payload.permission_slugs = cached.permissionSlugs;
+      }
+    }
+
     req.user = payload;
     req.admin = getEffectivePermissionSlugsFromUser(payload).includes("*");
     next();
@@ -91,10 +120,7 @@ export function requireRole(roles: string[]) {
       return;
     }
 
-    const userRoles = [req.user.role, ...(req.user.roles || [])].map(normalizeRoleName);
-    const requestedRoles = roles.map(normalizeRoleName);
-    const roleMatch = requestedRoles.some((roleName) => userRoles.includes(roleName));
-    if (roleMatch && requestHasPermission(req, "*")) {
+    if (requestHasPermission(req, "*")) {
       next();
       return;
     }
@@ -112,6 +138,11 @@ export function requireRole(roles: string[]) {
 
 export function requirePermissionSlugs(slugs: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (req.permissionLookupFailed) {
+      res.status(503).json({ error: "Permission lookup unavailable" });
+      return;
+    }
+
     const allowed = slugs.some((slug) => requestHasPermission(req, slug));
     if (!allowed) {
       res.status(403).json({ error: "Forbidden: Missing required permission" });
@@ -123,6 +154,11 @@ export function requirePermissionSlugs(slugs: string[]) {
 
 export function requirePermissions(module: string, action: string) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (req.permissionLookupFailed) {
+      res.status(503).json({ error: "Permission lookup unavailable" });
+      return;
+    }
+
     const requiredSlug = `${module}:${action}`;
     if (requestHasPermission(req, requiredSlug)) {
       next();
@@ -132,5 +168,3 @@ export function requirePermissions(module: string, action: string) {
     res.status(403).json({ error: "Forbidden: Missing required permission" });
   };
 }
-
-

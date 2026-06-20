@@ -135,8 +135,8 @@ function CollapsedPopout({
       <button
         onClick={() => setOpen(!open)}
         className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
-          isActive 
-            ? "bg-primary text-primary-foreground shadow-md animate-pulse-subtle" 
+          isActive
+            ? "bg-primary text-primary-foreground shadow-md animate-pulse-subtle"
             : "text-muted hover:bg-card-alt hover:text-foreground"
         }`}
         title={label}
@@ -144,7 +144,7 @@ function CollapsedPopout({
         <Icon className="w-[22px] h-[22px] shrink-0" />
       </button>
       {open && (
-        <div 
+        <div
           className="absolute left-[calc(100%+16px)] top-[32px] z-50 bg-card border border-border/80 rounded-2xl p-1.5 min-w-[170px] shadow-massive flex flex-col gap-0.5 animate-scale-in"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -160,11 +160,11 @@ function CollapsedPopout({
               const x_trunk = 28; // Completely clears the button circle (24px radius from center)
               const y_start = 16; // Button bottom height relative to top-[32px] container
               const r = 6;
-              
+
               const path = idx === 0
                 ? `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_item} L 72,${y_item}`
                 : `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_start + r} V ${y_item - r} Q ${x_trunk},${y_item} ${x_trunk + r},${y_item} L 72,${y_item}`;
-              
+
               return (
                 <path
                   key={link.href}
@@ -186,8 +186,8 @@ function CollapsedPopout({
                 href={link.href}
                 onClick={() => setOpen(false)}
                 className={`block px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  link.active 
-                    ? "bg-primary/10 text-primary font-bold" 
+                  link.active
+                    ? "bg-primary/10 text-primary font-bold"
                     : "text-foreground/80 hover:bg-card-alt hover:text-foreground"
                 }`}
               >
@@ -218,16 +218,16 @@ function SidebarLink({
 
   if (isCollapsed) {
     return (
-      <div 
+      <div
         className="relative flex justify-center w-full"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <Link 
-          href={href} 
+        <Link
+          href={href}
           className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
-            active 
-              ? "bg-primary text-primary-foreground shadow-md" 
+            active
+              ? "bg-primary text-primary-foreground shadow-md"
               : "text-muted hover:bg-card-alt hover:text-foreground"
           }`}
         >
@@ -360,8 +360,8 @@ export function AppSidebar() {
   ].filter(l => l.show);
 
   return (
-    <Sidebar 
-      collapsible="icon" 
+    <Sidebar
+      collapsible="icon"
       className="border-none bg-transparent [&_[data-sidebar=sidebar]]:border-none [&_[data-sidebar=sidebar]]:bg-transparent [&_[data-sidebar=sidebar]]:shadow-none"
     >
       {/* Header - Logo & Collapse Toggle */}
@@ -393,7 +393,7 @@ export function AppSidebar() {
                 </span>
               </div>
             </div>
-            
+
             <button
               onClick={toggleSidebar}
               className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-card-alt transition-all cursor-pointer shrink-0"

@@ -1,4 +1,9 @@
-import { mock } from "bun:test";
+import { mock, beforeEach } from "bun:test";
+import { invalidateAllCache } from "../lib/permissions-cache";
+
+beforeEach(() => {
+  invalidateAllCache();
+});
 import { fakeChain, mockUploadImage, mockDeleteImage, mockGetPublicUrl } from "./setup_helpers";
 
 process.env.JWT_SECRET = "test-secret";

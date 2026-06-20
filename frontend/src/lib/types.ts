@@ -92,8 +92,8 @@ export interface User {
 
 export interface InventoryStats {
   totalItems: number;
-  stockPerLocation: { 
-    location: string; 
+  stockPerLocation: {
+    location: string;
     quantity: number;
     lowStockItems: number;
     totalEntries: number;
@@ -217,7 +217,7 @@ export interface PayrollRun {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  employee_lines?: PayrollEmployeeLine[]; 
+  employee_lines?: PayrollEmployeeLine[];
 }
 
 export interface PayrollPreviewPayload {

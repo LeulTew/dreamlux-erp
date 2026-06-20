@@ -10,13 +10,14 @@ import PayrollReminder from "@/components/PayrollReminder";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
-import { 
-  HiOutlineSun, 
-  HiOutlineMoon, 
-  HiChevronDown, 
-  HiArrowRightOnRectangle, 
-  HiOutlineUser, 
-  HiOutlineInformationCircle, 
+import { useAuth } from "@/hooks/useAuth";
+import {
+  HiOutlineSun,
+  HiOutlineMoon,
+  HiChevronDown,
+  HiArrowRightOnRectangle,
+  HiOutlineUser,
+  HiOutlineInformationCircle,
   HiArrowsRightLeft,
   HiMagnifyingGlass
 } from "react-icons/hi2";
@@ -39,6 +40,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Close: "Close",
     Version: "Version",
     "Database Status": "Database Connected",
+    "Preview Mode: Active": "Preview Mode: Active",
+    "Viewing as": "Viewing as",
+    "Exit Preview": "Exit Preview",
   },
   am: {
     "Sign Out": "ውጣ",
@@ -56,6 +60,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Close: "ዝጋ",
     Version: "ስሪት",
     "Database Status": "ዳታቤዝ ተገናኝቷል",
+    "Preview Mode: Active": "የቅድመ እይታ ሁነታ፡ ንቁ",
+    "Viewing as": "በዚህ በመመልከት ላይ፡",
+    "Exit Preview": "ከቅድመ እይታ ውጣ",
   },
 };
 
@@ -602,6 +609,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const { isPreviewActive, previewRoleName, clearPreview } = useAuth();
   const [status] = useState<
     "checking" | "authenticated" | "unauthenticated"
   >(() => {
@@ -673,12 +681,31 @@ export default function AuthLayout({
       <div className="flex h-full w-full bg-background overflow-hidden">
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 w-full overflow-hidden">
+          {isPreviewActive && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-500 font-medium select-none z-50">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <span>
+                  {t("Preview Mode: Active")} ({t("Viewing as")} <strong>{previewRoleName}</strong>)
+                </span>
+              </div>
+              <button
+                onClick={clearPreview}
+                className="px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all font-semibold cursor-pointer"
+              >
+                {t("Exit Preview")}
+              </button>
+            </div>
+          )}
           {/* Header - Flat borderless design */}
           <header className="flex h-12 2xl:h-16 shrink-0 items-center gap-2 2xl:gap-3 px-3 md:px-5 2xl:px-6 bg-transparent select-none">
             <SidebarTrigger className="text-muted hover:text-foreground transition-all cursor-pointer" />
             <div className="h-4 w-px bg-border/50 shrink-0" />
             <Breadcrumbs />
-            
+
             {/* Top Right Controls */}
             <div className="ml-auto shrink-0 flex items-center gap-2 2xl:gap-3">
               {/* Search Trigger Button */}
@@ -695,11 +722,11 @@ export default function AuthLayout({
               </button>
 
               <PayrollReminder />
-              
+
               <div className="h-4 w-px bg-border/50 shrink-0 mx-0.5" />
 
               {/* User Dropdown */}
-              <HeaderUserMenu 
+              <HeaderUserMenu
                 pageWidth={pageWidth}
                 togglePageWidth={togglePageWidth}
                 setShowAbout={setShowAbout}
@@ -736,11 +763,11 @@ export default function AuthLayout({
               <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-3">
                 {t("Version")} 1.0.0 (Gold Release)
               </p>
-              
+
               <p className="text-xs text-muted leading-relaxed mb-6 px-2">
                 {t("Dream Lux ERP Description")}
               </p>
-              
+
               <div className="bg-card-alt border border-border rounded-xl p-3 text-left space-y-2 mb-6 text-xs text-foreground font-medium">
                 <div className="flex justify-between">
                   <span className="text-muted">Architecture:</span>

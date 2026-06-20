@@ -183,7 +183,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               {/* Section 1: Client & General Info */}
               <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">General Information</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Event Title</label>
@@ -250,7 +250,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               {/* Section 3: Finance & Status */}
               <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">Status & Budget</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1 flex items-center gap-1">
@@ -293,7 +293,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               {/* Section 2: Venue & Schedule */}
               <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">Schedule & Location</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Start Date</label>

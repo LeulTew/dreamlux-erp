@@ -3,6 +3,7 @@ import { Router, Response } from "express";
 import { pool } from "../db/pool";
 import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
 import { hasPermissionSlug } from "../lib/permissions";
+import { fetchHiddenFieldsForRoles } from "../lib/permissions-db";
 import {
   createEventSchema,
   updateEventSchema,
@@ -19,6 +20,8 @@ import {
 
 
 const router = Router();
+
+const hiddenEventFieldsByRoleKey = new Map<string, string[]>();
 
 function hasPermission(req: AuthRequest, slug: string): boolean {
   return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), slug);
@@ -52,10 +55,24 @@ function canApproveExpenses(req: AuthRequest): boolean {
   return hasPermission(req, "expenses:approve");
 }
 
-function redactEventForPermissions<T extends Record<string, any>>(event: T, req: AuthRequest): T {
+async function getHiddenEventFields(req: AuthRequest): Promise<string[]> {
+  const roleNames = [req.user?.role, ...(req.user?.roles || [])].filter((role): role is string => Boolean(role));
+  const key = roleNames.map((role) => role.toLowerCase()).sort().join("|");
+  if (!key) return [];
+  const cached = hiddenEventFieldsByRoleKey.get(key);
+  if (cached) return cached;
+  const hiddenFields = await fetchHiddenFieldsForRoles(roleNames, "events");
+  hiddenEventFieldsByRoleKey.set(key, hiddenFields);
+  return hiddenFields;
+}
+
+async function redactEventForPermissions<T extends Record<string, any>>(event: T, req: AuthRequest): Promise<T> {
   const redacted = { ...event };
   if (!canViewEventFinancials(req)) delete redacted.contract_price;
   if (!canViewEventOperations(req)) delete redacted.estimated_design_cost;
+  for (const fieldName of await getHiddenEventFields(req)) {
+    delete redacted[fieldName];
+  }
   return redacted;
 }
 
@@ -118,7 +135,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const dataResult = await pool.query(dataQuery, queryParams);
 
-    const events = dataResult.rows.map((row: any) => redactEventForPermissions(row, req));
+    const events = await Promise.all(dataResult.rows.map((row: any) => redactEventForPermissions(row, req)));
 
     res.json({
       events,
@@ -500,7 +517,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     `;
     const logsResult = await pool.query(logsQuery, [id]);
 
-    const filteredEvent = redactEventForPermissions(event, req);
+    const filteredEvent = await redactEventForPermissions(event, req);
 
     res.json({
       event: filteredEvent,
@@ -563,7 +580,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
     ]);
 
     // Redact contract_price/estimated_design_cost if user doesn't have privileges
-    const event = redactEventForPermissions(result.rows[0], req);
+    const event = await redactEventForPermissions(result.rows[0], req);
 
     res.status(201).json({ event });
   } catch (error: any) {
@@ -716,10 +733,10 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      const event = redactEventForPermissions(result.rows[0], req);
+      const event = await redactEventForPermissions(result.rows[0], req);
       res.json({ event });
     } else {
-      const event = redactEventForPermissions(currentEvent, req);
+      const event = await redactEventForPermissions(currentEvent, req);
       res.json({ event });
     }
   } catch (error: any) {
@@ -969,10 +986,10 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      const event = redactEventForPermissions(result.rows[0], req);
+      const event = await redactEventForPermissions(result.rows[0], req);
       res.json({ event });
     } else {
-      const event = redactEventForPermissions(currentEvent, req);
+      const event = await redactEventForPermissions(currentEvent, req);
       res.json({ event });
     }
   } catch (error: any) {

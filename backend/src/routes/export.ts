@@ -254,7 +254,7 @@ async function fetchEmployeesForExport(officeFilter?: string) {
 
   const { data, error } = await query;
   if (error) throw error;
-  
+
   return data || [];
 }
 
@@ -431,7 +431,7 @@ router.get("/employees/xlsx", requirePermissionSlugs(["exports:read", "hr:read"]
     for (let i = 0; i < employees.length; i++) {
       const emp = employees[i] as unknown as Record<string, unknown>;
       const row = sheet.addRow(buildEmployeeExportRow(emp, eventColumns));
-        
+
         if (i % 2 === 1) {
             row.eachCell((cell) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8F9FA" } };
@@ -457,7 +457,7 @@ router.get("/employees/xlsx", requirePermissionSlugs(["exports:read", "hr:read"]
 router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     const { data: runResult, error: runError } = await supabase
       .from("payroll_runs")
       .select("*")
@@ -466,7 +466,7 @@ router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:
 
     if (runError) throw runError;
     if (!runResult) { res.status(404).json({ error: "Run not found" }); return; }
-    
+
     const run = runResult;
 
     const periodTag = run.period_start
@@ -477,9 +477,9 @@ router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:
       .from("payroll_run_employee_lines")
       .select("*")
       .eq("run_id", id);
-      
+
     if (linesError) throw linesError;
-    
+
     // Sort lines by employee_name_snapshot
     const lines = (linesResult ?? []).sort((a: any, b: any) => a.employee_name_snapshot.localeCompare(b.employee_name_snapshot));
 
@@ -529,7 +529,7 @@ router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:
 router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     const { data: runResult, error: runError } = await supabase
       .from("payroll_runs")
       .select("*")
@@ -538,7 +538,7 @@ router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll
 
     if (runError) throw runError;
     if (!runResult) { res.status(404).json({ error: "Run not found" }); return; }
-    
+
     const run = runResult;
 
     const periodTag = run.period_start
@@ -549,9 +549,9 @@ router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll
       .from("payroll_run_employee_lines")
       .select("*")
       .eq("run_id", id);
-      
+
     if (linesError) throw linesError;
-    
+
     const lines = (linesResult ?? []).sort((a: any, b: any) => a.employee_name_snapshot.localeCompare(b.employee_name_snapshot));
 
     const workbook = new ExcelJS.Workbook();
@@ -588,7 +588,7 @@ router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll
           events_total: eventsTotal.toFixed(2),
           total_pay: totalPay.toFixed(2)
         });
-        
+
         if (i % 2 === 1) {
             row.eachCell((cell) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8F9FA" } };

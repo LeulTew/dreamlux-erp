@@ -430,7 +430,7 @@ function AssetsContent() {
 
   const filteredItems = useMemo(() => {
     let result = items;
-    
+
     if (searchTerm) {
       result = fuzzySearch(result, searchTerm, {
         keys: ["name", "description", "store.name"],
@@ -449,7 +449,7 @@ function AssetsContent() {
           else fieldVal = undefined;
 
           if (fieldVal === undefined || fieldVal === null) return false;
-          
+
           const sVal = String(fieldVal).toLowerCase();
           const rVal = rule.value.toLowerCase();
           const nVal = Number(fieldVal);
@@ -736,9 +736,9 @@ function AssetsContent() {
                <HiDocumentArrowDown className="w-4.5 h-4.5 text-accent" />
                {t("CSV")}
              </button>
- 
+
              <div className="w-px h-6 bg-border hidden sm:block mx-1" />
- 
+
             <button
               onClick={() => {
                 if (reconcileMode) {
@@ -757,7 +757,7 @@ function AssetsContent() {
               <HiCheckCircle className="w-4 h-4" />
               {reconcileMode ? t("Cancel Count") : t("Reconcile")}
             </button>
- 
+
             <button
               onClick={() => {
                 setSelectMode(false);
@@ -985,12 +985,12 @@ function AssetsContent() {
           <tbody>
             <AnimatePresence mode="popLayout" initial={false}>
             {table.getRowModel().rows.map((row) => (
-              <motion.tr 
+              <motion.tr
                 layout
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                key={row.id} 
+                key={row.id}
                 className="border-b border-border/30 hover:bg-primary-light/5 transition-all group"
               >
                 {row.getVisibleCells().map((cell) => (
@@ -1020,7 +1020,7 @@ function AssetsContent() {
                   className="w-5 h-5 rounded border-border accent-primary cursor-pointer shrink-0"
                 />
               )}
-              <div 
+              <div
                 className="flex-1 min-w-0 cursor-pointer"
                 onClick={() => {
                   if (selectMode && !showTrash) {
@@ -1030,8 +1030,8 @@ function AssetsContent() {
                   setEditingItem(item);
                 }}
               >
-                <MobileAssetCard 
-                  item={item} 
+                <MobileAssetCard
+                  item={item}
                   onEdit={(it) => setEditingItem(it)}
                   onDelete={(it) => setItemToDelete(it)}
                 />

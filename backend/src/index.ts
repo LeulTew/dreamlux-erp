@@ -78,10 +78,10 @@ app.get("/health", async (_req, res) => {
   try {
     // Ping DB to keep Supabase awake and verify connection health
     await pool.query("SELECT 1");
-    res.status(200).json({ 
+    res.status(200).json({
       status: "ok",
       database: "connected",
-      timestamp: new Date().toISOString() 
+      timestamp: new Date().toISOString()
     });
   } catch (error: any) {
     console.error("[health-check] Database connection error:", error);

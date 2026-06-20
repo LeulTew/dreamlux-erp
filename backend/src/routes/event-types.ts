@@ -86,8 +86,8 @@ router.post("/", requirePermissionSlugs(["events:write"]), async (req: AuthReque
 
     const { data, error } = await supabase
       .from("event_types")
-      .insert({ 
-        name: event_name, 
+      .insert({
+        name: event_name,
         description: description ?? null
       })
       .select()
