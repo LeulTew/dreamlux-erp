@@ -13,6 +13,8 @@ const protectedTables = [
   "vehicle_assignments",
   "event_allocations",
   "event_logs",
+  "event_proposals",
+  "event_proposal_logs",
 ];
 
 function isDenied(status: number): boolean {

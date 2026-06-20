@@ -15,6 +15,8 @@ DECLARE
     'event_assignments',
     'event_checklist',
     'event_logs',
+    'event_proposal_logs',
+    'event_proposals',
     'event_saved_views',
     'event_types',
     'events',
