@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { getCachedUserPermissions, setCachedUserPermissions } from "../lib/permissions-cache";
 
 let lastAdminTest = false;
+let simulateLegacyRoleIdsMissing = false;
 
 // Mock the DB pool with SQL-matching implementation to prevent startup query pollution
 const mockQuery = mock((sql: string, params?: any[]) => {
@@ -12,6 +13,18 @@ const mockQuery = mock((sql: string, params?: any[]) => {
 
   if (safeParams[0] === "verify-db-error") {
     return Promise.reject(new Error("permission database unavailable"));
+  }
+
+  if (safeParams[0] === "verify-db-legacy-role-id" && sql.includes("SELECT role_ids, role_id FROM users WHERE id = $1")) {
+    const error = new Error("column role_ids does not exist") as Error & { code?: string };
+    error.code = "42703";
+    simulateLegacyRoleIdsMissing = true;
+    return Promise.reject(error);
+  }
+
+  if (simulateLegacyRoleIdsMissing && sql.includes("SELECT role_id FROM users WHERE id = $1")) {
+    simulateLegacyRoleIdsMissing = false;
+    return Promise.resolve({ rows: [{ role_id: "role-1" }], rowCount: 1 });
   }
 
   if (sql.includes("SELECT name FROM roles WHERE id = $1")) {
@@ -233,6 +246,25 @@ describe("RBAC Caching & Guardrails", () => {
     // Call should pass and user should be cached
     expect(res.status).toBe(200);
     const cached = getCachedUserPermissions("verify-db-user");
+    expect(cached).not.toBeNull();
+    expect(cached?.roleNames).toContain("STORE_MANAGER");
+    expect(cached?.permissionSlugs).toContain("users:manage");
+  });
+
+  test("requireAuth falls back to role_id when role_ids column is missing", async () => {
+    expect(getCachedUserPermissions("verify-db-legacy-role-id")).toBeNull();
+
+    const verifyToken = jwt.sign(
+      { id: "verify-db-legacy-role-id", role: "STORE_MANAGER", username: "test" },
+      JWT_SECRET,
+      { expiresIn: "1h" },
+    );
+    const res = await request(app)
+      .get("/users/roles")
+      .set("Authorization", `Bearer ${verifyToken}`);
+
+    expect(res.status).toBe(200);
+    const cached = getCachedUserPermissions("verify-db-legacy-role-id");
     expect(cached).not.toBeNull();
     expect(cached?.roleNames).toContain("STORE_MANAGER");
     expect(cached?.permissionSlugs).toContain("users:manage");
