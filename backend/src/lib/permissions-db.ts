@@ -16,6 +16,18 @@ function isPoolUnreachable(error: unknown): boolean {
   );
 }
 
+function isMissingColumnError(error: unknown): boolean {
+  const err = error as { code?: string; message?: string };
+  const message = (err?.message || "").toLowerCase();
+  return err?.code === "42703" || message.includes("column");
+}
+
+function isMissingRelationError(error: unknown): boolean {
+  const err = error as { code?: string; message?: string };
+  const message = (err?.message || "").toLowerCase();
+  return err?.code === "42P01" || (message.includes("relation") && message.includes("does not exist"));
+}
+
 export function resolvePermissionSlugs(rawSlugs: unknown, rawMap: unknown): string[] {
   const explicit = normalizePermissionSlugs(rawSlugs);
   const mapDerived = permissionMapToSlugs(normalizePermissionMap(rawMap));
@@ -43,14 +55,31 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
     );
     rows = res.rows;
   } catch (error) {
-    if (isPoolUnreachable(error)) {
+    if (isMissingColumnError(error)) {
+      const res = await pool.query(
+        `SELECT role_id FROM users WHERE id = $1 LIMIT 1`,
+        [userId],
+      );
+      rows = res.rows.map((row) => ({ ...row, role_ids: [] }));
+    } else if (isPoolUnreachable(error)) {
       const { data, error: sbError } = await supabase
         .from("users")
         .select("role_id, role_ids")
         .eq("id", userId)
         .limit(1);
-      if (sbError) throw sbError;
-      rows = data || [];
+
+      if (sbError && isMissingColumnError(sbError)) {
+        const { data: legacyData, error: legacyError } = await supabase
+          .from("users")
+          .select("role_id")
+          .eq("id", userId)
+          .limit(1);
+        if (legacyError) throw legacyError;
+        rows = (legacyData || []).map((row: { role_id?: string | null }) => ({ ...row, role_ids: [] }));
+      } else {
+        if (sbError) throw sbError;
+        rows = data || [];
+      }
     } else {
       throw error;
     }
@@ -82,7 +111,15 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
     );
     roleRows = res.rows;
   } catch (error) {
-    if (isPoolUnreachable(error)) {
+    if (isMissingRelationError(error)) {
+      const res = await pool.query(
+        `SELECT name, permissions, '{}'::text[] AS permission_slugs
+         FROM roles
+         WHERE id = ANY($1::uuid[])`,
+        [roleIds],
+      );
+      roleRows = res.rows;
+    } else if (isPoolUnreachable(error)) {
       // 1. Fetch roles
       const { data: rolesData, error: rolesError } = await supabase
         .from("roles")
