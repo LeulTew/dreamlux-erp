@@ -63,6 +63,7 @@ INSERT INTO permissions (slug, description) VALUES
   ('events:write', 'Create and update events and event types'),
   ('events:delete', 'Delete, restore, and permanently remove events or event types'),
   ('events:override_completed', 'Modify completed events and restricted status transitions'),
+  ('events:saved_views:share', 'Create and manage role or global saved event views'),
   ('event_allocations:write', 'Create and release event inventory allocations'),
   ('event_checklist:write', 'Create and update event checklist items'),
   ('event_assignments:write', 'Assign employees to events and manage attendance'),
@@ -122,7 +123,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'events:saved_views:share', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
 WHERE LOWER(r.name) IN ('ops_manager')
 ON CONFLICT DO NOTHING;
 
@@ -478,6 +479,45 @@ CREATE TABLE IF NOT EXISTS event_logs (
 CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date);
 CREATE INDEX IF NOT EXISTS idx_event_logs_event_id ON event_logs(event_id);
+
+CREATE TABLE IF NOT EXISTS event_saved_views (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  scope TEXT NOT NULL CHECK (scope IN ('personal', 'role', 'global')) DEFAULT 'personal',
+  role_name TEXT DEFAULT NULL,
+  columns JSONB NOT NULL DEFAULT '[]'::jsonb,
+  filters JSONB NOT NULL DEFAULT '[]'::jsonb,
+  sort JSONB DEFAULT NULL,
+  page_size INTEGER NOT NULL DEFAULT 20 CHECK (page_size BETWEEN 1 AND 100),
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP DEFAULT NULL,
+  CONSTRAINT event_saved_views_scope_target_check CHECK (
+    (scope = 'personal' AND user_id IS NOT NULL AND role_name IS NULL)
+    OR (scope = 'role' AND user_id IS NULL AND role_name IS NOT NULL)
+    OR (scope = 'global' AND user_id IS NULL AND role_name IS NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_saved_views_user
+  ON event_saved_views(user_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_saved_views_scope
+  ON event_saved_views(scope, role_name)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_saved_views_default_personal
+  ON event_saved_views(user_id)
+  WHERE deleted_at IS NULL AND is_default = TRUE AND scope = 'personal';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_saved_views_default_role
+  ON event_saved_views(LOWER(role_name))
+  WHERE deleted_at IS NULL AND is_default = TRUE AND scope = 'role';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_saved_views_default_global
+  ON event_saved_views((scope))
+  WHERE deleted_at IS NULL AND is_default = TRUE AND scope = 'global';
 
 -- 15. Vehicles
 CREATE TABLE IF NOT EXISTS vehicles (

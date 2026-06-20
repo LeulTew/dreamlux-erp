@@ -16,6 +16,7 @@ const protectedTables = [
   "event_assignments",
   "event_checklist",
   "event_logs",
+  "event_saved_views",
   "event_types",
   "events",
   "expenses",
