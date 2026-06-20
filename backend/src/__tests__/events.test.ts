@@ -220,6 +220,209 @@ describe("Events API", () => {
     expect(res.body.events[0].vehicle_count).toBe(1);
   });
 
+  test("GET /events/export returns filtered CSV and audits financial export", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Corporate Gala",
+          client_name: "Aster",
+          event_type_name: "Gala",
+          status: "Planned",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 100000,
+          approved_expense_total: 40000,
+          net_profit: 60000,
+          margin_percentage: 60,
+          vehicle_count: 2,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "client_name", operator: "contains", value: "Ast" },
+    ]));
+
+    const res = await request(app)
+      .get(`/events/export?filters=${filters}&columns=name,client_name,net_profit&format=csv`)
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.header["content-type"]).toContain("text/csv");
+    expect(res.text).toContain("Event Name,Client Name,Net Profit");
+    expect(res.text).toContain("Corporate Gala,Aster,60000");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
+    expect((mockQuery.mock.calls[2][1] as unknown[])[2]).toBe("events_export_financial");
+  });
+
+  test("GET /events/export redacts financial columns for non-financial export users", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Wedding",
+          client_name: "Betty",
+          contract_price: 50000,
+          net_profit: 30000,
+          vehicle_count: 1,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+
+    const res = await request(app)
+      .get("/events/export?columns=name,contract_price,net_profit,vehicle_count")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Event Name,Vehicle Count");
+    expect(res.text).not.toContain("Revenue / Contract Price");
+    expect(res.text).not.toContain("Net Profit");
+    expect(res.text).not.toContain("50000");
+    expect(res.text).toContain("Wedding,1");
+  });
+
+  test("GET /events/export enforces large export guardrail before fetching rows", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1001" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // blocked audit
+
+    const res = await request(app)
+      .get("/events/export?maxRows=1000")
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(413);
+    expect(res.body.total).toBe(1001);
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    expect(String(mockQuery.mock.calls[1][0])).toContain("INSERT INTO event_logs");
+    expect((mockQuery.mock.calls[1][1] as unknown[])[2]).toBe("events_export_financial_blocked");
+  });
+
+  test("GET /events/export blocks unsupported financial filters for non-financial users", async () => {
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "net_profit", operator: "greater_than", value: 1 },
+    ]));
+
+    const res = await request(app)
+      .get(`/events/export?filters=${filters}`)
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events/export/template returns import template for event writers", async () => {
+    const res = await request(app)
+      .get("/events/export/template")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.header["content-type"]).toContain("text/csv");
+    expect(res.text).toContain("Event Name,Client Name");
+    expect(res.text).toContain("DreamLux SRD Wedding Setup");
+  });
+
+  test("POST /events/import/preview returns row-level validation errors for unknown event type", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // event type lookup
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+
+    const res = await request(app)
+      .post("/events/import/preview")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        mode: "insert",
+        rows: [{
+          name: "Imported Wedding",
+          client_name: "Aster",
+          event_type_name: "Unknown Type",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 120000,
+        }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.valid).toBe(false);
+    expect(res.body.errors[0]).toEqual({ row: 1, field: "event_type_name", message: "Unknown event type: Unknown Type" });
+  });
+
+  test("POST /events/import/commit inserts valid rows in one transaction and audits import", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "type-1" }], rowCount: 1 }); // event type lookup
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-imported" }], rowCount: 1 }); // insert
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // row audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // batch audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/import/commit")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        mode: "insert",
+        rows: [{
+          name: "Imported Wedding",
+          client_name: "Aster",
+          event_type_name: "Wedding",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 120000,
+          package_design_notes: "Imported estimate",
+          estimated_design_cost: 30000,
+        }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(true);
+    expect(res.body.importedCount).toBe(1);
+    expect(res.body.eventIds).toEqual(["event-imported"]);
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO events");
+    expect(String(mockQuery.mock.calls[4][0])).toContain("INSERT INTO event_logs");
+  });
+
+  test("POST /events/import/commit rolls back when update row is missing id", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // failed audit via pool
+
+    const res = await request(app)
+      .post("/events/import/commit")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        mode: "update",
+        rows: [{
+          name: "Imported Wedding",
+          client_name: "Aster",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 120000,
+        }],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.imported).toBe(false);
+    expect(res.body.errors[0].field).toBe("id");
+    expect(String(mockQuery.mock.calls[1][0])).toBe("ROLLBACK");
+  });
+
+  test("POST /events/import/commit blocks low-permission users", async () => {
+    const res = await request(app)
+      .post("/events/import/commit")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+      .send({ rows: [] });
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   test("GET /events/saved-views returns personal, matching role, and global views only", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [

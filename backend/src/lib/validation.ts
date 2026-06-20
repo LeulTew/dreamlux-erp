@@ -194,7 +194,7 @@ const parseEventFilters = (value: unknown) => {
   }
 };
 
-export const eventListQuerySchema = z.object({
+const eventListQueryBaseSchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
   search: z.string().max(200).optional(),
@@ -223,7 +223,9 @@ export const eventListQuerySchema = z.object({
     ]),
     value: eventAdvancedFilterValueSchema.optional(),
   })).max(25)).optional().default([]),
-}).refine((data) => {
+});
+
+export const eventListQuerySchema = eventListQueryBaseSchema.refine((data) => {
   if (!data.start_date || !data.end_date) return true;
   return new Date(data.start_date) <= new Date(data.end_date);
 }, {
@@ -260,6 +262,54 @@ export const eventSavedViewPayloadSchema = z.object({
 });
 
 export type EventSavedViewPayloadInput = z.infer<typeof eventSavedViewPayloadSchema>;
+
+const parseCsvColumns = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  return value.split(",").map((column) => column.trim()).filter(Boolean);
+};
+
+export const eventExportQuerySchema = eventListQueryBaseSchema.extend({
+  format: z.enum(["csv", "xlsx"]).optional().default("csv"),
+  columns: z.preprocess(parseCsvColumns, z.array(z.string().min(1).max(80)).max(40)).optional(),
+  maxRows: z.coerce.number().int().min(1).max(1000).optional().default(1000),
+}).refine((data) => {
+  if (!data.start_date || !data.end_date) return true;
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "end_date must be on or after start_date",
+  path: ["end_date"],
+});
+
+export type EventExportQueryInput = z.infer<typeof eventExportQuerySchema>;
+
+const eventImportRowSchema = z.object({
+  id: z.string().uuid("Invalid event ID").optional().nullable(),
+  name: z.string().min(1, "Event name is required").max(500, "Event name too long"),
+  client_name: z.string().min(1, "Client name is required").max(500, "Client name too long"),
+  client_phone: z.string().max(50, "Phone too long").optional().nullable().or(z.literal("")),
+  event_type_id: z.string().uuid("Invalid event type ID").optional().nullable().or(z.literal("")),
+  event_type_name: z.string().max(500, "Event type name too long").optional().nullable().or(z.literal("")),
+  start_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid start date"),
+  end_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid end date"),
+  start_time: z.string().optional().nullable().or(z.literal("")),
+  end_time: z.string().optional().nullable().or(z.literal("")),
+  venue_location: z.string().min(1, "Venue location is required").max(1000, "Venue location too long"),
+  contract_price: z.coerce.number().min(0, "Contract price cannot be negative"),
+  status: z.enum(["Planned", "Ongoing", "Completed"]).optional().default("Planned"),
+  package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable().or(z.literal("")),
+  estimated_design_cost: z.coerce.number().min(0, "Estimated design cost cannot be negative").optional().nullable(),
+}).refine((data) => new Date(data.start_date) <= new Date(data.end_date), {
+  message: "End date must be on or after start date",
+  path: ["end_date"],
+});
+
+export const eventImportPayloadSchema = z.object({
+  mode: z.enum(["insert", "update"]).optional().default("insert"),
+  rows: z.array(eventImportRowSchema).min(1, "At least one event row is required").max(500, "Import is limited to 500 rows per batch"),
+  commit: z.coerce.boolean().optional().default(false),
+});
+
+export type EventImportPayloadInput = z.infer<typeof eventImportPayloadSchema>;
 
 export const updateEventDesignSchema = z.object({
   package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable(),

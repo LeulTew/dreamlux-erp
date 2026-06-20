@@ -1,5 +1,7 @@
 import { Pool, PoolClient } from "pg";
 import { Router, Response } from "express";
+import ExcelJS from "exceljs";
+import { stringify } from "csv-stringify/sync";
 import { pool } from "../db/pool";
 import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
 import { hasPermissionSlug } from "../lib/permissions";
@@ -18,6 +20,8 @@ import {
   createTripLogSchema,
   eventListQuerySchema,
   eventSavedViewPayloadSchema,
+  eventExportQuerySchema,
+  eventImportPayloadSchema,
 } from "../lib/validation";
 
 
@@ -59,6 +63,14 @@ function canApproveExpenses(req: AuthRequest): boolean {
 
 function canShareSavedViews(req: AuthRequest): boolean {
   return hasPermission(req, "events:saved_views:share") || hasPermission(req, "users:manage");
+}
+
+function canExportEvents(req: AuthRequest): boolean {
+  return hasPermission(req, "exports:read") && (hasPermission(req, "events:read") || canAccessProfitReports(req));
+}
+
+function canImportEvents(req: AuthRequest): boolean {
+  return hasPermission(req, "events:write");
 }
 
 function getUserRoleNames(req: AuthRequest): string[] {
@@ -198,6 +210,122 @@ const EVENT_FILTER_FIELDS: Record<string, EventFilterField> = {
   pending_expense_count: { sql: "COALESCE(expenses.pending_expense_count, 0)", type: "number", financial: true },
 };
 
+type EventListQueryShape = {
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
+  filterLogic: "and" | "or";
+  filters: Array<{ field: string; operator: string; value?: unknown }>;
+};
+
+type EventQueryParts =
+  | { ok: true; whereClause: string; params: any[]; sortSql: string; sortDirection: "ASC" | "DESC"; summaryJoins: string }
+  | { ok: false; status: number; error: string };
+
+const EVENT_SUMMARY_JOINS = `
+  LEFT JOIN (
+    SELECT
+      event_id,
+      COALESCE(SUM(amount) FILTER (WHERE status = 'Approved'), 0)::numeric AS approved_expense_total,
+      COALESCE(COUNT(*) FILTER (WHERE status = 'Pending'), 0)::int AS pending_expense_count
+    FROM expenses
+    GROUP BY event_id
+  ) expenses ON expenses.event_id = e.id
+  LEFT JOIN (
+    SELECT event_id, COUNT(*)::int AS assigned_staff_count
+    FROM event_assignments
+    GROUP BY event_id
+  ) assignments ON assignments.event_id = e.id
+  LEFT JOIN (
+    SELECT event_id, COUNT(*)::int AS vehicle_count
+    FROM vehicle_assignments
+    GROUP BY event_id
+  ) vehicles ON vehicles.event_id = e.id
+  LEFT JOIN (
+    SELECT event_id, COUNT(*)::int AS allocation_count
+    FROM event_allocations
+    WHERE status <> 'Returned'
+    GROUP BY event_id
+  ) allocations ON allocations.event_id = e.id
+  LEFT JOIN (
+    SELECT
+      event_id,
+      COUNT(*)::int AS total_items,
+      COUNT(*) FILTER (WHERE status = 'Done')::int AS done_items
+    FROM event_checklist
+    GROUP BY event_id
+  ) checklist ON checklist.event_id = e.id
+`;
+
+const EVENT_SELECT_COLUMNS = `
+  e.*,
+  et.name as event_type_name,
+  COALESCE(expenses.approved_expense_total, 0)::float AS approved_expense_total,
+  COALESCE(e.estimated_design_cost, 0)::float AS estimated_cost_total,
+  (e.contract_price - COALESCE(expenses.approved_expense_total, 0))::float AS net_profit,
+  CASE
+    WHEN e.contract_price > 0 THEN ROUND((((e.contract_price - COALESCE(expenses.approved_expense_total, 0)) / e.contract_price) * 100)::numeric, 2)
+    ELSE 0
+  END::float AS margin_percentage,
+  COALESCE(vehicles.vehicle_count, 0)::int AS vehicle_count,
+  COALESCE(assignments.assigned_staff_count, 0)::int AS assigned_staff_count,
+  COALESCE(allocations.allocation_count, 0)::int AS allocation_count,
+  CASE
+    WHEN COALESCE(checklist.total_items, 0) = 0 THEN 0
+    ELSE ROUND(((COALESCE(checklist.done_items, 0)::numeric / checklist.total_items) * 100)::numeric, 2)
+  END::float AS checklist_completion_percentage,
+  COALESCE(expenses.pending_expense_count, 0)::int AS pending_expense_count
+`;
+
+const EVENT_EXPORT_COLUMNS: Record<string, { header: string; financial?: boolean }> = {
+  name: { header: "Event Name" },
+  client_name: { header: "Client Name" },
+  client_phone: { header: "Client Phone" },
+  event_type_name: { header: "Event Type" },
+  status: { header: "Status" },
+  start_date: { header: "Start Date" },
+  end_date: { header: "End Date" },
+  start_time: { header: "Start Time" },
+  end_time: { header: "End Time" },
+  venue_location: { header: "Venue / Location" },
+  contract_price: { header: "Revenue / Contract Price", financial: true },
+  approved_expense_total: { header: "Approved Expenses", financial: true },
+  estimated_cost_total: { header: "Estimated Cost", financial: true },
+  net_profit: { header: "Net Profit", financial: true },
+  margin_percentage: { header: "Margin %", financial: true },
+  vehicle_count: { header: "Vehicle Count" },
+  assigned_staff_count: { header: "Assigned Staff Count" },
+  allocation_count: { header: "Allocation Count" },
+  checklist_completion_percentage: { header: "Checklist Completion %" },
+  pending_expense_count: { header: "Pending Expense Count", financial: true },
+};
+
+const DEFAULT_EVENT_EXPORT_COLUMNS = [
+  "name",
+  "client_name",
+  "event_type_name",
+  "status",
+  "start_date",
+  "end_date",
+  "venue_location",
+  "vehicle_count",
+  "assigned_staff_count",
+  "allocation_count",
+  "checklist_completion_percentage",
+];
+
+const DEFAULT_FINANCIAL_EVENT_EXPORT_COLUMNS = [
+  "contract_price",
+  "approved_expense_total",
+  "estimated_cost_total",
+  "net_profit",
+  "margin_percentage",
+  "pending_expense_count",
+];
+
 function normalizeFilterValue(value: unknown, field: EventFilterField): string | number | boolean | null {
   if (value === null || value === undefined) return null;
   if (field.type === "number") {
@@ -269,6 +397,141 @@ function buildEventFilterCondition(
   }
 }
 
+function buildEventQueryParts(query: EventListQueryShape, req: AuthRequest): EventQueryParts {
+  const { status, start_date, end_date, search, sortBy, sortOrder, filterLogic, filters } = query;
+  const canSeeFinancials = canViewEventFinancials(req);
+  const conditions: string[] = ["e.deleted_at IS NULL"];
+  const params: any[] = [];
+
+  if (status) {
+    params.push(status);
+    conditions.push(`e.status = $${params.length}`);
+  }
+
+  if (start_date) {
+    params.push(start_date);
+    conditions.push(`e.start_date >= $${params.length}`);
+  }
+
+  if (end_date) {
+    params.push(end_date);
+    conditions.push(`e.end_date <= $${params.length}`);
+  }
+
+  if (search?.trim()) {
+    params.push(`%${search.trim()}%`);
+    conditions.push(
+      `(e.name ILIKE $${params.length} OR e.client_name ILIKE $${params.length} OR e.venue_location ILIKE $${params.length})`
+    );
+  }
+
+  const advancedConditions: string[] = [];
+  for (const filter of filters) {
+    const field = EVENT_FILTER_FIELDS[filter.field];
+    if (!field) {
+      return { ok: false, status: 400, error: `Unsupported event filter field: ${filter.field}` };
+    }
+    if (field.financial && !canSeeFinancials) {
+      return { ok: false, status: 403, error: "Forbidden: Missing profit report access permission" };
+    }
+    try {
+      advancedConditions.push(buildEventFilterCondition(field, filter.operator, filter.value, params));
+    } catch (error: any) {
+      return { ok: false, status: 400, error: error.message || "Invalid event filter" };
+    }
+  }
+
+  if (advancedConditions.length > 0) {
+    conditions.push(`(${advancedConditions.join(filterLogic === "or" ? " OR " : " AND ")})`);
+  }
+
+  const sortField = EVENT_FILTER_FIELDS[sortBy];
+  if (!sortField) {
+    return { ok: false, status: 400, error: `Unsupported event sort field: ${sortBy}` };
+  }
+  if (sortField.financial && !canSeeFinancials) {
+    return { ok: false, status: 403, error: "Forbidden: Missing profit report access permission" };
+  }
+
+  return {
+    ok: true,
+    whereClause: conditions.join(" AND "),
+    params,
+    sortSql: sortField.sql,
+    sortDirection: sortOrder === "desc" ? "DESC" : "ASC",
+    summaryJoins: EVENT_SUMMARY_JOINS,
+  };
+}
+
+function getRequestedExportColumns(rawColumns: string[] | undefined, includeFinancials: boolean): string[] {
+  const requested = rawColumns?.length
+    ? rawColumns
+    : [
+        ...DEFAULT_EVENT_EXPORT_COLUMNS,
+        ...(includeFinancials ? DEFAULT_FINANCIAL_EVENT_EXPORT_COLUMNS : []),
+      ];
+
+  return [...new Set(requested)].filter((column) => {
+    const meta = EVENT_EXPORT_COLUMNS[column];
+    return meta && (!meta.financial || includeFinancials);
+  });
+}
+
+function formatExportValue(value: unknown): string | number {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString().split("T")[0];
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+  if (typeof value === "number") return Number.isFinite(value) ? value : "";
+  return String(value);
+}
+
+function buildExportRows(events: Array<Record<string, unknown>>, columns: string[]) {
+  return events.map((event) => {
+    const row: Record<string, string | number> = {};
+    for (const column of columns) {
+      row[column] = formatExportValue(event[column]);
+    }
+    return row;
+  });
+}
+
+async function insertEventAuditLog(
+  client: PoolClient | Pool,
+  eventId: string | null,
+  userId: string | null,
+  fieldChanged: string,
+  oldValue: string | null,
+  newValue: string | null,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
+      VALUES ($1, $2, $3, $4, $5)
+    `,
+    [eventId, userId, fieldChanged, oldValue, newValue],
+  );
+}
+
+function normalizeImportText(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  return String(value).trim();
+}
+
+async function resolveImportEventTypeId(
+  client: PoolClient | Pool,
+  eventTypeId: string | null | undefined,
+  eventTypeName: string | null | undefined,
+): Promise<string | null> {
+  if (eventTypeId) return eventTypeId;
+  if (!eventTypeName?.trim()) return null;
+
+  const result = await client.query(
+    `SELECT id FROM event_types WHERE LOWER(name) = LOWER($1) AND deleted_at IS NULL LIMIT 1`,
+    [eventTypeName.trim()],
+  );
+  return result.rows[0]?.id || null;
+}
+
 // GET /events - List events (filtered, paginated)
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
@@ -278,118 +541,27 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { page, limit, status, start_date, end_date, search, sortBy, sortOrder, filterLogic, filters } = validationResult.data;
+    const { page, limit } = validationResult.data;
     const offset = (page - 1) * limit;
-    const canSeeFinancials = canViewEventFinancials(req);
-
-    const conditions: string[] = ["e.deleted_at IS NULL"];
-    const params: any[] = [];
-
-    if (status) {
-      params.push(status);
-      conditions.push(`e.status = $${params.length}`);
-    }
-
-    if (start_date) {
-      params.push(start_date);
-      conditions.push(`e.start_date >= $${params.length}`);
-    }
-
-    if (end_date) {
-      params.push(end_date);
-      conditions.push(`e.end_date <= $${params.length}`);
-    }
-
-    if (search?.trim()) {
-      params.push(`%${search.trim()}%`);
-      conditions.push(
-        `(e.name ILIKE $${params.length} OR e.client_name ILIKE $${params.length} OR e.venue_location ILIKE $${params.length})`
-      );
-    }
-
-    const advancedConditions: string[] = [];
-    for (const filter of filters) {
-      const field = EVENT_FILTER_FIELDS[filter.field];
-      if (!field) {
-        res.status(400).json({ error: `Unsupported event filter field: ${filter.field}` });
-        return;
-      }
-      if (field.financial && !canSeeFinancials) {
-        res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
-        return;
-      }
-      try {
-        advancedConditions.push(buildEventFilterCondition(field, filter.operator, filter.value, params));
-      } catch (error: any) {
-        res.status(400).json({ error: error.message || "Invalid event filter" });
-        return;
-      }
-    }
-
-    if (advancedConditions.length > 0) {
-      conditions.push(`(${advancedConditions.join(filterLogic === "or" ? " OR " : " AND ")})`);
-    }
-
-    const whereClause = conditions.join(" AND ");
-    const sortField = EVENT_FILTER_FIELDS[sortBy];
-    if (!sortField) {
-      res.status(400).json({ error: `Unsupported event sort field: ${sortBy}` });
+    const queryParts = buildEventQueryParts(validationResult.data, req);
+    if (!queryParts.ok) {
+      res.status(queryParts.status).json({ error: queryParts.error });
       return;
     }
-    if (sortField.financial && !canSeeFinancials) {
-      res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
-      return;
-    }
-    const sortSql = sortField.sql;
-    const sortDirection = sortOrder === "desc" ? "DESC" : "ASC";
-    const summaryJoins = `
-      LEFT JOIN (
-        SELECT
-          event_id,
-          COALESCE(SUM(amount) FILTER (WHERE status = 'Approved'), 0)::numeric AS approved_expense_total,
-          COALESCE(COUNT(*) FILTER (WHERE status = 'Pending'), 0)::int AS pending_expense_count
-        FROM expenses
-        GROUP BY event_id
-      ) expenses ON expenses.event_id = e.id
-      LEFT JOIN (
-        SELECT event_id, COUNT(*)::int AS assigned_staff_count
-        FROM event_assignments
-        GROUP BY event_id
-      ) assignments ON assignments.event_id = e.id
-      LEFT JOIN (
-        SELECT event_id, COUNT(*)::int AS vehicle_count
-        FROM vehicle_assignments
-        GROUP BY event_id
-      ) vehicles ON vehicles.event_id = e.id
-      LEFT JOIN (
-        SELECT event_id, COUNT(*)::int AS allocation_count
-        FROM event_allocations
-        WHERE status <> 'Returned'
-        GROUP BY event_id
-      ) allocations ON allocations.event_id = e.id
-      LEFT JOIN (
-        SELECT
-          event_id,
-          COUNT(*)::int AS total_items,
-          COUNT(*) FILTER (WHERE status = 'Done')::int AS done_items
-        FROM event_checklist
-        GROUP BY event_id
-      ) checklist ON checklist.event_id = e.id
-    `;
 
     // Get total count
     const countQuery = `
       SELECT COUNT(*)
       FROM events e
       LEFT JOIN event_types et ON e.event_type_id = et.id
-      ${summaryJoins}
-      WHERE ${whereClause}
+      ${queryParts.summaryJoins}
+      WHERE ${queryParts.whereClause}
     `;
-    const countResult = await pool.query(countQuery, params);
+    const countResult = await pool.query(countQuery, queryParts.params);
     const total = parseInt(countResult.rows[0].count, 10);
 
     // Get paginated data
-    const queryParams = [...params];
+    const queryParams = [...queryParts.params];
     queryParams.push(limit);
     const limitParam = `$${queryParams.length}`;
     queryParams.push(offset);
@@ -397,28 +569,12 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const dataQuery = `
       SELECT
-        e.*,
-        et.name as event_type_name,
-        COALESCE(expenses.approved_expense_total, 0)::float AS approved_expense_total,
-        COALESCE(e.estimated_design_cost, 0)::float AS estimated_cost_total,
-        (e.contract_price - COALESCE(expenses.approved_expense_total, 0))::float AS net_profit,
-        CASE
-          WHEN e.contract_price > 0 THEN ROUND((((e.contract_price - COALESCE(expenses.approved_expense_total, 0)) / e.contract_price) * 100)::numeric, 2)
-          ELSE 0
-        END::float AS margin_percentage,
-        COALESCE(vehicles.vehicle_count, 0)::int AS vehicle_count,
-        COALESCE(assignments.assigned_staff_count, 0)::int AS assigned_staff_count,
-        COALESCE(allocations.allocation_count, 0)::int AS allocation_count,
-        CASE
-          WHEN COALESCE(checklist.total_items, 0) = 0 THEN 0
-          ELSE ROUND(((COALESCE(checklist.done_items, 0)::numeric / checklist.total_items) * 100)::numeric, 2)
-        END::float AS checklist_completion_percentage,
-        COALESCE(expenses.pending_expense_count, 0)::int AS pending_expense_count
+        ${EVENT_SELECT_COLUMNS}
       FROM events e
       LEFT JOIN event_types et ON e.event_type_id = et.id
-      ${summaryJoins}
-      WHERE ${whereClause}
-      ORDER BY ${sortSql} ${sortDirection}, e.created_at DESC
+      ${queryParts.summaryJoins}
+      WHERE ${queryParts.whereClause}
+      ORDER BY ${queryParts.sortSql} ${queryParts.sortDirection}, e.created_at DESC
       LIMIT ${limitParam} OFFSET ${offsetParam}
     `;
 
@@ -435,6 +591,353 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("[get-events] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/export/template - CSV/XLSX import template with SRD-grounded sample event data
+router.get("/export/template", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canImportEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event import permission" });
+      return;
+    }
+
+    const format = req.query.format === "xlsx" ? "xlsx" : "csv";
+    const columns = [
+      { key: "name", header: "Event Name" },
+      { key: "client_name", header: "Client Name" },
+      { key: "client_phone", header: "Client Phone" },
+      { key: "event_type_name", header: "Event Type Name" },
+      { key: "start_date", header: "Start Date" },
+      { key: "end_date", header: "End Date" },
+      { key: "start_time", header: "Start Time" },
+      { key: "end_time", header: "End Time" },
+      { key: "venue_location", header: "Venue / Location" },
+      { key: "contract_price", header: "Contract Price" },
+      { key: "status", header: "Status" },
+      { key: "package_design_notes", header: "Package Design Notes" },
+      { key: "estimated_design_cost", header: "Estimated Design Cost" },
+    ];
+    const sampleRows = [
+      {
+        name: "DreamLux SRD Wedding Setup",
+        client_name: "SRD Sample Client",
+        client_phone: "+251900000000",
+        event_type_name: "Wedding",
+        start_date: "2026-07-20",
+        end_date: "2026-07-20",
+        start_time: "09:00",
+        end_time: "18:00",
+        venue_location: "Sheraton Addis",
+        contract_price: "250000",
+        status: "Planned",
+        package_design_notes: "Luxury floral and stage decor estimate",
+        estimated_design_cost: "50000",
+      },
+    ];
+
+    if (format === "xlsx") {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Event Import Template");
+      sheet.columns = columns.map((column) => ({ header: column.header, key: column.key, width: Math.max(column.header.length + 4, 18) }));
+      sheet.addRows(sampleRows);
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E2C2" } };
+      });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="events-import-template.xlsx"');
+      await workbook.xlsx.write(res as unknown as import("stream").Stream);
+      res.end();
+      return;
+    }
+
+    const csv = stringify(sampleRows, { header: true, columns });
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="events-import-template.csv"');
+    res.send(csv);
+  } catch (error: any) {
+    console.error("[events-export-template] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/export - Export filtered event rows as CSV/XLSX with backend redaction
+router.get("/export", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canExportEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event export permission" });
+      return;
+    }
+
+    const validationResult = eventExportQuerySchema.safeParse(req.query);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const payload = validationResult.data;
+    const queryParts = buildEventQueryParts(payload, req);
+    if (!queryParts.ok) {
+      res.status(queryParts.status).json({ error: queryParts.error });
+      return;
+    }
+
+    const countResult = await pool.query(
+      `
+        SELECT COUNT(*)
+        FROM events e
+        LEFT JOIN event_types et ON e.event_type_id = et.id
+        ${queryParts.summaryJoins}
+        WHERE ${queryParts.whereClause}
+      `,
+      queryParts.params,
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+    if (total > payload.maxRows) {
+      await insertEventAuditLog(
+        pool,
+        null,
+        req.user?.id || null,
+        canViewEventFinancials(req) ? "events_export_financial_blocked" : "events_export_blocked",
+        null,
+        `${payload.format}:${total}/${payload.maxRows}`,
+      );
+      res.status(413).json({
+        error: `Export contains ${total} rows and exceeds the maxRows guardrail of ${payload.maxRows}`,
+        total,
+        maxRows: payload.maxRows,
+      });
+      return;
+    }
+
+    const dataParams = [...queryParts.params, payload.maxRows];
+    const eventsResult = await pool.query(
+      `
+        SELECT ${EVENT_SELECT_COLUMNS}
+        FROM events e
+        LEFT JOIN event_types et ON e.event_type_id = et.id
+        ${queryParts.summaryJoins}
+        WHERE ${queryParts.whereClause}
+        ORDER BY ${queryParts.sortSql} ${queryParts.sortDirection}, e.created_at DESC
+        LIMIT $${dataParams.length}
+      `,
+      dataParams,
+    );
+    const events = await Promise.all(eventsResult.rows.map((row: any) => redactEventForPermissions(row, req)));
+    const columns = getRequestedExportColumns(payload.columns, canViewEventFinancials(req));
+    const exportRows = buildExportRows(events, columns);
+    const columnDefinitions = columns.map((column) => ({ key: column, header: EVENT_EXPORT_COLUMNS[column].header }));
+
+    await insertEventAuditLog(
+      pool,
+      null,
+      req.user?.id || null,
+      canViewEventFinancials(req) ? "events_export_financial" : "events_export",
+      null,
+      `${payload.format}:${events.length}/${total}`,
+    );
+
+    const dateTag = new Date().toISOString().slice(0, 10);
+    if (payload.format === "xlsx") {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Events");
+      sheet.columns = columnDefinitions.map((column) => ({ header: column.header, key: column.key, width: Math.max(column.header.length + 4, 18) }));
+      sheet.addRows(exportRows);
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E2C2" } };
+      });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="events-export-${dateTag}.xlsx"`);
+      await workbook.xlsx.write(res as unknown as import("stream").Stream);
+      res.end();
+      return;
+    }
+
+    const csv = stringify(exportRows, { header: true, columns: columnDefinitions });
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="events-export-${dateTag}.csv"`);
+    res.send(csv);
+  } catch (error: any) {
+    console.error("[events-export] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/import/preview - Validate structured rows parsed from CSV/XLSX before commit
+router.post("/import/preview", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canImportEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event import permission" });
+      return;
+    }
+
+    const validationResult = eventImportPayloadSchema.safeParse({ ...req.body, commit: false });
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { mode, rows } = validationResult.data;
+    const errors: Array<{ row: number; field: string; message: string }> = [];
+    const preparedRows = [];
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      const eventTypeId = await resolveImportEventTypeId(pool, normalizeImportText(row.event_type_id), normalizeImportText(row.event_type_name));
+      if (row.event_type_name && !eventTypeId) {
+        errors.push({ row: index + 1, field: "event_type_name", message: `Unknown event type: ${row.event_type_name}` });
+      }
+      if (mode === "update" && !row.id) {
+        errors.push({ row: index + 1, field: "id", message: "id is required for update imports" });
+      }
+      preparedRows.push({ row: index + 1, event_type_id: eventTypeId, action: mode, name: row.name });
+    }
+
+    await insertEventAuditLog(pool, null, req.user?.id || null, "events_import_preview", null, `${mode}:${rows.length}:errors=${errors.length}`);
+    res.json({
+      valid: errors.length === 0,
+      mode,
+      rowCount: rows.length,
+      preparedRows,
+      errors,
+    });
+  } catch (error: any) {
+    console.error("[events-import-preview] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/import/commit - Transactional event import after preview passes
+router.post("/import/commit", requireAuth, async (req: AuthRequest, res: Response) => {
+  if (!canImportEvents(req)) {
+    res.status(403).json({ error: "Forbidden: Missing event import permission" });
+    return;
+  }
+
+  const validationResult = eventImportPayloadSchema.safeParse({ ...req.body, commit: true });
+  if (!validationResult.success) {
+    res.status(400).json({ error: validationResult.error.errors[0].message });
+    return;
+  }
+
+  const { mode, rows } = validationResult.data;
+  const client = await pool.connect();
+  const importedIds: string[] = [];
+  const errors: Array<{ row: number; field: string; message: string }> = [];
+
+  try {
+    await client.query("BEGIN");
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      const eventTypeId = await resolveImportEventTypeId(client, normalizeImportText(row.event_type_id), normalizeImportText(row.event_type_name));
+      if (row.event_type_name && !eventTypeId) {
+        errors.push({ row: index + 1, field: "event_type_name", message: `Unknown event type: ${row.event_type_name}` });
+        continue;
+      }
+      if (mode === "update" && !row.id) {
+        errors.push({ row: index + 1, field: "id", message: "id is required for update imports" });
+        continue;
+      }
+
+      if (mode === "insert") {
+        const insertResult = await client.query(
+          `
+            INSERT INTO events (
+              name, client_name, client_phone, event_type_id,
+              start_date, end_date, start_time, end_time,
+              venue_location, contract_price, status, created_by,
+              package_design_notes, estimated_design_cost
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING id
+          `,
+          [
+            row.name,
+            row.client_name,
+            normalizeImportText(row.client_phone),
+            eventTypeId,
+            row.start_date,
+            row.end_date,
+            normalizeImportText(row.start_time),
+            normalizeImportText(row.end_time),
+            row.venue_location,
+            row.contract_price,
+            row.status,
+            req.user?.id || null,
+            normalizeImportText(row.package_design_notes),
+            row.estimated_design_cost ?? null,
+          ],
+        );
+        importedIds.push(insertResult.rows[0].id);
+        await insertEventAuditLog(client, insertResult.rows[0].id, req.user?.id || null, "event_import_created", null, row.name);
+      } else {
+        const updateResult = await client.query(
+          `
+            UPDATE events
+            SET name = $1,
+                client_name = $2,
+                client_phone = $3,
+                event_type_id = $4,
+                start_date = $5,
+                end_date = $6,
+                start_time = $7,
+                end_time = $8,
+                venue_location = $9,
+                contract_price = $10,
+                status = $11,
+                package_design_notes = $12,
+                estimated_design_cost = $13,
+                updated_at = NOW()
+            WHERE id = $14 AND deleted_at IS NULL
+            RETURNING id
+          `,
+          [
+            row.name,
+            row.client_name,
+            normalizeImportText(row.client_phone),
+            eventTypeId,
+            row.start_date,
+            row.end_date,
+            normalizeImportText(row.start_time),
+            normalizeImportText(row.end_time),
+            row.venue_location,
+            row.contract_price,
+            row.status,
+            normalizeImportText(row.package_design_notes),
+            row.estimated_design_cost ?? null,
+            row.id,
+          ],
+        );
+        if (updateResult.rowCount === 0) {
+          errors.push({ row: index + 1, field: "id", message: "Event not found or deleted" });
+          continue;
+        }
+        importedIds.push(updateResult.rows[0].id);
+        await insertEventAuditLog(client, updateResult.rows[0].id, req.user?.id || null, "event_import_updated", null, row.name);
+      }
+    }
+
+    if (errors.length > 0) {
+      await client.query("ROLLBACK");
+      await insertEventAuditLog(pool, null, req.user?.id || null, "events_import_failed", null, `${mode}:${rows.length}:errors=${errors.length}`);
+      res.status(400).json({ imported: false, mode, rowCount: rows.length, importedCount: 0, errors });
+      return;
+    }
+
+    await insertEventAuditLog(client, null, req.user?.id || null, "events_import_committed", null, `${mode}:${importedIds.length}`);
+    await client.query("COMMIT");
+    res.json({ imported: true, mode, rowCount: rows.length, importedCount: importedIds.length, eventIds: importedIds, errors: [] });
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    await insertEventAuditLog(pool, null, req.user?.id || null, "events_import_failed", null, `${mode}:${rows.length}:exception`);
+    console.error("[events-import-commit] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
   }
 });
 
