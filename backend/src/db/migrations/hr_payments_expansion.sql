@@ -108,3 +108,21 @@ CREATE TABLE IF NOT EXISTS payroll_run_line_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_payroll_run_line_events_employee_line_id ON payroll_run_line_events(employee_line_id);
+
+-- 5b. Payroll Audit Logs
+CREATE TABLE IF NOT EXISTS payroll_audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  payroll_run_id UUID REFERENCES payroll_runs(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  period_start DATE,
+  period_end DATE,
+  status_snapshot TEXT,
+  employee_count INTEGER NOT NULL DEFAULT 0,
+  total_payroll_snapshot NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payroll_audit_logs_run_id ON payroll_audit_logs(payroll_run_id);
+CREATE INDEX IF NOT EXISTS idx_payroll_audit_logs_created_at ON payroll_audit_logs(created_at);

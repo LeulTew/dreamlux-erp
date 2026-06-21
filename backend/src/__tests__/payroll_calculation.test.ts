@@ -226,7 +226,8 @@ describe("Decentralized Pricing Logic (Manual > Employee Price > 0)", () => {
       }) // 4. Salary levels
       .mockResolvedValueOnce({ rows: [{ id: "run-999" }] }) // 5. Insert run
       .mockResolvedValueOnce({ rows: [{ id: "line-999" }] }) // 6. Insert line
-      .mockResolvedValueOnce({ rows: [] }); // 7. Insert event rows (batch)
+      .mockResolvedValueOnce({ rows: [] }) // 7. Insert event rows (batch)
+      .mockResolvedValueOnce({ rows: [] }); // 8. Insert audit log
 
     const res = await request(app)
       .post("/payroll/runs")

@@ -27,6 +27,7 @@ DECLARE
     'inventory_reconciliation_legacy_trash',
     'inventory_reconciliation_runs',
     'items',
+    'payroll_audit_logs',
     'payroll_run_employee_lines',
     'payroll_run_line_events',
     'payroll_runs',

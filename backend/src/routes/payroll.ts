@@ -3,6 +3,7 @@ import { supabase } from "../db/supabase";
 import { generatePayrollPreviewSchema, finalizePayrollRunSchema, savePayrollDraftSchema } from "../lib/validation";
 import { getMonthlyBounds, getHalfMonthBounds } from "../utils/payroll-utils";
 import { getPublicUrl } from "../storage/storage";
+import { buildPayrollLines, toPayrollEventPayloads, toPayrollLinePayloads } from "../lib/payroll-generation";
 
 const router = express.Router();
 
@@ -26,6 +27,34 @@ function toDbStatus(status: string): "draft" | "finalized" | "flagged_wrong" | "
   return "trashed";
 }
 
+async function insertPayrollAuditLog(input: {
+  payrollRunId: string;
+  userId?: string | null;
+  action: "draft_saved" | "finalized";
+  periodStart: string;
+  periodEnd: string;
+  statusSnapshot: "draft" | "finalized";
+  employeeCount: number;
+  totalPayrollSnapshot: number;
+  metadata?: Record<string, unknown>;
+}) {
+  const { error } = await supabase.from("payroll_audit_logs").insert({
+    payroll_run_id: input.payrollRunId,
+    user_id: input.userId ?? null,
+    action: input.action,
+    period_start: input.periodStart,
+    period_end: input.periodEnd,
+    status_snapshot: input.statusSnapshot,
+    employee_count: input.employeeCount,
+    total_payroll_snapshot: input.totalPayrollSnapshot,
+    metadata: input.metadata ?? {},
+  });
+
+  if (error) {
+    console.warn(`Payroll audit log insert failed for ${input.action}:`, error.message);
+  }
+}
+
 // GET /payroll/runs — list runs with aggregated totals
 router.get("/runs", async (req, res) => {
   try {
@@ -39,7 +68,7 @@ router.get("/runs", async (req, res) => {
       .from("payroll_runs")
       .select("id, title, period_kind, period_start, period_end, status, created_at, updated_at, finalized_at, created_by");
 
-    // Sorting - We'll handle 'total' sorting in memory after aggregation if needed, 
+    // Sorting - We'll handle 'total' sorting in memory after aggregation if needed,
     // but default to period_start
     if (sortBy !== "total") {
       runsQuery = runsQuery.order(sortBy, { ascending: sortOrder === "asc" });
@@ -104,8 +133,8 @@ router.get("/runs", async (req, res) => {
 
     if (sortBy === "total") {
       result.sort((a: any, b: any) => {
-        return sortOrder === "asc" 
-          ? a.total_payroll_value - b.total_payroll_value 
+        return sortOrder === "asc"
+          ? a.total_payroll_value - b.total_payroll_value
           : b.total_payroll_value - a.total_payroll_value;
       });
     }
@@ -327,7 +356,7 @@ router.post("/preview", async (req, res) => {
     }
 
     const { month, year, period_kind, period_start, period_end, employeeLineEvents } = result.data;
-    
+
     const finalMonth = month || new Date().getUTCMonth() + 1;
     const finalYear = year || new Date().getUTCFullYear();
 
@@ -358,63 +387,12 @@ router.post("/preview", async (req, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
-    // Build look-up map for salary levels
-    const salaryLevelByCode = new Map<string, { id: string; amount: number }>();
-    for (const sl of salaryLevels ?? []) {
-      salaryLevelByCode.set(sl.code, {
-        id: String(sl.id),
-        amount: Number(sl.amount_etb ?? 0),
-      });
-    }
-
-    // Build O(1) lookup maps — avoids O(n×m) Array.find() inside loop
-    const employeeMap = new Map<string, any>();
-    for (const e of employees ?? []) employeeMap.set(e.id, e);
-    const eventMasterMap = new Map<string, any>();
-    for (const em of eventsMaster ?? []) eventMasterMap.set(em.id, em);
-
-    let totalPayrollValue = 0;
-    const processedLines = [];
-
-    for (const line of employeeLineEvents) {
-      const employee = employeeMap.get(line.employee_id);
-      if (!employee) continue;
-
-      const levelData = salaryLevelByCode.get(employee.salary_level ?? "");
-      const baseSalary = levelData?.amount ?? Number(employee.base_salary ?? 0);
-
-      let eventsTotal = 0;
-
-      const events = line.events.map((eventLine: { event_type_id: string; quantity: number; price_override?: number | null }) => {
-        // Dynamic Resolution: Price Override > Employee Specific Price > 0
-        const empEventPrices = (employee.event_prices || {}) as Record<string, number>;
-        const employeeDefinedPrice = Number(empEventPrices[eventLine.event_type_id] ?? 0);
-
-        const priceApplied = eventLine.price_override != null ? Number(eventLine.price_override) : employeeDefinedPrice;
-        const lineTotal = eventLine.quantity * priceApplied;
-        eventsTotal += lineTotal;
-
-        return {
-          event_type_id: eventLine.event_type_id,
-          quantity: eventLine.quantity,
-          price_applied: priceApplied,
-          total_price_for_type: lineTotal,
-        };
-      });
-
-      const totalLinePay = baseSalary + eventsTotal;
-      totalPayrollValue += totalLinePay;
-
-      processedLines.push({
-        employee_id: employee.id,
-        employee_name_snapshot: employee.full_name,
-        profile_photo_url: employee.profile_photo_key ? getPublicUrl(employee.profile_photo_key) : null,
-        snapshot_base_salary: baseSalary,
-        total_events_value: eventsTotal,
-        total_line_pay: totalLinePay,
-        events,
-      });
-    }
+    const { totalPayrollValue, lines: processedLines } = buildPayrollLines({
+      employeeLineEvents,
+      eventTypes: eventsMaster ?? [],
+      employees: employees ?? [],
+      salaryLevels: salaryLevels ?? [],
+    });
 
     res.json({
       month,
@@ -479,94 +457,12 @@ router.post("/drafts", async (req, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
-    const salaryLevelByCode = new Map<string, { id: string; amount: number; code: string }>();
-    const salaryLevelCodeById = new Map<string, string>();
-    for (const sl of salaryLevels ?? []) {
-      const normalizedId = String(sl.id);
-      salaryLevelByCode.set(sl.code, {
-        id: normalizedId,
-        amount: Number(sl.amount_etb ?? 0),
-        code: sl.code,
-      });
-      salaryLevelCodeById.set(normalizedId, sl.code);
-    }
-
-    const processedLines: Array<{
-      employee_id: string;
-      employee_name_snapshot: string;
-      salary_level_snapshot: string;
-      snapshot_base_salary: number;
-      total_events_value: number;
-      total_line_pay: number;
-      events: Array<{
-        event_type_id: string;
-        event_name_snapshot: string;
-        price_applied: number;
-        quantity: number;
-        total_price_for_type: number;
-        override_price_etb: number | null;
-        override_reason: string | null;
-      }>;
-    }> = [];
-
-    // Build O(1) lookup maps — avoids O(n×m) Array.find() inside nested loops
-    const employeeMap = new Map<string, any>();
-    for (const e of employees ?? []) employeeMap.set(e.id, e);
-    const eventMasterMap = new Map<string, any>();
-    for (const em of eventsMaster ?? []) eventMasterMap.set(em.id, em);
-
-    for (const line of employeeLineEvents) {
-      const employee = employeeMap.get(line.employee_id);
-      if (!employee) continue;
-
-      const levelData = salaryLevelByCode.get(employee.salary_level ?? "");
-      const baseSalary = levelData?.amount ?? Number(employee.base_salary ?? 0);
-      const levelCode = levelData?.code ?? employee.salary_level ?? "";
-      let eventsTotal = 0;
-
-      const events = line.events.map((eventLine: {
-        event_type_id: string;
-        quantity: number;
-        selected_level_id?: string | null;
-        price_override?: number | null;
-        override_reason?: string | null;
-      }) => {
-        const eventMaster = eventMasterMap.get(eventLine.event_type_id);
-
-        // Decentralized Resolution: Price Override > Employee Specific Price > 0
-        const empEventPrices = (employee.event_prices || {}) as Record<string, number>;
-        const employeeDefinedPrice = Number(empEventPrices[eventLine.event_type_id] ?? 0);
-
-        const priceApplied = eventLine.price_override != null ? Number(eventLine.price_override) : employeeDefinedPrice;
-        const lineTotal = eventLine.quantity * priceApplied;
-        eventsTotal += lineTotal;
-
-        const levelSuffix = eventLine.selected_level_id && salaryLevelCodeById.has(String(eventLine.selected_level_id))
-          ? ` ${salaryLevelCodeById.get(String(eventLine.selected_level_id))}`
-          : "";
-        const eventNameSnapshot = `${eventMaster?.name ?? "Event"}${levelSuffix}`;
-
-        return {
-          event_type_id: eventLine.event_type_id,
-          event_name_snapshot: eventNameSnapshot,
-          price_applied: priceApplied,
-          quantity: eventLine.quantity,
-          total_price_for_type: lineTotal,
-          override_price_etb: eventLine.price_override ?? null,
-          override_reason: eventLine.override_reason ?? null,
-        };
-      });
-
-      processedLines.push({
-        employee_id: employee.id,
-        employee_name_snapshot: employee.full_name,
-        salary_level_snapshot: levelCode,
-        snapshot_base_salary: baseSalary,
-        total_events_value: eventsTotal,
-        total_line_pay: baseSalary + eventsTotal,
-        events,
-      });
-    }
+    const { lines: processedLines } = buildPayrollLines({
+      employeeLineEvents,
+      eventTypes: eventsMaster ?? [],
+      employees: employees ?? [],
+      salaryLevels: salaryLevels ?? [],
+    });
 
     const insertPayload = {
       title,
@@ -615,15 +511,7 @@ router.post("/drafts", async (req, res) => {
         }
       }
 
-      const linePayloads = processedLines.map((line: any) => ({
-        run_id: runId,
-        employee_id: line.employee_id,
-        employee_name_snapshot: line.employee_name_snapshot,
-        salary_level_snapshot: line.salary_level_snapshot,
-        base_salary_snapshot: line.snapshot_base_salary,
-        commission_total_snapshot: line.total_events_value,
-        employee_total_snapshot: line.total_line_pay,
-      }));
+      const linePayloads = toPayrollLinePayloads(runId, processedLines);
 
       let insertedLines: Array<{ id: string; employee_id: string }> = [];
       if (linePayloads.length > 0) {
@@ -639,26 +527,7 @@ router.post("/drafts", async (req, res) => {
         insertedLines = lineData as Array<{ id: string; employee_id: string }>;
       }
 
-      const lineIdMap = new Map<string, string>(insertedLines.map((l) => [l.employee_id, l.id]));
-
-      const allEventRows = [];
-      for (const line of processedLines) {
-        const lineId = lineIdMap.get(line.employee_id);
-        if (!lineId) continue;
-
-        for (const ev of line.events) {
-          allEventRows.push({
-            employee_line_id: lineId,
-            event_type_id: ev.event_type_id,
-            event_name_snapshot: ev.event_name_snapshot,
-            unit_price_snapshot: ev.price_applied,
-            quantity: ev.quantity,
-            line_total_snapshot: ev.total_price_for_type,
-            override_price_etb: ev.override_price_etb,
-            override_reason: ev.override_reason,
-          });
-        }
-      }
+      const allEventRows = toPayrollEventPayloads(processedLines, insertedLines);
 
       if (allEventRows.length > 0) {
         const { error: evError } = await supabase.from("payroll_run_line_events").insert(allEventRows);
@@ -667,11 +536,24 @@ router.post("/drafts", async (req, res) => {
         }
       }
 
+      const totalPayrollValue = processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0);
+      await insertPayrollAuditLog({
+        payrollRunId: runId,
+        userId: created_by_user_id,
+        action: "draft_saved",
+        periodStart: bounds.start,
+        periodEnd: bounds.end,
+        statusSnapshot: "draft",
+        employeeCount: processedLines.length,
+        totalPayrollSnapshot: totalPayrollValue,
+        metadata: { existing_draft_updated: Boolean(existingDraft) },
+      });
+
       res.status(201).json({
         id: runId,
         title,
         status: "DRAFT",
-        total_payroll_value: processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0),
+        total_payroll_value: totalPayrollValue,
         employee_count: processedLines.length,
       });
     } catch (err: any) {
@@ -693,7 +575,7 @@ router.post("/runs", async (req, res) => {
     }
 
     const { month, year, period_kind, period_start, employeeLineEvents, created_by_user_id } = result.data;
-    
+
     const finalMonth = month || new Date().getUTCMonth() + 1;
     const finalYear = year || new Date().getUTCFullYear();
 
@@ -720,8 +602,8 @@ router.post("/runs", async (req, res) => {
     }
 
     if (existingRun) {
-      return res.status(409).json({ 
-        error: "A finalized payroll run already exists for this period. To redo it, trash the existing one first." 
+      return res.status(409).json({
+        error: "A finalized payroll run already exists for this period. To redo it, trash the existing one first."
       });
     }
 
@@ -740,94 +622,12 @@ router.post("/runs", async (req, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
-    const salaryLevelByCode = new Map<string, { id: string; amount: number; code: string }>();
-    const salaryLevelCodeById = new Map<string, string>();
-    for (const sl of salaryLevels ?? []) {
-      const normalizedId = String(sl.id);
-      salaryLevelByCode.set(sl.code, {
-        id: normalizedId,
-        amount: Number(sl.amount_etb ?? 0),
-        code: sl.code,
-      });
-      salaryLevelCodeById.set(normalizedId, sl.code);
-    }
-
-    const processedLines: Array<{
-      employee_id: string;
-      employee_name_snapshot: string;
-      salary_level_snapshot: string;
-      snapshot_base_salary: number;
-      total_events_value: number;
-      total_line_pay: number;
-      events: Array<{
-        event_type_id: string;
-        event_name_snapshot: string;
-        price_applied: number;
-        quantity: number;
-        total_price_for_type: number;
-        override_price_etb: number | null;
-        override_reason: string | null;
-      }>;
-    }> = [];
-
-    // Build O(1) lookup maps — avoids O(n×m) Array.find() inside nested loops
-    const employeeMap = new Map<string, any>();
-    for (const e of employees ?? []) employeeMap.set(e.id, e);
-    const eventMasterMap = new Map<string, any>();
-    for (const em of eventsMaster ?? []) eventMasterMap.set(em.id, em);
-
-    for (const line of employeeLineEvents) {
-      const employee = employeeMap.get(line.employee_id);
-      if (!employee) continue;
-
-      const levelData = salaryLevelByCode.get(employee.salary_level ?? "");
-      const baseSalary = levelData?.amount ?? Number(employee.base_salary ?? 0);
-      const levelCode = levelData?.code ?? employee.salary_level ?? "";
-      let eventsTotal = 0;
-
-      const events = line.events.map((eventLine: {
-        event_type_id: string;
-        quantity: number;
-        selected_level_id?: string | null;
-        price_override?: number | null;
-        override_reason?: string | null;
-      }) => {
-        const eventMaster = eventMasterMap.get(eventLine.event_type_id);
-        
-        // Decentralized Resolution: Price Override > Employee Specific Price > 0
-        const empEventPrices = (employee.event_prices || {}) as Record<string, number>;
-        const employeeDefinedPrice = Number(empEventPrices[eventLine.event_type_id] ?? 0);
-
-        const priceApplied = eventLine.price_override != null ? Number(eventLine.price_override) : employeeDefinedPrice;
-        const lineTotal = eventLine.quantity * priceApplied;
-        eventsTotal += lineTotal;
-
-        const levelSuffix = eventLine.selected_level_id && salaryLevelCodeById.has(String(eventLine.selected_level_id))
-          ? ` ${salaryLevelCodeById.get(String(eventLine.selected_level_id))}`
-          : "";
-        const eventNameSnapshot = `${eventMaster?.name ?? "Event"}${levelSuffix}`;
-
-        return {
-          event_type_id: eventLine.event_type_id,
-          event_name_snapshot: eventNameSnapshot,
-          price_applied: priceApplied,
-          quantity: eventLine.quantity,
-          total_price_for_type: lineTotal,
-          override_price_etb: eventLine.price_override ?? null,
-          override_reason: eventLine.override_reason ?? null,
-        };
-      });
-
-      processedLines.push({
-        employee_id: employee.id,
-        employee_name_snapshot: employee.full_name,
-        salary_level_snapshot: levelCode,
-        snapshot_base_salary: baseSalary,
-        total_events_value: eventsTotal,
-        total_line_pay: baseSalary + eventsTotal,
-        events,
-      });
-    }
+    const { lines: processedLines } = buildPayrollLines({
+      employeeLineEvents,
+      eventTypes: eventsMaster ?? [],
+      employees: employees ?? [],
+      salaryLevels: salaryLevels ?? [],
+    });
 
     // Insert payroll run header
     const { data: runData, error: runError } = await supabase
@@ -853,15 +653,7 @@ router.post("/runs", async (req, res) => {
 
     try {
       // 2. Batched Insert: Employee Lines (O(1) roundtrip)
-      const linePayloads = processedLines.map((line: any) => ({
-        run_id: runId,
-        employee_id: line.employee_id,
-        employee_name_snapshot: line.employee_name_snapshot,
-        salary_level_snapshot: line.salary_level_snapshot,
-        base_salary_snapshot: line.snapshot_base_salary,
-        commission_total_snapshot: line.total_events_value,
-        employee_total_snapshot: line.total_line_pay,
-      }));
+      const linePayloads = toPayrollLinePayloads(runId, processedLines);
 
       const { data: insertedLines, error: lineError } = await supabase
         .from("payroll_run_employee_lines")
@@ -872,28 +664,8 @@ router.post("/runs", async (req, res) => {
         throw new Error(`Failed to insert employee lines: ${lineError?.message}`);
       }
 
-      // Map employee_id -> inserted_line_id for linking events
-      const lineIdMap = new Map<string, string>(insertedLines.map((l: any) => [l.employee_id as string, l.id as string]));
-
       // 3. Batched Insert: Line Events (O(1) roundtrip)
-      const allEventRows = [];
-      for (const line of processedLines) {
-        const lineId = lineIdMap.get(line.employee_id);
-        if (!lineId) continue;
-
-        for (const ev of line.events) {
-          allEventRows.push({
-            employee_line_id: lineId,
-            event_type_id: ev.event_type_id,
-            event_name_snapshot: ev.event_name_snapshot,
-            unit_price_snapshot: ev.price_applied,
-            quantity: ev.quantity,
-            line_total_snapshot: ev.total_price_for_type,
-            override_price_etb: ev.override_price_etb,
-            override_reason: ev.override_reason,
-          });
-        }
-      }
+      const allEventRows = toPayrollEventPayloads(processedLines, insertedLines);
 
       if (allEventRows.length > 0) {
         const { error: evError } = await supabase
@@ -905,21 +677,34 @@ router.post("/runs", async (req, res) => {
         }
       }
 
+      const totalPayrollValue = processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0);
+      await insertPayrollAuditLog({
+        payrollRunId: runId,
+        userId: created_by_user_id,
+        action: "finalized",
+        periodStart: bounds.start,
+        periodEnd: bounds.end,
+        statusSnapshot: "finalized",
+        employeeCount: processedLines.length,
+        totalPayrollSnapshot: totalPayrollValue,
+        metadata: { duplicate_guard_checked: true },
+      });
+
       res.status(201).json({
         id: runId,
         title,
         status: "FINALIZED", // Match frontend expectation
-        total_payroll_value: processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0),
+        total_payroll_value: totalPayrollValue,
         employee_count: processedLines.length
       });
 
     } catch (err: any) {
       console.error("Critical error during payroll finalization:", err);
-      
+
       // Attempt cleanup (soft rollback)
       await supabase.from("payroll_runs").update({ status: "failed", deleted_at: new Date().toISOString() }).eq("id", runId);
-      
-      res.status(500).json({ 
+
+      res.status(500).json({
         error: "Payroll finalization partially failed. The run has been marked as failed and hidden. Please try again.",
         details: err.message
       });
