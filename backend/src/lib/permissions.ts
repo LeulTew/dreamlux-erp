@@ -42,7 +42,7 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
   super_admin: ["*"],
   admin: ["*"],
   owner: ["*"],
-  system_manager: ["users:manage", "settings:write"],
+  system_manager: ["users:manage", "settings:write", "events:read", "events:write", "reports:profit:read"],
   inventory_controller: ["assets:read", "assets:write", "assets:reconcile", "assets:delete", "exports:read"],
   inventory_officer: ["assets:read", "assets:write", "assets:reconcile", "exports:read"],
   ops_manager: [
