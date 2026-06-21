@@ -669,6 +669,8 @@ describe("Payroll API > POST /payroll/drafts", () => {
       // insert employee lines
       .mockResolvedValueOnce({ rows: [{ id: LINE_ID, employee_id: EMPLOYEE_ID }] })
       // insert event rows
+      .mockResolvedValueOnce({ rows: [] })
+      // insert audit log
       .mockResolvedValueOnce({ rows: [] });
   }
 
@@ -697,6 +699,8 @@ describe("Payroll API > POST /payroll/drafts", () => {
       // insert employee lines
       .mockResolvedValueOnce({ rows: [{ id: LINE_ID, employee_id: EMPLOYEE_ID }] })
       // insert event rows
+      .mockResolvedValueOnce({ rows: [] })
+      // insert audit log
       .mockResolvedValueOnce({ rows: [] });
   }
 
@@ -722,6 +726,15 @@ describe("Payroll API > POST /payroll/drafts", () => {
     expect(res.status).toBe(201);
     expect(res.body.id).toBe(RUN_ID);
     expect(res.body.status).toBe("DRAFT");
+    expect(insertPayloads).toContainEqual(expect.objectContaining({
+      payroll_run_id: RUN_ID,
+      action: "draft_saved",
+      status_snapshot: "draft",
+      employee_count: 1,
+      total_payroll_snapshot: 8900,
+      period_start: "2026-04-01",
+      period_end: "2026-04-15",
+    }));
   });
 
   test("updates an existing draft for the same period", async () => {
@@ -793,6 +806,8 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
       // insert employee line
         .mockResolvedValueOnce({ rows: [{ id: LINE_ID, employee_id: EMPLOYEE_ID }] })
       // insert event rows
+      .mockResolvedValueOnce({ rows: [] })
+      // insert audit log
       .mockResolvedValueOnce({ rows: [] });
   }
 
@@ -823,6 +838,15 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
     expect(res.status).toBe(201);
     expect(res.body.id).toBe(RUN_ID);
     expect(res.body.status).toBe("FINALIZED");
+    expect(insertPayloads).toContainEqual(expect.objectContaining({
+      payroll_run_id: RUN_ID,
+      action: "finalized",
+      status_snapshot: "finalized",
+      employee_count: 1,
+      total_payroll_snapshot: 10800,
+      period_start: "2026-04-01",
+      period_end: "2026-04-15",
+    }));
   });
 
   test("handles employee with price override (no reason required)", async () => {
@@ -987,7 +1011,8 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
       .mockResolvedValueOnce({ rows: [] }) // 3. employees
       .mockResolvedValueOnce({ rows: [] }) // 4. salary levels
       .mockResolvedValueOnce({ rows: [{ id: RUN_ID }] }) // 5. insert run
-      .mockResolvedValueOnce({ rows: [] }); // 6. insert employee lines batch (empty)
+      .mockResolvedValueOnce({ rows: [] }) // 6. insert employee lines batch (empty)
+      .mockResolvedValueOnce({ rows: [] }); // 7. insert audit log
 
     const res = await request(app)
       .post("/payroll/runs")
