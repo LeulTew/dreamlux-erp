@@ -72,7 +72,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Most Profitable Type": "Most Profitable Type",
     "Highest Margin Type": "Highest Margin Type",
     "Proposal Conversion": "Proposal Conversion Rate",
-    "Avg Variance (Est vs Act)": "Avg Variance (Est vs Act)"
+    "Avg Variance (Est vs Act)": "Avg Variance (Est vs Act)",
+    "Premium Event Logistics & Rentals": "Premium Event Logistics & Rentals"
   },
   am: {
     "Financial Dashboard & Reports": "የፋይናንስ ዳሽቦርድ እና ሪፖርቶች",
@@ -134,7 +135,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Most Profitable Type": "በጣም ትርፋማ አይነት",
     "Highest Margin Type": "ከፍተኛ ህዳግ ያለው አይነት",
     "Proposal Conversion": "የፕሮፖዛል ልወጣ መጠን",
-    "Avg Variance (Est vs Act)": "አማካይ ልዩነት (ተገመተ እና ትክክለኛ)"
+    "Avg Variance (Est vs Act)": "አማካይ ልዩነት (ተገመተ እና ትክክለኛ)",
+    "Premium Event Logistics & Rentals": "ፕሪሚየም የዝግጅት ሎጂስቲክስ እና ኪራይ"
   }
 };
 
@@ -226,7 +228,7 @@ export default function FinancialDashboardPage() {
     return (
       <AuthLayout>
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-danger/10 flex items-center justify-center text-danger mb-4 border border-danger/20">
+          <div className="w-16 h-16 rounded-lg bg-danger/10 flex items-center justify-center text-danger mb-4 border border-danger/20">
             <HiLockClosed className="h-8 w-8" />
           </div>
           <h2 className="text-xl font-bold text-foreground">{t("Forbidden: Insufficient privileges")}</h2>
@@ -302,7 +304,7 @@ export default function FinancialDashboardPage() {
           <div className="flex justify-between items-end">
             <div>
               <h1 className="text-2xl font-black text-foreground tracking-tight">DREAM LUX</h1>
-              <p className="text-[10px] text-primary uppercase font-bold tracking-widest">Premium Event Logistics & Rentals</p>
+              <p className="text-[10px] text-primary uppercase font-bold tracking-widest">{t("Premium Event Logistics & Rentals")}</p>
             </div>
             <div className="text-right text-xs text-muted">
               <div className="font-bold text-foreground">{t("Dream Lux Event Profitability Report")}</div>
@@ -372,7 +374,7 @@ export default function FinancialDashboardPage() {
 
               <button
                 onClick={handleResetFilters}
-                className="text-xs font-bold text-danger hover:underline uppercase tracking-wider"
+                className="text-xs font-bold text-danger [@media(hover:hover)]:hover:underline uppercase tracking-wider"
               >
                 {t("Reset")}
               </button>
@@ -392,7 +394,7 @@ export default function FinancialDashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setIsExportOpen(!isExportOpen)}
-                  className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-lg bg-card-alt border border-border text-muted hover:text-foreground"
+                  className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                 >
                   <HiArrowDownTray className="w-4 h-4" />
                   {t("Export")}
@@ -401,13 +403,13 @@ export default function FinancialDashboardPage() {
                   <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-lg shadow-massive z-10 py-1">
                     <button
                       onClick={() => handleExport("csv")}
-                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground hover:bg-card-alt"
+                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt"
                     >
                       {t("Export CSV")}
                     </button>
                     <button
                       onClick={() => handleExport("xlsx")}
-                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground hover:bg-card-alt"
+                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt"
                     >
                       {t("Export XLSX")}
                     </button>
@@ -430,7 +432,7 @@ export default function FinancialDashboardPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as "overview" | "monthly" | "eventTypes" | "categories" | "variance")}
-              className={`px-4 py-2.5 text-xs font-black uppercase tracking-wider border-b-2 transition-all ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted hover:text-foreground"}`}
+              className={`px-4 py-2.5 text-xs font-black uppercase tracking-wider border-b-2 transition-all ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted [@media(hover:hover)]:hover:text-foreground"}`}
             >
               {tab.label}
             </button>
@@ -613,7 +615,7 @@ export default function FinancialDashboardPage() {
                       </thead>
                       <tbody>
                         {monthlyData.map((row) => (
-                          <tr key={row.month} className="border-b border-border/50 hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                          <tr key={row.month} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
                             <td className="px-6 py-4 font-mono">{row.month}</td>
                             <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
                             <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
@@ -660,7 +662,7 @@ export default function FinancialDashboardPage() {
                       </thead>
                       <tbody>
                         {eventTypePerformance.map((row) => (
-                          <tr key={row.eventType} className="border-b border-border/50 hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                          <tr key={row.eventType} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
                             <td className="px-6 py-4 font-bold">{row.eventType}</td>
                             <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
                             <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
@@ -707,7 +709,7 @@ export default function FinancialDashboardPage() {
                           const percentage = data.summary.totalExpenses > 0 ? (row.amount / data.summary.totalExpenses) * 100 : 0;
                           const colorClass = colors[row.category as keyof typeof colors] || "bg-slate-500";
                           return (
-                            <tr key={row.category} className="border-b border-border/50 hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                            <tr key={row.category} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
                               <td className="px-6 py-4 flex items-center gap-2 font-bold">
                                 <span className={`h-2.5 w-2.5 rounded-full ${colorClass}`} />
                                 {t(row.category)}
@@ -750,7 +752,7 @@ export default function FinancialDashboardPage() {
                       </thead>
                       <tbody>
                         {proposalVariance.map((row) => (
-                          <tr key={row.eventId} className="border-b border-border/50 hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                          <tr key={row.eventId} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
                             <td className="px-6 py-4 font-bold">{row.eventName}</td>
                             <td className="px-6 py-4 font-mono text-muted text-[10px]">{row.proposalId}</td>
                             <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.estimatedNetProfit)}</td>
