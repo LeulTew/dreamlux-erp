@@ -1694,6 +1694,8 @@ describe("Events API", () => {
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Labor", amount: 20000.00 });
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Fuel", amount: 5000.00 });
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Other", amount: 15000.00 });
+      expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Approved'");
+      expect(String(mockQuery.mock.calls[1][0])).not.toContain("status != 'Rejected'");
     });
 
     test("GET /events/:id/profit returns 404 if event not found", async () => {
@@ -1806,6 +1808,57 @@ describe("Events API", () => {
       expect(julyData.profit).toBe(40000.00);
       expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN event_proposals");
       expect(String(mockQuery.mock.calls[1][0])).toContain("ORDER BY profit_rows.net_profit DESC");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Approved' AND category = 'Labor'");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Pending'");
+      expect(String(mockQuery.mock.calls[1][0])).not.toContain("status != 'Rejected'");
+    });
+
+    test("GET /events/reports/profit keeps reversed generated labor out of approved profit math", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ count: "1" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            event_id: "event-1",
+            event_name: "Corporate Gala",
+            event_type_name: "Gala",
+            start_date: "2026-06-10",
+            status: "Completed",
+            revenue: "100000.00",
+            approved_expenses: "20000.00",
+            labor_cost: "20000.00",
+            fuel_cost: "0.00",
+            other_cost: "0.00",
+            pending_expense_exposure: "3500.00",
+            net_profit: "80000.00",
+            margin_percentage: "80.00",
+            proposal_id: null,
+            proposal_status: null,
+            estimated_total_cost: "0.00",
+            estimated_net_profit: "0.00",
+            estimated_profit_variance: null,
+          },
+        ],
+        rowCount: 1,
+      });
+
+      const res = await request(app)
+        .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-06-30")
+        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.summary.totalExpenses).toBe(20000.00);
+      expect(res.body.summary.netProfit).toBe(80000.00);
+      expect(res.body.summary.pendingExpenseExposure).toBe(3500.00);
+      expect(res.body.categoryBreakdown).toContainEqual({ category: "Labor", amount: 20000.00 });
+      expect(res.body.events[0].labor_cost).toBe(20000.00);
+      expect(res.body.events[0].pending_expense_exposure).toBe(3500.00);
+      expect(String(mockQuery.mock.calls[1][0])).toContain("SUM(amount) FILTER (WHERE status = 'Approved')");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("SUM(amount) FILTER (WHERE status = 'Approved' AND category = 'Labor')");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("SUM(amount) FILTER (WHERE status = 'Pending')");
+      expect(String(mockQuery.mock.calls[1][0])).not.toContain("status != 'Rejected'");
     });
 
     test("GET /events/reports/profit validates bounded report filters", async () => {
@@ -1855,8 +1908,11 @@ describe("Events API", () => {
       expect(res.headers["content-type"]).toContain("text/csv");
       expect(res.text).toContain("Net Profit");
       expect(res.text).toContain("Corporate Gala");
+      expect(res.text).toContain("Labor / Commission");
+      expect(res.text).toContain("20000");
       expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
       expect((mockQuery.mock.calls[2][1] as unknown[])[1]).toBe("profit_report_export");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Approved' AND category = 'Labor'");
     });
 
     test("GET /events/reports/profit/export enforces maxRows before exporting", async () => {
