@@ -282,6 +282,56 @@ export const eventExportQuerySchema = eventListQueryBaseSchema.extend({
 
 export type EventExportQueryInput = z.infer<typeof eventExportQuerySchema>;
 
+const profitReportQueryBaseSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  search: z.string().max(200).optional(),
+  start_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid start_date"),
+  end_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid end_date"),
+  event_type_id: z.string().uuid("Invalid event_type_id").optional(),
+  status: z.enum(["Planned", "Ongoing", "Completed"]).optional(),
+  min_margin: z.coerce.number().optional(),
+  max_margin: z.coerce.number().optional(),
+  min_profit: z.coerce.number().optional(),
+  max_profit: z.coerce.number().optional(),
+  sortBy: z.enum([
+    "start_date",
+    "event_name",
+    "event_type",
+    "revenue",
+    "approved_expenses",
+    "labor_cost",
+    "fuel_cost",
+    "net_profit",
+    "margin_percentage",
+    "pending_expense_exposure",
+    "estimated_profit_variance",
+  ]).optional().default("start_date"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+});
+
+export const profitReportQuerySchema = profitReportQueryBaseSchema.refine((data) => {
+  if (!data.start_date || !data.end_date) return true;
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "end_date must be on or after start_date",
+  path: ["end_date"],
+});
+
+export const profitReportExportQuerySchema = profitReportQueryBaseSchema.extend({
+  format: z.enum(["csv", "xlsx"]).optional().default("csv"),
+  maxRows: z.coerce.number().int().min(1).max(1000).optional().default(1000),
+}).refine((data) => {
+  if (!data.start_date || !data.end_date) return true;
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "end_date must be on or after start_date",
+  path: ["end_date"],
+});
+
+export type ProfitReportQueryInput = z.infer<typeof profitReportQuerySchema>;
+export type ProfitReportExportQueryInput = z.infer<typeof profitReportExportQuerySchema>;
+
 const eventImportRowSchema = z.object({
   id: z.string().uuid("Invalid event ID").optional().nullable(),
   name: z.string().min(1, "Event name is required").max(500, "Event name too long"),
