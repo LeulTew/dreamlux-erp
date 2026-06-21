@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createEventProposal, submitEventProposal, getEventTypes, createEventType } from "@/lib/api";
@@ -173,6 +173,42 @@ export default function NewProposalPage() {
   const [showAddEventType, setShowAddEventType] = useState(false);
   const [newEventTypeName, setNewEventTypeName] = useState("");
   const [newEventTypeDesc, setNewEventTypeDesc] = useState("");
+
+  const addEventTypeModalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showAddEventType) return;
+    const focusableElements = addEventTypeModalRef.current?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusableElements && focusableElements.length > 0) {
+      (focusableElements[0] as HTMLElement).focus();
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowAddEventType(false);
+        return;
+      }
+      if (e.key === "Tab") {
+        if (!focusableElements || focusableElements.length === 0) return;
+        const firstEl = focusableElements[0] as HTMLElement;
+        const lastEl = focusableElements[focusableElements.length - 1] as HTMLElement;
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl) {
+            lastEl.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastEl) {
+            firstEl.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showAddEventType]);
 
   // Step 1: Basics Form State
   const [name, setName] = useState("");
@@ -351,7 +387,7 @@ export default function NewProposalPage() {
 
   return (
     <AuthLayout>
-      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+      <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
         <header className="mb-6">
           <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight uppercase">
             {t("New Proposal Intake")}
@@ -637,7 +673,7 @@ export default function NewProposalPage() {
                           onChange={(e) => updateLine("design", idx, "notes", e.target.value)}
                           className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border"
                         />
-                        <button onClick={() => removeLine("design", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("design", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -684,7 +720,7 @@ export default function NewProposalPage() {
                           onChange={(e) => updateLine("team", idx, "amount", Number(e.target.value))}
                           className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
                         />
-                        <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -731,7 +767,7 @@ export default function NewProposalPage() {
                           onChange={(e) => updateLine("trip", idx, "amount", Number(e.target.value))}
                           className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
                         />
-                        <button onClick={() => removeLine("trip", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("trip", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -771,7 +807,7 @@ export default function NewProposalPage() {
                           onChange={(e) => updateLine("other", idx, "notes", e.target.value)}
                           className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border"
                         />
-                        <button onClick={() => removeLine("other", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("other", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -828,7 +864,7 @@ export default function NewProposalPage() {
               {step > 1 ? (
                 <button
                   onClick={() => setStep(step - 1)}
-                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                 >
                   <HiArrowLeft className="w-4 h-4" />
                   {t("Back")}
@@ -836,7 +872,7 @@ export default function NewProposalPage() {
               ) : (
                 <button
                   onClick={() => router.push("/events/proposals")}
-                  className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                  className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                 >
                   {t("Cancel")}
                 </button>
@@ -845,7 +881,7 @@ export default function NewProposalPage() {
               {step < 3 ? (
                 <button
                   onClick={handleNextStep}
-                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 border border-primary/20"
+                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
                 >
                   {t("Next")}
                   <HiArrowRight className="w-4 h-4" />
@@ -855,13 +891,13 @@ export default function NewProposalPage() {
                   <button
                     onClick={handleSaveDraft}
                     disabled={createProposalMutation.isPending}
-                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground hover:bg-card-alt"
+                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt"
                   >
                     {t("Create Draft")}
                   </button>
                   <button
                     onClick={handleSubmitForApproval}
-                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 border border-primary/20"
+                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
                   >
                     {t("Submit for Approval")}
                   </button>
@@ -871,7 +907,7 @@ export default function NewProposalPage() {
           </div>
 
           {/* Sticky Live Financial Summary Card */}
-          <div className="w-full lg:w-80 shrink-0 space-y-4 sticky top-6">
+          <div className="hidden md:block w-full lg:w-80 shrink-0 space-y-4 lg:sticky lg:top-6">
             <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
                 <HiOutlinePresentationChartBar className="w-4 h-4 text-primary" />
@@ -899,7 +935,13 @@ export default function NewProposalPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Margin")}</span>
-                  <span className="font-mono font-black text-primary">
+                  <span className={`font-mono font-black ${
+                    financials.netProfit < 0 || financials.margin < 10
+                      ? "text-danger"
+                      : financials.margin < 25
+                        ? "text-warning"
+                        : "text-success"
+                  }`}>
                     {financials.margin}%
                   </span>
                 </div>
@@ -930,7 +972,7 @@ export default function NewProposalPage() {
               <button 
                 type="button"
                 onClick={() => window.open("/docs/guidelines", "_blank")}
-                className="w-full h-10 mt-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card-alt text-xs font-black uppercase tracking-wider text-muted hover:text-foreground hover:bg-border/30 transition-all cursor-pointer active:scale-95"
+                className="w-full h-10 mt-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card-alt text-xs font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:bg-border/30 transition-all cursor-pointer active:scale-95"
               >
                 <span>{t("View Guidelines")}</span>
                 <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
@@ -964,6 +1006,40 @@ export default function NewProposalPage() {
               </div>
             </div>
           </div>
+
+          {/* Dense Fixed Bottom Strip for Mobile (<768px) */}
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border/80 px-4 py-2.5 shadow-lg flex items-center justify-between text-xs font-semibold">
+            <div className="flex flex-col">
+              <span className="text-[9px] text-muted uppercase tracking-wider block">{t("Revenue")}</span>
+              <span className="font-mono font-bold text-foreground">
+                ETB {requestedBudget.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-muted uppercase tracking-wider block">{t("Estimated Cost")}</span>
+              <span className="font-mono font-bold text-foreground">
+                ETB {financials.totalCost.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-muted uppercase tracking-wider block">{t("Net Profit")}</span>
+              <span className={`font-mono font-bold ${financials.netProfit < 0 ? "text-danger" : "text-foreground"}`}>
+                ETB {financials.netProfit.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] text-muted uppercase tracking-wider block">{t("Margin")}</span>
+              <span className={`font-mono font-black ${
+                financials.netProfit < 0 || financials.margin < 10 
+                  ? "text-danger" 
+                  : financials.margin < 25 
+                    ? "text-warning" 
+                    : "text-success"
+              }`}>
+                {financials.margin}%
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -975,8 +1051,14 @@ export default function NewProposalPage() {
             onClick={() => setShowAddEventType(false)}
           />
           <div className="fixed inset-0 z-70 flex items-center justify-center pointer-events-none p-4">
-            <div className="pointer-events-auto bg-card rounded-lg border border-border p-6 w-full max-w-sm flex flex-col shadow-2xl relative animate-scale-in">
-              <h3 className="text-sm font-black text-foreground mb-4 uppercase tracking-wider">
+            <div
+              ref={addEventTypeModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-event-type-title"
+              className="pointer-events-auto bg-card rounded-lg border border-border p-6 w-full max-w-sm flex flex-col shadow-2xl relative animate-scale-in"
+            >
+              <h3 id="add-event-type-title" className="text-sm font-black text-foreground mb-4 uppercase tracking-wider">
                 {t("Add Event Type")}
               </h3>
               <div className="flex flex-col gap-3 mb-6">
@@ -1004,7 +1086,7 @@ export default function NewProposalPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddEventType(false)}
-                  className="flex-1 py-2.5 rounded-lg bg-card-alt border border-border text-foreground font-bold hover:bg-border transition-all text-xs active:scale-95 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-lg bg-card-alt border border-border text-foreground font-bold [@media(hover:hover)]:hover:bg-border transition-all text-xs active:scale-95 cursor-pointer"
                 >
                   {t("Cancel")}
                 </button>
@@ -1027,7 +1109,7 @@ export default function NewProposalPage() {
                       setErrorMsg("Failed to add event type");
                     }
                   }}
-                  className="flex-1 py-2.5 rounded-lg bg-primary text-white font-bold hover:opacity-90 transition-all text-xs active:scale-95 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-lg bg-primary text-white font-bold [@media(hover:hover)]:hover:opacity-90 transition-all text-xs active:scale-95 cursor-pointer"
                 >
                   {t("Save")}
                 </button>
