@@ -15,8 +15,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Import Events": "Import Events",
     "Close": "Close",
     "Step 1: Upload File": "Step 1: Upload File",
-    "Step 2: Preview & Validate": "Step 2: Preview & Validate",
-    "Step 3: Commit Import": "Step 3: Commit Import",
+    "Step 1.5: Match Columns": "Step 2: Match Columns",
+    "Step 2: Preview & Validate": "Step 3: Preview & Validate",
+    "Step 3: Commit Import": "Step 4: Commit Import",
     "Download Template": "Download Template (CSV)",
     "Upload Mode": "Upload Mode",
     "Insert (New Events)": "Insert (New Events)",
@@ -51,14 +52,36 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Client": "Client",
     "Date": "Date",
     "Venue": "Venue",
-    "Price": "Price"
+    "Price": "Price",
+    "Database Field": "Database Field",
+    "CSV Column": "CSV Column",
+    "Select CSV Column": "Select CSV Column...",
+    "Skip Column": "-- Skip Column --",
+    "Please map all required fields": "Please map all required fields: Event Name, Client Name, Start Date, End Date, Venue, Contract Price",
+    "First Row Preview": "First Row Data Preview",
+    "Required": "Required",
+    "Optional": "Optional",
+    "name": "Event Name",
+    "client_name": "Client Name",
+    "client_phone": "Client Phone",
+    "event_type_name": "Event Type",
+    "start_date": "Start Date",
+    "end_date": "End Date",
+    "start_time": "Start Time",
+    "end_time": "End Time",
+    "venue_location": "Venue / Location",
+    "contract_price": "Contract Price",
+    "status": "Status",
+    "package_design_notes": "Package Design Notes",
+    "estimated_design_cost": "Estimated Design Cost"
   },
   am: {
     "Import Events": "ዝግጅቶችን አስገባ",
     "Close": "ዝጋ",
     "Step 1: Upload File": "ደረጃ 1፡ ፋይል ስቀል",
-    "Step 2: Preview & Validate": "ደረጃ 2፡ ቅድመ-ዕይታ እና ማረጋገጫ",
-    "Step 3: Commit Import": "ደረጃ 3፡ አስገባ",
+    "Step 1.5: Match Columns": "ደረጃ 2፡ አምዶችን አዛምድ",
+    "Step 2: Preview & Validate": "ደረጃ 3፡ ቅድመ-ዕይታ እና ማረጋገጫ",
+    "Step 3: Commit Import": "ደረጃ 4፡ አስገባ",
     "Download Template": "ቅጽ አውርድ (CSV)",
     "Upload Mode": "የመስቀያ ሁኔታ",
     "Insert (New Events)": "አዲስ መዝግብ (አስገባ)",
@@ -93,7 +116,28 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Client": "ደንበኛ",
     "Date": "ቀን",
     "Venue": "ቦታ",
-    "Price": "ዋጋ"
+    "Price": "ዋጋ",
+    "Database Field": "የስርአቱ መረጃ ክፍል",
+    "CSV Column": "የCSV ፋይል አምድ",
+    "Select CSV Column": "የCSV አምድ ይምረጡ...",
+    "Skip Column": "-- አትጠቀምበት --",
+    "Please map all required fields": "እባክዎን ሁሉንም አስፈላጊ ክፍሎች ያዛምዱ፡ የዝግጅት ስም፣ የደንበኛ ስም፣ መጀመሪያ ቀን፣ መጨረሻ ቀን፣ ቦታ፣ የውል ዋጋ",
+    "First Row Preview": "የመጀመሪያው ረድፍ መረጃ ቅድመ-ዕይታ",
+    "Required": "አስፈላጊ",
+    "Optional": "አማራጭ",
+    "name": "የዝግጅት ስም",
+    "client_name": "የደንበኛ ስም",
+    "client_phone": "የደንበኛ ስልክ",
+    "event_type_name": "የዝግጅት አይነት",
+    "start_date": "መጀመሪያ ቀን",
+    "end_date": "መጨረሻ ቀን",
+    "start_time": "መጀመሪያ ሰዓት",
+    "end_time": "መጨረሻ ሰዓት",
+    "venue_location": "ቦታ",
+    "contract_price": "የውል ዋጋ",
+    "status": "ሁኔታ",
+    "package_design_notes": "የጥቅል ዲዛይን ማስታወሻዎች",
+    "estimated_design_cost": "ግምታዊ የዲዛይን ወጪ"
   }
 };
 
@@ -115,6 +159,22 @@ const HEADER_MAP: Record<string, string> = {
   "Event ID": "id"
 };
 
+const DB_FIELDS = [
+  { key: "name", label: "Event Name", required: true },
+  { key: "client_name", label: "Client Name", required: true },
+  { key: "client_phone", label: "Client Phone", required: false },
+  { key: "event_type_name", label: "Event Type", required: false },
+  { key: "start_date", label: "Start Date", required: true },
+  { key: "end_date", label: "End Date", required: true },
+  { key: "start_time", label: "Start Time", required: false },
+  { key: "end_time", label: "End Time", required: false },
+  { key: "venue_location", label: "Venue / Location", required: true },
+  { key: "contract_price", label: "Contract Price", required: true },
+  { key: "status", label: "Status", required: false },
+  { key: "package_design_notes", label: "Package Design Notes", required: false },
+  { key: "estimated_design_cost", label: "Estimated Design Cost", required: false }
+];
+
 interface ValidationError {
   row: number;
   field: string;
@@ -130,7 +190,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<number>(1);
   const [mode, setMode] = useState<"insert" | "update">("insert");
   const [file, setFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([]);
@@ -138,6 +198,11 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
   const [isLoading, setIsLoading] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Matching Mapper States
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [rawCsvRows, setRawCsvRows] = useState<string[][]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
 
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -247,30 +312,66 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
       };
 
       const rawHeaders = splitCSVLine(lines[0]);
-      const mappedHeaders = rawHeaders.map(h => HEADER_MAP[h] || h);
-
-      const rows: Record<string, string>[] = [];
+      const rawRows: string[][] = [];
       for (let i = 1; i < lines.length; i++) {
         const values = splitCSVLine(lines[i]);
-        if (values.length < rawHeaders.length) continue;
-        const row: Record<string, string> = {};
-        mappedHeaders.forEach((header, index) => {
-          row[header] = values[index] || "";
-        });
-        rows.push(row);
+        if (values.length > 0) {
+          rawRows.push(values);
+        }
       }
 
-      setParsedRows(rows);
+      setCsvHeaders(rawHeaders);
+      setRawCsvRows(rawRows);
+
+      // Auto-match headers to Database Fields
+      const initialMapping: Record<string, string> = {};
+      DB_FIELDS.forEach(field => {
+        const match = rawHeaders.find(h => {
+          const normalizedH = h.trim().toLowerCase();
+          const targetKey = field.key.toLowerCase();
+          return normalizedH === targetKey || 
+                 HEADER_MAP[h] === field.key ||
+                 normalizedH.replace(/[^a-z0-9]/g, '') === targetKey.replace(/[^a-z0-9]/g, '');
+        });
+        initialMapping[field.key] = match || "";
+      });
+      setMapping(initialMapping);
+      setStep(1.5);
     };
     reader.readAsText(fileToParse);
   };
 
-  const handleValidate = async () => {
-    if (parsedRows.length === 0) return;
-    setIsLoading(true);
+  const handleApplyMapping = async () => {
     setErrorMsg("");
+    
+    // Check if required fields are mapped
+    const unmappedRequired = DB_FIELDS.filter(f => f.required && !mapping[f.key]);
+    if (unmappedRequired.length > 0) {
+      setErrorMsg(`${t("Please map all required fields")}`);
+      return;
+    }
+
+    // Build parsedRows using the mapping
+    const rows: Record<string, string>[] = [];
+    rawCsvRows.forEach(csvRow => {
+      const row: Record<string, string> = {};
+      Object.entries(mapping).forEach(([dbKey, csvHeader]) => {
+        if (csvHeader) {
+          const csvHeaderIndex = csvHeaders.indexOf(csvHeader);
+          if (csvHeaderIndex !== -1) {
+            row[dbKey] = csvRow[csvHeaderIndex] || "";
+          }
+        }
+      });
+      rows.push(row);
+    });
+
+    setParsedRows(rows);
+
+    // Call validation preview API
+    setIsLoading(true);
     try {
-      const res = await previewEventsImport({ mode, rows: parsedRows });
+      const res = await previewEventsImport({ mode, rows });
       setValidationResult(res as ValidationResult);
       setStep(2);
     } catch (err: unknown) {
@@ -346,9 +447,12 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
         </div>
 
         {/* Stepper Status */}
-        <div className="grid grid-cols-3 border-b border-border/50 text-center text-xs font-bold uppercase tracking-wider bg-card">
+        <div className="grid grid-cols-4 border-b border-border/50 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider bg-card">
           <div className={`py-3.5 border-r border-border/50 ${step === 1 ? "bg-primary/10 text-primary border-b-2 border-b-primary" : "text-muted"}`}>
             {t("Step 1: Upload File")}
+          </div>
+          <div className={`py-3.5 border-r border-border/50 ${step === 1.5 ? "bg-primary/10 text-primary border-b-2 border-b-primary" : "text-muted"}`}>
+            {t("Step 1.5: Match Columns")}
           </div>
           <div className={`py-3.5 border-r border-border/50 ${step === 2 ? "bg-primary/10 text-primary border-b-2 border-b-primary" : "text-muted"}`}>
             {t("Step 2: Preview & Validate")}
@@ -418,8 +522,8 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 </div>
                 {file ? (
                   <div>
-                    <p className="text-sm font-bold text-foreground">{file.name}</p>
-                    <p className="text-xs text-muted font-mono mt-1">{(file.size / 1024).toFixed(1)} KB</p>
+                     <p className="text-sm font-bold text-foreground">{file.name}</p>
+                     <p className="text-xs text-muted font-mono mt-1">{(file.size / 1024).toFixed(1)} KB</p>
                   </div>
                 ) : (
                   <div>
@@ -427,6 +531,84 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                     <p className="text-xs text-muted font-medium mt-1">.csv (max 500 rows)</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {step === 1.5 && (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-1.5">
+                <h3 className="text-xs font-bold text-muted uppercase tracking-wider">{t("First Row Preview")}</h3>
+                <div className="border border-border/50 rounded-lg overflow-x-auto bg-card-alt/30">
+                  <div className="p-4 flex gap-6 overflow-x-auto min-w-[500px]">
+                    {csvHeaders.slice(0, 5).map((header, idx) => (
+                      <div key={header} className="flex flex-col gap-1 shrink-0">
+                        <span className="text-[10px] font-bold text-muted uppercase tracking-wider">{header}</span>
+                        <span className="text-xs font-semibold text-foreground font-mono">{rawCsvRows[0]?.[idx] || "-"}</span>
+                      </div>
+                    ))}
+                    {csvHeaders.length > 5 && (
+                      <div className="flex flex-col justify-center shrink-0">
+                        <span className="text-xs font-black text-muted">+{csvHeaders.length - 5} more</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs font-bold text-muted uppercase tracking-wider">{t("Step 1.5: Match Columns")}</h3>
+                <div className="border border-border/50 rounded-lg overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-card-alt text-muted font-bold border-b border-border/50">
+                        <th className="px-4 py-3">{t("Database Field")}</th>
+                        <th className="px-4 py-3">{t("CSV Column")}</th>
+                        <th className="px-4 py-3">{t("First Row Preview")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DB_FIELDS.map((field) => {
+                        const mappedHeader = mapping[field.key] || "";
+                        const headerIndex = csvHeaders.indexOf(mappedHeader);
+                        const previewVal = (mappedHeader && headerIndex !== -1) ? rawCsvRows[0]?.[headerIndex] : "";
+                        return (
+                          <tr key={field.key} className="border-b border-border/30 [@media(hover:hover)]:hover:bg-card-alt/50">
+                            <td className="px-4 py-3 font-bold text-foreground">
+                              <span className="flex items-center gap-2">
+                                {t(field.key)}
+                                {field.required ? (
+                                  <span className="px-1.5 py-0.5 rounded bg-danger/10 text-danger text-[10px] uppercase font-black tracking-wider">
+                                    {t("Required")}
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded bg-muted/10 text-muted text-[10px] uppercase font-black tracking-wider">
+                                    {t("Optional")}
+                                  </span>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <select
+                                value={mappedHeader}
+                                onChange={(e) => setMapping(prev => ({ ...prev, [field.key]: e.target.value }))}
+                                className="w-full h-[38px] px-3 rounded-lg border border-border bg-card text-foreground text-xs focus:border-primary focus:outline-none transition-all"
+                              >
+                                <option value="">{t("Skip Column")}</option>
+                                {csvHeaders.map(header => (
+                                  <option key={header} value={header}>{header}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-4 py-3 text-muted font-mono max-w-[200px] truncate">
+                              {previewVal !== undefined && previewVal !== "" ? previewVal : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -540,8 +722,33 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
               </button>
               <button
                 type="button"
-                onClick={handleValidate}
-                disabled={parsedRows.length === 0 || isLoading}
+                disabled
+                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary opacity-50 transition-all border border-primary/20"
+              >
+                {t("Next")}
+              </button>
+            </>
+          )}
+
+          {step === 1.5 && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setFile(null);
+                  setParsedRows([]);
+                  setCsvHeaders([]);
+                  setRawCsvRows([]);
+                }}
+                className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-card [@media(hover:hover)]:hover:bg-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all border border-border"
+              >
+                {t("Back")}
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyMapping}
+                disabled={isLoading}
                 className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 disabled:opacity-50 disabled:scale-100 transition-all border border-primary/20"
               >
                 {isLoading ? t("Validating") : t("Validate & Preview")}
@@ -553,7 +760,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
             <>
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(1.5)}
                 className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-card [@media(hover:hover)]:hover:bg-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all border border-border"
               >
                 {t("Back")}
