@@ -101,3 +101,8 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_expenses_event ON expenses(event_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_event_status_category ON expenses(event_id, status, category);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_auto_labor_once_per_event
+  ON expenses(event_id)
+  WHERE category = 'Labor'
+    AND description = 'Auto-generated labor cost from attended event assignments'
+    AND status != 'Rejected';

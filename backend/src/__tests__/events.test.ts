@@ -922,6 +922,46 @@ describe("Events API", () => {
     expect(res.body.event.name).toBe("Updated Name");
   });
 
+  test("PUT /events/:id auto-generates labor expense when event transitions to Completed", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          status: "Ongoing",
+          name: "Corporate Gala",
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // status audit
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Completed", name: "Corporate Gala" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 }); // event lock
+    mockQuery.mockResolvedValueOnce({ rows: [{ total: "3500" }], rowCount: 1 }); // labor sum
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // existing generated labor
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // generation audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .put("/events/event-1")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({ status: "Completed" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.status).toBe("Completed");
+    expect(String(mockQuery.mock.calls[4][0])).toContain("FOR UPDATE");
+    expect(String(mockQuery.mock.calls[7][0])).toContain("INSERT INTO expenses");
+    expect((mockQuery.mock.calls[8][1] as unknown[])[2]).toBe("labor_expense_generation");
+    expect(String((mockQuery.mock.calls[8][1] as unknown[])[4])).toContain("\"outcome\":\"created\"");
+  });
+
   // Test invalid status transitions (Ongoing -> Planned)
   test("PUT /events/:id blocks transition from Ongoing back to Planned", async () => {
     mockQuery.mockResolvedValueOnce({
@@ -1532,6 +1572,8 @@ describe("Events API", () => {
       rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
       rowCount: 1,
     });
+    // Audit generation
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
     // COMMIT
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
@@ -1542,6 +1584,84 @@ describe("Events API", () => {
     expect(res.status).toBe(201);
     expect(res.body.category).toBe("Labor");
     expect(res.body.status).toBe("Pending");
+    expect((mockQuery.mock.calls[5][1] as unknown[])[2]).toBe("labor_expense_generation");
+  });
+
+  test("POST /events/:id/expenses/generate-labor handles concurrent duplicate generation as idempotent conflict", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Completed" }],
+      rowCount: 1,
+    }); // Event check/lock
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ total: "3500" }],
+      rowCount: 1,
+    }); // Labor sum
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // Pre-insert existing check
+    mockQuery.mockRejectedValueOnce({
+      code: "23505",
+      constraint: "idx_expenses_auto_labor_once_per_event",
+    }); // Unique index race
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-labor-existing" }],
+      rowCount: 1,
+    }); // Duplicate lookup
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // Audit generation outcome
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/event-1/expenses/generate-labor")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("already been generated");
+    expect((mockQuery.mock.calls[6][1] as unknown[])[2]).toBe("labor_expense_generation");
+    expect(String((mockQuery.mock.calls[6][1] as unknown[])[4])).toContain("\"outcome\":\"already_exists\"");
+  });
+
+  test("POST /events/:id/expenses/reverse-auto-labor rejects pending generated labor without deleting audit context", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1" }], rowCount: 1 }); // event lock
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "expense-labor-1", status: "Pending" }], rowCount: 1 }); // expense lock
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "expense-labor-1",
+        category: "Labor",
+        status: "Rejected",
+        rejected_reason: "Corrected assignment attendance",
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/event-1/expenses/reverse-auto-labor")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+      .send({ reason: "Corrected assignment attendance" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("Rejected");
+    expect(String(mockQuery.mock.calls[3][0])).toContain("UPDATE expenses");
+    expect((mockQuery.mock.calls[4][1] as unknown[])[2]).toBe("labor_expense_reversal");
+  });
+
+  test("POST /events/:id/expenses/reverse-auto-labor keeps approved generated labor locked", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1" }], rowCount: 1 }); // event lock
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "expense-labor-1", status: "Approved" }], rowCount: 1 }); // expense lock
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/event-1/expenses/reverse-auto-labor")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+      .send({ reason: "Corrected assignment attendance" });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("Approved labor expenses are locked");
+    expect((mockQuery.mock.calls[3][1] as unknown[])[2]).toBe("labor_expense_reversal");
+    expect(String((mockQuery.mock.calls[3][1] as unknown[])[4])).toContain("approved_locked");
   });
 
   describe("Profitability Reports & Dashboards API", () => {
@@ -1801,6 +1921,17 @@ describe("Events API", () => {
         });
       expect(res.status).toBe(403);
       expect(res.body.error).toContain("Forbidden");
+    });
+
+    test("POST /events/:id/expenses/reverse-auto-labor blocks DRIVER role", async () => {
+      const res = await request(app)
+        .post("/events/event-1/expenses/reverse-auto-labor")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({ reason: "Unauthorized reversal attempt" });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("Forbidden");
+      expect(mockQuery).not.toHaveBeenCalled();
     });
 
     test("GET /events/:id/workspace omits financial data for non-financial roles", async () => {
