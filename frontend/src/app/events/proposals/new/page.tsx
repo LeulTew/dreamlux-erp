@@ -1,17 +1,25 @@
 "use client";
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { createEventProposal, submitEventProposal, getEventTypes } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createEventProposal, submitEventProposal, getEventTypes, createEventType } from "@/lib/api";
 import { EventType } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
+import Select from "@/components/ui/Select";
 import { 
   HiArrowRight, 
   HiArrowLeft, 
   HiPlus, 
   HiTrash, 
   HiExclamationTriangle,
-  HiCurrencyDollar
+  HiOutlineCalendar,
+  HiOutlinePhone,
+  HiOutlineUser,
+  HiOutlineClock,
+  HiOutlineMapPin,
+  HiOutlinePresentationChartBar,
+  HiOutlineQuestionMarkCircle,
+  HiArrowTopRightOnSquare
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -63,7 +71,20 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Submit Success": "Proposal submitted successfully",
     "Review Details": "Review Details",
     "Review Description": "Please verify all details and calculations before committing or submitting for approval.",
-    "phone_validation_error": "Invalid Ethiopian phone number. Use +251... or 09.../07..."
+    "phone_validation_error": "Invalid Ethiopian phone number. Use +251... or 09.../07...",
+    "Event Details": "Event Details",
+    "Location & Notes": "Location & Notes",
+    "Need help?": "Need help?",
+    "Make sure to fill all required fields to get accurate estimates.": "Make sure to fill all required fields to get accurate estimates.",
+    "View Guidelines": "View Guidelines",
+    "Form Progress": "Form Progress",
+    "Complete basic information": "Complete basic information",
+    "Complete estimates": "Complete estimates",
+    "Review & submit": "Review & submit",
+    "Add Event Type": "Add Event Type",
+    "Event Type Name": "Event Type Name",
+    "Description": "Description",
+    "Save": "Save"
   },
   am: {
     "New Proposal Intake": "አዲስ ፕሮፖዛል ማስገቢያ",
@@ -112,7 +133,20 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Submit Success": "ፕሮፖዛሉ በተሳካ ሁኔታ ቀርቧል",
     "Review Details": "ዝርዝሩን ይከልሱ",
     "Review Description": "እባክዎን ከማስገባትዎ ወይም ለማጽደቅ ከማቅረብዎ በፊት ሁሉንም ዝርዝሮች እና ስሌቶች ያረጋግጡ።",
-    "phone_validation_error": "ትክክለኛ የኢትዮጵያ ስልክ ቁጥር አይደለም። በ +251... ወይም 09.../07... ይጠቀሙ"
+    "phone_validation_error": "ትክክለኛ የኢትዮጵያ ስልክ ቁጥር አይደለም። በ +251... ወይም 09.../07... ይጠቀሙ",
+    "Event Details": "የዝግጅት ዝርዝሮች",
+    "Location & Notes": "ቦታ እና ማስታወሻዎች",
+    "Need help?": "እርዳታ ይፈልጋሉ?",
+    "Make sure to fill all required fields to get accurate estimates.": "ትክክለኛ ግምቶችን ለማግኘት እባክዎን ሁሉንም አስፈላጊ መስኮች ይሙሉ",
+    "View Guidelines": "መመሪያዎችን ይመልከቱ",
+    "Form Progress": "የቅጽ ሂደት",
+    "Complete basic information": "መሰረታዊ መረጃዎችን ይሙሉ",
+    "Complete estimates": "ግምቶችን ያጠናቅቁ",
+    "Review & submit": "ይከልሱ እና ያስገቡ",
+    "Add Event Type": "አዲስ የዝግጅት አይነት",
+    "Event Type Name": "የዝግጅት አይነት ስም",
+    "Description": "መግለጫ",
+    "Save": "አስቀምጥ"
   }
 };
 
@@ -131,8 +165,14 @@ export default function NewProposalPage() {
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
 
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Add Event Type Modal state
+  const [showAddEventType, setShowAddEventType] = useState(false);
+  const [newEventTypeName, setNewEventTypeName] = useState("");
+  const [newEventTypeDesc, setNewEventTypeDesc] = useState("");
 
   // Step 1: Basics Form State
   const [name, setName] = useState("");
@@ -316,13 +356,58 @@ export default function NewProposalPage() {
           <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight uppercase">
             {t("New Proposal Intake")}
           </h1>
-          <div className="flex items-center gap-2 text-xs font-bold text-muted uppercase tracking-wider mt-2.5">
-            <span>{t("Progress")}:</span>
-            <span className={step === 1 ? "text-primary" : ""}>{t("Basics")}</span>
-            <span>➔</span>
-            <span className={step === 2 ? "text-primary" : ""}>{t("Estimates")}</span>
-            <span>➔</span>
-            <span className={step === 3 ? "text-primary" : ""}>{t("Review")}</span>
+          
+          {/* Stepper progress tracker */}
+          <div className="flex items-center justify-center max-w-xl mx-auto my-6 select-none">
+            {/* Step 1 */}
+            <div className="flex items-center gap-2.5">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                step >= 1 ? "bg-primary text-on-primary font-bold shadow-md" : "bg-card-alt border border-border text-muted"
+              }`}>
+                1
+              </div>
+              <span className={`text-xs font-black uppercase tracking-wider ${step >= 1 ? "text-primary" : "text-muted"}`}>
+                {t("Basics")}
+              </span>
+            </div>
+
+            {/* Line 1 -> 2 */}
+            <div className="flex-1 mx-4 h-0.5 bg-border relative min-w-[60px]">
+              <div className={`absolute top-0 left-0 h-full bg-primary transition-all duration-300 ${
+                step > 1 ? "w-full" : step === 1 ? "w-1/2" : "w-0"
+              }`} />
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex items-center gap-2.5">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                step >= 2 ? "bg-primary text-on-primary font-bold shadow-md" : "bg-card-alt border border-border text-muted"
+              }`}>
+                2
+              </div>
+              <span className={`text-xs font-black uppercase tracking-wider ${step >= 2 ? "text-primary" : "text-muted"}`}>
+                {t("Estimates")}
+              </span>
+            </div>
+
+            {/* Line 2 -> 3 */}
+            <div className="flex-1 mx-4 h-0.5 bg-border relative min-w-[60px]">
+              <div className={`absolute top-0 left-0 h-full bg-primary transition-all duration-300 ${
+                step > 2 ? "w-full" : step === 2 ? "w-1/2" : "w-0"
+              }`} />
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex items-center gap-2.5">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                step >= 3 ? "bg-primary text-on-primary font-bold shadow-md" : "bg-card-alt border border-border text-muted"
+              }`}>
+                3
+              </div>
+              <span className={`text-xs font-black uppercase tracking-wider ${step >= 3 ? "text-primary" : "text-muted"}`}>
+                {t("Review")}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -338,23 +423,19 @@ export default function NewProposalPage() {
           <div className="flex-1 w-full bg-card border border-border rounded-lg p-5 sm:p-6 space-y-6">
             {step === 1 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                {/* Event Details Section Header */}
+                <div className="flex items-center gap-2 pb-2.5 border-b border-border/50 col-span-1 sm:col-span-2 mb-2">
+                  <HiOutlineCalendar className="w-5 h-5 text-primary" />
+                  <h3 className="text-sm font-black text-foreground uppercase tracking-wider">{t("Event Details")}</h3>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Event Name")} *</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    required
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Name")} *</label>
-                  <input
-                    type="text"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="e.g. Annual Charity Gala"
                     required
                     className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
                   />
@@ -362,89 +443,136 @@ export default function NewProposalPage() {
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Phone")}</label>
-                  <input
-                    type="text"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="e.g. +251912345678"
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={clientPhone}
+                      onChange={(e) => setClientPhone(e.target.value)}
+                      placeholder="e.g. +1 (123) 456-7890"
+                      className="w-full pl-10 pr-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                    />
+                    <HiOutlinePhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted" />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Event Type")}</label>
-                  <select
-                    value={eventTypeId}
-                    onChange={(e) => setEventTypeId(e.target.value)}
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
-                  >
-                    <option value="">{t("Select Event Type")}</option>
-                    {eventTypes.map((type) => (
-                      <option key={type.id} value={type.id}>{type.event_name}</option>
-                    ))}
-                  </select>
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Name")} *</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="e.g. Acme Corporation"
+                      required
+                      className="w-full pl-10 pr-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                    />
+                    <HiOutlineUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted" />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Requested Budget")} *</label>
-                  <input
-                    type="number"
-                    value={requestedBudget || ""}
-                    onChange={(e) => setRequestedBudget(Number(e.target.value))}
-                    required
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={requestedBudget || ""}
+                      onChange={(e) => setRequestedBudget(Number(e.target.value))}
+                      placeholder="0.00"
+                      required
+                      className="w-full pl-3.5 pr-16 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                    />
+                    <div className="absolute right-0 top-0 bottom-0 px-3 bg-card-alt border-l border-border/80 flex items-center justify-center text-xs font-black text-muted uppercase tracking-wider select-none rounded-r-lg">
+                      ETB
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Date")}</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Event Type")} *</label>
+                  <Select
+                    options={eventTypes.map((type) => ({ id: type.id, label: type.event_name }))}
+                    value={eventTypeId}
+                    onChange={setEventTypeId}
+                    placeholder={t("Select Event Type")}
+                    onAdd={() => setShowAddEventType(true)}
+                    addLabel={t("+ Add Event Type")}
                   />
+                </div>
+
+                {/* Empty block to align grid */}
+                <div className="hidden sm:block" />
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Date")}</label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                    />
+                    <HiOutlineCalendar className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("End Date")}</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                    />
+                    <HiOutlineCalendar className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Time")}</label>
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type="time"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                    />
+                    <HiOutlineClock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("End Time")}</label>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                    />
+                    <HiOutlineClock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Location & Notes Section Header */}
+                <div className="flex items-center gap-2 pb-2.5 border-b border-border/50 col-span-1 sm:col-span-2 mt-4 mb-2">
+                  <HiOutlineMapPin className="w-5 h-5 text-primary" />
+                  <h3 className="text-sm font-black text-foreground uppercase tracking-wider">{t("Location & Notes")}</h3>
                 </div>
 
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Venue Location")} *</label>
-                  <input
-                    type="text"
-                    value={venueLocation}
-                    onChange={(e) => setVenueLocation(e.target.value)}
-                    required
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={venueLocation}
+                      onChange={(e) => setVenueLocation(e.target.value)}
+                      placeholder="e.g. Grand Hyatt, Addis Ababa"
+                      required
+                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                    />
+                    <HiOutlineMapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -452,8 +580,9 @@ export default function NewProposalPage() {
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add any special requests, requirements, or important notes..."
                     rows={3}
-                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none"
+                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
                   />
                 </div>
 
@@ -462,8 +591,9 @@ export default function NewProposalPage() {
                   <textarea
                     value={designNotes}
                     onChange={(e) => setDesignNotes(e.target.value)}
+                    placeholder="Add design direction, theme ideas, or package details..."
                     rows={3}
-                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none"
+                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
                   />
                 </div>
               </div>
@@ -744,11 +874,11 @@ export default function NewProposalPage() {
           <div className="w-full lg:w-80 shrink-0 space-y-4 sticky top-6">
             <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
-                <HiCurrencyDollar className="w-4 h-4 text-primary" />
+                <HiOutlinePresentationChartBar className="w-4 h-4 text-primary" />
                 {t("Live Financial Summary")}
               </h3>
 
-              <div className="space-y-2.5 text-sm">
+              <div className="space-y-3.5 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Revenue")}</span>
                   <span className="font-mono font-bold text-foreground">
@@ -761,7 +891,7 @@ export default function NewProposalPage() {
                     ETB {financials.totalCost.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex items-center justify-between border-t border-border/40 pt-2.5">
+                <div className="flex items-center justify-between border-t border-border/40 pt-3">
                   <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Net Profit")}</span>
                   <span className={`font-mono font-black ${financials.netProfit < 0 ? "text-danger" : "text-foreground"}`}>
                     ETB {financials.netProfit.toLocaleString()}
@@ -769,7 +899,7 @@ export default function NewProposalPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Margin")}</span>
-                  <span className={`font-mono font-black ${financials.margin < 25 ? "text-warning" : "text-success"}`}>
+                  <span className="font-mono font-black text-primary">
                     {financials.margin}%
                   </span>
                 </div>
@@ -777,8 +907,8 @@ export default function NewProposalPage() {
             </div>
 
             {hasMarginRisk && (
-              <div className="bg-warning/10 border border-warning/25 rounded-lg p-4 text-warning flex items-start gap-2.5 shadow-sm">
-                <HiExclamationTriangle className="w-5 h-5 shrink-0" />
+              <div className="bg-danger/5 border border-danger/20 rounded-lg p-4 text-danger flex items-start gap-2.5 shadow-sm animate-pulse-subtle">
+                <HiExclamationTriangle className="w-5 h-5 shrink-0 text-danger" />
                 <div className="space-y-1">
                   <span className="text-xs font-black uppercase tracking-wider block">{t("Margin Risk Warning")}</span>
                   <p className="text-[11px] font-semibold leading-relaxed">
@@ -787,9 +917,125 @@ export default function NewProposalPage() {
                 </div>
               </div>
             )}
+
+            {/* Need Help Card */}
+            <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-3 shadow-sm">
+              <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
+                <HiOutlineQuestionMarkCircle className="w-4 h-4 text-primary" />
+                {t("Need help?")}
+              </h3>
+              <p className="text-xs text-muted font-semibold leading-relaxed">
+                {t("Make sure to fill all required fields to get accurate estimates.")}
+              </p>
+              <button 
+                type="button"
+                onClick={() => window.open("/docs/guidelines", "_blank")}
+                className="w-full h-10 mt-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card-alt text-xs font-black uppercase tracking-wider text-muted hover:text-foreground hover:bg-border/30 transition-all cursor-pointer active:scale-95"
+              >
+                <span>{t("View Guidelines")}</span>
+                <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Form Progress Card */}
+            <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
+              <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
+                {t("Form Progress")}
+              </h3>
+              <div className="flex items-center gap-4">
+                <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+                  <svg className="w-12 h-12 transform -rotate-90">
+                    <circle cx="24" cy="24" r="16" stroke="currentColor" className="text-muted/10" strokeWidth="3.5" fill="transparent" />
+                    <circle cx="24" cy="24" r="16" stroke="currentColor" className="text-primary" strokeWidth="3.5" fill="transparent"
+                      strokeDasharray={2 * Math.PI * 16}
+                      strokeDashoffset={(2 * Math.PI * 16) - ((step === 1 ? 20 : step === 2 ? 60 : 100) / 100) * (2 * Math.PI * 16)}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <span className="absolute text-[10px] font-black text-foreground font-mono">
+                    {step === 1 ? 20 : step === 2 ? 60 : 100}%
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-foreground leading-tight">
+                    {step === 1 ? t("Complete basic information") : step === 2 ? t("Complete estimates") : t("Review & submit")}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Add Event Type Dialog Modal */}
+      {showAddEventType && (
+        <>
+          <div
+            className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm pointer-events-auto"
+            onClick={() => setShowAddEventType(false)}
+          />
+          <div className="fixed inset-0 z-70 flex items-center justify-center pointer-events-none p-4">
+            <div className="pointer-events-auto bg-card rounded-lg border border-border p-6 w-full max-w-sm flex flex-col shadow-2xl relative animate-scale-in">
+              <h3 className="text-sm font-black text-foreground mb-4 uppercase tracking-wider">
+                {t("Add Event Type")}
+              </h3>
+              <div className="flex flex-col gap-3 mb-6">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Event Type Name")} *</label>
+                  <input
+                    type="text"
+                    value={newEventTypeName}
+                    onChange={(e) => setNewEventTypeName(e.target.value)}
+                    required
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Description")}</label>
+                  <textarea
+                    value={newEventTypeDesc}
+                    onChange={(e) => setNewEventTypeDesc(e.target.value)}
+                    rows={2}
+                    className="p-3 rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 resize-none"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={() => setShowAddEventType(false)}
+                  className="flex-1 py-2.5 rounded-lg bg-card-alt border border-border text-foreground font-bold hover:bg-border transition-all text-xs active:scale-95 cursor-pointer"
+                >
+                  {t("Cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!newEventTypeName.trim()) return;
+                    try {
+                      const res = await createEventType({
+                        event_name: newEventTypeName.trim(),
+                        description: newEventTypeDesc.trim() || null
+                      });
+                      await queryClient.invalidateQueries({ queryKey: ["event-types"] });
+                      setEventTypeId(res.eventType.id);
+                      setNewEventTypeName("");
+                      setNewEventTypeDesc("");
+                      setShowAddEventType(false);
+                    } catch (err) {
+                      console.error(err);
+                      setErrorMsg("Failed to add event type");
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-lg bg-primary text-white font-bold hover:opacity-90 transition-all text-xs active:scale-95 cursor-pointer"
+                >
+                  {t("Save")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </AuthLayout>
   );
 }
