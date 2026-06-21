@@ -1599,39 +1599,79 @@ describe("Events API", () => {
       expect(res.body.error).toContain("Forbidden");
     });
 
-    test("GET /events/reports/profit aggregates monthly/yearly reports correctly with date filtering", async () => {
-      // First query: events list
+    test("GET /events/reports/profit returns paginated event rows, KPIs, proposal variance, and aggregates", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ count: "2" }],
+        rowCount: 1,
+      });
       mockQuery.mockResolvedValueOnce({
         rows: [
-          { id: "event-1", name: "Corporate Gala", contract_price: "100000.00", start_date: "2026-06-10" },
-          { id: "event-2", name: "Private Birthday", contract_price: "50000.00", start_date: "2026-07-15" },
+          {
+            event_id: "event-1",
+            event_name: "Corporate Gala",
+            event_type_name: "Gala",
+            start_date: "2026-06-10",
+            status: "Completed",
+            revenue: "100000.00",
+            approved_expenses: "25000.00",
+            labor_cost: "20000.00",
+            fuel_cost: "5000.00",
+            other_cost: "0.00",
+            pending_expense_exposure: "2000.00",
+            net_profit: "75000.00",
+            margin_percentage: "75.00",
+            proposal_id: "proposal-1",
+            proposal_status: "Converted",
+            estimated_total_cost: "30000.00",
+            estimated_net_profit: "70000.00",
+            estimated_profit_variance: "5000.00",
+          },
+          {
+            event_id: "event-2",
+            event_name: "Private Birthday",
+            event_type_name: "Birthday",
+            start_date: "2026-07-15",
+            status: "Completed",
+            revenue: "50000.00",
+            approved_expenses: "10000.00",
+            labor_cost: "0.00",
+            fuel_cost: "0.00",
+            other_cost: "10000.00",
+            pending_expense_exposure: "0.00",
+            net_profit: "40000.00",
+            margin_percentage: "80.00",
+            proposal_id: null,
+            proposal_status: null,
+            estimated_total_cost: "0.00",
+            estimated_net_profit: "0.00",
+            estimated_profit_variance: null,
+          },
         ],
         rowCount: 2,
       });
-      // Second query: approved expenses
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          { event_id: "event-1", category: "Labor", total_amount: 20000.00 },
-          { event_id: "event-1", category: "Fuel", total_amount: 5000.00 },
-          { event_id: "event-2", category: "Other", total_amount: 10000.00 },
-        ],
-        rowCount: 3,
-      });
 
       const res = await request(app)
-        .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-07-31")
+        .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-07-31&sortBy=net_profit&sortOrder=desc&page=1&limit=1")
         .set("Authorization", `Bearer ${getToken("OWNER")}`);
 
       expect(res.status).toBe(200);
+      expect(res.body.total).toBe(2);
+      expect(res.body.events).toHaveLength(1);
+      expect(res.body.events[0].event_name).toBe("Corporate Gala");
       expect(res.body.summary.totalEvents).toBe(2);
       expect(res.body.summary.totalRevenue).toBe(150000.00);
       expect(res.body.summary.totalExpenses).toBe(35000.00);
       expect(res.body.summary.netProfit).toBe(115000.00);
       expect(res.body.summary.profitMargin).toBe(76.67);
+      expect(res.body.summary.pendingExpenseExposure).toBe(2000.00);
       
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Labor", amount: 20000.00 });
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Fuel", amount: 5000.00 });
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Other", amount: 10000.00 });
+      expect(res.body.kpis.mostProfitableEvent.event_name).toBe("Corporate Gala");
+      expect(res.body.kpis.highestMarginEventType.eventType).toBe("Birthday");
+      expect(res.body.proposalVariance.averageVariance).toBe(5000.00);
+      expect(res.body.proposalVariance.events[0].proposalId).toBe("proposal-1");
 
       const juneData = res.body.monthlyData.find((m: any) => m.month === "2026-06");
       const julyData = res.body.monthlyData.find((m: any) => m.month === "2026-07");
@@ -1644,6 +1684,76 @@ describe("Events API", () => {
       expect(julyData.revenue).toBe(50000.00);
       expect(julyData.expenses).toBe(10000.00);
       expect(julyData.profit).toBe(40000.00);
+      expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN event_proposals");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("ORDER BY profit_rows.net_profit DESC");
+    });
+
+    test("GET /events/reports/profit validates bounded report filters", async () => {
+      const res = await request(app)
+        .get("/events/reports/profit?start_date=2026-08-01&end_date=2026-07-01")
+        .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+      expect(res.status).toBe(400);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test("GET /events/reports/profit/export returns CSV and audits financial export", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ count: "1" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          event_id: "event-1",
+          event_name: "Corporate Gala",
+          event_type_name: "Gala",
+          start_date: "2026-06-10",
+          status: "Completed",
+          revenue: "100000.00",
+          approved_expenses: "25000.00",
+          labor_cost: "20000.00",
+          fuel_cost: "5000.00",
+          other_cost: "0.00",
+          pending_expense_exposure: "2000.00",
+          net_profit: "75000.00",
+          margin_percentage: "75.00",
+          proposal_id: "proposal-1",
+          proposal_status: "Converted",
+          estimated_total_cost: "30000.00",
+          estimated_net_profit: "70000.00",
+          estimated_profit_variance: "5000.00",
+        }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const res = await request(app)
+        .get("/events/reports/profit/export?start_date=2026-06-01&end_date=2026-07-31&format=csv")
+        .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/csv");
+      expect(res.text).toContain("Net Profit");
+      expect(res.text).toContain("Corporate Gala");
+      expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
+      expect((mockQuery.mock.calls[2][1] as unknown[])[1]).toBe("profit_report_export");
+    });
+
+    test("GET /events/reports/profit/export enforces maxRows before exporting", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ count: "1001" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const res = await request(app)
+        .get("/events/reports/profit/export?maxRows=1000")
+        .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+      expect(res.status).toBe(413);
+      expect(String(mockQuery.mock.calls[1][0])).toContain("INSERT INTO event_logs");
+      expect((mockQuery.mock.calls[1][1] as unknown[])[1]).toBe("profit_report_export_blocked");
+      expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("ORDER BY profit_rows"))).toBe(false);
     });
 
     test("GET /events/reports/profit restricts access to non-financial roles", async () => {
