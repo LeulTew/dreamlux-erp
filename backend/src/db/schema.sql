@@ -64,6 +64,8 @@ INSERT INTO permissions (slug, description) VALUES
   ('events:delete', 'Delete, restore, and permanently remove events or event types'),
   ('events:override_completed', 'Modify completed events and restricted status transitions'),
   ('events:saved_views:share', 'Create and manage role or global saved event views'),
+  ('events:proposals:write', 'Create and submit event intake profitability proposals'),
+  ('events:proposals:approve', 'Approve, reject, cancel, and convert event intake proposals'),
   ('event_allocations:write', 'Create and release event inventory allocations'),
   ('event_checklist:write', 'Create and update event checklist items'),
   ('event_assignments:write', 'Assign employees to events and manage attendance'),
@@ -123,14 +125,14 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'events:saved_views:share', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'events:saved_views:share', 'events:proposals:write', 'events:proposals:approve', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
 WHERE LOWER(r.name) IN ('ops_manager')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:proposals:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write')
 WHERE LOWER(r.name) IN ('event_manager')
 ON CONFLICT DO NOTHING;
 
@@ -479,6 +481,91 @@ CREATE TABLE IF NOT EXISTS event_logs (
 CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date);
 CREATE INDEX IF NOT EXISTS idx_event_logs_event_id ON event_logs(event_id);
+
+CREATE TABLE IF NOT EXISTS event_proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  client_name TEXT NOT NULL,
+  client_phone TEXT,
+  event_type_id UUID REFERENCES event_types(id) ON DELETE SET NULL,
+  requested_budget NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  requested_start_date DATE,
+  requested_end_date DATE,
+  requested_start_time TIME,
+  requested_end_time TIME,
+  venue_location TEXT,
+  notes TEXT,
+  package_design_notes TEXT,
+  cost_breakdown JSONB NOT NULL DEFAULT '{"design":[],"team":[],"trip":[],"other":[]}'::jsonb,
+  estimated_design_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_team_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_trip_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_other_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_total_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_net_profit NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_margin_percentage NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+  status TEXT NOT NULL CHECK (status IN ('Draft', 'Submitted', 'Approved', 'Rejected', 'Converted', 'Canceled')) DEFAULT 'Draft',
+  rejection_reason TEXT,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_at TIMESTAMP,
+  converted_event_id UUID,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  submitted_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP DEFAULT NULL,
+  CONSTRAINT event_proposals_requested_date_check CHECK (
+    requested_start_date IS NULL OR requested_end_date IS NULL OR requested_start_date <= requested_end_date
+  )
+);
+
+CREATE TABLE IF NOT EXISTS event_proposal_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposal_id UUID NOT NULL REFERENCES event_proposals(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  old_status TEXT,
+  new_status TEXT,
+  note TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE events ADD COLUMN IF NOT EXISTS event_proposal_id UUID REFERENCES event_proposals(id) ON DELETE SET NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'event_proposals_converted_event_fk'
+      AND conrelid = 'event_proposals'::regclass
+  ) THEN
+    ALTER TABLE event_proposals
+      ADD CONSTRAINT event_proposals_converted_event_fk
+      FOREIGN KEY (converted_event_id) REFERENCES events(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_event_proposals_status
+  ON event_proposals(status)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposals_created_by
+  ON event_proposals(created_by)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposals_requested_start
+  ON event_proposals(requested_start_date)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposals_profit
+  ON event_proposals(estimated_net_profit, estimated_margin_percentage)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_proposals_converted_event_unique
+  ON event_proposals(converted_event_id)
+  WHERE converted_event_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_proposal_unique
+  ON events(event_proposal_id)
+  WHERE event_proposal_id IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposal_logs_proposal_id
+  ON event_proposal_logs(proposal_id);
 
 CREATE TABLE IF NOT EXISTS event_saved_views (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

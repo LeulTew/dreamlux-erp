@@ -311,6 +311,85 @@ export const eventImportPayloadSchema = z.object({
 
 export type EventImportPayloadInput = z.infer<typeof eventImportPayloadSchema>;
 
+const proposalEstimateLineSchema = z.object({
+  label: z.string().min(1, "Estimate label is required").max(200, "Estimate label too long"),
+  amount: z.coerce.number().min(0, "Estimate amount cannot be negative"),
+  notes: z.string().max(1000, "Estimate notes too long").optional().nullable(),
+});
+
+export const eventProposalPayloadSchema = z.object({
+  name: z.string().min(1, "Proposal name is required").max(500, "Proposal name too long"),
+  client_name: z.string().min(1, "Client name is required").max(500, "Client name too long"),
+  client_phone: z
+    .string()
+    .max(50, "Phone too long")
+    .optional()
+    .nullable()
+    .or(z.literal(""))
+    .refine((val) => {
+      if (!val) return true;
+      const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
+      return ethioRegex.test(val.replace(/\s+/g, ""));
+    }, "Invalid Ethiopian phone number. Use +251... or 09.../07..."),
+  event_type_id: z.string().uuid("Invalid event type ID").optional().nullable().or(z.literal("")),
+  requested_budget: z.coerce.number().min(0, "Requested budget cannot be negative"),
+  requested_start_date: z.string().optional().nullable().or(z.literal(""))
+    .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid requested start date"),
+  requested_end_date: z.string().optional().nullable().or(z.literal(""))
+    .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid requested end date"),
+  requested_start_time: z.string().optional().nullable().or(z.literal("")),
+  requested_end_time: z.string().optional().nullable().or(z.literal("")),
+  venue_location: z.string().max(1000, "Venue location too long").optional().nullable().or(z.literal("")),
+  notes: z.string().max(4000, "Notes too long").optional().nullable().or(z.literal("")),
+  package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable().or(z.literal("")),
+  cost_breakdown: z.object({
+    design: z.array(proposalEstimateLineSchema).max(50).optional().default([]),
+    team: z.array(proposalEstimateLineSchema.extend({
+      people_count: z.coerce.number().int().min(1).max(1000).optional().default(1),
+      commission_per_person: z.coerce.number().min(0).optional(),
+    })).max(50).optional().default([]),
+    trip: z.array(proposalEstimateLineSchema.extend({
+      km: z.coerce.number().min(0).optional(),
+      fuel_price: z.coerce.number().min(0).optional(),
+    })).max(50).optional().default([]),
+    other: z.array(proposalEstimateLineSchema).max(50).optional().default([]),
+  }).optional().default({ design: [], team: [], trip: [], other: [] }),
+}).refine((data) => {
+  if (!data.requested_start_date || !data.requested_end_date) return true;
+  return new Date(data.requested_start_date) <= new Date(data.requested_end_date);
+}, {
+  message: "Requested end date must be on or after requested start date",
+  path: ["requested_end_date"],
+});
+
+export const eventProposalListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  status: z.enum(["Draft", "Submitted", "Approved", "Rejected", "Converted", "Canceled"]).optional(),
+  created_by: z.string().uuid("Invalid creator ID").optional(),
+  event_type_id: z.string().uuid("Invalid event type ID").optional(),
+  search: z.string().max(200).optional(),
+  start_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid start_date"),
+  end_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid end_date"),
+  min_margin: z.coerce.number().optional(),
+  max_margin: z.coerce.number().optional(),
+  min_profit: z.coerce.number().optional(),
+  max_profit: z.coerce.number().optional(),
+}).refine((data) => {
+  if (!data.start_date || !data.end_date) return true;
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "end_date must be on or after start_date",
+  path: ["end_date"],
+});
+
+export const eventProposalRejectSchema = z.object({
+  reason: z.string().min(1, "Rejection reason is required").max(2000, "Rejection reason too long"),
+});
+
+export type EventProposalPayloadInput = z.infer<typeof eventProposalPayloadSchema>;
+export type EventProposalListQueryInput = z.infer<typeof eventProposalListQuerySchema>;
+
 export const updateEventDesignSchema = z.object({
   package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable(),
   estimated_design_cost: z.coerce.number().min(0, "Estimated cost cannot be negative").optional().nullable(),

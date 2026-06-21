@@ -570,6 +570,180 @@ describe("Events API", () => {
     expect(String(mockQuery.mock.calls[2][0])).toContain("SET is_default = FALSE");
   });
 
+  test("POST /events/proposals creates draft with calculated profitability and audit log", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Corporate Gala Proposal",
+        client_name: "Aster",
+        requested_budget: "200000.00",
+        estimated_design_cost: "50000.00",
+        estimated_team_cost: "24000.00",
+        estimated_trip_cost: "10000.00",
+        estimated_other_cost: "6000.00",
+        estimated_total_cost: "90000.00",
+        estimated_net_profit: "110000.00",
+        estimated_margin_percentage: "55.00",
+        status: "Draft",
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // proposal audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        name: "Corporate Gala Proposal",
+        client_name: "Aster",
+        client_phone: "+251900000000",
+        requested_budget: 200000,
+        requested_start_date: "2026-07-20",
+        requested_end_date: "2026-07-20",
+        venue_location: "Hilton",
+        cost_breakdown: {
+          design: [{ label: "Stage", amount: 50000 }],
+          team: [{ label: "Decor crew", amount: 0, people_count: 6, commission_per_person: 4000 }],
+          trip: [{ label: "Fuel", amount: 10000 }],
+          other: [{ label: "Permits", amount: 6000 }],
+        },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.proposal.estimated_net_profit).toBe(110000);
+    const insertParams = mockQuery.mock.calls[1][1] as unknown[];
+    expect(insertParams[17]).toBe(90000);
+    expect(insertParams[18]).toBe(110000);
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_proposal_logs");
+  });
+
+  test("POST /events/proposals blocks low-permission users", async () => {
+    const res = await request(app)
+      .post("/events/proposals")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+      .send({ name: "Blocked", client_name: "Aster", requested_budget: 200000 });
+
+    expect(res.status).toBe(403);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test("GET /events/proposals applies queue filters and prioritization", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Near Term Gala",
+        status: "Submitted",
+        requested_budget: "200000.00",
+        estimated_total_cost: "90000.00",
+        estimated_net_profit: "110000.00",
+        estimated_margin_percentage: "55.00",
+      }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/proposals?status=Submitted&min_profit=100000&min_margin=40")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposals[0].estimated_margin_percentage).toBe(55);
+    expect(String(mockQuery.mock.calls[1][0])).toContain("p.estimated_net_profit");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("p.created_at ASC");
+  });
+
+  test("POST /events/proposals/:id/submit moves Draft to Submitted with audit", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Draft" }], rowCount: 1 }); // lock
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Submitted" }], rowCount: 1 }); // update
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals/proposal-1/submit")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposal.status).toBe("Submitted");
+    expect(String(mockQuery.mock.calls[3][0])).toContain("INSERT INTO event_proposal_logs");
+  });
+
+  test("POST /events/proposals/:id/reject requires reason and approver permission", async () => {
+    const missingReason = await request(app)
+      .post("/events/proposals/proposal-1/reject")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`)
+      .send({});
+
+    expect(missingReason.status).toBe(400);
+
+    const noPermission = await request(app)
+      .post("/events/proposals/proposal-1/reject")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({ reason: "Low margin" });
+
+    expect(noPermission.status).toBe(403);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test("POST /events/proposals/:id/convert creates one real event and links proposal atomically", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Approved Gala",
+        client_name: "Aster",
+        client_phone: "+251900000000",
+        event_type_id: "type-1",
+        requested_start_date: "2026-07-20",
+        requested_end_date: "2026-07-20",
+        requested_start_time: "09:00",
+        requested_end_time: "18:00",
+        venue_location: "Hilton",
+        requested_budget: "200000.00",
+        package_design_notes: "Decor estimate",
+        estimated_design_cost: "50000.00",
+        status: "Approved",
+        converted_event_id: null,
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", name: "Approved Gala" }], rowCount: 1 }); // insert event
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Converted", converted_event_id: "event-1" }], rowCount: 1 }); // update proposal
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // proposal audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // event audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals/proposal-1/convert")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(201);
+    expect(res.body.event.id).toBe("event-1");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("FOR UPDATE");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO events");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("event_proposal_id");
+    expect(String(mockQuery.mock.calls[3][0])).toContain("converted_event_id IS NULL");
+  });
+
+  test("POST /events/proposals/:id/convert blocks duplicate conversion without inserting event", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proposal-1", status: "Converted", converted_event_id: "event-existing" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+    const res = await request(app)
+      .post("/events/proposals/proposal-1/convert")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.eventId).toBe("event-existing");
+    expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO events"))).toBe(false);
+  });
+
   // Test single event retrieval
   test("GET /events/:id returns event details and audit logs", async () => {
     mockQuery.mockResolvedValueOnce({
