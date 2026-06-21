@@ -122,7 +122,29 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No Saved Views": "No Saved Views",
     "Save View Description": "Save your current search, filters, and sorting parameters as a saved view.",
     "View Title": "View Title",
-    "Proposals": "Proposals"
+    "Proposals": "Proposals",
+    "Logic": "Logic",
+    "Filter constraints": "Manage logical filter constraints",
+    "Print PDF": "Print PDF",
+    "e.g. Administrator": "e.g. Administrator",
+    "Greater Than or Equal": "Greater Than or Equal",
+    "Less Than or Equal": "Less Than or Equal",
+    "In List": "In List",
+    "Not In List": "Not In List",
+    "Between": "Between",
+    "and": "and",
+    "comma-separated": "comma-separated values",
+    "Event Status": "Event Status",
+    "Workflow Status": "Workflow Status",
+    "Created At": "Created At",
+    "Updated At": "Updated At",
+    "Estimated Cost": "Estimated Cost",
+    "Vehicle Count": "Vehicle Count",
+    "Staff Count": "Staff Count",
+    "Allocation Count": "Allocation Count",
+    "Pending Expense Count": "Pending Expense Count",
+    "to": "to",
+    "Restricted": "Restricted"
   },
   am: {
     Events: "ዝግጅቶች",
@@ -206,30 +228,82 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No Saved Views": "ምንም የተቀመጡ እይታዎች የሉም",
     "Save View Description": "የአሁኑን ፍለጋ፣ ማጣሪያዎች እና መደርደሪያዎች እንደ የተቀመጠ እይታ ያስቀምጡ።",
     "View Title": "የእይታ ርዕስ",
-    "Proposals": "ጥያቄዎች"
+    "Proposals": "ጥያቄዎች",
+    "Logic": "ሎጂክ",
+    "Filter constraints": "የማጣሪያ ቅናሾችን ያስተዳድሩ",
+    "Print PDF": "PDF አትም",
+    "e.g. Administrator": "ለምሳሌ፡ Administrator",
+    "Greater Than or Equal": "ይበልጣል ወይም እኩል ነው",
+    "Less Than or Equal": "ያንሳል ወይም እኩል ነው",
+    "In List": "ዝርዝር ውስጥ ነው",
+    "Not In List": "ዝርዝር ውስጥ አይደለም",
+    "Between": "መካከል",
+    "and": "እና",
+    "comma-separated": "በኮማ የተለዩ ዋጋዎች",
+    "Event Status": "የዝግጅት ሁኔታ",
+    "Workflow Status": "የስርዓት ሁኔታ",
+    "Created At": "የተፈጠረበት ቀን",
+    "Updated At": "የተዘመነበት ቀን",
+    "Estimated Cost": "የተገመተ ወጪ",
+    "Vehicle Count": "የተሽከርካሪ ብዛት",
+    "Staff Count": "የሰራተኛ ብዛት",
+    "Allocation Count": "የምደባ ብዛት",
+    "Pending Expense Count": "የጥበቃ ወጪ ብዛት",
+    "to": "እስከ",
+    "Restricted": "ክልክል ነው"
   }
 };
 
-const FIELD_OPTIONS = [
-  { key: "name", label: "Event Name" },
-  { key: "client_name", label: "Client Name" },
-  { key: "client_phone", label: "Client Phone" },
-  { key: "venue_location", label: "Venue Location" },
-  { key: "contract_price", label: "Revenue" },
-  { key: "status", label: "Status" },
-  { key: "start_date", label: "Start Date" },
-  { key: "end_date", label: "End Date" },
-  { key: "checklist_completion_percentage", label: "Checklist %" }
+// Field type metadata for typed value editors and operator compatibility
+type FieldType = "text" | "numeric" | "date" | "status" | "workflow_status";
+
+const FIELD_OPTIONS: { key: string; label: string; type: FieldType }[] = [
+  // Event fields
+  { key: "name", label: "Event Name", type: "text" },
+  { key: "client_name", label: "Client Name", type: "text" },
+  { key: "client_phone", label: "Client Phone", type: "text" },
+  { key: "venue_location", label: "Venue Location", type: "text" },
+  { key: "event_type_name", label: "Event Type Name", type: "text" },
+  { key: "status", label: "Event Status", type: "status" },
+  { key: "workflow_status", label: "Workflow Status", type: "workflow_status" },
+  // Dates
+  { key: "start_date", label: "Start Date", type: "date" },
+  { key: "end_date", label: "End Date", type: "date" },
+  { key: "created_at", label: "Created At", type: "date" },
+  { key: "updated_at", label: "Updated At", type: "date" },
+  // Financial
+  { key: "contract_price", label: "Revenue", type: "numeric" },
+  { key: "approved_expenses", label: "Approved Expenses", type: "numeric" },
+  { key: "net_profit", label: "Net Profit", type: "numeric" },
+  { key: "margin_percent", label: "Margin %", type: "numeric" },
+  { key: "estimated_cost", label: "Estimated Cost", type: "numeric" },
+  // Operational
+  { key: "checklist_completion_percentage", label: "Checklist %", type: "numeric" },
+  { key: "vehicle_count", label: "Vehicle Count", type: "numeric" },
+  { key: "staff_count", label: "Staff Count", type: "numeric" },
+  { key: "allocation_count", label: "Allocation Count", type: "numeric" },
+  { key: "pending_expense_count", label: "Pending Expense Count", type: "numeric" },
 ];
 
-const OPERATOR_OPTIONS = [
-  { id: "contains", label: "Contains" },
-  { id: "equals", label: "Equals" },
-  { id: "not_equals", label: "Not Equals" },
-  { id: "greater_than", label: "Greater Than" },
-  { id: "less_than", label: "Less Than" },
-  { id: "is_empty", label: "Is Empty" },
-  { id: "is_not_empty", label: "Is Not Empty" }
+type OperatorId =
+  | "contains" | "equals" | "not_equals" | "starts_with"
+  | "greater_than" | "less_than" | "gte" | "lte" | "between"
+  | "in_list" | "not_in_list" | "is_empty" | "is_not_empty";
+
+const OPERATOR_OPTIONS: { id: OperatorId; label: string; forTypes: FieldType[] }[] = [
+  { id: "contains",       label: "Contains",             forTypes: ["text"] },
+  { id: "starts_with",    label: "Starts With",          forTypes: ["text"] },
+  { id: "equals",         label: "Equals",               forTypes: ["text", "numeric", "date", "status", "workflow_status"] },
+  { id: "not_equals",     label: "Not Equals",           forTypes: ["text", "numeric", "date", "status", "workflow_status"] },
+  { id: "in_list",        label: "In List",              forTypes: ["text", "status", "workflow_status"] },
+  { id: "not_in_list",    label: "Not In List",          forTypes: ["text", "status", "workflow_status"] },
+  { id: "greater_than",   label: "Greater Than",         forTypes: ["numeric", "date"] },
+  { id: "less_than",      label: "Less Than",            forTypes: ["numeric", "date"] },
+  { id: "gte",            label: "Greater Than or Equal",forTypes: ["numeric", "date"] },
+  { id: "lte",            label: "Less Than or Equal",   forTypes: ["numeric", "date"] },
+  { id: "between",        label: "Between",              forTypes: ["numeric", "date"] },
+  { id: "is_empty",       label: "Is Empty",             forTypes: ["text", "numeric", "date", "status", "workflow_status"] },
+  { id: "is_not_empty",   label: "Is Not Empty",         forTypes: ["text", "numeric", "date", "status", "workflow_status"] },
 ];
 
 const DATE_RANGE_OPTIONS = [
@@ -257,12 +331,12 @@ export function EventsPageContent() {
   const filterLogic = (searchParams.get("filterLogic") || "and") as "and" | "or";
   const activeViewId = searchParams.get("viewId") || "";
 
-  // Parse advanced filters from URL
+  // Parse advanced filters from URL — base64url-encoded JSON for Amharic/special char safety
   const filters = useMemo<EventSavedView["filters"]>(() => {
     const raw = searchParams.get("filters");
     if (!raw) return [];
     try {
-      return JSON.parse(raw) as EventSavedView["filters"];
+      return JSON.parse(atob(raw)) as EventSavedView["filters"];
     } catch {
       return [];
     }
@@ -425,7 +499,7 @@ export function EventsPageContent() {
   const handleApplyView = (view: EventSavedView) => {
     updateUrl({
       viewId: view.id,
-      filters: view.filters.length > 0 ? JSON.stringify(view.filters) : null,
+      filters: view.filters.length > 0 ? btoa(JSON.stringify(view.filters)) : null,
       sortBy: view.sort?.sortBy || "start_date",
       sortOrder: view.sort?.sortOrder || "asc",
       page: "1"
@@ -446,26 +520,36 @@ export function EventsPageContent() {
     });
   };
 
-  // Advanced Filters builder logic modifiers
   const handleAddFilterRule = () => {
     const nextRules = [...filters, { field: "name", operator: "contains", value: "" }];
-    updateUrl({ filters: JSON.stringify(nextRules), page: "1", viewId: null });
+    updateUrl({ filters: btoa(JSON.stringify(nextRules)), page: "1", viewId: null });
   };
 
   const handleUpdateFilterRule = (index: number, key: string, val: unknown) => {
     const nextRules = filters.map((rule, i: number) => {
       if (i === index) {
+        // Reset operator to a compatible one when field changes
+        if (key === "field") {
+          const fieldMeta = FIELD_OPTIONS.find(f => f.key === val);
+          const fieldType = fieldMeta?.type || "text";
+          const currentOp = OPERATOR_OPTIONS.find(op => op.id === rule.operator);
+          const isCompatible = currentOp?.forTypes.includes(fieldType);
+          const defaultOp = isCompatible
+            ? rule.operator
+            : (OPERATOR_OPTIONS.find(op => op.forTypes.includes(fieldType))?.id || "equals");
+          return { ...rule, field: val as string, operator: defaultOp, value: "" };
+        }
         return { ...rule, [key]: val };
       }
       return rule;
     });
-    updateUrl({ filters: JSON.stringify(nextRules), page: "1", viewId: null });
+    updateUrl({ filters: btoa(JSON.stringify(nextRules)), page: "1", viewId: null });
   };
 
   const handleRemoveFilterRule = (index: number) => {
     const nextRules = filters.filter((_, i: number) => i !== index);
     updateUrl({ 
-      filters: nextRules.length > 0 ? JSON.stringify(nextRules) : null,
+      filters: nextRules.length > 0 ? btoa(JSON.stringify(nextRules)) : null,
       page: "1", 
       viewId: null 
     });
@@ -736,7 +820,7 @@ export function EventsPageContent() {
                       className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground hover:bg-card-alt flex items-center gap-1.5"
                     >
                       <HiPrinter className="w-4 h-4" />
-                      Print PDF
+                      {t("Print PDF")}
                     </button>
                   </div>
                 )}
@@ -981,12 +1065,12 @@ export function EventsPageContent() {
         isOpen={isFiltersOpen}
         onClose={() => setIsFiltersOpen(false)}
         title={t("Advanced Filters")}
-        subtitle="Manage logical filter constraints"
+        subtitle={t("Filter constraints")}
       >
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-muted uppercase tracking-wider">Logic</label>
+              <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Logic")}</label>
               <div className="flex rounded-lg border border-border overflow-hidden">
                 <button
                   onClick={() => updateUrl({ filterLogic: "and", page: "1" })}
@@ -1024,26 +1108,125 @@ export function EventsPageContent() {
                   ))}
                 </select>
 
-                {/* Operator Selector */}
-                <select
-                  value={rule.operator}
-                  onChange={(e) => handleUpdateFilterRule(idx, "operator", e.target.value)}
-                  className="w-full sm:w-36 px-3 py-2 text-xs font-semibold rounded bg-card border border-border outline-none"
-                >
-                  {OPERATOR_OPTIONS.map((op) => (
-                    <option key={op.id} value={op.id}>{t(op.label)}</option>
-                  ))}
-                </select>
+                {/* Operator Selector — filtered by selected field type */}
+                {
+                  (() => {
+                    const fieldMeta = FIELD_OPTIONS.find(f => f.key === rule.field);
+                    const fieldType = fieldMeta?.type || "text";
+                    const compatibleOps = OPERATOR_OPTIONS.filter(op => op.forTypes.includes(fieldType));
+                    return (
+                      <select
+                        value={rule.operator}
+                        onChange={(e) => handleUpdateFilterRule(idx, "operator", e.target.value)}
+                        className="w-full sm:w-44 px-3 py-2 text-xs font-semibold rounded bg-card border border-border outline-none"
+                      >
+                        {compatibleOps.map((op) => (
+                          <option key={op.id} value={op.id}>{t(op.label)}</option>
+                        ))}
+                      </select>
+                    );
+                  })()
+                }
 
-                {/* Value Input */}
+                {/* Typed Value Editor — adapts to field type and operator */}
                 {rule.operator !== "is_empty" && rule.operator !== "is_not_empty" && (
-                  <input
-                    type="text"
-                    value={(rule.value as string) || ""}
-                    placeholder={t("Value")}
-                    onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
-                    className="flex-2 px-3 py-2 text-xs font-semibold rounded bg-card border border-border outline-none text-foreground"
-                  />
+                  (() => {
+                    const fieldMeta = FIELD_OPTIONS.find(f => f.key === rule.field);
+                    const fieldType = fieldMeta?.type || "text";
+                    const inputCls = "flex-1 px-3 py-2 text-xs font-semibold rounded bg-card border border-border outline-none text-foreground";
+
+                    if (rule.operator === "between") {
+                      const parts = ((rule.value as string) || "").split("|");
+                      return (
+                        <div className="flex items-center gap-1 flex-1">
+                          <input
+                            type={fieldType === "date" ? "date" : "number"}
+                            value={parts[0] || ""}
+                            placeholder="From"
+                            onChange={(e) => handleUpdateFilterRule(idx, "value", `${e.target.value}|${parts[1] || ""}`)}
+                            className={inputCls}
+                          />
+                          <span className="text-xs text-muted font-bold">{t("and")}</span>
+                          <input
+                            type={fieldType === "date" ? "date" : "number"}
+                            value={parts[1] || ""}
+                            placeholder="To"
+                            onChange={(e) => handleUpdateFilterRule(idx, "value", `${parts[0] || ""}|${e.target.value}`)}
+                            className={inputCls}
+                          />
+                        </div>
+                      );
+                    }
+
+                    if (fieldType === "date") {
+                      return (
+                        <input
+                          type="date"
+                          value={(rule.value as string) || ""}
+                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          className={inputCls}
+                        />
+                      );
+                    }
+
+                    if (fieldType === "numeric") {
+                      return (
+                        <input
+                          type="number"
+                          value={(rule.value as string) || ""}
+                          placeholder={t("Value")}
+                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          className={inputCls}
+                        />
+                      );
+                    }
+
+                    if (fieldType === "status") {
+                      return (
+                        <select
+                          value={(rule.value as string) || ""}
+                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          className={inputCls}
+                        >
+                          <option value="">{t("Select Status")}</option>
+                          {["Planned", "Ongoing", "Completed"].map(s => (
+                            <option key={s} value={s}>{t(s)}</option>
+                          ))}
+                        </select>
+                      );
+                    }
+
+                    if (fieldType === "workflow_status") {
+                      return (
+                        <select
+                          value={(rule.value as string) || ""}
+                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          className={inputCls}
+                        >
+                          <option value="">{t("Select Status")}</option>
+                          {["draft", "submitted", "approved", "rejected", "converted"].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      );
+                    }
+
+                    // Default: text / in_list / not_in_list
+                    return (
+                      <div className="flex-1 flex flex-col gap-1">
+                        <input
+                          type="text"
+                          value={(rule.value as string) || ""}
+                          placeholder={rule.operator === "in_list" || rule.operator === "not_in_list" ? t("comma-separated") : t("Value")}
+                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          className={inputCls}
+                        />
+                        {(rule.operator === "in_list" || rule.operator === "not_in_list") && (
+                          <span className="text-[10px] text-muted font-semibold">{t("comma-separated")}</span>
+                        )}
+                      </div>
+                    );
+                  })()
                 )}
 
                 {/* Remove button */}
@@ -1118,7 +1301,7 @@ export function EventsPageContent() {
                   value={newViewRoleName}
                   onChange={(e) => setNewViewRoleName(e.target.value)}
                   required
-                  placeholder="e.g. Administrator"
+                  placeholder={t("e.g. Administrator")}
                   className="px-3 py-2 rounded bg-card-alt border border-border text-sm outline-none"
                 />
               </div>

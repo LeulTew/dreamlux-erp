@@ -23,6 +23,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Update (Edit Existing)": "Update (Edit Existing)",
     "Drop CSV file here": "Drop CSV file here or click to browse",
     "Only CSV files are supported": "Only CSV files are supported",
+    "csv hint": ".csv (max 500 rows)",
     "Back": "Back",
     "Next": "Next",
     "Validate & Preview": "Validate & Preview",
@@ -43,7 +44,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Confirm Commit": "Confirm Commit",
     "You are importing": "You are about to import",
     "records. This action is irreversible.": "records. This action is irreversible.",
-    "invalid_phone": "Invalid Ethiopian phone number. Use +251... or 09.../07..."
+    "invalid_phone": "Invalid Ethiopian phone number. Use +251... or 09.../07...",
+    "Errors": "Errors",
+    "Row #": "#",
+    "Name": "Name",
+    "Client": "Client",
+    "Date": "Date",
+    "Venue": "Venue",
+    "Price": "Price"
   },
   am: {
     "Import Events": "ዝግጅቶችን አስገባ",
@@ -57,6 +65,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Update (Edit Existing)": "ነባር አሻሽል (አዘምን)",
     "Drop CSV file here": "የCSV ፋይል እዚህ ይጣሉ ወይም ለመምረጥ ጠቅ ያድርጉ",
     "Only CSV files are supported": "የCSV ፋይሎች ብቻ ናቸው የሚደገፉት",
+    "csv hint": ".csv (ከፍተኛ 500 ረድፎች)",
     "Back": "ተመለስ",
     "Next": "ቀጥል",
     "Validate & Preview": "አረጋግጥ እና አሳይ",
@@ -77,7 +86,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Confirm Commit": "ማስገባት አረጋግጥ",
     "You are importing": "ለማስገባት እያዘጋጁ ነው፡",
     "records. This action is irreversible.": "መዝገቦች። ይህ ተግባር ሊመለስ የማይችል ነው።",
-    "invalid_phone": "ትክክለኛ የኢትዮጵያ ስልክ ቁጥር አይደለም። በ +251... ወይም 09.../07... ይጠቀሙ"
+    "invalid_phone": "ትክክለኛ የኢትዮጵያ ስልክ ቁጥር አይደለም። በ +251... ወይም 09.../07... ይጠቀሙ",
+    "Errors": "ስህተቶች",
+    "Row #": "#",
+    "Name": "ስም",
+    "Client": "ደንበኛ",
+    "Date": "ቀን",
+    "Venue": "ቦታ",
+    "Price": "ዋጋ"
   }
 };
 
@@ -162,6 +178,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
       const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
       if (lines.length === 0) return;
 
+      // RFC 4180 compliant CSV parser: handles escaped double-quotes ("") inside quoted fields
       const splitCSVLine = (line: string): string[] => {
         const result: string[] = [];
         let current = "";
@@ -169,7 +186,13 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
         for (let i = 0; i < line.length; i++) {
           const char = line[i];
           if (char === '"') {
-            inQuotes = !inQuotes;
+            if (inQuotes && line[i + 1] === '"') {
+              // Escaped double-quote inside quoted field: "" → literal "
+              current += '"';
+              i++; // skip next quote
+            } else {
+              inQuotes = !inQuotes;
+            }
           } else if (char === ',' && !inQuotes) {
             result.push(current.trim());
             current = "";
@@ -178,7 +201,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
           }
         }
         result.push(current.trim());
-        return result.map(s => s.replace(/^"|"$/g, "").trim());
+        return result.map(s => s.trim());
       };
 
       const rawHeaders = splitCSVLine(lines[0]);
@@ -233,10 +256,28 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
     }
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     const token = localStorage.getItem("auth_token");
     const baseUrl = api.defaults.baseURL || "";
-    window.open(`${baseUrl}/events/export/template?format=csv&token=${token || ""}`, "_blank");
+    try {
+      // Security: never put bearer tokens in URL query strings (browser history, logs, referrer leaks).
+      // Use Authorization header with fetch and create a temporary blob URL instead.
+      const response = await fetch(`${baseUrl}/events/export/template?format=csv`, {
+        headers: { Authorization: `Bearer ${token || ""}` }
+      });
+      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "dreamlux_events_template.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Template download failed:", err);
+    }
   };
 
   return (
@@ -364,7 +405,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
               {/* Error Details */}
               {validationResult.errors && validationResult.errors.length > 0 && (
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-xs font-bold text-muted uppercase tracking-wider">Errors ({validationResult.errors.length})</h3>
+                  <h3 className="text-xs font-bold text-muted uppercase tracking-wider">{t("Errors")} ({validationResult.errors.length})</h3>
                   <div className="border border-border/50 rounded-lg overflow-hidden max-h-[160px] overflow-y-auto">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
@@ -395,12 +436,12 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-card-alt text-muted font-bold border-b border-border/50">
-                        <th className="px-4 py-2 w-12">#</th>
-                        <th className="px-4 py-2">Name</th>
-                        <th className="px-4 py-2">Client</th>
-                        <th className="px-4 py-2">Date</th>
-                        <th className="px-4 py-2">Venue</th>
-                        <th className="px-4 py-2">Price</th>
+                        <th className="px-4 py-2 w-12">{t("Row #")}</th>
+                        <th className="px-4 py-2">{t("Name")}</th>
+                        <th className="px-4 py-2">{t("Client")}</th>
+                        <th className="px-4 py-2">{t("Date")}</th>
+                        <th className="px-4 py-2">{t("Venue")}</th>
+                        <th className="px-4 py-2">{t("Price")}</th>
                       </tr>
                     </thead>
                     <tbody>

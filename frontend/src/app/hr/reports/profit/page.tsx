@@ -66,7 +66,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Monthly View": "Monthly View",
     "Event Type View": "Event Type View",
     "Category View": "Category View",
-    "Proposal Variance View": "Proposal Variance View"
+    "Proposal Variance View": "Proposal Variance View",
+    "Search events...": "Search events...",
+    "Key Performance Indicators": "Key Performance Indicators",
+    "Most Profitable Type": "Most Profitable Type",
+    "Highest Margin Type": "Highest Margin Type",
+    "Proposal Conversion": "Proposal Conversion Rate",
+    "Avg Variance (Est vs Act)": "Avg Variance (Est vs Act)"
   },
   am: {
     "Financial Dashboard & Reports": "የፋይናንስ ዳሽቦርድ እና ሪፖርቶች",
@@ -122,7 +128,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Monthly View": "ወርሃዊ እይታ",
     "Event Type View": "የዝግጅት አይነት እይታ",
     "Category View": "የምድብ እይታ",
-    "Proposal Variance View": "የፕሮፖዛል ልዩነት እይታ"
+    "Proposal Variance View": "የፕሮፖዛል ልዩነት እይታ",
+    "Search events...": "ዝግጅቶችን አስፈልግ...",
+    "Key Performance Indicators": "ቁልፍ የአፈጻጸም አመልካቾች",
+    "Most Profitable Type": "በጣም ትርፋማ አይነት",
+    "Highest Margin Type": "ከፍተኛ ህዳግ ያለው አይነት",
+    "Proposal Conversion": "የፕሮፖዛል ልወጣ መጠን",
+    "Avg Variance (Est vs Act)": "አማካይ ልዩነት (ተገመተ እና ትክክለኛ)"
   }
 };
 
@@ -329,7 +341,7 @@ export default function FinancialDashboardPage() {
                 <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                 <input
                   type="text"
-                  placeholder="Search events..."
+                  placeholder={t("Search events...")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 h-[44px] rounded-lg bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
@@ -451,7 +463,7 @@ export default function FinancialDashboardPage() {
               </div>
               <div className="rounded-lg border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Net Profit")}</div>
-                <div className={`mt-2 text-xl font-black font-mono tabular-nums ${data.summary.netProfit >= 0 ? "text-emerald-500" : "text-danger"}`}>
+                <div className={`mt-2 text-xl font-black font-mono tabular-nums ${data.summary.netProfit >= 0 ? "text-success" : "text-danger"}`}>
                   {formatCurrency(data.summary.netProfit)}
                 </div>
               </div>
@@ -504,15 +516,15 @@ export default function FinancialDashboardPage() {
                           </text>
 
                           {/* Revenue line */}
-                          <path d={revenuePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d={revenuePath} fill="none" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                           {/* Profit line */}
-                          <path d={profitPath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d={profitPath} fill="none" stroke="var(--color-success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
                           {/* Data dots */}
                           {monthlyData.map((m, idx) => (
                             <g key={idx}>
-                              <circle cx={getX(idx)} cy={getY(m.revenue)} r="3.5" className="fill-blue-500 stroke-card stroke-2" />
-                              <circle cx={getX(idx)} cy={getY(m.profit)} r="3.5" className="fill-emerald-500 stroke-card stroke-2" />
+                              <circle cx={getX(idx)} cy={getY(m.revenue)} r="3.5" style={{ fill: "var(--color-primary)" }} className="stroke-card stroke-2" />
+                              <circle cx={getX(idx)} cy={getY(m.profit)} r="3.5" style={{ fill: "var(--color-success)" }} className="stroke-card stroke-2" />
                             </g>
                           ))}
 
@@ -533,11 +545,11 @@ export default function FinancialDashboardPage() {
 
                       <div className="flex justify-center gap-4 text-xs font-semibold">
                         <div className="flex items-center gap-1.5">
-                          <span className="h-3 w-3 rounded-full bg-blue-500" />
+                          <span className="h-3 w-3 rounded-full bg-primary" />
                           <span>{t("Revenue")}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="h-3 w-3 rounded-full bg-emerald-500" />
+                          <span className="h-3 w-3 rounded-full bg-success" />
                           <span>{t("Net Profit")}</span>
                         </div>
                       </div>
@@ -548,23 +560,23 @@ export default function FinancialDashboardPage() {
                 {/* KPI highlights lists */}
                 <section className="rounded-lg border border-border bg-card p-5 space-y-4">
                   <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
-                    Key Performance Indicators
+                    {t("Key Performance Indicators")}
                   </h3>
                   <div className="space-y-3.5 text-xs">
                     <div className="flex justify-between items-center py-2 border-b border-border/30">
-                      <span className="text-muted font-bold uppercase tracking-wide">Most Profitable Type</span>
+                      <span className="text-muted font-bold uppercase tracking-wide">{t("Most Profitable Type")}</span>
                       <span className="font-bold text-foreground">{data.kpis.mostProfitableEventType?.eventType || "-"}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-border/30">
-                      <span className="text-muted font-bold uppercase tracking-wide">Highest Margin Type</span>
+                      <span className="text-muted font-bold uppercase tracking-wide">{t("Highest Margin Type")}</span>
                       <span className="font-bold text-foreground">{data.kpis.highestMarginEventType?.eventType || "-"}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-border/30">
-                      <span className="text-muted font-bold uppercase tracking-wide">Proposal Conversion</span>
+                      <span className="text-muted font-bold uppercase tracking-wide">{t("Proposal Conversion")}</span>
                       <span className="font-mono font-black text-foreground">{data.kpis.proposalConversionRate}%</span>
                     </div>
                     <div className="flex justify-between items-center py-2">
-                      <span className="text-muted font-bold uppercase tracking-wide">Avg Variance (Est vs Act)</span>
+                      <span className="text-muted font-bold uppercase tracking-wide">{t("Avg Variance (Est vs Act)")}</span>
                       <span className={`font-mono font-black ${data.proposalVariance.averageVariance < 0 ? "text-danger" : "text-success"}`}>
                         ETB {data.proposalVariance.averageVariance.toLocaleString()}
                       </span>
