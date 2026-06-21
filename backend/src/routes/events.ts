@@ -442,6 +442,127 @@ async function insertEventAuditLog(
   );
 }
 
+const AUTO_LABOR_EXPENSE_DESCRIPTION = "Auto-generated labor cost from attended event assignments";
+
+type LaborGenerationResult =
+  | { status: "created"; expense: any; laborTotal: number }
+  | { status: "already_exists"; expenseId: string | null }
+  | { status: "event_not_found" }
+  | { status: "event_not_completed" }
+  | { status: "no_labor"; laborTotal: number };
+
+async function generateLaborExpenseFromAssignments(
+  client: PoolClient,
+  eventId: string,
+  userId: string | null,
+): Promise<LaborGenerationResult> {
+  const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [eventId]);
+  if (eventResult.rowCount === 0) return { status: "event_not_found" };
+  if (eventResult.rows[0].status !== "Completed") return { status: "event_not_completed" };
+
+  const assignmentResult = await client.query(
+    "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
+    [eventId],
+  );
+  const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
+  if (laborTotal <= 0) return { status: "no_labor", laborTotal };
+
+  const existingResult = await client.query(
+    "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
+    [eventId, AUTO_LABOR_EXPENSE_DESCRIPTION],
+  );
+  if ((existingResult.rowCount || 0) > 0) {
+    return { status: "already_exists", expenseId: existingResult.rows[0]?.id ?? null };
+  }
+
+  let result;
+  try {
+    result = await client.query(
+      `
+        INSERT INTO expenses (event_id, category, amount, description, status, created_by)
+        VALUES ($1, 'Labor', $2, $3, 'Pending', $4)
+        RETURNING *
+      `,
+      [eventId, laborTotal, AUTO_LABOR_EXPENSE_DESCRIPTION, userId],
+    );
+  } catch (error: any) {
+    if (error?.code === "23505" && String(error?.constraint || "").includes("idx_expenses_auto_labor_once_per_event")) {
+      const duplicateResult = await client.query(
+        "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
+        [eventId, AUTO_LABOR_EXPENSE_DESCRIPTION],
+      );
+      return { status: "already_exists", expenseId: duplicateResult.rows[0]?.id ?? null };
+    }
+    throw error;
+  }
+
+  return { status: "created", expense: result.rows[0], laborTotal };
+}
+
+async function auditLaborGenerationOutcome(
+  client: PoolClient,
+  eventId: string,
+  userId: string | null,
+  result: LaborGenerationResult,
+  source: "event_completion" | "manual",
+): Promise<void> {
+  const generatedExpenseId = result.status === "created" ? result.expense?.id : result.status === "already_exists" ? result.expenseId : null;
+  const total = result.status === "created" || result.status === "no_labor" ? result.laborTotal : null;
+  await insertEventAuditLog(
+    client,
+    eventId,
+    userId,
+    "labor_expense_generation",
+    source,
+    JSON.stringify({
+      outcome: result.status,
+      generatedExpenseId,
+      laborTotal: total,
+    }),
+  );
+}
+
+async function reversePendingAutoLaborExpense(
+  client: PoolClient,
+  eventId: string,
+  userId: string | null,
+  reason: string,
+): Promise<{ status: "reversed"; expense: any } | { status: "not_found" } | { status: "approved_locked"; expenseId: string }> {
+  const eventResult = await client.query("SELECT id FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [eventId]);
+  if (eventResult.rowCount === 0) return { status: "not_found" };
+
+  const existingResult = await client.query(
+    "SELECT id, status FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected' FOR UPDATE",
+    [eventId, AUTO_LABOR_EXPENSE_DESCRIPTION],
+  );
+  if (existingResult.rowCount === 0) return { status: "not_found" };
+  if (existingResult.rows[0].status === "Approved") {
+    return { status: "approved_locked", expenseId: existingResult.rows[0].id };
+  }
+
+  const updateResult = await client.query(
+    `
+      UPDATE expenses
+      SET status = 'Rejected',
+          rejected_reason = $1
+      WHERE id = $2
+      RETURNING *
+    `,
+    [reason, existingResult.rows[0].id],
+  );
+
+  await insertEventAuditLog(
+    client,
+    eventId,
+    userId,
+    "labor_expense_reversal",
+    existingResult.rows[0].id,
+    JSON.stringify({ outcome: "reversed", reason }),
+  );
+
+  return { status: "reversed", expense: updateResult.rows[0] };
+}
+
 function normalizeImportText(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
   return String(value).trim();
@@ -1190,6 +1311,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     }
 
     const updateData = validationResult.data;
+    const shouldGenerateLaborOnCompletion = updateData.status === "Completed" && currentEvent.status !== "Completed";
 
     // Status transition validation
     if (updateData.status && updateData.status !== currentEvent.status) {
@@ -1297,6 +1419,20 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
+      if (shouldGenerateLaborOnCompletion) {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const generationResult = await generateLaborExpenseFromAssignments(client, id, req.user?.id || null);
+          await auditLaborGenerationOutcome(client, id, req.user?.id || null, generationResult, "event_completion");
+          await client.query("COMMIT");
+        } catch (generationError) {
+          await client.query("ROLLBACK");
+          throw generationError;
+        } finally {
+          client.release();
+        }
+      }
       const event = await redactEventForPermissions(result.rows[0], req);
       res.json({ event });
     } else {
@@ -2441,51 +2577,32 @@ router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest
     try {
       await client.query("BEGIN");
 
-      // Lock parent event record FOR UPDATE to serialize concurrent generation calls
-      const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
-      if (eventResult.rowCount === 0) {
+      const generationResult = await generateLaborExpenseFromAssignments(client, id, req.user?.id || null);
+      if (generationResult.status === "event_not_found") {
         await client.query("ROLLBACK");
         res.status(404).json({ error: "Event not found" });
         return;
       }
-      if (eventResult.rows[0].status !== "Completed") {
+      if (generationResult.status === "event_not_completed") {
         await client.query("ROLLBACK");
         res.status(400).json({ error: "Labor expense can only be generated after event completion" });
         return;
       }
-
-      const assignmentResult = await client.query(
-        "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
-        [id]
-      );
-      const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
-      if (laborTotal <= 0) {
+      if (generationResult.status === "no_labor") {
         await client.query("ROLLBACK");
         res.status(400).json({ error: "No attended labor assignments found for this event" });
         return;
       }
-
-      const existingResult = await client.query(
-        "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
-        [id, "Auto-generated labor cost from attended event assignments"]
-      );
-      if ((existingResult.rowCount || 0) > 0) {
-        await client.query("ROLLBACK");
+      if (generationResult.status === "already_exists") {
+        await auditLaborGenerationOutcome(client, id, req.user?.id || null, generationResult, "manual");
+        await client.query("COMMIT");
         res.status(409).json({ error: "Labor expense has already been generated for this event" });
         return;
       }
 
-      const result = await client.query(
-        `
-          INSERT INTO expenses (event_id, category, amount, description, status, created_by)
-          VALUES ($1, 'Labor', $2, $3, 'Pending', $4)
-          RETURNING *
-        `,
-        [id, laborTotal, "Auto-generated labor cost from attended event assignments", req.user?.id || null]
-      );
-
+      await auditLaborGenerationOutcome(client, id, req.user?.id || null, generationResult, "manual");
       await client.query("COMMIT");
-      res.status(201).json(result.rows[0]);
+      res.status(201).json(generationResult.expense);
     } catch (error: any) {
       await client.query("ROLLBACK");
       throw error;
@@ -2494,6 +2611,56 @@ router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest
     }
   } catch (error: any) {
     console.error("[post-event-labor-expense] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/expenses/reverse-auto-labor - reject pending generated labor after correction
+router.post("/:id/expenses/reverse-auto-labor", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!hasPermission(req, "expenses:labor_generate")) {
+      res.status(403).json({ error: "Forbidden: Insufficient labor expense privileges" });
+      return;
+    }
+
+    const reason = typeof req.body?.reason === "string" && req.body.reason.trim()
+      ? req.body.reason.trim()
+      : "Auto-generated labor expense reversed after event correction";
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const reversalResult = await reversePendingAutoLaborExpense(client, id, req.user?.id || null, reason);
+      if (reversalResult.status === "not_found") {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Pending auto-generated labor expense not found" });
+        return;
+      }
+      if (reversalResult.status === "approved_locked") {
+        await insertEventAuditLog(
+          client,
+          id,
+          req.user?.id || null,
+          "labor_expense_reversal",
+          reversalResult.expenseId,
+          JSON.stringify({ outcome: "approved_locked", reason }),
+        );
+        await client.query("COMMIT");
+        res.status(409).json({ error: "Approved labor expenses are locked and cannot be reversed automatically" });
+        return;
+      }
+
+      await client.query("COMMIT");
+      res.json(reversalResult.expense);
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error("[post-event-labor-expense-reversal] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
