@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useLanguage } from "@/hooks/use-language";
 import { previewEventsImport, commitEventsImport, api } from "@/lib/api";
 import { HiXMark, HiArrowUpTray, HiArrowDownTray, HiCheckCircle, HiExclamationTriangle } from "react-icons/hi2";
@@ -138,6 +138,48 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
   const [isLoading, setIsLoading] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Focus the first interactive element or close button
+    const focusableElements = modalRef.current?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusableElements && focusableElements.length > 0) {
+      (focusableElements[0] as HTMLElement).focus();
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        if (!focusableElements || focusableElements.length === 0) return;
+        const firstEl = focusableElements[0] as HTMLElement;
+        const lastEl = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl) {
+            lastEl.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastEl) {
+            firstEl.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -286,13 +328,19 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
       {/* Sheet Container */}
-      <div className="relative w-full max-w-4xl bg-card border border-border rounded-lg shadow-massive overflow-hidden flex flex-col max-h-[90vh]">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-dialog-title"
+        className="relative w-full max-w-4xl bg-card border border-border rounded-lg shadow-massive overflow-hidden flex flex-col max-h-[90vh]"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border/50 bg-card-alt">
-          <h2 className="text-base font-black text-foreground uppercase tracking-wider">
+          <h2 id="import-dialog-title" className="text-base font-black text-foreground uppercase tracking-wider">
             {t("Import Events")}
           </h2>
-          <button onClick={onClose} className="p-2 rounded-lg bg-card hover:bg-border text-muted hover:text-foreground transition-all">
+          <button onClick={onClose} className="p-2 rounded-lg bg-card [@media(hover:hover)]:hover:bg-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all">
             <HiXMark className="w-5 h-5" />
           </button>
         </div>
@@ -328,13 +376,13 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                   <div className="flex rounded-lg border border-border overflow-hidden">
                     <button
                       onClick={() => setMode("insert")}
-                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "insert" ? "bg-primary text-on-primary" : "bg-card-alt text-muted hover:bg-border"}`}
+                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "insert" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                     >
                       {t("Insert (New Events)")}
                     </button>
                     <button
                       onClick={() => setMode("update")}
-                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "update" ? "bg-primary text-on-primary" : "bg-card-alt text-muted hover:bg-border"}`}
+                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "update" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                     >
                       {t("Update (Edit Existing)")}
                     </button>
@@ -344,7 +392,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 <button
                   type="button"
                   onClick={handleDownloadTemplate}
-                  className="flex items-center justify-center gap-2 h-[44px] px-5 rounded-lg text-xs font-black border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all self-end"
+                  className="flex items-center justify-center gap-2 h-[44px] px-5 rounded-lg text-xs font-black border border-primary/20 bg-primary/5 text-primary [@media(hover:hover)]:hover:bg-primary/10 transition-all self-end"
                 >
                   <HiArrowDownTray className="w-4 h-4" />
                   {t("Download Template")}
@@ -356,7 +404,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={() => document.getElementById("csv-file-input")?.click()}
-                className="border-2 border-dashed border-border/60 hover:border-primary/50 bg-card-alt/50 hover:bg-primary-light/5 rounded-xl py-12 px-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[220px]"
+                className="border-2 border-dashed border-border/60 [@media(hover:hover)]:hover:border-primary/50 bg-card-alt/50 [@media(hover:hover)]:hover:bg-primary-light/5 rounded-xl py-12 px-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[220px]"
               >
                 <input
                   id="csv-file-input"
@@ -417,7 +465,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                       </thead>
                       <tbody>
                         {validationResult.errors.map((err: ValidationError, idx: number) => (
-                          <tr key={idx} className="border-b border-border/30 hover:bg-card-alt/50">
+                          <tr key={idx} className="border-b border-border/30 [@media(hover:hover)]:hover:bg-card-alt/50">
                             <td className="px-4 py-2 font-mono font-bold">{err.row}</td>
                             <td className="px-4 py-2 font-bold text-foreground">{err.field}</td>
                             <td className="px-4 py-2 text-danger font-medium">{err.message}</td>
@@ -449,7 +497,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                         const rowErrors = validationResult.errors?.filter((e: ValidationError) => e.row === idx + 1) || [];
                         const isRowErroneous = rowErrors.length > 0;
                         return (
-                          <tr key={idx} className={`border-b border-border/30 hover:bg-card-alt/50 ${isRowErroneous ? "bg-danger/5" : ""}`}>
+                          <tr key={idx} className={`border-b border-border/30 [@media(hover:hover)]:hover:bg-card-alt/50 ${isRowErroneous ? "bg-danger/5" : ""}`}>
                             <td className="px-4 py-2 font-mono text-muted">{idx + 1}</td>
                             <td className={`px-4 py-2 font-bold ${rowErrors.some((e: ValidationError) => e.field === "name") ? "text-danger" : "text-foreground"}`}>{row.name || "-"}</td>
                             <td className={`px-4 py-2 ${rowErrors.some((e: ValidationError) => e.field === "client_name") ? "text-danger" : ""}`}>{row.client_name || "-"}</td>
@@ -486,7 +534,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
               <button
                 type="button"
                 onClick={onClose}
-                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-card hover:bg-border text-muted hover:text-foreground transition-all border border-border"
+                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-card [@media(hover:hover)]:hover:bg-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all border border-border"
               >
                 {t("Cancel")}
               </button>
@@ -494,7 +542,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 type="button"
                 onClick={handleValidate}
                 disabled={parsedRows.length === 0 || isLoading}
-                className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 disabled:opacity-50 disabled:scale-100 transition-all border border-primary/20"
+                className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 disabled:opacity-50 disabled:scale-100 transition-all border border-primary/20"
               >
                 {isLoading ? t("Validating") : t("Validate & Preview")}
               </button>
@@ -506,7 +554,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-card hover:bg-border text-muted hover:text-foreground transition-all border border-border"
+                className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-card [@media(hover:hover)]:hover:bg-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all border border-border"
               >
                 {t("Back")}
               </button>
@@ -514,7 +562,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 type="button"
                 onClick={handleCommit}
                 disabled={!validationResult?.valid || isCommitting}
-                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 disabled:opacity-50 disabled:scale-100 transition-all border border-primary/20"
+                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 disabled:opacity-50 disabled:scale-100 transition-all border border-primary/20"
               >
                 {isCommitting ? t("Importing") : t("Confirm Commit")}
               </button>
@@ -525,7 +573,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
             <button
               type="button"
               onClick={onClose}
-              className="w-full h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 transition-all border border-primary/20"
+              className="w-full h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 transition-all border border-primary/20"
             >
               {t("Finish")}
             </button>

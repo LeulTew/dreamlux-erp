@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useMemo, Suspense } from "react";
+import React, { useEffect, useState, useMemo, Suspense, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   getEvents, 
@@ -359,6 +359,78 @@ export function EventsPageContent() {
 
   const limit = 10;
 
+  // Refs and hooks for dialog accessibility (focus trap and Escape key listener)
+  const saveViewModalRef = useRef<HTMLFormElement>(null);
+  const deleteViewModalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isSaveViewOpen) return;
+    const focusableElements = saveViewModalRef.current?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusableElements && focusableElements.length > 0) {
+      (focusableElements[0] as HTMLElement).focus();
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsSaveViewOpen(false);
+        return;
+      }
+      if (e.key === "Tab") {
+        if (!focusableElements || focusableElements.length === 0) return;
+        const firstEl = focusableElements[0] as HTMLElement;
+        const lastEl = focusableElements[focusableElements.length - 1] as HTMLElement;
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl) {
+            lastEl.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastEl) {
+            firstEl.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSaveViewOpen]);
+
+  useEffect(() => {
+    if (!isDeleteViewOpen) return;
+    const focusableElements = deleteViewModalRef.current?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusableElements && focusableElements.length > 0) {
+      (focusableElements[0] as HTMLElement).focus();
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsDeleteViewOpen(null);
+        return;
+      }
+      if (e.key === "Tab") {
+        if (!focusableElements || focusableElements.length === 0) return;
+        const firstEl = focusableElements[0] as HTMLElement;
+        const lastEl = focusableElements[focusableElements.length - 1] as HTMLElement;
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl) {
+            lastEl.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastEl) {
+            firstEl.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isDeleteViewOpen]);
+
   const { data: authData, isLoading: authLoading } = useQuery({
     queryKey: ["auth-permissions"],
     queryFn: async () => {
@@ -659,14 +731,14 @@ export function EventsPageContent() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/events/proposals"
-              className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt text-muted hover:text-foreground border border-border"
+              className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border"
             >
               {t("Proposals")}
             </Link>
             {canWrite && (
               <button
                 onClick={() => setIsAddOpen(true)}
-                className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
+                className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
               >
                 <HiPlus className="w-4 h-4" />
                 {t("Add Event")}
@@ -718,7 +790,7 @@ export function EventsPageContent() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setDefaultViewMutation.mutate(activeViewId)}
-                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted hover:text-warning"
+                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-warning"
                     title={t("Default View")}
                   >
                     <HiStar className="w-4 h-4" />
@@ -728,14 +800,14 @@ export function EventsPageContent() {
                       const active = savedViews.find(v => v.id === activeViewId);
                       if (active) duplicateViewMutation.mutate({ id: active.id, name: `${active.name} Copy` });
                     }}
-                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted hover:text-foreground"
+                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                     title={t("Duplicate")}
                   >
                     <HiDocumentDuplicate className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setIsDeleteViewOpen(activeViewId)}
-                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted hover:text-danger"
+                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-danger"
                     title={t("Delete")}
                   >
                     <HiTrash className="w-4 h-4" />
@@ -746,7 +818,7 @@ export function EventsPageContent() {
               {filters.length > 0 && !activeViewId && (
                 <button
                   onClick={() => setIsSaveViewOpen(true)}
-                  className="px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-lg bg-card-alt text-primary hover:bg-primary/5 border border-primary/20 flex items-center gap-1.5"
+                  className="px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-lg bg-card-alt text-primary [@media(hover:hover)]:hover:bg-primary/5 border border-primary/20 flex items-center gap-1.5"
                 >
                   <HiBookmark className="w-4 h-4" />
                   {t("Save Current View")}
@@ -761,7 +833,7 @@ export function EventsPageContent() {
                   <button
                     key={opt.id}
                     onClick={() => updateUrl({ dateRange: opt.id, page: "1" })}
-                    className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider transition-all ${dateRange === opt.id ? "bg-primary text-on-primary" : "text-muted hover:bg-border"}`}
+                    className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider transition-all ${dateRange === opt.id ? "bg-primary text-on-primary" : "text-muted [@media(hover:hover)]:hover:bg-border"}`}
                   >
                     {t(opt.label)}
                   </button>
@@ -771,7 +843,7 @@ export function EventsPageContent() {
               {/* Advanced filter builder button */}
               <button
                 onClick={() => setIsFiltersOpen(true)}
-                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-primary bg-primary/5 text-primary" : "border-border bg-card-alt text-muted hover:text-foreground"}`}
+                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-primary bg-primary/5 text-primary" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"}`}
               >
                 <HiAdjustmentsHorizontal className="w-4 h-4" />
                 {t("Filters")}
@@ -786,7 +858,7 @@ export function EventsPageContent() {
               {canWrite && (
                 <button
                   onClick={() => setIsImportOpen(true)}
-                  className="p-2.5 rounded-lg bg-card-alt border border-border text-muted hover:text-foreground"
+                  className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                   title={t("Import")}
                 >
                   <HiArrowUpTray className="w-5 h-5" />
@@ -796,7 +868,7 @@ export function EventsPageContent() {
               <div className="relative">
                 <button
                   onClick={() => setIsExportOpen(!isExportOpen)}
-                  className="p-2.5 rounded-lg bg-card-alt border border-border text-muted hover:text-foreground flex items-center justify-center"
+                  className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground flex items-center justify-center"
                   title={t("Export")}
                 >
                   <HiArrowDownTray className="w-5 h-5" />
@@ -805,19 +877,19 @@ export function EventsPageContent() {
                   <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-lg shadow-massive z-10 py-1">
                     <button
                       onClick={() => handleExport("csv")}
-                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground hover:bg-card-alt"
+                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt"
                     >
                       {t("Export CSV")}
                     </button>
                     <button
                       onClick={() => handleExport("xlsx")}
-                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground hover:bg-card-alt"
+                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt"
                     >
                       {t("Export XLSX")}
                     </button>
                     <button
                       onClick={() => window.print()}
-                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground hover:bg-card-alt flex items-center gap-1.5"
+                      className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt flex items-center gap-1.5"
                     >
                       <HiPrinter className="w-4 h-4" />
                       {t("Print PDF")}
@@ -833,7 +905,7 @@ export function EventsPageContent() {
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-3">
             <button
               onClick={() => updateUrl({ status: "all", page: "1" })}
-              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === "all" ? "bg-primary border-primary text-on-primary" : "bg-card-alt border-border text-muted hover:text-foreground"}`}
+              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === "all" ? "bg-primary border-primary text-on-primary" : "bg-card-alt border-border text-muted [@media(hover:hover)]:hover:text-foreground"}`}
             >
               {t("All Statuses")}
             </button>
@@ -841,7 +913,7 @@ export function EventsPageContent() {
               <button
                 key={s}
                 onClick={() => updateUrl({ status: s, page: "1" })}
-                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === s ? "bg-primary border-primary text-on-primary" : "bg-card-alt border-border text-muted hover:text-foreground"}`}
+                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === s ? "bg-primary border-primary text-on-primary" : "bg-card-alt border-border text-muted [@media(hover:hover)]:hover:text-foreground"}`}
               >
                 {t(s)}
               </button>
@@ -871,22 +943,22 @@ export function EventsPageContent() {
                 <thead>
                   <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
                     <th className="px-6 py-4">#</th>
-                    <th className="px-6 py-4 cursor-pointer hover:bg-card-alt/50" onClick={() => handleSort("name")}>
+                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("name")}>
                       {t("Event Title")} {sortBy === "name" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:bg-card-alt/50" onClick={() => handleSort("client_name")}>
+                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("client_name")}>
                       {t("Client Name")} {sortBy === "client_name" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:bg-card-alt/50" onClick={() => handleSort("start_date")}>
+                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("start_date")}>
                       {t("Date")} {sortBy === "start_date" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:bg-card-alt/50" onClick={() => handleSort("venue_location")}>
+                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("venue_location")}>
                       {t("Venue")} {sortBy === "venue_location" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:bg-card-alt/50 text-right" onClick={() => handleSort("contract_price")}>
+                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50 text-right" onClick={() => handleSort("contract_price")}>
                       {t("Price")} {sortBy === "contract_price" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:bg-card-alt/50" onClick={() => handleSort("status")}>
+                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("status")}>
                       {t("Status")} {sortBy === "status" && (sortOrder === "asc" ? "▲" : "▼")}
                     </th>
                     <th className="px-6 py-4 text-right no-print">{t("Actions")}</th>
@@ -896,7 +968,7 @@ export function EventsPageContent() {
                   {events.map((event, index) => (
                     <tr
                       key={event.id}
-                      className="border-b border-border/50 hover:bg-primary-light/5 transition-all text-sm"
+                      className="border-b border-border/50 [@media(hover:hover)]:hover:bg-primary-light/5 transition-all text-sm"
                     >
                       <td className="px-6 py-4 text-xs font-mono text-muted">
                         {(page - 1) * limit + index + 1}
@@ -905,7 +977,7 @@ export function EventsPageContent() {
                         <button
                           type="button"
                           onClick={() => setEditingEvent(event)}
-                          className="font-bold text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+                          className="font-bold text-foreground [@media(hover:hover)]:hover:text-primary transition-all text-left cursor-pointer [@media(hover:hover)]:hover:underline"
                         >
                           {event.name}
                         </button>
@@ -915,7 +987,7 @@ export function EventsPageContent() {
                           <button
                             type="button"
                             onClick={() => setEditingEvent(event)}
-                            className="font-semibold text-foreground hover:text-primary transition-all text-left cursor-pointer hover:underline"
+                            className="font-semibold text-foreground [@media(hover:hover)]:hover:text-primary transition-all text-left cursor-pointer [@media(hover:hover)]:hover:underline"
                           >
                             {event.client_name}
                           </button>
@@ -956,14 +1028,14 @@ export function EventsPageContent() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => setEditingEvent(event)}
-                            className="p-1.5 rounded bg-card-alt border border-border text-muted hover:text-primary hover:border-primary/30 transition-all"
+                            className="p-1.5 rounded bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-primary [@media(hover:hover)]:hover:border-primary/30 transition-all"
                             title="Edit Event"
                           >
                             <HiPencilSquare className="w-4 h-4" />
                           </button>
                           <Link
                             href={`/events/${event.id}`}
-                            className="p-1.5 rounded bg-card-alt border border-border text-muted hover:text-foreground hover:border-border transition-all flex items-center gap-1 text-xs font-black uppercase tracking-wider px-2.5"
+                            className="p-1.5 rounded bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:border-border transition-all flex items-center gap-1 text-xs font-black uppercase tracking-wider px-2.5"
                             title="Open Event Workspace"
                           >
                             <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
@@ -1041,7 +1113,7 @@ export function EventsPageContent() {
                     <Link
                       href={`/events/${event.id}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[10px] font-black uppercase tracking-wider bg-card-alt border border-border px-2.5 py-1 rounded text-muted hover:text-foreground flex items-center gap-1"
+                      className="text-[10px] font-black uppercase tracking-wider bg-card-alt border border-border px-2.5 py-1 rounded text-muted [@media(hover:hover)]:hover:text-foreground flex items-center gap-1"
                     >
                       <HiArrowTopRightOnSquare className="w-3 h-3" />
                       {t("Workspace")}
@@ -1074,13 +1146,13 @@ export function EventsPageContent() {
               <div className="flex rounded-lg border border-border overflow-hidden">
                 <button
                   onClick={() => updateUrl({ filterLogic: "and", page: "1" })}
-                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${filterLogic === "and" ? "bg-primary text-on-primary" : "bg-card-alt text-muted hover:bg-border"}`}
+                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${filterLogic === "and" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                 >
                   {t("Match All (AND)")}
                 </button>
                 <button
                   onClick={() => updateUrl({ filterLogic: "or", page: "1" })}
-                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${filterLogic === "or" ? "bg-primary text-on-primary" : "bg-card-alt text-muted hover:bg-border"}`}
+                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${filterLogic === "or" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                 >
                   {t("Match Any (OR)")}
                 </button>
@@ -1088,7 +1160,7 @@ export function EventsPageContent() {
             </div>
             <button
               onClick={handleClearFilters}
-              className="text-xs font-bold text-danger hover:underline uppercase tracking-wider"
+              className="text-xs font-bold text-danger [@media(hover:hover)]:hover:underline uppercase tracking-wider"
             >
               {t("Reset")}
             </button>
@@ -1232,7 +1304,7 @@ export function EventsPageContent() {
                 {/* Remove button */}
                 <button
                   onClick={() => handleRemoveFilterRule(idx)}
-                  className="w-8 h-8 rounded bg-danger/10 text-danger hover:bg-danger hover:text-on-danger flex items-center justify-center transition-all shrink-0 self-end sm:self-auto"
+                  className="w-8 h-8 rounded bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger flex items-center justify-center transition-all shrink-0 self-end sm:self-auto"
                 >
                   <HiXMark className="w-4 h-4" />
                 </button>
@@ -1241,7 +1313,7 @@ export function EventsPageContent() {
 
             <button
               onClick={handleAddFilterRule}
-              className="mt-2 h-[44px] border border-dashed border-primary/35 hover:bg-primary/5 rounded-lg text-primary text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]"
+              className="mt-2 h-[44px] border border-dashed border-primary/35 [@media(hover:hover)]:hover:bg-primary/5 rounded-lg text-primary text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]"
             >
               <HiPlus className="w-4 h-4" />
               {t("Add Rule")}
@@ -1251,7 +1323,7 @@ export function EventsPageContent() {
           <div className="flex justify-end gap-2 border-t border-border pt-4 mt-4">
             <button
               onClick={() => setIsFiltersOpen(false)}
-              className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 transition-all border border-primary/20"
+              className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 transition-all border border-primary/20"
             >
               {t("Apply")}
             </button>
@@ -1263,9 +1335,16 @@ export function EventsPageContent() {
       {isSaveViewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsSaveViewOpen(false)} />
-          <form onSubmit={handleSaveViewSubmit} className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4">
+          <form
+            ref={saveViewModalRef}
+            onSubmit={handleSaveViewSubmit}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-view-title"
+            className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
+          >
             <div>
-              <h3 className="text-base font-black text-foreground uppercase tracking-wider">{t("Save View")}</h3>
+              <h3 id="save-view-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Save View")}</h3>
               <p className="text-xs text-muted font-medium mt-1">{t("Save View Description")}</p>
             </div>
 
@@ -1324,13 +1403,13 @@ export function EventsPageContent() {
               <button
                 type="button"
                 onClick={() => setIsSaveViewOpen(false)}
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
               >
                 {t("Cancel")}
               </button>
               <button
                 type="submit"
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 border border-primary/20"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
               >
                 {t("Save")}
               </button>
@@ -1343,21 +1422,27 @@ export function EventsPageContent() {
       {isDeleteViewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsDeleteViewOpen(null)} />
-          <div className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4">
-            <h3 className="text-base font-black text-foreground uppercase tracking-wider">{t("Delete View")}</h3>
+          <div
+            ref={deleteViewModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-view-title"
+            className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
+          >
+            <h3 id="delete-view-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Delete View")}</h3>
             <p className="text-sm text-muted font-semibold">{t("Are you sure you want to delete this saved view?")}</p>
 
             <div className="flex justify-end gap-2 border-t border-border pt-4">
               <button
                 type="button"
                 onClick={() => setIsDeleteViewOpen(null)}
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
               >
                 {t("Cancel")}
               </button>
               <button
                 onClick={() => deleteViewMutation.mutate(isDeleteViewOpen)}
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-danger text-on-danger hover:opacity-90 border border-danger/25"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-danger text-on-danger [@media(hover:hover)]:hover:opacity-90 border border-danger/25"
               >
                 {t("Yes, Delete")}
               </button>
