@@ -394,53 +394,53 @@ export default function NewProposalPage() {
           </h1>
           
           {/* Stepper progress tracker */}
-          <div className="flex items-center justify-center max-w-xl mx-auto my-6 select-none">
+          <div className="flex items-center justify-center max-w-xl mx-auto my-6 select-none w-full px-2">
             {/* Step 1 */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
                 step >= 1 ? "bg-primary text-on-primary font-bold shadow-md" : "bg-card-alt border border-border text-muted"
               }`}>
                 1
               </div>
-              <span className={`text-xs font-black uppercase tracking-wider ${step >= 1 ? "text-primary" : "text-muted"}`}>
+              <span className={`text-xs font-black uppercase tracking-wider hidden sm:inline ${step >= 1 ? "text-primary" : "text-muted"}`}>
                 {t("Basics")}
               </span>
             </div>
 
             {/* Line 1 -> 2 */}
-            <div className="flex-1 mx-4 h-0.5 bg-border relative min-w-[60px]">
+            <div className="flex-1 mx-2 sm:mx-4 h-0.5 bg-border relative min-w-[30px] sm:min-w-[60px]">
               <div className={`absolute top-0 left-0 h-full bg-primary transition-all duration-300 ${
                 step > 1 ? "w-full" : step === 1 ? "w-1/2" : "w-0"
               }`} />
             </div>
 
             {/* Step 2 */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
                 step >= 2 ? "bg-primary text-on-primary font-bold shadow-md" : "bg-card-alt border border-border text-muted"
               }`}>
                 2
               </div>
-              <span className={`text-xs font-black uppercase tracking-wider ${step >= 2 ? "text-primary" : "text-muted"}`}>
+              <span className={`text-xs font-black uppercase tracking-wider hidden sm:inline ${step >= 2 ? "text-primary" : "text-muted"}`}>
                 {t("Estimates")}
               </span>
             </div>
 
             {/* Line 2 -> 3 */}
-            <div className="flex-1 mx-4 h-0.5 bg-border relative min-w-[60px]">
+            <div className="flex-1 mx-2 sm:mx-4 h-0.5 bg-border relative min-w-[30px] sm:min-w-[60px]">
               <div className={`absolute top-0 left-0 h-full bg-primary transition-all duration-300 ${
                 step > 2 ? "w-full" : step === 2 ? "w-1/2" : "w-0"
               }`} />
             </div>
 
             {/* Step 3 */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
                 step >= 3 ? "bg-primary text-on-primary font-bold shadow-md" : "bg-card-alt border border-border text-muted"
               }`}>
                 3
               </div>
-              <span className={`text-xs font-black uppercase tracking-wider ${step >= 3 ? "text-primary" : "text-muted"}`}>
+              <span className={`text-xs font-black uppercase tracking-wider hidden sm:inline ${step >= 3 ? "text-primary" : "text-muted"}`}>
                 {t("Review")}
               </span>
             </div>

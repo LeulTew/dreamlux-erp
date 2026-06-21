@@ -736,13 +736,22 @@ export function EventsPageContent() {
               {t("Proposals")}
             </Link>
             {canWrite && (
-              <button
-                onClick={() => setIsAddOpen(true)}
-                className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
-              >
-                <HiPlus className="w-4 h-4" />
-                {t("Add Event")}
-              </button>
+              <>
+                <button
+                  onClick={() => setIsImportOpen(true)}
+                  className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border transition-all"
+                >
+                  <HiArrowUpTray className="w-4 h-4 text-primary" />
+                  {t("Import")}
+                </button>
+                <button
+                  onClick={() => setIsAddOpen(true)}
+                  className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
+                >
+                  <HiPlus className="w-4 h-4" />
+                  {t("Add Event")}
+                </button>
+              </>
             )}
           </div>
         </header>
@@ -854,16 +863,7 @@ export function EventsPageContent() {
                 )}
               </button>
 
-              {/* Import/Export buttons */}
-              {canWrite && (
-                <button
-                  onClick={() => setIsImportOpen(true)}
-                  className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
-                  title={t("Import")}
-                >
-                  <HiArrowUpTray className="w-5 h-5" />
-                </button>
-              )}
+
 
               <div className="relative">
                 <button
