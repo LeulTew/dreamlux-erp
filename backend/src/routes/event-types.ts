@@ -1,7 +1,7 @@
 import express from "express";
 import { supabase } from "../db/supabase";
 import { createEventTypeSchema, updateEventTypeSchema } from "../lib/validation";
-import { requireRole, AuthRequest } from "../middleware/auth";
+import { requirePermissionSlugs, AuthRequest } from "../middleware/auth";
 
 const router = express.Router();
 
@@ -75,7 +75,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // CREATE event type
-router.post("/", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
+router.post("/", requirePermissionSlugs(["events:write"]), async (req: AuthRequest, res) => {
   try {
     const result = createEventTypeSchema.safeParse(req.body);
     if (!result.success) {
@@ -86,8 +86,8 @@ router.post("/", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), 
 
     const { data, error } = await supabase
       .from("event_types")
-      .insert({ 
-        name: event_name, 
+      .insert({
+        name: event_name,
         description: description ?? null
       })
       .select()
@@ -106,7 +106,7 @@ router.post("/", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), 
 });
 
 // UPDATE event type
-router.put("/:id", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
+router.put("/:id", requirePermissionSlugs(["events:write"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const result = updateEventTypeSchema.safeParse(req.body);
@@ -153,7 +153,7 @@ router.put("/:id", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"])
 });
 
 // DELETE (soft delete) event type
-router.delete("/:id", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
+router.delete("/:id", requirePermissionSlugs(["events:delete"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -182,7 +182,7 @@ router.delete("/:id", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN
 });
 
 // GET TRASH
-router.get("/trash/list", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (_req: AuthRequest, res) => {
+router.get("/trash/list", requirePermissionSlugs(["events:read"]), async (_req: AuthRequest, res) => {
   try {
     const { data, error } = await supabase
       .from("event_types")
@@ -203,7 +203,7 @@ router.get("/trash/list", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_A
 });
 
 // RESTORE FROM TRASH
-router.post("/:id/restore", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
+router.post("/:id/restore", requirePermissionSlugs(["events:delete"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -231,7 +231,7 @@ router.post("/:id/restore", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER
 });
 
 // DELETE (permanent hard delete) event type
-router.delete("/:id/permanent", requireRole(["OWNER", "OPS_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res) => {
+router.delete("/:id/permanent", requirePermissionSlugs(["events:delete"]), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 

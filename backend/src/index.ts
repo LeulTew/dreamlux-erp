@@ -12,7 +12,7 @@ import salaryLevelsRouter from "./routes/salary-levels";
 import eventTypesRouter from "./routes/event-types";
 import payrollRouter from "./routes/payroll";
 import eventsRouter from "./routes/events";
-import { requireAuth, requirePermissionSlugs, requireRole } from "./middleware/auth";
+import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
 import { runStartupMigrations } from "./db/startup-migration";
 import { pool } from "./db/pool";
@@ -78,10 +78,10 @@ app.get("/health", async (_req, res) => {
   try {
     // Ping DB to keep Supabase awake and verify connection health
     await pool.query("SELECT 1");
-    res.status(200).json({ 
+    res.status(200).json({
       status: "ok",
       database: "connected",
-      timestamp: new Date().toISOString() 
+      timestamp: new Date().toISOString()
     });
   } catch (error: any) {
     console.error("[health-check] Database connection error:", error);
@@ -107,10 +107,10 @@ app.use("/stores", requireAuth, officeRoutes); // Compatibility for old inventor
 app.use("/employees", requireAuth, employeesRouter);
 app.use("/export", requireAuth, exportRoutes);
 app.use("/settings", requireAuth, requirePermissionSlugs(["settings:write", "users:manage"]), settingsRouter);
-app.use("/departments", requireAuth, requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), departmentsRouter);
-app.use("/salary-levels", requireAuth, requireRole(["OWNER", "HR_MANAGER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), salaryLevelsRouter);
+app.use("/departments", requireAuth, requirePermissionSlugs(["departments:manage"]), departmentsRouter);
+app.use("/salary-levels", requireAuth, requirePermissionSlugs(["salary-levels:manage"]), salaryLevelsRouter);
 app.use("/event-types", requireAuth, eventTypesRouter);
-app.use("/payroll", requireAuth, requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), payrollRouter);
+app.use("/payroll", requireAuth, requirePermissionSlugs(["payroll:read", "payroll:write"]), payrollRouter);
 app.use("/events", requireAuth, eventsRouter);
 
 // Error handler

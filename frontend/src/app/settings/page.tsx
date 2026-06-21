@@ -40,6 +40,7 @@ import {
   HiUsers,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -135,12 +136,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 type TabId = "overview" | "users" | "system" | "database";
 type UserModalTab = "identity" | "contact" | "access" | "security";
 
-const ALLOWED_SETTINGS_ROLES = new Set([
-  "SUPER_ADMIN",
-  "admin",
-  "SYSTEM_MANAGER",
-  "system_manager",
-]);
+// Removed hardcoded ALLOWED_SETTINGS_ROLES mapping. Access is now gated dynamically via useAuth.
 
 function extractErrorMessage(err: unknown, fallback: string): string {
   const maybeError = err as {
@@ -162,8 +158,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [prefix, setPrefix] = useState("");
 
-  const [roleReady, setRoleReady] = useState(false);
-  const [currentRole, setCurrentRole] = useState<string>("");
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const canAccessAdmin = hasPermission("users:manage") || hasPermission("settings:write");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userModalTab, setUserModalTab] = useState<UserModalTab>("identity");
@@ -176,22 +172,6 @@ export default function SettingsPage() {
   const [profileImageStatus, setProfileImageStatus] = useState("");
   const [profileImageBusy, setProfileImageBusy] = useState(false);
   const [pendingImageSaveAction, setPendingImageSaveAction] = useState<"none" | "upload" | "remove">("none");
-
-  useEffect(() => {
-    try {
-      const rawUser = localStorage.getItem("user");
-      if (rawUser) {
-        const parsed = JSON.parse(rawUser) as { role?: string };
-        setCurrentRole(parsed.role || "");
-      }
-    } catch {
-      setCurrentRole("");
-    } finally {
-      setRoleReady(true);
-    }
-  }, []);
-
-  const canAccessAdmin = ALLOWED_SETTINGS_ROLES.has(currentRole);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["appSettings"],
@@ -225,6 +205,23 @@ export default function SettingsPage() {
     }
     return byId;
   }, [roles]);
+
+  const effectivePermissions = useMemo(() => {
+    const slugs = new Set<string>();
+    formData.roleIds.forEach((roleId) => {
+      const roleObj = roles.find((r) => r.id === roleId);
+      if (roleObj) {
+        const nameUpper = roleObj.name.toUpperCase();
+        if (["SUPER_ADMIN", "ADMIN", "OWNER"].includes(nameUpper)) {
+          slugs.add("*");
+        }
+        if (roleObj.permission_slugs) {
+          roleObj.permission_slugs.forEach((slug) => slugs.add(slug));
+        }
+      }
+    });
+    return Array.from(slugs).sort();
+  }, [formData.roleIds, roles]);
 
   const { data: health, isLoading: healthLoading } = useQuery({
     queryKey: ["backendHealth"],
@@ -628,7 +625,7 @@ export default function SettingsPage() {
   const isSystemSaveDisabled = !isSystemSavePending && prefix === settings?.employee_id_prefix;
   const isUserSavePending = createMutation.isPending || updateUserMutation.isPending;
 
-  if (!roleReady) {
+  if (authLoading) {
     return (
       <AuthLayout>
         <div className="max-w-3xl mx-auto py-20">
@@ -638,7 +635,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (!canAccessAdmin) {
+  if (!isAuthenticated || !canAccessAdmin) {
     return (
       <AuthLayout>
         <div className="max-w-3xl mx-auto py-20">
@@ -1030,7 +1027,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <div className="space-y-3">
                     <label className="text-xs uppercase font-semibold text-muted-foreground tracking-wider block">Profile Image</label>
- 
+
                     <input
                       id="profile-image-input"
                       type="file"
@@ -1038,7 +1035,7 @@ export default function SettingsPage() {
                       onChange={(e) => handleProfileImageChange(e.target.files?.[0] || null)}
                       className="hidden"
                     />
- 
+
                     <label
                       htmlFor="profile-image-input"
                       className="block rounded-xl border border-dashed border-border bg-card-alt p-3 cursor-pointer hover:border-primary/50 transition-colors"
@@ -1056,7 +1053,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     </label>
- 
+
                     {formData.profileImagePreviewUrl && (
                       <button
                         type="button"
@@ -1066,7 +1063,7 @@ export default function SettingsPage() {
                         Remove Image
                       </button>
                     )}
- 
+
                     {(profileImageStatus || profileImageBusy) && (
                       <div className="rounded-lg border border-border bg-card-alt p-3 space-y-2">
                         <div className="h-2 rounded-full bg-border overflow-hidden">
@@ -1079,7 +1076,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
- 
+
                   <div>
                     <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Username *</label>
                     <input
@@ -1091,7 +1088,7 @@ export default function SettingsPage() {
                       className="w-full h-11 px-4 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium disabled:opacity-50"
                     />
                   </div>
- 
+
                   <div>
                     <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Full Name *</label>
                     <input
@@ -1157,6 +1154,32 @@ export default function SettingsPage() {
                     <p className="text-[11px] text-muted mt-1">
                       Multiple roles are supported; the first checked role is used as primary for compatibility.
                     </p>
+                  </div>
+
+                  <div className="pt-2">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Resolved Effective Permissions</label>
+                    {effectivePermissions.length === 0 ? (
+                      <div className="text-xs text-muted-foreground p-3 border border-dashed border-border rounded-xl bg-card-alt">
+                        No permissions resolved. Select at least one role.
+                      </div>
+                    ) : (
+                      <div className="max-h-40 overflow-y-auto rounded-xl border border-border bg-card-alt p-3 space-y-1.5">
+                        {effectivePermissions.includes("*") ? (
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-success font-mono bg-success/10 p-2 rounded-lg">
+                            <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse" />
+                            * (Full System Access)
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {effectivePermissions.map((slug) => (
+                              <div key={slug} className="text-xs font-semibold text-foreground font-mono bg-card border border-border/50 px-2 py-1 rounded-lg truncate" title={slug}>
+                                {slug}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3 pt-1">

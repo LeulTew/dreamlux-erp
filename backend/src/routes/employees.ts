@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { fromBuffer } from "file-type";
 import { supabase } from "../db/supabase";
 import { uploadImage, deleteImage, getPublicUrl } from "../storage/storage";
-import { AuthRequest, requireRole } from "../middleware/auth";
+import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
@@ -83,7 +83,7 @@ const cpUpload = upload.fields([
 // POST /employees — create employee with images
 router.post(
   "/",
-  requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]),
+  requirePermissionSlugs(["hr:write"]),
   cpUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const keysToCleanup: string[] = [];
@@ -340,16 +340,16 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
     // Handle cases where the migration hasn't been applied or multiple relationships exist.
     if (queryError && (queryError.message.includes("column") || queryError.message.includes("relationship") || queryError.message.includes("embed"))) {
       console.warn(`[Compatibility Mode] Employees query fallback triggered. Error: ${queryError.message}`);
-      
+
       // Re-build a safe query for legacy schema
       let fallbackQuery = supabase
         .from("employees")
-        .select("*, stores!office_id(name)", { count: "exact" }); 
-      
+        .select("*, stores!office_id(name)", { count: "exact" });
+
       // Apply same filters
       if (status === "trash") fallbackQuery = fallbackQuery.not("deleted_at", "is", null);
       else fallbackQuery = fallbackQuery.is("deleted_at", null);
-      
+
       if (department_id && department_id !== "all") fallbackQuery = fallbackQuery.eq("department_id", department_id);
       if (office_id && office_id !== "all") fallbackQuery = fallbackQuery.eq("office_id", office_id);
       if (search) fallbackQuery = fallbackQuery.or(`full_name.ilike.%${search}%,employee_id.ilike.%${search}%,department.ilike.%${search}%`);
@@ -366,14 +366,14 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
       }
 
       const res1 = await fallbackQuery.range(offset, offset + limit - 1);
-      
+
       if (res1.error) {
         console.warn(`[Compatibility Mode] Secondary fallback triggered. Error: ${res1.error.message}`);
         // Ultra-safe: No joins, just raw data
         let ultraFallback = supabase.from("employees").select("*", { count: "exact" });
         if (status === "trash") ultraFallback = ultraFallback.not("deleted_at", "is", null);
         else ultraFallback = ultraFallback.is("deleted_at", null);
-        
+
         if (department_id && department_id !== "all") ultraFallback = ultraFallback.eq("department_id", department_id);
         if (office_id && office_id !== "all") ultraFallback = ultraFallback.eq("office_id", office_id);
         if (search) ultraFallback = ultraFallback.or(`full_name.ilike.%${search}%,employee_id.ilike.%${search}%,department.ilike.%${search}%`);
@@ -413,7 +413,7 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
         event_prices: (row as unknown as Record<string, Record<string, number>>).event_prices || {},
       };
     });
-    
+
     res.json({ employees, total: finalCount || 0, page, limit });
   } catch (error: unknown) {
     console.error("Failed to fetch employees:", error);
@@ -474,7 +474,7 @@ router.get("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 // PATCH /employees/:id — update employee
 router.patch(
   "/:id",
-  requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]),
+  requirePermissionSlugs(["hr:write"]),
   cpUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -674,7 +674,7 @@ router.patch(
 );
 
 // POST /employees/:id/recover — recover soft-deleted employee
-router.post("/:id/recover", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/:id/recover", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { error } = await supabase
@@ -693,7 +693,7 @@ router.post("/:id/recover", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_
 });
 
 // DELETE /employees/:id — Soft delete
-router.delete("/:id", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete("/:id", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { error: deleteError } = await supabase
@@ -712,7 +712,7 @@ router.delete("/:id", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"
 });
 
 // DELETE /employees/:id/permanent — Hard delete
-router.delete("/:id/permanent", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete("/:id/permanent", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { error: deleteError } = await supabase

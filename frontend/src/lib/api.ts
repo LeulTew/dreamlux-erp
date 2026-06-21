@@ -498,28 +498,28 @@ export const permanentlyDeleteItem = (id: string) =>
   api.delete(`/assets/${id}/permanent`).then((r) => r.data);
 
 // Reconcile
-export const getReconcilePreview = (params: { 
-  store?: string; 
-  page?: number; 
-  limit?: number; 
+export const getReconcilePreview = (params: {
+  store?: string;
+  page?: number;
+  limit?: number;
   filter?: string;
   search?: string;
-} = {}) => 
+} = {}) =>
   getWithAliasFallback<{ items: Item[]; total: number; page: number; limit: number }>("/assets/reconcile/preview", { params });
 
-export const submitReconcile = (data: { 
+export const submitReconcile = (data: {
   items: Array<{
     id: string;
     quantity: number;
     expected_current_quantity?: number;
     source_run_id?: string;
-  }>; 
-  store_id?: string | null; 
+  }>;
+  store_id?: string | null;
   notes?: string;
-}) => 
+}) =>
   postWithAliasFallback<ReconcileSummary>("/assets/reconcile", data);
 
-export const undoReconcileHistoryItem = (params: { 
+export const undoReconcileHistoryItem = (params: {
   runId: string;
   itemId: string;
   quantity: number;
@@ -645,9 +645,9 @@ export const undoReconcileHistoryRun = async (runId: string): Promise<ReconcileS
   return result;
 };
 
-export const getReconcileHistory = (params: { 
-  page?: number; 
-  limit?: number; 
+export const getReconcileHistory = (params: {
+  page?: number;
+  limit?: number;
   store?: string;
   startDate?: string;
   endDate?: string;
@@ -1139,7 +1139,7 @@ export const deleteEventTypePermanent = (id: string) => api.delete(`/event-types
 // ====================================================
 // PAYROLL RUNS
 // ====================================================
-export const getPayrollRuns = (params?: { 
+export const getPayrollRuns = (params?: {
   view?: "active" | "trash",
   status?: string,
   year?: string,
@@ -1172,11 +1172,26 @@ export const getEvents = (
   search?: string,
   status?: string,
   start_date?: string,
-  end_date?: string
+  end_date?: string,
+  sortBy?: string,
+  sortOrder?: "asc" | "desc",
+  filterLogic?: "and" | "or",
+  filters?: unknown[]
 ) =>
   api
     .get("/events", {
-      params: { page, limit, search, status, start_date, end_date },
+      params: {
+        page,
+        limit,
+        search,
+        status,
+        start_date,
+        end_date,
+        sortBy,
+        sortOrder,
+        filterLogic,
+        filters: filters ? JSON.stringify(filters) : undefined,
+      },
     })
     .then((r) => r.data);
 
@@ -1268,6 +1283,114 @@ export const reviewEventExpense = (
 export const getEventProfit = (id: string): Promise<EventProfitSummary> =>
   api.get(`/events/${id}/profit`).then((r) => r.data);
 
-export const getProfitReport = (start_date?: string, end_date?: string): Promise<ProfitReportSummary> =>
-  api.get("/events/reports/profit", { params: { start_date, end_date } }).then((r) => r.data);
+export const getProfitReport = (
+  start_date?: string,
+  end_date?: string,
+  params: Record<string, unknown> = {}
+): Promise<ProfitReportSummary> =>
+  api.get("/events/reports/profit", { params: { start_date, end_date, ...params } }).then((r) => r.data);
 
+// ====================================================
+// SAVED VIEWS API
+// ====================================================
+export const getEventSavedViews = () =>
+  api.get("/events/saved-views").then((r) => r.data);
+
+export const createEventSavedView = (data: Record<string, unknown>) =>
+  api.post("/events/saved-views", data).then((r) => r.data);
+
+export const updateEventSavedView = (id: string, data: Record<string, unknown>) =>
+  api.put(`/events/saved-views/${id}`, data).then((r) => r.data);
+
+export const deleteEventSavedView = (id: string) =>
+  api.delete(`/events/saved-views/${id}`).then((r) => r.data);
+
+export const duplicateEventSavedView = (id: string, name?: string) =>
+  api.post(`/events/saved-views/${id}/duplicate`, { name }).then((r) => r.data);
+
+export const setDefaultEventSavedView = (id: string) =>
+  api.patch(`/events/saved-views/${id}/default`).then((r) => r.data);
+
+// ====================================================
+// EVENT PROPOSALS API
+// ====================================================
+export const getEventProposals = (params: Record<string, unknown> = {}) =>
+  api.get("/events/proposals", { params }).then((r) => r.data);
+
+export const createEventProposal = (data: Record<string, unknown>) =>
+  api.post("/events/proposals", data).then((r) => r.data);
+
+export const getEventProposal = (id: string) =>
+  api.get(`/events/proposals/${id}`).then((r) => r.data);
+
+export const submitEventProposal = (id: string) =>
+  api.post(`/events/proposals/${id}/submit`).then((r) => r.data);
+
+export const approveEventProposal = (id: string) =>
+  api.post(`/events/proposals/${id}/approve`).then((r) => r.data);
+
+export const rejectEventProposal = (id: string, reason: string) =>
+  api.post(`/events/proposals/${id}/reject`, { reason }).then((r) => r.data);
+
+export const cancelEventProposal = (id: string) =>
+  api.post(`/events/proposals/${id}/cancel`).then((r) => r.data);
+
+export const convertEventProposal = (id: string) =>
+  api.post(`/events/proposals/${id}/convert`).then((r) => r.data);
+
+// ====================================================
+// IMPORT / EXPORT API
+// ====================================================
+export const getEventsExportUrl = (params: Record<string, unknown>) => {
+  const url = new URL("/events/export", api.defaults.baseURL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4000"));
+  Object.entries(params).forEach(([key, val]) => {
+    if (val !== undefined && val !== null) {
+      if (typeof val === "object") {
+        url.searchParams.append(key, JSON.stringify(val));
+      } else {
+        url.searchParams.append(key, String(val));
+      }
+    }
+  });
+  return url.toString();
+};
+
+export const getProfitReportExportUrl = (params: Record<string, unknown>) => {
+  const url = new URL("/events/reports/profit/export", api.defaults.baseURL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4000"));
+  Object.entries(params).forEach(([key, val]) => {
+    if (val !== undefined && val !== null) {
+      url.searchParams.append(key, String(val));
+    }
+  });
+  return url.toString();
+};
+
+export const previewEventsImport = (data: { mode: "insert" | "update"; rows: unknown[] }) =>
+  api.post("/events/import/preview", data).then((r) => r.data);
+
+export const commitEventsImport = (data: { mode: "insert" | "update"; rows: unknown[] }) =>
+  api.post("/events/import/commit", data).then((r) => r.data);
+
+export const getPermissionsCatalog = (): Promise<{ slug: string; description: string }[]> =>
+  api.get("/users/permissions").then((r) => r.data);
+
+export const updateRolePermissions = (roleId: string, permissionSlugs: string[]): Promise<Role> =>
+  api.put(`/users/roles/${roleId}/permissions`, { permission_slugs: permissionSlugs }).then((r) => r.data);
+
+export const getEffectivePermissions = (): Promise<{
+  user_id: string | null;
+  role: string | null;
+  roles: string[];
+  permission_slugs: string[];
+  is_superuser: boolean;
+  catalog: { slug: string; description: string }[];
+}> => api.get("/auth/permissions").then((r) => r.data);
+
+export const createRole = (data: { name: string; description: string; cloneFromRoleId?: string }) =>
+  api.post<Role>("/users/roles", data).then((r) => r.data);
+
+export const updateRole = (id: string, data: { name: string; description: string }) =>
+  api.put<Role>(`/users/roles/${id}`, data).then((r) => r.data);
+
+export const deleteRole = (id: string) =>
+  api.delete(`/users/roles/${id}`).then((r) => r.data);

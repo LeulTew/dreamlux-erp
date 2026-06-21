@@ -1,7 +1,14 @@
 import { Pool, PoolClient } from "pg";
 import { Router, Response } from "express";
+import ExcelJS from "exceljs";
+import { stringify } from "csv-stringify/sync";
 import { pool } from "../db/pool";
-import { requireAdmin, requireAuth, AuthRequest } from "../middleware/auth";
+import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
+import { hasPermissionSlug } from "../lib/permissions";
+import { fetchHiddenFieldsForRoles } from "../lib/permissions-db";
+import { createEventProposalsRouter } from "./events/proposals";
+import { createEventProfitReportsRouter } from "./events/profit-reports";
+import { createEventSavedViewsRouter } from "./events/saved-views";
 import {
   createEventSchema,
   updateEventSchema,
@@ -14,105 +21,496 @@ import {
   createEventExpenseSchema,
   reviewEventExpenseSchema,
   createTripLogSchema,
+  eventListQuerySchema,
+  eventExportQuerySchema,
+  eventImportPayloadSchema,
 } from "../lib/validation";
 
 
 const router = Router();
 
-function canAccessProfitReports(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
-  return allowed.includes(role.toUpperCase());
+const hiddenEventFieldsByRoleKey = new Map<string, string[]>();
+
+function hasPermission(req: AuthRequest, slug: string): boolean {
+  return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), slug);
 }
 
-// Helper to check if user has permission to edit completed events or transition backward
-function canOverrideCompleted(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
-  return allowed.includes(role.toUpperCase());
+function hasAnyPermission(req: AuthRequest, slugs: string[]): boolean {
+  return slugs.some((slug) => hasPermission(req, slug));
 }
 
-function canLogTrips(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT", "DRIVER"];
-  return allowed.includes(role.toUpperCase());
+function canAccessProfitReports(req: AuthRequest): boolean {
+  return hasPermission(req, "reports:profit:read");
 }
 
-function canApproveExpenses(role?: string): boolean {
-  if (!role) return false;
-  const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"];
-  return allowed.includes(role.toUpperCase());
+function canOverrideCompleted(req: AuthRequest): boolean {
+  return hasPermission(req, "events:override_completed");
+}
+
+function canViewEventFinancials(req: AuthRequest): boolean {
+  return canAccessProfitReports(req);
+}
+
+function canViewEventOperations(req: AuthRequest): boolean {
+  return hasAnyPermission(req, ["events:write", "event_assignments:write", "vehicle_assignments:write", "events:delete", "expenses:approve"]);
+}
+
+function canLogTrips(req: AuthRequest): boolean {
+  return hasPermission(req, "trips:create");
+}
+
+function canApproveExpenses(req: AuthRequest): boolean {
+  return hasPermission(req, "expenses:approve");
+}
+
+function canExportEvents(req: AuthRequest): boolean {
+  return hasPermission(req, "exports:read") && (hasPermission(req, "events:read") || canAccessProfitReports(req));
+}
+
+function canImportEvents(req: AuthRequest): boolean {
+  return hasPermission(req, "events:write");
+}
+
+async function getHiddenEventFields(req: AuthRequest): Promise<string[]> {
+  const roleNames = [req.user?.role, ...(req.user?.roles || [])].filter((role): role is string => Boolean(role));
+  const key = roleNames.map((role) => role.toLowerCase()).sort().join("|");
+  if (!key) return [];
+  const cached = hiddenEventFieldsByRoleKey.get(key);
+  if (cached) return cached;
+  const hiddenFields = await fetchHiddenFieldsForRoles(roleNames, "events");
+  hiddenEventFieldsByRoleKey.set(key, hiddenFields);
+  return hiddenFields;
+}
+
+async function redactEventForPermissions<T extends Record<string, any>>(event: T, req: AuthRequest): Promise<T> {
+  const redacted = { ...event };
+  if (!canViewEventFinancials(req)) {
+    delete redacted.contract_price;
+    delete redacted.approved_expense_total;
+    delete redacted.estimated_cost_total;
+    delete redacted.net_profit;
+    delete redacted.margin_percentage;
+    delete redacted.pending_expense_count;
+  }
+  if (!canViewEventOperations(req)) delete redacted.estimated_design_cost;
+  for (const fieldName of await getHiddenEventFields(req)) {
+    delete redacted[fieldName];
+  }
+  return redacted;
+}
+
+type EventFilterField = {
+  sql: string;
+  type: "text" | "number" | "date" | "uuid";
+  financial?: boolean;
+};
+
+const EVENT_FILTER_FIELDS: Record<string, EventFilterField> = {
+  name: { sql: "e.name", type: "text" },
+  title: { sql: "e.name", type: "text" },
+  event_type: { sql: "et.name", type: "text" },
+  event_type_id: { sql: "e.event_type_id", type: "uuid" },
+  client_name: { sql: "e.client_name", type: "text" },
+  client_phone: { sql: "e.client_phone", type: "text" },
+  status: { sql: "e.status", type: "text" },
+  start_date: { sql: "e.start_date", type: "date" },
+  end_date: { sql: "e.end_date", type: "date" },
+  venue_location: { sql: "e.venue_location", type: "text" },
+  location: { sql: "e.venue_location", type: "text" },
+  created_by: { sql: "e.created_by", type: "uuid" },
+  created_date: { sql: "e.created_at", type: "date" },
+  updated_date: { sql: "e.updated_at", type: "date" },
+  contract_price: { sql: "e.contract_price", type: "number", financial: true },
+  revenue: { sql: "e.contract_price", type: "number", financial: true },
+  approved_expense_total: { sql: "COALESCE(expenses.approved_expense_total, 0)", type: "number", financial: true },
+  estimated_cost_total: { sql: "COALESCE(e.estimated_design_cost, 0)", type: "number", financial: true },
+  net_profit: { sql: "e.contract_price - COALESCE(expenses.approved_expense_total, 0)", type: "number", financial: true },
+  margin_percentage: {
+    sql: "CASE WHEN e.contract_price > 0 THEN ((e.contract_price - COALESCE(expenses.approved_expense_total, 0)) / e.contract_price) * 100 ELSE 0 END",
+    type: "number",
+    financial: true,
+  },
+  vehicle_count: { sql: "COALESCE(vehicles.vehicle_count, 0)", type: "number" },
+  assigned_staff_count: { sql: "COALESCE(assignments.assigned_staff_count, 0)", type: "number" },
+  allocation_count: { sql: "COALESCE(allocations.allocation_count, 0)", type: "number" },
+  checklist_completion_percentage: {
+    sql: "CASE WHEN COALESCE(checklist.total_items, 0) = 0 THEN 0 ELSE (COALESCE(checklist.done_items, 0)::numeric / checklist.total_items) * 100 END",
+    type: "number",
+  },
+  pending_expense_count: { sql: "COALESCE(expenses.pending_expense_count, 0)", type: "number", financial: true },
+};
+
+type EventListQueryShape = {
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
+  filterLogic: "and" | "or";
+  filters: Array<{ field: string; operator: string; value?: unknown }>;
+};
+
+type EventQueryParts =
+  | { ok: true; whereClause: string; params: any[]; sortSql: string; sortDirection: "ASC" | "DESC"; summaryJoins: string }
+  | { ok: false; status: number; error: string };
+
+const EVENT_SUMMARY_JOINS = `
+  LEFT JOIN (
+    SELECT
+      event_id,
+      COALESCE(SUM(amount) FILTER (WHERE status = 'Approved'), 0)::numeric AS approved_expense_total,
+      COALESCE(COUNT(*) FILTER (WHERE status = 'Pending'), 0)::int AS pending_expense_count
+    FROM expenses
+    GROUP BY event_id
+  ) expenses ON expenses.event_id = e.id
+  LEFT JOIN (
+    SELECT event_id, COUNT(*)::int AS assigned_staff_count
+    FROM event_assignments
+    GROUP BY event_id
+  ) assignments ON assignments.event_id = e.id
+  LEFT JOIN (
+    SELECT event_id, COUNT(*)::int AS vehicle_count
+    FROM vehicle_assignments
+    GROUP BY event_id
+  ) vehicles ON vehicles.event_id = e.id
+  LEFT JOIN (
+    SELECT event_id, COUNT(*)::int AS allocation_count
+    FROM event_allocations
+    WHERE status <> 'Returned'
+    GROUP BY event_id
+  ) allocations ON allocations.event_id = e.id
+  LEFT JOIN (
+    SELECT
+      event_id,
+      COUNT(*)::int AS total_items,
+      COUNT(*) FILTER (WHERE status = 'Done')::int AS done_items
+    FROM event_checklist
+    GROUP BY event_id
+  ) checklist ON checklist.event_id = e.id
+`;
+
+const EVENT_SELECT_COLUMNS = `
+  e.*,
+  et.name as event_type_name,
+  COALESCE(expenses.approved_expense_total, 0)::float AS approved_expense_total,
+  COALESCE(e.estimated_design_cost, 0)::float AS estimated_cost_total,
+  (e.contract_price - COALESCE(expenses.approved_expense_total, 0))::float AS net_profit,
+  CASE
+    WHEN e.contract_price > 0 THEN ROUND((((e.contract_price - COALESCE(expenses.approved_expense_total, 0)) / e.contract_price) * 100)::numeric, 2)
+    ELSE 0
+  END::float AS margin_percentage,
+  COALESCE(vehicles.vehicle_count, 0)::int AS vehicle_count,
+  COALESCE(assignments.assigned_staff_count, 0)::int AS assigned_staff_count,
+  COALESCE(allocations.allocation_count, 0)::int AS allocation_count,
+  CASE
+    WHEN COALESCE(checklist.total_items, 0) = 0 THEN 0
+    ELSE ROUND(((COALESCE(checklist.done_items, 0)::numeric / checklist.total_items) * 100)::numeric, 2)
+  END::float AS checklist_completion_percentage,
+  COALESCE(expenses.pending_expense_count, 0)::int AS pending_expense_count
+`;
+
+const EVENT_EXPORT_COLUMNS: Record<string, { header: string; financial?: boolean }> = {
+  name: { header: "Event Name" },
+  client_name: { header: "Client Name" },
+  client_phone: { header: "Client Phone" },
+  event_type_name: { header: "Event Type" },
+  status: { header: "Status" },
+  start_date: { header: "Start Date" },
+  end_date: { header: "End Date" },
+  start_time: { header: "Start Time" },
+  end_time: { header: "End Time" },
+  venue_location: { header: "Venue / Location" },
+  contract_price: { header: "Revenue / Contract Price", financial: true },
+  approved_expense_total: { header: "Approved Expenses", financial: true },
+  estimated_cost_total: { header: "Estimated Cost", financial: true },
+  net_profit: { header: "Net Profit", financial: true },
+  margin_percentage: { header: "Margin %", financial: true },
+  vehicle_count: { header: "Vehicle Count" },
+  assigned_staff_count: { header: "Assigned Staff Count" },
+  allocation_count: { header: "Allocation Count" },
+  checklist_completion_percentage: { header: "Checklist Completion %" },
+  pending_expense_count: { header: "Pending Expense Count", financial: true },
+};
+
+const DEFAULT_EVENT_EXPORT_COLUMNS = [
+  "name",
+  "client_name",
+  "event_type_name",
+  "status",
+  "start_date",
+  "end_date",
+  "venue_location",
+  "vehicle_count",
+  "assigned_staff_count",
+  "allocation_count",
+  "checklist_completion_percentage",
+];
+
+const DEFAULT_FINANCIAL_EVENT_EXPORT_COLUMNS = [
+  "contract_price",
+  "approved_expense_total",
+  "estimated_cost_total",
+  "net_profit",
+  "margin_percentage",
+  "pending_expense_count",
+];
+
+function normalizeFilterValue(value: unknown, field: EventFilterField): string | number | boolean | null {
+  if (value === null || value === undefined) return null;
+  if (field.type === "number") {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new Error("Filter value must be a number");
+    return parsed;
+  }
+  if (field.type === "date") {
+    if (typeof value !== "string" || isNaN(Date.parse(value))) throw new Error("Filter value must be a valid date");
+    return value;
+  }
+  if (field.type === "uuid") {
+    if (typeof value !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+      throw new Error("Filter value must be a valid UUID");
+    }
+    return value;
+  }
+  return String(value);
+}
+
+function buildEventFilterCondition(
+  field: EventFilterField,
+  operator: string,
+  value: unknown,
+  params: any[],
+): string {
+  const sql = field.sql;
+  const addParam = (raw: unknown) => {
+    const normalized = normalizeFilterValue(raw, field);
+    params.push(normalized);
+    return `$${params.length}`;
+  };
+
+  switch (operator) {
+    case "equals":
+      return `${sql} = ${addParam(value)}`;
+    case "not_equals":
+      return `${sql} IS DISTINCT FROM ${addParam(value)}`;
+    case "contains":
+      if (field.type !== "text") throw new Error("contains is only supported for text fields");
+      return `${sql} ILIKE ${addParam(`%${String(value ?? "")}%`)}`;
+    case "starts_with":
+      if (field.type !== "text") throw new Error("starts_with is only supported for text fields");
+      return `${sql} ILIKE ${addParam(`${String(value ?? "")}%`)}`;
+    case "greater_than":
+      return `${sql} > ${addParam(value)}`;
+    case "greater_than_or_equal":
+      return `${sql} >= ${addParam(value)}`;
+    case "less_than":
+      return `${sql} < ${addParam(value)}`;
+    case "less_than_or_equal":
+      return `${sql} <= ${addParam(value)}`;
+    case "between": {
+      if (!Array.isArray(value) || value.length !== 2) throw new Error("between requires exactly two values");
+      return `(${sql} >= ${addParam(value[0])} AND ${sql} <= ${addParam(value[1])})`;
+    }
+    case "in":
+    case "not_in": {
+      if (!Array.isArray(value) || value.length === 0) throw new Error(`${operator} requires a non-empty value list`);
+      const placeholders = value.map((entry) => addParam(entry));
+      return `${sql} ${operator === "not_in" ? "NOT " : ""}IN (${placeholders.join(", ")})`;
+    }
+    case "is_empty":
+      return field.type === "text" ? `(${sql} IS NULL OR ${sql} = '')` : `${sql} IS NULL`;
+    case "is_not_empty":
+      return field.type === "text" ? `(${sql} IS NOT NULL AND ${sql} <> '')` : `${sql} IS NOT NULL`;
+    default:
+      throw new Error("Unsupported filter operator");
+  }
+}
+
+function buildEventQueryParts(query: EventListQueryShape, req: AuthRequest): EventQueryParts {
+  const { status, start_date, end_date, search, sortBy, sortOrder, filterLogic, filters } = query;
+  const canSeeFinancials = canViewEventFinancials(req);
+  const conditions: string[] = ["e.deleted_at IS NULL"];
+  const params: any[] = [];
+
+  if (status) {
+    params.push(status);
+    conditions.push(`e.status = $${params.length}`);
+  }
+
+  if (start_date) {
+    params.push(start_date);
+    conditions.push(`e.start_date >= $${params.length}`);
+  }
+
+  if (end_date) {
+    params.push(end_date);
+    conditions.push(`e.end_date <= $${params.length}`);
+  }
+
+  if (search?.trim()) {
+    params.push(`%${search.trim()}%`);
+    conditions.push(
+      `(e.name ILIKE $${params.length} OR e.client_name ILIKE $${params.length} OR e.venue_location ILIKE $${params.length})`
+    );
+  }
+
+  const advancedConditions: string[] = [];
+  for (const filter of filters) {
+    const field = EVENT_FILTER_FIELDS[filter.field];
+    if (!field) {
+      return { ok: false, status: 400, error: `Unsupported event filter field: ${filter.field}` };
+    }
+    if (field.financial && !canSeeFinancials) {
+      return { ok: false, status: 403, error: "Forbidden: Missing profit report access permission" };
+    }
+    try {
+      advancedConditions.push(buildEventFilterCondition(field, filter.operator, filter.value, params));
+    } catch (error: any) {
+      return { ok: false, status: 400, error: error.message || "Invalid event filter" };
+    }
+  }
+
+  if (advancedConditions.length > 0) {
+    conditions.push(`(${advancedConditions.join(filterLogic === "or" ? " OR " : " AND ")})`);
+  }
+
+  const sortField = EVENT_FILTER_FIELDS[sortBy];
+  if (!sortField) {
+    return { ok: false, status: 400, error: `Unsupported event sort field: ${sortBy}` };
+  }
+  if (sortField.financial && !canSeeFinancials) {
+    return { ok: false, status: 403, error: "Forbidden: Missing profit report access permission" };
+  }
+
+  return {
+    ok: true,
+    whereClause: conditions.join(" AND "),
+    params,
+    sortSql: sortField.sql,
+    sortDirection: sortOrder === "desc" ? "DESC" : "ASC",
+    summaryJoins: EVENT_SUMMARY_JOINS,
+  };
+}
+
+function getRequestedExportColumns(rawColumns: string[] | undefined, includeFinancials: boolean): string[] {
+  const requested = rawColumns?.length
+    ? rawColumns
+    : [
+        ...DEFAULT_EVENT_EXPORT_COLUMNS,
+        ...(includeFinancials ? DEFAULT_FINANCIAL_EVENT_EXPORT_COLUMNS : []),
+      ];
+
+  return [...new Set(requested)].filter((column) => {
+    const meta = EVENT_EXPORT_COLUMNS[column];
+    return meta && (!meta.financial || includeFinancials);
+  });
+}
+
+function formatExportValue(value: unknown): string | number {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString().split("T")[0];
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+  if (typeof value === "number") return Number.isFinite(value) ? value : "";
+  return String(value);
+}
+
+function buildExportRows(events: Array<Record<string, unknown>>, columns: string[]) {
+  return events.map((event) => {
+    const row: Record<string, string | number> = {};
+    for (const column of columns) {
+      row[column] = formatExportValue(event[column]);
+    }
+    return row;
+  });
+}
+
+async function insertEventAuditLog(
+  client: PoolClient | Pool,
+  eventId: string | null,
+  userId: string | null,
+  fieldChanged: string,
+  oldValue: string | null,
+  newValue: string | null,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
+      VALUES ($1, $2, $3, $4, $5)
+    `,
+    [eventId, userId, fieldChanged, oldValue, newValue],
+  );
+}
+
+function normalizeImportText(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  return String(value).trim();
+}
+
+async function resolveImportEventTypeId(
+  client: PoolClient | Pool,
+  eventTypeId: string | null | undefined,
+  eventTypeName: string | null | undefined,
+): Promise<string | null> {
+  if (eventTypeId) return eventTypeId;
+  if (!eventTypeName?.trim()) return null;
+
+  const result = await client.query(
+    `SELECT id FROM event_types WHERE LOWER(name) = LOWER($1) AND deleted_at IS NULL LIMIT 1`,
+    [eventTypeName.trim()],
+  );
+  return result.rows[0]?.id || null;
 }
 
 // GET /events - List events (filtered, paginated)
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string || "1", 10));
-    const limit = Math.max(1, parseInt(req.query.limit as string || "20", 10));
+    const validationResult = eventListQuerySchema.safeParse(req.query);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { page, limit } = validationResult.data;
     const offset = (page - 1) * limit;
-
-    const { status, start_date, end_date, search } = req.query;
-
-    const conditions: string[] = ["e.deleted_at IS NULL"];
-    const params: any[] = [];
-
-    if (status) {
-      params.push(status);
-      conditions.push(`e.status = $${params.length}`);
+    const queryParts = buildEventQueryParts(validationResult.data, req);
+    if (!queryParts.ok) {
+      res.status(queryParts.status).json({ error: queryParts.error });
+      return;
     }
-
-    if (start_date) {
-      params.push(start_date);
-      conditions.push(`e.start_date >= $${params.length}`);
-    }
-
-    if (end_date) {
-      params.push(end_date);
-      conditions.push(`e.end_date <= $${params.length}`);
-    }
-
-    if (search) {
-      params.push(`%${search}%`);
-      conditions.push(
-        `(e.name ILIKE $${params.length} OR e.client_name ILIKE $${params.length} OR e.venue_location ILIKE $${params.length})`
-      );
-    }
-
-    const whereClause = conditions.join(" AND ");
 
     // Get total count
-    const countQuery = `SELECT COUNT(*) FROM events e WHERE ${whereClause}`;
-    const countResult = await pool.query(countQuery, params);
+    const countQuery = `
+      SELECT COUNT(*)
+      FROM events e
+      LEFT JOIN event_types et ON e.event_type_id = et.id
+      ${queryParts.summaryJoins}
+      WHERE ${queryParts.whereClause}
+    `;
+    const countResult = await pool.query(countQuery, queryParts.params);
     const total = parseInt(countResult.rows[0].count, 10);
 
     // Get paginated data
-    const queryParams = [...params];
+    const queryParams = [...queryParts.params];
     queryParams.push(limit);
     const limitParam = `$${queryParams.length}`;
     queryParams.push(offset);
     const offsetParam = `$${queryParams.length}`;
 
     const dataQuery = `
-      SELECT e.*, et.name as event_type_name
+      SELECT
+        ${EVENT_SELECT_COLUMNS}
       FROM events e
       LEFT JOIN event_types et ON e.event_type_id = et.id
-      WHERE ${whereClause}
-      ORDER BY e.start_date ASC, e.created_at DESC
+      ${queryParts.summaryJoins}
+      WHERE ${queryParts.whereClause}
+      ORDER BY ${queryParts.sortSql} ${queryParts.sortDirection}, e.created_at DESC
       LIMIT ${limitParam} OFFSET ${offsetParam}
     `;
 
     const dataResult = await pool.query(dataQuery, queryParams);
 
-    const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = canAccessProfitReports(userRole);
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-
-    const events = dataResult.rows.map((row: any) => {
-      const cloned = { ...row };
-      if (!isFinancial) delete cloned.contract_price;
-      if (!isPrivileged) delete cloned.estimated_design_cost;
-      return cloned;
-    });
+    const events = await Promise.all(dataResult.rows.map((row: any) => redactEventForPermissions(row, req)));
 
     res.json({
       events,
@@ -126,10 +524,361 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /events/export/template - CSV/XLSX import template with SRD-grounded sample event data
+router.get("/export/template", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canImportEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event import permission" });
+      return;
+    }
+
+    const format = req.query.format === "xlsx" ? "xlsx" : "csv";
+    const columns = [
+      { key: "name", header: "Event Name" },
+      { key: "client_name", header: "Client Name" },
+      { key: "client_phone", header: "Client Phone" },
+      { key: "event_type_name", header: "Event Type Name" },
+      { key: "start_date", header: "Start Date" },
+      { key: "end_date", header: "End Date" },
+      { key: "start_time", header: "Start Time" },
+      { key: "end_time", header: "End Time" },
+      { key: "venue_location", header: "Venue / Location" },
+      { key: "contract_price", header: "Contract Price" },
+      { key: "status", header: "Status" },
+      { key: "package_design_notes", header: "Package Design Notes" },
+      { key: "estimated_design_cost", header: "Estimated Design Cost" },
+    ];
+    const sampleRows = [
+      {
+        name: "DreamLux SRD Wedding Setup",
+        client_name: "SRD Sample Client",
+        client_phone: "+251900000000",
+        event_type_name: "Wedding",
+        start_date: "2026-07-20",
+        end_date: "2026-07-20",
+        start_time: "09:00",
+        end_time: "18:00",
+        venue_location: "Sheraton Addis",
+        contract_price: "250000",
+        status: "Planned",
+        package_design_notes: "Luxury floral and stage decor estimate",
+        estimated_design_cost: "50000",
+      },
+    ];
+
+    if (format === "xlsx") {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Event Import Template");
+      sheet.columns = columns.map((column) => ({ header: column.header, key: column.key, width: Math.max(column.header.length + 4, 18) }));
+      sheet.addRows(sampleRows);
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E2C2" } };
+      });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="events-import-template.xlsx"');
+      await workbook.xlsx.write(res as unknown as import("stream").Stream);
+      res.end();
+      return;
+    }
+
+    const csv = stringify(sampleRows, { header: true, columns });
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="events-import-template.csv"');
+    res.send(csv);
+  } catch (error: any) {
+    console.error("[events-export-template] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/export - Export filtered event rows as CSV/XLSX with backend redaction
+router.get("/export", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canExportEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event export permission" });
+      return;
+    }
+
+    const validationResult = eventExportQuerySchema.safeParse(req.query);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const payload = validationResult.data;
+    const queryParts = buildEventQueryParts(payload, req);
+    if (!queryParts.ok) {
+      res.status(queryParts.status).json({ error: queryParts.error });
+      return;
+    }
+
+    const countResult = await pool.query(
+      `
+        SELECT COUNT(*)
+        FROM events e
+        LEFT JOIN event_types et ON e.event_type_id = et.id
+        ${queryParts.summaryJoins}
+        WHERE ${queryParts.whereClause}
+      `,
+      queryParts.params,
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
+    if (total > payload.maxRows) {
+      await insertEventAuditLog(
+        pool,
+        null,
+        req.user?.id || null,
+        canViewEventFinancials(req) ? "events_export_financial_blocked" : "events_export_blocked",
+        null,
+        `${payload.format}:${total}/${payload.maxRows}`,
+      );
+      res.status(413).json({
+        error: `Export contains ${total} rows and exceeds the maxRows guardrail of ${payload.maxRows}`,
+        total,
+        maxRows: payload.maxRows,
+      });
+      return;
+    }
+
+    const dataParams = [...queryParts.params, payload.maxRows];
+    const eventsResult = await pool.query(
+      `
+        SELECT ${EVENT_SELECT_COLUMNS}
+        FROM events e
+        LEFT JOIN event_types et ON e.event_type_id = et.id
+        ${queryParts.summaryJoins}
+        WHERE ${queryParts.whereClause}
+        ORDER BY ${queryParts.sortSql} ${queryParts.sortDirection}, e.created_at DESC
+        LIMIT $${dataParams.length}
+      `,
+      dataParams,
+    );
+    const events = await Promise.all(eventsResult.rows.map((row: any) => redactEventForPermissions(row, req)));
+    const columns = getRequestedExportColumns(payload.columns, canViewEventFinancials(req));
+    const exportRows = buildExportRows(events, columns);
+    const columnDefinitions = columns.map((column) => ({ key: column, header: EVENT_EXPORT_COLUMNS[column].header }));
+
+    await insertEventAuditLog(
+      pool,
+      null,
+      req.user?.id || null,
+      canViewEventFinancials(req) ? "events_export_financial" : "events_export",
+      null,
+      `${payload.format}:${events.length}/${total}`,
+    );
+
+    const dateTag = new Date().toISOString().slice(0, 10);
+    if (payload.format === "xlsx") {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Events");
+      sheet.columns = columnDefinitions.map((column) => ({ header: column.header, key: column.key, width: Math.max(column.header.length + 4, 18) }));
+      sheet.addRows(exportRows);
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E2C2" } };
+      });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="events-export-${dateTag}.xlsx"`);
+      await workbook.xlsx.write(res as unknown as import("stream").Stream);
+      res.end();
+      return;
+    }
+
+    const csv = stringify(exportRows, { header: true, columns: columnDefinitions });
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="events-export-${dateTag}.csv"`);
+    res.send(csv);
+  } catch (error: any) {
+    console.error("[events-export] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/import/preview - Validate structured rows parsed from CSV/XLSX before commit
+router.post("/import/preview", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canImportEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event import permission" });
+      return;
+    }
+
+    const validationResult = eventImportPayloadSchema.safeParse({ ...req.body, commit: false });
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { mode, rows } = validationResult.data;
+    const errors: Array<{ row: number; field: string; message: string }> = [];
+    const preparedRows = [];
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      const eventTypeId = await resolveImportEventTypeId(pool, normalizeImportText(row.event_type_id), normalizeImportText(row.event_type_name));
+      if (row.event_type_name && !eventTypeId) {
+        errors.push({ row: index + 1, field: "event_type_name", message: `Unknown event type: ${row.event_type_name}` });
+      }
+      if (mode === "update" && !row.id) {
+        errors.push({ row: index + 1, field: "id", message: "id is required for update imports" });
+      }
+      preparedRows.push({ row: index + 1, event_type_id: eventTypeId, action: mode, name: row.name });
+    }
+
+    await insertEventAuditLog(pool, null, req.user?.id || null, "events_import_preview", null, `${mode}:${rows.length}:errors=${errors.length}`);
+    res.json({
+      valid: errors.length === 0,
+      mode,
+      rowCount: rows.length,
+      preparedRows,
+      errors,
+    });
+  } catch (error: any) {
+    console.error("[events-import-preview] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/import/commit - Transactional event import after preview passes
+router.post("/import/commit", requireAuth, async (req: AuthRequest, res: Response) => {
+  if (!canImportEvents(req)) {
+    res.status(403).json({ error: "Forbidden: Missing event import permission" });
+    return;
+  }
+
+  const validationResult = eventImportPayloadSchema.safeParse({ ...req.body, commit: true });
+  if (!validationResult.success) {
+    res.status(400).json({ error: validationResult.error.errors[0].message });
+    return;
+  }
+
+  const { mode, rows } = validationResult.data;
+  const client = await pool.connect();
+  const importedIds: string[] = [];
+  const errors: Array<{ row: number; field: string; message: string }> = [];
+
+  try {
+    await client.query("BEGIN");
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      const eventTypeId = await resolveImportEventTypeId(client, normalizeImportText(row.event_type_id), normalizeImportText(row.event_type_name));
+      if (row.event_type_name && !eventTypeId) {
+        errors.push({ row: index + 1, field: "event_type_name", message: `Unknown event type: ${row.event_type_name}` });
+        continue;
+      }
+      if (mode === "update" && !row.id) {
+        errors.push({ row: index + 1, field: "id", message: "id is required for update imports" });
+        continue;
+      }
+
+      if (mode === "insert") {
+        const insertResult = await client.query(
+          `
+            INSERT INTO events (
+              name, client_name, client_phone, event_type_id,
+              start_date, end_date, start_time, end_time,
+              venue_location, contract_price, status, created_by,
+              package_design_notes, estimated_design_cost
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING id
+          `,
+          [
+            row.name,
+            row.client_name,
+            normalizeImportText(row.client_phone),
+            eventTypeId,
+            row.start_date,
+            row.end_date,
+            normalizeImportText(row.start_time),
+            normalizeImportText(row.end_time),
+            row.venue_location,
+            row.contract_price,
+            row.status,
+            req.user?.id || null,
+            normalizeImportText(row.package_design_notes),
+            row.estimated_design_cost ?? null,
+          ],
+        );
+        importedIds.push(insertResult.rows[0].id);
+        await insertEventAuditLog(client, insertResult.rows[0].id, req.user?.id || null, "event_import_created", null, row.name);
+      } else {
+        const updateResult = await client.query(
+          `
+            UPDATE events
+            SET name = $1,
+                client_name = $2,
+                client_phone = $3,
+                event_type_id = $4,
+                start_date = $5,
+                end_date = $6,
+                start_time = $7,
+                end_time = $8,
+                venue_location = $9,
+                contract_price = $10,
+                status = $11,
+                package_design_notes = $12,
+                estimated_design_cost = $13,
+                updated_at = NOW()
+            WHERE id = $14 AND deleted_at IS NULL
+            RETURNING id
+          `,
+          [
+            row.name,
+            row.client_name,
+            normalizeImportText(row.client_phone),
+            eventTypeId,
+            row.start_date,
+            row.end_date,
+            normalizeImportText(row.start_time),
+            normalizeImportText(row.end_time),
+            row.venue_location,
+            row.contract_price,
+            row.status,
+            normalizeImportText(row.package_design_notes),
+            row.estimated_design_cost ?? null,
+            row.id,
+          ],
+        );
+        if (updateResult.rowCount === 0) {
+          errors.push({ row: index + 1, field: "id", message: "Event not found or deleted" });
+          continue;
+        }
+        importedIds.push(updateResult.rows[0].id);
+        await insertEventAuditLog(client, updateResult.rows[0].id, req.user?.id || null, "event_import_updated", null, row.name);
+      }
+    }
+
+    if (errors.length > 0) {
+      await client.query("ROLLBACK");
+      await insertEventAuditLog(pool, null, req.user?.id || null, "events_import_failed", null, `${mode}:${rows.length}:errors=${errors.length}`);
+      res.status(400).json({ imported: false, mode, rowCount: rows.length, importedCount: 0, errors });
+      return;
+    }
+
+    await insertEventAuditLog(client, null, req.user?.id || null, "events_import_committed", null, `${mode}:${importedIds.length}`);
+    await client.query("COMMIT");
+    res.json({ imported: true, mode, rowCount: rows.length, importedCount: importedIds.length, eventIds: importedIds, errors: [] });
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    await insertEventAuditLog(pool, null, req.user?.id || null, "events_import_failed", null, `${mode}:${rows.length}:exception`);
+    console.error("[events-import-commit] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
+  }
+});
+
+router.use(createEventProposalsRouter());
+router.use(createEventSavedViewsRouter());
+router.use(createEventProfitReportsRouter());
+
 // GET /events/expenses/pending - accountant approval queue
 router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    if (!canApproveExpenses(req.user?.role)) {
+    if (!canApproveExpenses(req)) {
       res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
       return;
     }
@@ -158,7 +907,7 @@ router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Respo
 router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { expenseId } = req.params;
-    if (!canApproveExpenses(req.user?.role)) {
+    if (!canApproveExpenses(req)) {
       res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
       return;
     }
@@ -237,174 +986,12 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
   }
 });
 
-// GET /events/reports/profit - Monthly/Yearly event profitability report
-router.get("/reports/profit", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    if (!canAccessProfitReports(req.user?.role)) {
-      res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
-      return;
-    }
-
-    const currentYear = new Date().getFullYear();
-    const start = (req.query.start_date as string) || `${currentYear}-01-01`;
-    const end = (req.query.end_date as string) || `${currentYear}-12-31`;
-
-    // Fetch all events start_date in range
-    const eventsQuery = `
-      SELECT id, name, contract_price, start_date
-      FROM events
-      WHERE start_date >= $1 AND start_date <= $2 AND deleted_at IS NULL
-      ORDER BY start_date ASC
-    `;
-    const eventsResult = await pool.query(eventsQuery, [start, end]);
-    const events = eventsResult.rows;
-
-    // Fetch approved expenses for events in range
-    const expensesQuery = `
-      SELECT exp.event_id, exp.category, COALESCE(SUM(exp.amount), 0)::float AS total_amount
-      FROM expenses exp
-      JOIN events e ON exp.event_id = e.id
-      WHERE e.start_date >= $1 AND e.start_date <= $2 AND e.deleted_at IS NULL AND exp.status = 'Approved'
-      GROUP BY exp.event_id, exp.category
-    `;
-    const expensesResult = await pool.query(expensesQuery, [start, end]);
-    const expenses = expensesResult.rows;
-
-    // Group expenses by event_id
-    const eventExpensesMap: Record<string, Record<string, number>> = {};
-    for (const row of expenses) {
-      const { event_id, category, total_amount } = row;
-      if (!eventExpensesMap[event_id]) {
-        eventExpensesMap[event_id] = {};
-      }
-      eventExpensesMap[event_id][category] = total_amount;
-    }
-
-    // Generate contiguous months list between start and end (max 36 months to prevent loops)
-    const monthlyMap: Record<string, {
-      month: string;
-      eventCount: number;
-      revenue: number;
-      expenses: number;
-      profit: number;
-      margin: number;
-    }> = {};
-
-    const startYear = new Date(start).getFullYear();
-    const startMonth = new Date(start).getMonth();
-    const endYear = new Date(end).getFullYear();
-    const endMonth = new Date(end).getMonth();
-
-    const monthsList: string[] = [];
-    let currYear = startYear;
-    let currMonth = startMonth;
-
-    while (currYear < endYear || (currYear === endYear && currMonth <= endMonth)) {
-      const monthKey = `${currYear}-${String(currMonth + 1).padStart(2, "0")}`;
-      monthsList.push(monthKey);
-      currMonth++;
-      if (currMonth > 11) {
-        currMonth = 0;
-        currYear++;
-      }
-      if (monthsList.length > 36) {
-        break;
-      }
-    }
-
-    for (const monthKey of monthsList) {
-      monthlyMap[monthKey] = {
-        month: monthKey,
-        eventCount: 0,
-        revenue: 0,
-        expenses: 0,
-        profit: 0,
-        margin: 0,
-      };
-    }
-
-    const categoriesList = ["Fuel", "Labor", "Transportation", "Equipment Rental", "Consumables", "Other"];
-    const categoryTotals: Record<string, number> = {};
-    for (const cat of categoriesList) {
-      categoryTotals[cat] = 0;
-    }
-
-    for (const event of events) {
-      const eventId = event.id;
-      const revenue = Number(event.contract_price || 0);
-      const eventExpenses = eventExpensesMap[eventId] || {};
-
-      let totalEventExpense = 0;
-      for (const [cat, amt] of Object.entries(eventExpenses)) {
-        totalEventExpense += amt;
-        const normalizedCat = categoriesList.includes(cat) ? cat : "Other";
-        categoryTotals[normalizedCat] += amt;
-      }
-
-      const profit = revenue - totalEventExpense;
-
-      const dateObj = new Date(event.start_date);
-      const year = dateObj.getFullYear();
-      const monthIndex = dateObj.getMonth();
-      const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-
-      if (!monthlyMap[monthKey]) {
-        monthlyMap[monthKey] = {
-          month: monthKey,
-          eventCount: 0,
-          revenue: 0,
-          expenses: 0,
-          profit: 0,
-          margin: 0,
-        };
-      }
-
-      monthlyMap[monthKey].eventCount += 1;
-      monthlyMap[monthKey].revenue += revenue;
-      monthlyMap[monthKey].expenses += totalEventExpense;
-      monthlyMap[monthKey].profit += profit;
-    }
-
-    let totalRevenue = 0;
-    let totalExpenses = 0;
-
-    for (const mData of Object.values(monthlyMap)) {
-      totalRevenue += mData.revenue;
-      totalExpenses += mData.expenses;
-      mData.margin = mData.revenue > 0 ? Number(((mData.profit / mData.revenue) * 100).toFixed(2)) : 0;
-    }
-
-    const netProfit = totalRevenue - totalExpenses;
-    const profitMargin = totalRevenue > 0 ? Number(((netProfit / totalRevenue) * 100).toFixed(2)) : 0;
-
-    const categoryBreakdown = categoriesList.map(cat => ({
-      category: cat,
-      amount: Number((categoryTotals[cat] || 0).toFixed(2))
-    }));
-
-    res.json({
-      summary: {
-        totalEvents: events.length,
-        totalRevenue: Number(totalRevenue.toFixed(2)),
-        totalExpenses: Number(totalExpenses.toFixed(2)),
-        netProfit: Number(netProfit.toFixed(2)),
-        profitMargin
-      },
-      categoryBreakdown,
-      monthlyData: Object.values(monthlyMap)
-    });
-  } catch (error: any) {
-    console.error("[get-profit-report] Error:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
-  }
-});
-
 // GET /events/:id/profit - Profit calculations for a single event
 router.get("/:id/profit", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    if (!canAccessProfitReports(req.user?.role)) {
+    if (!canAccessProfitReports(req)) {
       res.status(403).json({ error: "Forbidden: Missing profit report access permission" });
       return;
     }
@@ -426,7 +1013,7 @@ router.get("/:id/profit", requireAuth, async (req: AuthRequest, res: Response) =
       GROUP BY category
     `;
     const expensesResult = await pool.query(expensesQuery, [id]);
-    
+
     const categoriesList = ["Fuel", "Labor", "Transportation", "Equipment Rental", "Consumables", "Other"];
     const eventExpenses: Record<string, number> = {};
     for (const cat of categoriesList) {
@@ -494,13 +1081,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     `;
     const logsResult = await pool.query(logsQuery, [id]);
 
-    const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = canAccessProfitReports(userRole);
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-
-    const filteredEvent = { ...event };
-    if (!isFinancial) delete filteredEvent.contract_price;
-    if (!isPrivileged) delete filteredEvent.estimated_design_cost;
+    const filteredEvent = await redactEventForPermissions(event, req);
 
     res.json({
       event: filteredEvent,
@@ -515,8 +1096,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // POST /events - Create a new event
 router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const userRole = req.user?.role?.toUpperCase();
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "events:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to create events" });
       return;
     }
@@ -564,11 +1144,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
     ]);
 
     // Redact contract_price/estimated_design_cost if user doesn't have privileges
-    const event = result.rows[0];
-    const isFinancial = canAccessProfitReports(userRole);
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-    if (!isFinancial) delete event.contract_price;
-    if (!isPrivileged) delete event.estimated_design_cost;
+    const event = await redactEventForPermissions(result.rows[0], req);
 
     res.status(201).json({ event });
   } catch (error: any) {
@@ -581,8 +1157,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "events:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to update events" });
       return;
     }
@@ -599,7 +1174,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     const currentEvent = eventResult.rows[0];
 
     // Auth validation: Completed event locking
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -722,18 +1297,10 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      const event = result.rows[0];
-      const isFinancial = canAccessProfitReports(userRole);
-      const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-      if (!isFinancial) delete event.contract_price;
-      if (!isPrivileged) delete event.estimated_design_cost;
+      const event = await redactEventForPermissions(result.rows[0], req);
       res.json({ event });
     } else {
-      const event = { ...currentEvent };
-      const isFinancial = canAccessProfitReports(userRole);
-      const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
-      if (!isFinancial) delete event.contract_price;
-      if (!isPrivileged) delete event.estimated_design_cost;
+      const event = await redactEventForPermissions(currentEvent, req);
       res.json({ event });
     }
   } catch (error: any) {
@@ -743,7 +1310,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /events/:id - Soft delete event
-router.delete("/:id", requireAdmin, async (req: AuthRequest, res: Response) => {
+router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -839,8 +1406,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     `;
     const vehicleAssignmentsResult = await pool.query(vehicleAssignmentsQuery, [id]);
 
-    const userRole = req.user?.role?.toUpperCase();
-    const isFinancial = canAccessProfitReports(userRole);
+    const isFinancial = canViewEventFinancials(req);
 
     let expenses: any[] = [];
     let trips: any[] = [];
@@ -878,7 +1444,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
       trips = tripsResult.rows;
     }
 
-    const isPrivileged = userRole && ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"].includes(userRole);
+    const isPrivileged = canViewEventOperations(req);
 
     const filteredEvent = { ...event };
     if (!isFinancial) delete filteredEvent.contract_price;
@@ -912,8 +1478,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
 router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "events:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to update event design" });
       return;
     }
@@ -928,7 +1493,7 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
 
     const currentEvent = eventResult.rows[0];
 
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -985,14 +1550,10 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
         RETURNING *
       `;
       const result = await pool.query(updateQuery, updateParams);
-      const event = result.rows[0];
-      const isFinancial = canAccessProfitReports(userRole);
-      if (!isFinancial) delete event.contract_price;
+      const event = await redactEventForPermissions(result.rows[0], req);
       res.json({ event });
     } else {
-      const event = { ...currentEvent };
-      const isFinancial = canAccessProfitReports(userRole);
-      if (!isFinancial) delete event.contract_price;
+      const event = await redactEventForPermissions(currentEvent, req);
       res.json({ event });
     }
   } catch (error: any) {
@@ -1005,10 +1566,7 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
 router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, INVENTORY_CONTROLLER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "INVENTORY_CONTROLLER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -1023,7 +1581,7 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
 
     const currentEvent = eventResult.rows[0];
 
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -1101,10 +1659,7 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
 router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, allocationId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, INVENTORY_OFFICER, INVENTORY_CONTROLLER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "INVENTORY_OFFICER" && userRole !== "INVENTORY_CONTROLLER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -1119,7 +1674,7 @@ router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthReq
 
     const currentEvent = eventResult.rows[0];
 
-    const isOverrideAuthorized = canOverrideCompleted(req.user?.role);
+    const isOverrideAuthorized = canOverrideCompleted(req);
     if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
       res.status(403).json({
         error: "Completed events cannot be edited except by administrators or accountants",
@@ -1150,10 +1705,7 @@ router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthReq
 router.post("/:id/checklist", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, EVENT_MANAGER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_checklist:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient checklist privileges" });
       return;
     }
@@ -1198,10 +1750,7 @@ router.post("/:id/checklist", requireAuth, async (req: AuthRequest, res: Respons
 router.patch("/:id/checklist/:itemId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, itemId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, OPS_MANAGER, EVENT_MANAGER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_checklist:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient checklist privileges" });
       return;
     }
@@ -1383,10 +1932,7 @@ router.get("/:id/assignments/available-vehicles", requireAuth, async (req: AuthR
 router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions (Owner, Ops Manager, Event Manager)
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "vehicle_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -1414,7 +1960,7 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
       const event = eventResult.rows[0];
 
       // Enforce completed-event locking
-      if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      if (event.status === "Completed" && !canOverrideCompleted(req)) {
         await client.query("ROLLBACK");
         res.status(400).json({
           error: "Completed event assignments cannot be modified except by administrators or accountants",
@@ -1474,10 +2020,7 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
 router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, employeeId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -1492,7 +2035,7 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
     const event = eventResult.rows[0];
 
     // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1522,10 +2065,7 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
 router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "event_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -1553,7 +2093,7 @@ router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, r
       const event = eventResult.rows[0];
 
       // Enforce completed-event locking
-      if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      if (event.status === "Completed" && !canOverrideCompleted(req)) {
         await client.query("ROLLBACK");
         res.status(400).json({
           error: "Completed event assignments cannot be modified except by administrators or accountants",
@@ -1635,10 +2175,7 @@ router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, r
 router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, vehicleId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_assignments:write", "vehicle_assignments:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges" });
       return;
     }
@@ -1653,7 +2190,7 @@ router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: A
     const event = eventResult.rows[0];
 
     // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1683,10 +2220,7 @@ router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: A
 router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, employeeId } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Check permissions
-    if (userRole !== "OWNER" && userRole !== "OPS_MANAGER" && userRole !== "EVENT_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasAnyPermission(req, ["event_assignments:write", "vehicle_assignments:write"])) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges" });
       return;
     }
@@ -1701,7 +2235,7 @@ router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, a
     const event = eventResult.rows[0];
 
     // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(400).json({
         error: "Completed event assignments cannot be modified except by administrators or accountants",
       });
@@ -1738,15 +2272,7 @@ router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, a
 router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    const canWriteManualExpenses = (role?: string): boolean => {
-      if (!role) return false;
-      const allowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "OPS_MANAGER", "EVENT_MANAGER", "ACCOUNTANT"];
-      return allowed.includes(role.toUpperCase());
-    };
-
-    if (!canWriteManualExpenses(userRole)) {
+    if (!hasPermission(req, "expenses:write")) {
       res.status(403).json({ error: "Forbidden: Missing expense write permission" });
       return;
     }
@@ -1758,7 +2284,7 @@ router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response
     }
 
     const event = eventResult.rows[0];
-    if (event.status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+    if (event.status === "Completed" && !canOverrideCompleted(req)) {
       res.status(403).json({ error: "Completed event expenses cannot be changed except by administrators or accountants" });
       return;
     }
@@ -1790,7 +2316,7 @@ router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response
 router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!canLogTrips(req.user?.role)) {
+    if (!canLogTrips(req)) {
       res.status(403).json({ error: "Forbidden: Missing expense write permission" });
       return;
     }
@@ -1855,7 +2381,7 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
         }
       }
 
-      if (assignment.event_status === "Completed" && !canOverrideCompleted(req.user?.role)) {
+      if (assignment.event_status === "Completed" && !canOverrideCompleted(req)) {
         await client.query("ROLLBACK");
         res.status(403).json({ error: "Completed event trips cannot be changed except by administrators or accountants" });
         return;
@@ -1906,10 +2432,7 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
 router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userRole = req.user?.role?.toUpperCase();
-
-    // Restrict to OWNER, ACCOUNTANT, OPS_MANAGER, SUPER_ADMIN, ADMIN
-    if (userRole !== "OWNER" && userRole !== "ACCOUNTANT" && userRole !== "OPS_MANAGER" && userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    if (!hasPermission(req, "expenses:labor_generate")) {
       res.status(403).json({ error: "Forbidden: Insufficient labor expense privileges" });
       return;
     }

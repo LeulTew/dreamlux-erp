@@ -1,10 +1,104 @@
 export type PermissionMap = Record<string, unknown>;
 
+export type PermissionDefinition = {
+  slug: string;
+  description: string;
+};
+
+export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
+  { slug: "assets:read", description: "View inventory items, stock levels, and asset reports" },
+  { slug: "assets:write", description: "Create and update inventory items" },
+  { slug: "assets:delete", description: "Delete and restore inventory items" },
+  { slug: "assets:reconcile", description: "Run inventory reconciliation updates" },
+  { slug: "users:manage", description: "Manage users and role assignments" },
+  { slug: "settings:write", description: "Manage system settings" },
+  { slug: "hr:read", description: "View HR records" },
+  { slug: "hr:write", description: "Create and update HR records" },
+  { slug: "departments:manage", description: "Manage departments" },
+  { slug: "salary-levels:manage", description: "Manage salary levels" },
+  { slug: "payroll:read", description: "View payroll runs and payroll exports" },
+  { slug: "payroll:write", description: "Create and update payroll runs" },
+  { slug: "events:read", description: "View events, event types, and operational schedules" },
+  { slug: "events:write", description: "Create and update events and event types" },
+  { slug: "events:delete", description: "Delete, restore, and permanently remove events or event types" },
+  { slug: "events:override_completed", description: "Modify completed events and restricted status transitions" },
+  { slug: "events:saved_views:share", description: "Create and manage role or global saved event views" },
+  { slug: "events:proposals:write", description: "Create and submit event intake profitability proposals" },
+  { slug: "events:proposals:approve", description: "Approve, reject, cancel, and convert event intake proposals" },
+  { slug: "event_allocations:write", description: "Create and release event inventory allocations" },
+  { slug: "event_checklist:write", description: "Create and update event checklist items" },
+  { slug: "event_assignments:write", description: "Assign employees to events and manage attendance" },
+  { slug: "vehicle_assignments:write", description: "Assign vehicles and drivers to events" },
+  { slug: "exports:read", description: "Export inventory, employee, and payroll data" },
+  { slug: "reports:profit:read", description: "View profit and profitability reports" },
+  { slug: "trips:create", description: "Create event trip logs and generated fuel expenses" },
+  { slug: "expenses:write", description: "Create manual event expenses" },
+  { slug: "expenses:labor_generate", description: "Generate labor expenses from attended event assignments" },
+  { slug: "expenses:approve", description: "Approve expenses" },
+  { slug: "approvals:history:read", description: "View approval history" },
+];
+
+export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
+  super_admin: ["*"],
+  admin: ["*"],
+  owner: ["*"],
+  system_manager: ["users:manage", "settings:write"],
+  inventory_controller: ["assets:read", "assets:write", "assets:reconcile", "assets:delete", "exports:read"],
+  inventory_officer: ["assets:read", "assets:write", "assets:reconcile", "exports:read"],
+  ops_manager: [
+    "assets:read",
+    "events:read",
+    "events:write",
+    "events:delete",
+    "events:override_completed",
+    "events:saved_views:share",
+    "events:proposals:write",
+    "events:proposals:approve",
+    "event_allocations:write",
+    "event_checklist:write",
+    "event_assignments:write",
+    "vehicle_assignments:write",
+    "trips:create",
+    "expenses:write",
+    "expenses:labor_generate",
+    "exports:read",
+    "approvals:history:read",
+  ],
+  event_manager: ["assets:read", "events:read", "events:write", "events:proposals:write", "event_checklist:write", "event_assignments:write", "vehicle_assignments:write", "trips:create", "expenses:write"],
+  viewer: ["assets:read", "events:read"],
+  sales_rep: ["assets:read", "events:read"],
+  hr_manager: ["hr:read", "hr:write", "departments:manage", "salary-levels:manage", "exports:read"],
+  accountant: [
+    "payroll:read",
+    "payroll:write",
+    "exports:read",
+    "reports:profit:read",
+    "events:override_completed",
+    "expenses:write",
+    "expenses:labor_generate",
+    "expenses:approve",
+    "approvals:history:read",
+  ],
+  driver: ["events:read", "trips:create"],
+};
+
 export function normalizePermissionMap(raw: unknown): PermissionMap {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     return raw as PermissionMap;
   }
   return {};
+}
+
+export function normalizeRoleName(value: string | undefined | null): string {
+  return (value || "").trim().toLowerCase();
+}
+
+export function roleNamesToPermissionSlugs(roleNames: Array<string | undefined | null>): string[] {
+  return [
+    ...new Set(
+      roleNames.flatMap((roleName) => ROLE_PERMISSION_SEEDS[normalizeRoleName(roleName)] || []),
+    ),
+  ];
 }
 
 function normalizeSlug(value: string): string {

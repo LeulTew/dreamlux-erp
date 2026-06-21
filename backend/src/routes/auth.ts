@@ -7,9 +7,9 @@ import { supabase } from "../db/supabase";
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
 import { AuthRequest, requireAuth } from "../middleware/auth";
 import {
+  PERMISSION_DEFINITIONS,
   normalizePermissionMap,
-  normalizePermissionSlugs,
-  permissionMapToSlugs,
+  normalizeRoleName,
 } from "../lib/permissions";
 
 const router = Router();
@@ -29,11 +29,10 @@ function isMissingRelationError(error: unknown): boolean {
   return err?.code === "42P01" || (err?.message || "").toLowerCase().includes("relation") && (err?.message || "").toLowerCase().includes("does not exist");
 }
 
-function resolvePermissionSlugs(rawSlugs: unknown, rawMap: unknown): string[] {
-  const explicit = normalizePermissionSlugs(rawSlugs);
-  const mapDerived = permissionMapToSlugs(normalizePermissionMap(rawMap));
-  return [...new Set([...explicit, ...mapDerived])];
-}
+import {
+  fetchUserRoleContext,
+  resolveEffectivePermissionSlugs,
+} from "../lib/permissions-db";
 
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body;
@@ -68,6 +67,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
           u.full_name,
           u.profile_image_url,
           u.is_active,
+          u.role_id,
           r.name as role_name,
           r.permissions,
           COALESCE(array_agg(p.slug) FILTER (WHERE p.slug IS NOT NULL), '{}') AS permission_slugs
@@ -76,7 +76,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
          LEFT JOIN role_permissions rp ON rp.role_id = r.id
          LEFT JOIN permissions p ON p.id = rp.permission_id
          WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)
-         GROUP BY u.id, u.username, u.full_name, u.profile_image_url, u.is_active, r.name, r.permissions`,
+         GROUP BY u.id, u.username, u.full_name, u.profile_image_url, u.is_active, u.role_id, r.name, r.permissions`,
         [queryUsername, queryPassword]
       );
       rows = queryResult?.rows || [];
@@ -86,7 +86,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       }
 
       const queryResult = await pool.query(
-        `SELECT u.id, u.username, u.full_name, NULL::text as profile_image_url, u.is_active, r.name as role_name, r.permissions
+        `SELECT u.id, u.username, u.full_name, NULL::text as profile_image_url, u.is_active, u.role_id, r.name as role_name, r.permissions
          FROM users u
          JOIN roles r ON u.role_id = r.id
          WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)`,
@@ -107,7 +107,8 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
               username: adminUser.username,
               role: adminUser.role_name,
               permissions: adminUser.permissions,
-              permission_slugs: resolvePermissionSlugs(undefined, adminUser.permissions),
+              roles: [adminUser.role_name],
+              permission_slugs: resolveEffectivePermissionSlugs(undefined, adminUser.permissions, [adminUser.role_name]),
             },
             jwtSecret,
             { expiresIn: '7d' },
@@ -139,28 +140,46 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const permissionSlugs = resolvePermissionSlugs(user.permission_slugs, user.permissions);
+    let roleNames = [user.role_name];
+    let permissions = user.permissions;
+    let permissionSlugs = resolveEffectivePermissionSlugs(user.permission_slugs, user.permissions, roleNames);
+
+    try {
+      const roleContext = await fetchUserRoleContext(user.id, (user as any).role_id);
+      if (roleContext.roleNames.length > 0) {
+        roleNames = roleContext.roleNames;
+        permissions = roleContext.permissions;
+        permissionSlugs = roleContext.permissionSlugs;
+      }
+    } catch (roleContextError) {
+      if (!isMissingColumnError(roleContextError) && !isMissingRelationError(roleContextError)) {
+        throw roleContextError;
+      }
+    }
 
     const token = jwt.sign(
       {
         id: user.id,
         username: user.username,
-        role: user.role_name,
-        permissions: user.permissions,
+        role: roleNames[0] || user.role_name,
+        roles: roleNames,
+        permissions,
         permission_slugs: permissionSlugs,
       },
-      jwtSecret, 
+      jwtSecret,
       { expiresIn: "7d" }
     );
-    
+
     res.json({
       token,
       user: {
         id: user.id,
         username: user.username,
         full_name: user.full_name,
-        role: user.role_name,
+        role: roleNames[0] || user.role_name,
+        roles: roleNames,
         profile_image_url: user.profile_image_url || null,
+        permission_slugs: permissionSlugs,
       },
     });
 
@@ -219,13 +238,15 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 
             const roleName = roleRows?.[0]?.name || "UNKNOWN";
             const permissions = normalizePermissionMap(roleRows?.[0]?.permissions);
-            const permissionSlugs = resolvePermissionSlugs(undefined, permissions);
+            const roleNames = [roleName];
+            const permissionSlugs = resolveEffectivePermissionSlugs(undefined, permissions, roleNames);
 
             const token = jwt.sign(
               {
                 id: candidate.id,
                 username: candidate.username,
                 role: roleName,
+                roles: roleNames,
                 permissions,
                 permission_slugs: permissionSlugs,
               },
@@ -240,7 +261,9 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
                 username: candidate.username,
                 full_name: candidate.full_name,
                 role: roleName,
+                roles: roleNames,
                 profile_image_url: candidate.profile_image_url || null,
+                permission_slugs: permissionSlugs,
               },
             });
             return;
@@ -262,14 +285,51 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 });
 
 router.get("/me", requireAuth, (req: AuthRequest, res: Response) => {
+  const permissionSlugs = resolveEffectivePermissionSlugs(
+    req.user?.permission_slugs,
+    req.user?.permissions,
+    [req.user?.role, ...(req.user?.roles || [])].filter((role): role is string => Boolean(role)),
+  );
   res.json({
     user: {
       id: req.user?.id,
       username: req.user?.username,
       role: req.user?.role,
+      roles: req.user?.roles || (req.user?.role ? [req.user.role] : []),
       permissions: req.user?.permissions,
-      permission_slugs: req.user?.permission_slugs || [],
+      permission_slugs: permissionSlugs,
     },
+  });
+});
+
+router.get("/permissions", requireAuth, async (req: AuthRequest, res: Response) => {
+  const tokenRoles = [req.user?.role, ...(req.user?.roles || [])].filter((role): role is string => Boolean(role));
+  let roleNames = tokenRoles;
+  let permissionSlugs = resolveEffectivePermissionSlugs(req.user?.permission_slugs, req.user?.permissions, tokenRoles);
+
+  if (req.user?.id) {
+    try {
+      const roleContext = await fetchUserRoleContext(req.user.id);
+      if (roleContext.roleNames.length > 0) {
+        roleNames = roleContext.roleNames;
+        permissionSlugs = roleContext.permissionSlugs;
+      }
+    } catch (error) {
+      if (!isMissingColumnError(error) && !isMissingRelationError(error) && !isPoolUnreachable(error)) {
+        console.error("Effective permissions error:", error);
+        res.status(500).json({ error: "Failed to resolve effective permissions" });
+        return;
+      }
+    }
+  }
+
+  res.json({
+    user_id: req.user?.id || null,
+    role: roleNames[0] || req.user?.role || null,
+    roles: roleNames,
+    permission_slugs: permissionSlugs,
+    is_superuser: permissionSlugs.includes("*") || roleNames.some((role) => ["super_admin", "admin", "owner"].includes(normalizeRoleName(role))),
+    catalog: PERMISSION_DEFINITIONS,
   });
 });
 

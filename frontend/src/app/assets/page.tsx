@@ -379,32 +379,6 @@ function AssetsContent() {
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
   const [itemToRecover, setItemToRecover] = useState<Item | null>(null);
   const [showReconcileReview, setShowReconcileReview] = useState(false);
-  const [cachedRoleName, setCachedRoleName] = useState("");
-  const [cachedPermissionSlugs, setCachedPermissionSlugs] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const rawUser = localStorage.getItem("user");
-    if (!rawUser) return;
-    try {
-      const parsed = JSON.parse(rawUser) as {
-        role?: string;
-        role_name?: string;
-        permission_slugs?: string[];
-      };
-      const nextRoleName = (parsed.role_name || parsed.role || "").toUpperCase();
-      const nextPermissionSlugs = Array.isArray(parsed.permission_slugs) ? parsed.permission_slugs : [];
-      Promise.resolve().then(() => {
-        setCachedRoleName(nextRoleName);
-        setCachedPermissionSlugs(nextPermissionSlugs);
-      });
-    } catch {
-      Promise.resolve().then(() => {
-        setCachedRoleName("");
-        setCachedPermissionSlugs([]);
-      });
-    }
-  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -456,7 +430,7 @@ function AssetsContent() {
 
   const filteredItems = useMemo(() => {
     let result = items;
-    
+
     if (searchTerm) {
       result = fuzzySearch(result, searchTerm, {
         keys: ["name", "description", "store.name"],
@@ -475,7 +449,7 @@ function AssetsContent() {
           else fieldVal = undefined;
 
           if (fieldVal === undefined || fieldVal === null) return false;
-          
+
           const sVal = String(fieldVal).toLowerCase();
           const rVal = rule.value.toLowerCase();
           const nVal = Number(fieldVal);
@@ -624,23 +598,11 @@ function AssetsContent() {
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
 
-  const { isAdmin, isInventoryController, hasPermission, isLoading: authLoading } = useAuth();
-  const cachedIsManager =
-    cachedRoleName === "SUPER_ADMIN" ||
-    cachedRoleName === "ADMIN" ||
-    cachedRoleName === "SYSTEM_MANAGER" ||
-    cachedRoleName === "INVENTORY_CONTROLLER";
-  const cachedCanManageAssets =
-    cachedIsManager ||
-    cachedPermissionSlugs.includes("assets:write") ||
-    cachedPermissionSlugs.includes("assets:delete") ||
-    cachedPermissionSlugs.includes("assets:reconcile");
+  const { hasPermission, isLoading: authLoading } = useAuth();
   const canManageAssets =
-    isAdmin ||
-    isInventoryController ||
     hasPermission("assets:write") ||
     hasPermission("assets:delete") ||
-    cachedCanManageAssets;
+    hasPermission("assets:reconcile");
 
   const handleExportPDF = () => {
     if (total === 0) {
@@ -774,9 +736,9 @@ function AssetsContent() {
                <HiDocumentArrowDown className="w-4.5 h-4.5 text-accent" />
                {t("CSV")}
              </button>
- 
+
              <div className="w-px h-6 bg-border hidden sm:block mx-1" />
- 
+
             <button
               onClick={() => {
                 if (reconcileMode) {
@@ -795,7 +757,7 @@ function AssetsContent() {
               <HiCheckCircle className="w-4 h-4" />
               {reconcileMode ? t("Cancel Count") : t("Reconcile")}
             </button>
- 
+
             <button
               onClick={() => {
                 setSelectMode(false);
@@ -1023,12 +985,12 @@ function AssetsContent() {
           <tbody>
             <AnimatePresence mode="popLayout" initial={false}>
             {table.getRowModel().rows.map((row) => (
-              <motion.tr 
+              <motion.tr
                 layout
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                key={row.id} 
+                key={row.id}
                 className="border-b border-border/30 hover:bg-primary-light/5 transition-all group"
               >
                 {row.getVisibleCells().map((cell) => (
@@ -1058,7 +1020,7 @@ function AssetsContent() {
                   className="w-5 h-5 rounded border-border accent-primary cursor-pointer shrink-0"
                 />
               )}
-              <div 
+              <div
                 className="flex-1 min-w-0 cursor-pointer"
                 onClick={() => {
                   if (selectMode && !showTrash) {
@@ -1068,8 +1030,8 @@ function AssetsContent() {
                   setEditingItem(item);
                 }}
               >
-                <MobileAssetCard 
-                  item={item} 
+                <MobileAssetCard
+                  item={item}
                   onEdit={(it) => setEditingItem(it)}
                   onDelete={(it) => setItemToDelete(it)}
                 />

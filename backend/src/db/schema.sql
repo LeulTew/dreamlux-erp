@@ -22,7 +22,13 @@ INSERT INTO roles (name, description, permissions) VALUES
   ('SYSTEM_MANAGER', 'Can manage users and settings', '{"users": ["manage"], "settings": ["write"]}'),
   ('system_manager', 'Can manage users and settings', '{"users": ["manage"], "settings": ["write"]}'),
   ('SALES_REP', 'Can view inventory but not modify', '{"assets": ["read"]}'),
-  ('viewer', 'Read-only access to assets', '{"assets": ["read"]}')
+  ('viewer', 'Read-only access to assets', '{"assets": ["read"]}'),
+  ('OWNER', 'Business owner with full system access', '{"all": true}'),
+  ('OPS_MANAGER', 'Can manage event operations', '{"events": ["read", "write", "delete"], "assets": ["read"]}'),
+  ('EVENT_MANAGER', 'Can manage assigned event operations', '{"events": ["read", "write"], "assets": ["read"]}'),
+  ('INVENTORY_OFFICER', 'Can manage inventory operations', '{"assets": ["read", "write", "reconcile"]}'),
+  ('ACCOUNTANT', 'Can manage payroll, approvals, and profitability reports', '{"payroll": ["read", "write"], "reports": ["profit:read"]}'),
+  ('DRIVER', 'Can view assigned events and log trips', '{"events": ["read"], "trips": ["create"]}')
 ON CONFLICT (name) DO NOTHING;
 
 -- 1b. Fine-grained permission catalog
@@ -48,7 +54,29 @@ INSERT INTO permissions (slug, description) VALUES
   ('users:manage', 'Manage users and role assignments'),
   ('settings:write', 'Manage system settings'),
   ('hr:read', 'View HR records'),
-  ('hr:write', 'Create and update HR records')
+  ('hr:write', 'Create and update HR records'),
+  ('departments:manage', 'Manage departments'),
+  ('salary-levels:manage', 'Manage salary levels'),
+  ('payroll:read', 'View payroll runs and payroll exports'),
+  ('payroll:write', 'Create and update payroll runs'),
+  ('events:read', 'View events, event types, and operational schedules'),
+  ('events:write', 'Create and update events and event types'),
+  ('events:delete', 'Delete, restore, and permanently remove events or event types'),
+  ('events:override_completed', 'Modify completed events and restricted status transitions'),
+  ('events:saved_views:share', 'Create and manage role or global saved event views'),
+  ('events:proposals:write', 'Create and submit event intake profitability proposals'),
+  ('events:proposals:approve', 'Approve, reject, cancel, and convert event intake proposals'),
+  ('event_allocations:write', 'Create and release event inventory allocations'),
+  ('event_checklist:write', 'Create and update event checklist items'),
+  ('event_assignments:write', 'Assign employees to events and manage attendance'),
+  ('vehicle_assignments:write', 'Assign vehicles and drivers to events'),
+  ('exports:read', 'Export inventory, employee, and payroll data'),
+  ('reports:profit:read', 'View profit and profitability reports'),
+  ('trips:create', 'Create event trip logs and generated fuel expenses'),
+  ('expenses:write', 'Create manual event expenses'),
+  ('expenses:labor_generate', 'Generate labor expenses from attended event assignments'),
+  ('expenses:approve', 'Approve expenses'),
+  ('approvals:history:read', 'View approval history')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Role-to-permission mappings
@@ -56,13 +84,13 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
 JOIN permissions p ON TRUE
-WHERE LOWER(r.name) IN ('super_admin', 'admin')
+WHERE LOWER(r.name) IN ('super_admin', 'admin', 'owner')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'exports:read')
 WHERE LOWER(r.name) IN ('inventory_controller')
 ON CONFLICT DO NOTHING;
 
@@ -76,8 +104,50 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read')
 WHERE LOWER(r.name) IN ('viewer', 'sales_rep')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('hr:read', 'hr:write', 'departments:manage', 'salary-levels:manage', 'exports:read')
+WHERE LOWER(r.name) IN ('hr_manager')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'exports:read')
+WHERE LOWER(r.name) IN ('inventory_officer')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'events:saved_views:share', 'events:proposals:write', 'events:proposals:approve', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
+WHERE LOWER(r.name) IN ('ops_manager')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:proposals:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write')
+WHERE LOWER(r.name) IN ('event_manager')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read')
+WHERE LOWER(r.name) IN ('accountant')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+JOIN permissions p ON p.slug IN ('events:read', 'trips:create')
+WHERE LOWER(r.name) IN ('driver')
 ON CONFLICT DO NOTHING;
 
 -- 2. App Users
@@ -240,7 +310,7 @@ CREATE TABLE IF NOT EXISTS salary_levels (
 
 -- Seed default levels if table is empty
 INSERT INTO salary_levels (code, amount_etb, sort_order)
-VALUES 
+VALUES
   ('L1', 5000.00, 1),
   ('L2', 7000.00, 2),
   ('L3', 9000.00, 3),
@@ -305,7 +375,7 @@ CREATE TABLE IF NOT EXISTS event_types (
 
 -- Seed default event types
 INSERT INTO event_types (name)
-VALUES 
+VALUES
   ('Wedding'),
   ('Mels'),
   ('Birthday'),
@@ -411,6 +481,130 @@ CREATE TABLE IF NOT EXISTS event_logs (
 CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date);
 CREATE INDEX IF NOT EXISTS idx_event_logs_event_id ON event_logs(event_id);
+
+CREATE TABLE IF NOT EXISTS event_proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  client_name TEXT NOT NULL,
+  client_phone TEXT,
+  event_type_id UUID REFERENCES event_types(id) ON DELETE SET NULL,
+  requested_budget NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  requested_start_date DATE,
+  requested_end_date DATE,
+  requested_start_time TIME,
+  requested_end_time TIME,
+  venue_location TEXT,
+  notes TEXT,
+  package_design_notes TEXT,
+  cost_breakdown JSONB NOT NULL DEFAULT '{"design":[],"team":[],"trip":[],"other":[]}'::jsonb,
+  estimated_design_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_team_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_trip_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_other_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_total_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_net_profit NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  estimated_margin_percentage NUMERIC(8, 2) NOT NULL DEFAULT 0.00,
+  status TEXT NOT NULL CHECK (status IN ('Draft', 'Submitted', 'Approved', 'Rejected', 'Converted', 'Canceled')) DEFAULT 'Draft',
+  rejection_reason TEXT,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_at TIMESTAMP,
+  converted_event_id UUID,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  submitted_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP DEFAULT NULL,
+  CONSTRAINT event_proposals_requested_date_check CHECK (
+    requested_start_date IS NULL OR requested_end_date IS NULL OR requested_start_date <= requested_end_date
+  )
+);
+
+CREATE TABLE IF NOT EXISTS event_proposal_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposal_id UUID NOT NULL REFERENCES event_proposals(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  old_status TEXT,
+  new_status TEXT,
+  note TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE events ADD COLUMN IF NOT EXISTS event_proposal_id UUID REFERENCES event_proposals(id) ON DELETE SET NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'event_proposals_converted_event_fk'
+      AND conrelid = 'event_proposals'::regclass
+  ) THEN
+    ALTER TABLE event_proposals
+      ADD CONSTRAINT event_proposals_converted_event_fk
+      FOREIGN KEY (converted_event_id) REFERENCES events(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_event_proposals_status
+  ON event_proposals(status)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposals_created_by
+  ON event_proposals(created_by)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposals_requested_start
+  ON event_proposals(requested_start_date)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposals_profit
+  ON event_proposals(estimated_net_profit, estimated_margin_percentage)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_proposals_converted_event_unique
+  ON event_proposals(converted_event_id)
+  WHERE converted_event_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_proposal_unique
+  ON events(event_proposal_id)
+  WHERE event_proposal_id IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_proposal_logs_proposal_id
+  ON event_proposal_logs(proposal_id);
+
+CREATE TABLE IF NOT EXISTS event_saved_views (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  scope TEXT NOT NULL CHECK (scope IN ('personal', 'role', 'global')) DEFAULT 'personal',
+  role_name TEXT DEFAULT NULL,
+  columns JSONB NOT NULL DEFAULT '[]'::jsonb,
+  filters JSONB NOT NULL DEFAULT '[]'::jsonb,
+  sort JSONB DEFAULT NULL,
+  page_size INTEGER NOT NULL DEFAULT 20 CHECK (page_size BETWEEN 1 AND 100),
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP DEFAULT NULL,
+  CONSTRAINT event_saved_views_scope_target_check CHECK (
+    (scope = 'personal' AND user_id IS NOT NULL AND role_name IS NULL)
+    OR (scope = 'role' AND user_id IS NULL AND role_name IS NOT NULL)
+    OR (scope = 'global' AND user_id IS NULL AND role_name IS NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_saved_views_user
+  ON event_saved_views(user_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_event_saved_views_scope
+  ON event_saved_views(scope, role_name)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_saved_views_default_personal
+  ON event_saved_views(user_id)
+  WHERE deleted_at IS NULL AND is_default = TRUE AND scope = 'personal';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_saved_views_default_role
+  ON event_saved_views(LOWER(role_name))
+  WHERE deleted_at IS NULL AND is_default = TRUE AND scope = 'role';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_saved_views_default_global
+  ON event_saved_views((scope))
+  WHERE deleted_at IS NULL AND is_default = TRUE AND scope = 'global';
 
 -- 15. Vehicles
 CREATE TABLE IF NOT EXISTS vehicles (

@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { supabase } from "../db/supabase";
 
 import { getPublicUrl, downloadImage } from "../storage/storage";
-import { AuthRequest, requireRole } from "../middleware/auth";
+import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 
 interface ItemRow {
   id: string;
@@ -93,7 +93,7 @@ router.get("/pdf", (req, res) => {
 });
 
 // GET /export/xlsx — Excel with embedded images
-router.get("/xlsx", requireRole(["OWNER", "OPS_MANAGER", "INVENTORY_OFFICER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/xlsx", requirePermissionSlugs(["exports:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const storeFilter = req.query.store as string | undefined;
     const items = await fetchItemsForExport(storeFilter);
@@ -200,7 +200,7 @@ router.get("/xlsx", requireRole(["OWNER", "OPS_MANAGER", "INVENTORY_OFFICER", "A
 });
 
 // GET /export/csv — CSV with image URLs
-router.get("/csv", requireRole(["OWNER", "OPS_MANAGER", "INVENTORY_OFFICER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/csv", requirePermissionSlugs(["exports:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const storeFilter = req.query.store as string | undefined;
     const items = await fetchItemsForExport(storeFilter);
@@ -254,7 +254,7 @@ async function fetchEmployeesForExport(officeFilter?: string) {
 
   const { data, error } = await query;
   if (error) throw error;
-  
+
   return data || [];
 }
 
@@ -350,7 +350,7 @@ function buildEmployeeExportRow(
   return row;
 }
 
-router.get("/employees/csv", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/employees/csv", requirePermissionSlugs(["exports:read", "hr:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const officeFilter = req.query.office as string | undefined;
     const [employees, eventTypes] = await Promise.all([
@@ -391,7 +391,7 @@ router.get("/employees/csv", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER
   }
 });
 
-router.get("/employees/xlsx", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/employees/xlsx", requirePermissionSlugs(["exports:read", "hr:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const officeFilter = req.query.office as string | undefined;
     const [employees, eventTypes] = await Promise.all([
@@ -431,7 +431,7 @@ router.get("/employees/xlsx", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPE
     for (let i = 0; i < employees.length; i++) {
       const emp = employees[i] as unknown as Record<string, unknown>;
       const row = sheet.addRow(buildEmployeeExportRow(emp, eventColumns));
-        
+
         if (i % 2 === 1) {
             row.eachCell((cell) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8F9FA" } };
@@ -454,10 +454,10 @@ router.get("/employees/xlsx", requireRole(["OWNER", "HR_MANAGER", "ADMIN", "SUPE
 // HR EXPORTS (PAYROLL RUN)
 // ====================================================
 
-router.get("/payroll/:id/csv", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     const { data: runResult, error: runError } = await supabase
       .from("payroll_runs")
       .select("*")
@@ -466,7 +466,7 @@ router.get("/payroll/:id/csv", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUP
 
     if (runError) throw runError;
     if (!runResult) { res.status(404).json({ error: "Run not found" }); return; }
-    
+
     const run = runResult;
 
     const periodTag = run.period_start
@@ -477,9 +477,9 @@ router.get("/payroll/:id/csv", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUP
       .from("payroll_run_employee_lines")
       .select("*")
       .eq("run_id", id);
-      
+
     if (linesError) throw linesError;
-    
+
     // Sort lines by employee_name_snapshot
     const lines = (linesResult ?? []).sort((a: any, b: any) => a.employee_name_snapshot.localeCompare(b.employee_name_snapshot));
 
@@ -526,10 +526,10 @@ router.get("/payroll/:id/csv", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUP
   }
 });
 
-router.get("/payroll/:id/xlsx", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SUPER_ADMIN"]), async (req: AuthRequest, res: Response): Promise<void> => {
+router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
     const { data: runResult, error: runError } = await supabase
       .from("payroll_runs")
       .select("*")
@@ -538,7 +538,7 @@ router.get("/payroll/:id/xlsx", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SU
 
     if (runError) throw runError;
     if (!runResult) { res.status(404).json({ error: "Run not found" }); return; }
-    
+
     const run = runResult;
 
     const periodTag = run.period_start
@@ -549,9 +549,9 @@ router.get("/payroll/:id/xlsx", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SU
       .from("payroll_run_employee_lines")
       .select("*")
       .eq("run_id", id);
-      
+
     if (linesError) throw linesError;
-    
+
     const lines = (linesResult ?? []).sort((a: any, b: any) => a.employee_name_snapshot.localeCompare(b.employee_name_snapshot));
 
     const workbook = new ExcelJS.Workbook();
@@ -588,7 +588,7 @@ router.get("/payroll/:id/xlsx", requireRole(["OWNER", "ACCOUNTANT", "ADMIN", "SU
           events_total: eventsTotal.toFixed(2),
           total_pay: totalPay.toFixed(2)
         });
-        
+
         if (i % 2 === 1) {
             row.eachCell((cell) => {
               cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8F9FA" } };

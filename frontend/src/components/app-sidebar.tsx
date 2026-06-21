@@ -17,6 +17,7 @@ import {
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Sidebar,
   SidebarContent,
@@ -58,6 +59,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "List Events": "List Events",
     Finance: "Finance",
     "Profit Reports": "Profit Reports",
+    "Event Proposals": "Event Proposals",
   },
   am: {
     Employees: "ሰራተኞች",
@@ -82,6 +84,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "List Events": "የዝግጅቶች ዝርዝር",
     Finance: "ፋይናንስ",
     "Profit Reports": "የትርፍ ሪፖርቶች",
+    "Event Proposals": "የዝግጅት ፕሮፖዛሎች",
   },
 };
 
@@ -134,8 +137,8 @@ function CollapsedPopout({
       <button
         onClick={() => setOpen(!open)}
         className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
-          isActive 
-            ? "bg-primary text-primary-foreground shadow-md animate-pulse-subtle" 
+          isActive
+            ? "bg-primary text-primary-foreground shadow-md animate-pulse-subtle"
             : "text-muted hover:bg-card-alt hover:text-foreground"
         }`}
         title={label}
@@ -143,7 +146,7 @@ function CollapsedPopout({
         <Icon className="w-[22px] h-[22px] shrink-0" />
       </button>
       {open && (
-        <div 
+        <div
           className="absolute left-[calc(100%+16px)] top-[32px] z-50 bg-card border border-border/80 rounded-2xl p-1.5 min-w-[170px] shadow-massive flex flex-col gap-0.5 animate-scale-in"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -159,11 +162,11 @@ function CollapsedPopout({
               const x_trunk = 28; // Completely clears the button circle (24px radius from center)
               const y_start = 16; // Button bottom height relative to top-[32px] container
               const r = 6;
-              
+
               const path = idx === 0
                 ? `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_item} L 72,${y_item}`
                 : `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_start + r} V ${y_item - r} Q ${x_trunk},${y_item} ${x_trunk + r},${y_item} L 72,${y_item}`;
-              
+
               return (
                 <path
                   key={link.href}
@@ -185,8 +188,8 @@ function CollapsedPopout({
                 href={link.href}
                 onClick={() => setOpen(false)}
                 className={`block px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  link.active 
-                    ? "bg-primary/10 text-primary font-bold" 
+                  link.active
+                    ? "bg-primary/10 text-primary font-bold"
                     : "text-foreground/80 hover:bg-card-alt hover:text-foreground"
                 }`}
               >
@@ -217,16 +220,16 @@ function SidebarLink({
 
   if (isCollapsed) {
     return (
-      <div 
+      <div
         className="relative flex justify-center w-full"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <Link 
-          href={href} 
+        <Link
+          href={href}
           className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
-            active 
-              ? "bg-primary text-primary-foreground shadow-md" 
+            active
+              ? "bg-primary text-primary-foreground shadow-md"
               : "text-muted hover:bg-card-alt hover:text-foreground"
           }`}
         >
@@ -326,39 +329,44 @@ export function AppSidebar() {
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
-  const userRole = currentUser.role;
-
-  const hasAccess = (roles?: string[]) => {
-    if (!roles) return true;
-    return roles.includes(userRole);
-  };
+  const { hasPermission, hasAnyPermission } = useAuth();
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const hrRoles = [
-    "SUPER_ADMIN", "super_admin", "admin", "ADMIN", "HR_ADMIN",
-    "EVENT_MANAGER", "event_manager", "OWNER", "owner",
-    "OPS_MANAGER", "ops_manager", "ACCOUNTANT", "accountant",
-  ];
+  const showHRGroup = hasAnyPermission([
+    "hr:read",
+    "hr:write",
+    "events:read",
+    "events:write",
+    "events:proposals:write",
+    "events:proposals:approve",
+    "payroll:read",
+    "payroll:write",
+    "expenses:approve",
+    "reports:profit:read",
+    "salary-levels:manage",
+    "departments:manage"
+  ]);
 
   const eventLinks = [
-    { href: "/events", label: t("List Events"), active: pathname === "/events", show: hasAccess(hrRoles) },
-    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
+    { href: "/events", label: t("List Events"), active: pathname === "/events", show: hasPermission("events:read") },
+    { href: "/events/proposals", label: t("Event Proposals"), active: pathname === "/events/proposals" || pathname.startsWith("/events/proposals/"), show: hasAnyPermission(["events:proposals:write", "events:write", "events:proposals:approve"]) },
+    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasPermission("events:write") },
   ].filter(l => l.show);
 
   const financeLinks = [
-    { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN", "ACCOUNTANT", "accountant"]) },
-    { href: "/hr/expenses/approve", label: t("Expense Approvals"), active: pathname === "/hr/expenses/approve", show: hasAccess(["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "OWNER", "owner", "ACCOUNTANT", "accountant"]) },
-    { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasAccess(["SUPER_ADMIN", "super_admin", "admin", "ADMIN", "OWNER", "owner", "ACCOUNTANT", "accountant"]) },
-    { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) },
+    { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAnyPermission(["payroll:read", "payroll:write"]) },
+    { href: "/hr/expenses/approve", label: t("Expense Approvals"), active: pathname === "/hr/expenses/approve", show: hasPermission("expenses:approve") },
+    { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasPermission("reports:profit:read") },
+    { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
   ].filter(l => l.show);
 
   return (
-    <Sidebar 
-      collapsible="icon" 
+    <Sidebar
+      collapsible="icon"
       className="border-none bg-transparent [&_[data-sidebar=sidebar]]:border-none [&_[data-sidebar=sidebar]]:bg-transparent [&_[data-sidebar=sidebar]]:shadow-none"
     >
       {/* Header - Logo & Collapse Toggle */}
@@ -390,7 +398,7 @@ export function AppSidebar() {
                 </span>
               </div>
             </div>
-            
+
             <button
               onClick={toggleSidebar}
               className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-card-alt transition-all cursor-pointer shrink-0"
@@ -405,7 +413,7 @@ export function AppSidebar() {
       {/* Content Groupings */}
       <SidebarContent className="py-2">
         {/* HR Management Section */}
-        {hasAccess(hrRoles) && (
+        {showHRGroup && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
               {t("HR Management")}
@@ -413,7 +421,7 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
                 {/* Employees (Nested) — expanded vs collapsed */}
-                {hasAccess(["SUPER_ADMIN", "super_admin", "HR_ADMIN", "admin", "ADMIN"]) && (
+                {hasAnyPermission(["hr:read", "hr:write"]) && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     {isCollapsed ? (
                       <CollapsedPopout
@@ -477,7 +485,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiOutlineCalendar}
                         label={t("Events")}
-                        isActive={isActive("/events") || isActive("/hr/event-types")}
+                        isActive={isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")}
                         links={eventLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
                       />
                     ) : (
@@ -485,7 +493,7 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setEventsOpen(!eventsOpen)}
                           className={`w-full justify-between rounded-xl h-10 ${
-                            isActive("/events") || isActive("/hr/event-types") ? "text-primary font-semibold" : ""
+                            isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary font-semibold" : ""
                           }`}
                         >
                           <span className="flex items-center gap-3">
@@ -573,7 +581,7 @@ export function AppSidebar() {
         )}
 
         {/* Inventory Management Section */}
-        {hasAccess(["SUPER_ADMIN", "INVENTORY_CONTROLLER", "admin"]) && (
+        {hasPermission("assets:read") && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
               {t("Inventory Management")}
@@ -685,7 +693,7 @@ export function AppSidebar() {
         )}
 
         {/* Admin Settings Section */}
-        {hasAccess(["SUPER_ADMIN", "admin", "SYSTEM_MANAGER", "system_manager"]) && (
+        {hasAnyPermission(["users:manage", "settings:write"]) && (
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>

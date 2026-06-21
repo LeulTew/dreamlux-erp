@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
@@ -10,6 +10,7 @@ import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser } from
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
+import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 
 const eventValidationSchema = z.object({
@@ -42,21 +43,8 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Parse current user role
-  const [userRole, setUserRole] = useState("");
-  useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const parsed = JSON.parse(userStr);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setUserRole(parsed.role_name || parsed.role || "");
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
-
-  const isOverrideAllowed = ["SUPER_ADMIN", "ADMIN", "OWNER", "ACCOUNTANT"].includes(userRole.toUpperCase());
+  const { hasPermission } = useAuth();
+  const isOverrideAllowed = hasPermission("events:override_completed");
   const isCompleted = event?.status === "Completed";
   const isReadOnly = isCompleted && !isOverrideAllowed;
 
@@ -195,7 +183,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               {/* Section 1: Client & General Info */}
               <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">General Information</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Event Title</label>
@@ -262,7 +250,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               {/* Section 3: Finance & Status */}
               <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">Status & Budget</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1 flex items-center gap-1">
@@ -305,7 +293,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               {/* Section 2: Venue & Schedule */}
               <div className="bg-card-alt/30 p-5 rounded-xl border border-border/50 space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">Schedule & Location</h3>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">Start Date</label>

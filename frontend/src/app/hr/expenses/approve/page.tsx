@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getPendingEventExpenses, reviewEventExpense } from "@/lib/api";
 import type { EventExpense } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -72,30 +73,22 @@ export default function ExpenseApprovalPage() {
   const queryClient = useQueryClient();
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
 
-  const authStatus = useMemo<"authorized" | "unauthorized" | "no-user">(() => {
-    if (typeof window === "undefined") return "no-user";
-    const rawUser = localStorage.getItem("user");
-    if (!rawUser) return "no-user";
-    try {
-      const parsed = JSON.parse(rawUser) as { role?: string; role_name?: string };
-      const role = (parsed.role_name || parsed.role || "").toUpperCase();
-      return ["OWNER", "ACCOUNTANT", "SUPER_ADMIN", "ADMIN"].includes(role)
-        ? "authorized"
-        : "unauthorized";
-    } catch {
-      return "unauthorized";
-    }
-  }, []);
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (authStatus === "no-user") router.replace("/login");
-    else if (authStatus === "unauthorized") router.replace("/");
-  }, [authStatus, router]);
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.replace("/login");
+      } else if (!hasPermission("expenses:approve")) {
+        router.replace("/");
+      }
+    }
+  }, [authLoading, isAuthenticated, hasPermission, router]);
 
   const expensesQuery = useQuery({
     queryKey: ["pending-event-expenses"],
     queryFn: getPendingEventExpenses,
-    enabled: authStatus === "authorized",
+    enabled: isAuthenticated && hasPermission("expenses:approve"),
   });
 
   const reviewMutation = useMutation({
@@ -115,7 +108,7 @@ export default function ExpenseApprovalPage() {
     },
   });
 
-  if (authStatus !== "authorized") {
+  if (authLoading || !isAuthenticated || !hasPermission("expenses:approve")) {
     return (
       <AuthLayout>
         <div className="flex h-[50vh] items-center justify-center">

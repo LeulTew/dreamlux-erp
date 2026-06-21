@@ -73,6 +73,677 @@ describe("Events API", () => {
     expect(res.body.events[0].name).toBe("Lux Wedding");
   });
 
+  test("GET /events applies allowlisted advanced filters, sorting, summaries, and pagination", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "1" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Corporate Gala",
+          client_name: "Aster",
+          status: "Planned",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: "100000.00",
+          approved_expense_total: 40000,
+          estimated_cost_total: 5000,
+          net_profit: 60000,
+          margin_percentage: 60,
+          vehicle_count: 2,
+          assigned_staff_count: 8,
+          allocation_count: 5,
+          checklist_completion_percentage: 75,
+          pending_expense_count: 1,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "client_name", operator: "contains", value: "Ast" },
+      { field: "net_profit", operator: "greater_than_or_equal", value: 50000 },
+      { field: "vehicle_count", operator: "greater_than", value: 1 },
+    ]));
+
+    const res = await request(app)
+      .get(`/events?filters=${filters}&sortBy=margin_percentage&sortOrder=desc&page=2&limit=25`)
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(2);
+    expect(res.body.limit).toBe(25);
+    expect(res.body.events[0].net_profit).toBe(60000);
+    expect(res.body.events[0].vehicle_count).toBe(2);
+
+    const countSql = String(mockQuery.mock.calls[0][0]);
+    const dataSql = String(mockQuery.mock.calls[1][0]);
+    const dataParams = mockQuery.mock.calls[1][1] as unknown[];
+    expect(countSql).toContain("LEFT JOIN event_types et");
+    expect(dataSql).toContain("ORDER BY CASE WHEN e.contract_price > 0");
+    expect(dataSql).toContain("LIMIT $4 OFFSET $5");
+    expect(dataParams).toEqual(["%Ast%", 50000, 1, 25, 25]);
+  });
+
+  test("GET /events rejects unsupported filter fields instead of interpolating SQL", async () => {
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "name; DROP TABLE events; --", operator: "equals", value: "x" },
+    ]));
+
+    const res = await request(app)
+      .get(`/events?filters=${filters}`)
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Unsupported event filter field");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events rejects unsupported sort fields instead of interpolating SQL", async () => {
+    const res = await request(app)
+      .get("/events?sortBy=name%3B%20DROP%20TABLE%20events")
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Unsupported event sort field");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events blocks financial filters and sorting for non-financial users", async () => {
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "net_profit", operator: "greater_than", value: 1 },
+    ]));
+
+    const filterRes = await request(app)
+      .get(`/events?filters=${filters}`)
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(filterRes.status).toBe(403);
+
+    const sortRes = await request(app)
+      .get("/events?sortBy=margin_percentage")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(sortRes.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events enforces pagination bounds", async () => {
+    const res = await request(app)
+      .get("/events?limit=101")
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Number must be less than or equal to 100");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events redacts derived financial summary fields for non-financial users", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: "1" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Wedding",
+          contract_price: "50000.00",
+          estimated_design_cost: "5000.00",
+          approved_expense_total: 20000,
+          estimated_cost_total: 5000,
+          net_profit: 30000,
+          margin_percentage: 60,
+          pending_expense_count: 1,
+          vehicle_count: 1,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    const res = await request(app)
+      .get("/events")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.events[0].contract_price).toBeUndefined();
+    expect(res.body.events[0].approved_expense_total).toBeUndefined();
+    expect(res.body.events[0].estimated_cost_total).toBeUndefined();
+    expect(res.body.events[0].net_profit).toBeUndefined();
+    expect(res.body.events[0].margin_percentage).toBeUndefined();
+    expect(res.body.events[0].pending_expense_count).toBeUndefined();
+    expect(res.body.events[0].vehicle_count).toBe(1);
+  });
+
+  test("GET /events/export returns filtered CSV and audits financial export", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Corporate Gala",
+          client_name: "Aster",
+          event_type_name: "Gala",
+          status: "Planned",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 100000,
+          approved_expense_total: 40000,
+          net_profit: 60000,
+          margin_percentage: 60,
+          vehicle_count: 2,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "client_name", operator: "contains", value: "Ast" },
+    ]));
+
+    const res = await request(app)
+      .get(`/events/export?filters=${filters}&columns=name,client_name,net_profit&format=csv`)
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.header["content-type"]).toContain("text/csv");
+    expect(res.text).toContain("Event Name,Client Name,Net Profit");
+    expect(res.text).toContain("Corporate Gala,Aster,60000");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
+    expect((mockQuery.mock.calls[2][1] as unknown[])[2]).toBe("events_export_financial");
+  });
+
+  test("GET /events/export redacts financial columns for non-financial export users", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Wedding",
+          client_name: "Betty",
+          contract_price: 50000,
+          net_profit: 30000,
+          vehicle_count: 1,
+        },
+      ],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+
+    const res = await request(app)
+      .get("/events/export?columns=name,contract_price,net_profit,vehicle_count")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Event Name,Vehicle Count");
+    expect(res.text).not.toContain("Revenue / Contract Price");
+    expect(res.text).not.toContain("Net Profit");
+    expect(res.text).not.toContain("50000");
+    expect(res.text).toContain("Wedding,1");
+  });
+
+  test("GET /events/export enforces large export guardrail before fetching rows", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1001" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // blocked audit
+
+    const res = await request(app)
+      .get("/events/export?maxRows=1000")
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+    expect(res.status).toBe(413);
+    expect(res.body.total).toBe(1001);
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    expect(String(mockQuery.mock.calls[1][0])).toContain("INSERT INTO event_logs");
+    expect((mockQuery.mock.calls[1][1] as unknown[])[2]).toBe("events_export_financial_blocked");
+  });
+
+  test("GET /events/export blocks unsupported financial filters for non-financial users", async () => {
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "net_profit", operator: "greater_than", value: 1 },
+    ]));
+
+    const res = await request(app)
+      .get(`/events/export?filters=${filters}`)
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events/export/template returns import template for event writers", async () => {
+    const res = await request(app)
+      .get("/events/export/template")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.header["content-type"]).toContain("text/csv");
+    expect(res.text).toContain("Event Name,Client Name");
+    expect(res.text).toContain("DreamLux SRD Wedding Setup");
+  });
+
+  test("POST /events/import/preview returns row-level validation errors for unknown event type", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // event type lookup
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+
+    const res = await request(app)
+      .post("/events/import/preview")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        mode: "insert",
+        rows: [{
+          name: "Imported Wedding",
+          client_name: "Aster",
+          event_type_name: "Unknown Type",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 120000,
+        }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.valid).toBe(false);
+    expect(res.body.errors[0]).toEqual({ row: 1, field: "event_type_name", message: "Unknown event type: Unknown Type" });
+  });
+
+  test("POST /events/import/commit inserts valid rows in one transaction and audits import", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "type-1" }], rowCount: 1 }); // event type lookup
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-imported" }], rowCount: 1 }); // insert
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // row audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // batch audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/import/commit")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        mode: "insert",
+        rows: [{
+          name: "Imported Wedding",
+          client_name: "Aster",
+          event_type_name: "Wedding",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 120000,
+          package_design_notes: "Imported estimate",
+          estimated_design_cost: 30000,
+        }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(true);
+    expect(res.body.importedCount).toBe(1);
+    expect(res.body.eventIds).toEqual(["event-imported"]);
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO events");
+    expect(String(mockQuery.mock.calls[4][0])).toContain("INSERT INTO event_logs");
+  });
+
+  test("POST /events/import/commit rolls back when update row is missing id", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // failed audit via pool
+
+    const res = await request(app)
+      .post("/events/import/commit")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        mode: "update",
+        rows: [{
+          name: "Imported Wedding",
+          client_name: "Aster",
+          start_date: "2026-07-20",
+          end_date: "2026-07-20",
+          venue_location: "Hilton",
+          contract_price: 120000,
+        }],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.imported).toBe(false);
+    expect(res.body.errors[0].field).toBe("id");
+    expect(String(mockQuery.mock.calls[1][0])).toBe("ROLLBACK");
+  });
+
+  test("POST /events/import/commit blocks low-permission users", async () => {
+    const res = await request(app)
+      .post("/events/import/commit")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+      .send({ rows: [] });
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events/saved-views returns personal, matching role, and global views only", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { id: "view-personal", name: "Mine", scope: "personal", user_id: "user-1" },
+        { id: "view-role", name: "Ops Queue", scope: "role", role_name: "EVENT_MANAGER" },
+        { id: "view-global", name: "All Events", scope: "global" },
+      ],
+      rowCount: 3,
+    });
+
+    const res = await request(app)
+      .get("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.savedViews).toHaveLength(3);
+    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("LOWER(role_name) = ANY");
+    expect(params).toEqual(["user-1", ["event_manager"]]);
+  });
+
+  test("POST /events/saved-views creates a personal default view in a transaction", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // clear defaults
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1", name: "My Event View", scope: "personal", user_id: "user-1", is_default: true }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        name: "My Event View",
+        is_default: true,
+        columns: ["name", "status"],
+        filters: [{ field: "status", operator: "equals", value: "Planned" }],
+        sort: { sortBy: "start_date", sortOrder: "asc" },
+        page_size: 50,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.savedView.name).toBe("My Event View");
+    const insertParams = mockQuery.mock.calls[2][1] as unknown[];
+    expect(insertParams[1]).toBe("user-1");
+    expect(insertParams[2]).toBe("personal");
+    expect(insertParams[8]).toBe(true);
+  });
+
+  test("POST /events/saved-views blocks role/global sharing without permission", async () => {
+    const res = await request(app)
+      .post("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        name: "Role View",
+        scope: "role",
+        role_name: "EVENT_MANAGER",
+      });
+
+    expect(res.status).toBe(403);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test("POST /events/saved-views allows shared role view with audit log for permitted users", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-role", name: "Ops Shared", scope: "role", role_name: "EVENT_MANAGER" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/saved-views")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`)
+      .send({
+        name: "Ops Shared",
+        scope: "role",
+        role_name: "EVENT_MANAGER",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.savedView.scope).toBe("role");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
+  });
+
+  test("PUT /events/saved-views/:viewId blocks editing another user's personal view", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-other", name: "Other", scope: "personal", user_id: "other-user" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+    const res = await request(app)
+      .put("/events/saved-views/view-other")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({ name: "Nope" });
+
+    expect(res.status).toBe(403);
+  });
+
+  test("POST /events/saved-views/:viewId/duplicate duplicates only visible views as personal", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-global", name: "Global", scope: "global", columns: ["name"], filters: [], page_size: 20 }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "copy-1", name: "My Copy", scope: "personal", user_id: "user-1" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .post("/events/saved-views/view-global/duplicate")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+      .send({ name: "My Copy" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.savedView.scope).toBe("personal");
+    const insertParams = mockQuery.mock.calls[1][1] as unknown[];
+    expect(insertParams[1]).toBe("user-1");
+  });
+
+  test("PATCH /events/saved-views/:viewId/default clears sibling defaults before setting selected view", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1", scope: "personal", user_id: "user-1", role_name: null }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // clear defaults
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "view-1", scope: "personal", user_id: "user-1", is_default: true }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .patch("/events/saved-views/view-1/default")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.savedView.is_default).toBe(true);
+    expect(String(mockQuery.mock.calls[2][0])).toContain("SET is_default = FALSE");
+  });
+
+  test("POST /events/proposals creates draft with calculated profitability and audit log", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Corporate Gala Proposal",
+        client_name: "Aster",
+        requested_budget: "200000.00",
+        estimated_design_cost: "50000.00",
+        estimated_team_cost: "24000.00",
+        estimated_trip_cost: "10000.00",
+        estimated_other_cost: "6000.00",
+        estimated_total_cost: "90000.00",
+        estimated_net_profit: "110000.00",
+        estimated_margin_percentage: "55.00",
+        status: "Draft",
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // proposal audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        name: "Corporate Gala Proposal",
+        client_name: "Aster",
+        client_phone: "+251900000000",
+        requested_budget: 200000,
+        requested_start_date: "2026-07-20",
+        requested_end_date: "2026-07-20",
+        venue_location: "Hilton",
+        cost_breakdown: {
+          design: [{ label: "Stage", amount: 50000 }],
+          team: [{ label: "Decor crew", amount: 0, people_count: 6, commission_per_person: 4000 }],
+          trip: [{ label: "Fuel", amount: 10000 }],
+          other: [{ label: "Permits", amount: 6000 }],
+        },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.proposal.estimated_net_profit).toBe(110000);
+    const insertParams = mockQuery.mock.calls[1][1] as unknown[];
+    expect(insertParams[17]).toBe(90000);
+    expect(insertParams[18]).toBe(110000);
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_proposal_logs");
+  });
+
+  test("POST /events/proposals blocks low-permission users", async () => {
+    const res = await request(app)
+      .post("/events/proposals")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+      .send({ name: "Blocked", client_name: "Aster", requested_budget: 200000 });
+
+    expect(res.status).toBe(403);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test("GET /events/proposals applies queue filters and prioritization", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Near Term Gala",
+        status: "Submitted",
+        requested_budget: "200000.00",
+        estimated_total_cost: "90000.00",
+        estimated_net_profit: "110000.00",
+        estimated_margin_percentage: "55.00",
+      }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/proposals?status=Submitted&min_profit=100000&min_margin=40")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposals[0].estimated_margin_percentage).toBe(55);
+    expect(String(mockQuery.mock.calls[1][0])).toContain("p.estimated_net_profit");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("p.created_at ASC");
+  });
+
+  test("POST /events/proposals/:id/submit moves Draft to Submitted with audit", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Draft" }], rowCount: 1 }); // lock
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Submitted" }], rowCount: 1 }); // update
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals/proposal-1/submit")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposal.status).toBe("Submitted");
+    expect(String(mockQuery.mock.calls[3][0])).toContain("INSERT INTO event_proposal_logs");
+  });
+
+  test("POST /events/proposals/:id/reject requires reason and approver permission", async () => {
+    const missingReason = await request(app)
+      .post("/events/proposals/proposal-1/reject")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`)
+      .send({});
+
+    expect(missingReason.status).toBe(400);
+
+    const noPermission = await request(app)
+      .post("/events/proposals/proposal-1/reject")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({ reason: "Low margin" });
+
+    expect(noPermission.status).toBe(403);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test("POST /events/proposals/:id/convert creates one real event and links proposal atomically", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Approved Gala",
+        client_name: "Aster",
+        client_phone: "+251900000000",
+        event_type_id: "type-1",
+        requested_start_date: "2026-07-20",
+        requested_end_date: "2026-07-20",
+        requested_start_time: "09:00",
+        requested_end_time: "18:00",
+        venue_location: "Hilton",
+        requested_budget: "200000.00",
+        package_design_notes: "Decor estimate",
+        estimated_design_cost: "50000.00",
+        status: "Approved",
+        converted_event_id: null,
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", name: "Approved Gala" }], rowCount: 1 }); // insert event
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Converted", converted_event_id: "event-1" }], rowCount: 1 }); // update proposal
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // proposal audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // event audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals/proposal-1/convert")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(201);
+    expect(res.body.event.id).toBe("event-1");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("FOR UPDATE");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO events");
+    expect(String(mockQuery.mock.calls[2][0])).toContain("event_proposal_id");
+    expect(String(mockQuery.mock.calls[3][0])).toContain("converted_event_id IS NULL");
+  });
+
+  test("POST /events/proposals/:id/convert blocks duplicate conversion without inserting event", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proposal-1", status: "Converted", converted_event_id: "event-existing" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+    const res = await request(app)
+      .post("/events/proposals/proposal-1/convert")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.eventId).toBe("event-existing");
+    expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO events"))).toBe(false);
+  });
+
   // Test single event retrieval
   test("GET /events/:id returns event details and audit logs", async () => {
     mockQuery.mockResolvedValueOnce({
@@ -928,39 +1599,79 @@ describe("Events API", () => {
       expect(res.body.error).toContain("Forbidden");
     });
 
-    test("GET /events/reports/profit aggregates monthly/yearly reports correctly with date filtering", async () => {
-      // First query: events list
+    test("GET /events/reports/profit returns paginated event rows, KPIs, proposal variance, and aggregates", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ count: "2" }],
+        rowCount: 1,
+      });
       mockQuery.mockResolvedValueOnce({
         rows: [
-          { id: "event-1", name: "Corporate Gala", contract_price: "100000.00", start_date: "2026-06-10" },
-          { id: "event-2", name: "Private Birthday", contract_price: "50000.00", start_date: "2026-07-15" },
+          {
+            event_id: "event-1",
+            event_name: "Corporate Gala",
+            event_type_name: "Gala",
+            start_date: "2026-06-10",
+            status: "Completed",
+            revenue: "100000.00",
+            approved_expenses: "25000.00",
+            labor_cost: "20000.00",
+            fuel_cost: "5000.00",
+            other_cost: "0.00",
+            pending_expense_exposure: "2000.00",
+            net_profit: "75000.00",
+            margin_percentage: "75.00",
+            proposal_id: "proposal-1",
+            proposal_status: "Converted",
+            estimated_total_cost: "30000.00",
+            estimated_net_profit: "70000.00",
+            estimated_profit_variance: "5000.00",
+          },
+          {
+            event_id: "event-2",
+            event_name: "Private Birthday",
+            event_type_name: "Birthday",
+            start_date: "2026-07-15",
+            status: "Completed",
+            revenue: "50000.00",
+            approved_expenses: "10000.00",
+            labor_cost: "0.00",
+            fuel_cost: "0.00",
+            other_cost: "10000.00",
+            pending_expense_exposure: "0.00",
+            net_profit: "40000.00",
+            margin_percentage: "80.00",
+            proposal_id: null,
+            proposal_status: null,
+            estimated_total_cost: "0.00",
+            estimated_net_profit: "0.00",
+            estimated_profit_variance: null,
+          },
         ],
         rowCount: 2,
       });
-      // Second query: approved expenses
-      mockQuery.mockResolvedValueOnce({
-        rows: [
-          { event_id: "event-1", category: "Labor", total_amount: 20000.00 },
-          { event_id: "event-1", category: "Fuel", total_amount: 5000.00 },
-          { event_id: "event-2", category: "Other", total_amount: 10000.00 },
-        ],
-        rowCount: 3,
-      });
 
       const res = await request(app)
-        .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-07-31")
+        .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-07-31&sortBy=net_profit&sortOrder=desc&page=1&limit=1")
         .set("Authorization", `Bearer ${getToken("OWNER")}`);
 
       expect(res.status).toBe(200);
+      expect(res.body.total).toBe(2);
+      expect(res.body.events).toHaveLength(1);
+      expect(res.body.events[0].event_name).toBe("Corporate Gala");
       expect(res.body.summary.totalEvents).toBe(2);
       expect(res.body.summary.totalRevenue).toBe(150000.00);
       expect(res.body.summary.totalExpenses).toBe(35000.00);
       expect(res.body.summary.netProfit).toBe(115000.00);
       expect(res.body.summary.profitMargin).toBe(76.67);
+      expect(res.body.summary.pendingExpenseExposure).toBe(2000.00);
       
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Labor", amount: 20000.00 });
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Fuel", amount: 5000.00 });
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Other", amount: 10000.00 });
+      expect(res.body.kpis.mostProfitableEvent.event_name).toBe("Corporate Gala");
+      expect(res.body.kpis.highestMarginEventType.eventType).toBe("Birthday");
+      expect(res.body.proposalVariance.averageVariance).toBe(5000.00);
+      expect(res.body.proposalVariance.events[0].proposalId).toBe("proposal-1");
 
       const juneData = res.body.monthlyData.find((m: any) => m.month === "2026-06");
       const julyData = res.body.monthlyData.find((m: any) => m.month === "2026-07");
@@ -973,6 +1684,76 @@ describe("Events API", () => {
       expect(julyData.revenue).toBe(50000.00);
       expect(julyData.expenses).toBe(10000.00);
       expect(julyData.profit).toBe(40000.00);
+      expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN event_proposals");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("ORDER BY profit_rows.net_profit DESC");
+    });
+
+    test("GET /events/reports/profit validates bounded report filters", async () => {
+      const res = await request(app)
+        .get("/events/reports/profit?start_date=2026-08-01&end_date=2026-07-01")
+        .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+      expect(res.status).toBe(400);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test("GET /events/reports/profit/export returns CSV and audits financial export", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ count: "1" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          event_id: "event-1",
+          event_name: "Corporate Gala",
+          event_type_name: "Gala",
+          start_date: "2026-06-10",
+          status: "Completed",
+          revenue: "100000.00",
+          approved_expenses: "25000.00",
+          labor_cost: "20000.00",
+          fuel_cost: "5000.00",
+          other_cost: "0.00",
+          pending_expense_exposure: "2000.00",
+          net_profit: "75000.00",
+          margin_percentage: "75.00",
+          proposal_id: "proposal-1",
+          proposal_status: "Converted",
+          estimated_total_cost: "30000.00",
+          estimated_net_profit: "70000.00",
+          estimated_profit_variance: "5000.00",
+        }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const res = await request(app)
+        .get("/events/reports/profit/export?start_date=2026-06-01&end_date=2026-07-31&format=csv")
+        .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("text/csv");
+      expect(res.text).toContain("Net Profit");
+      expect(res.text).toContain("Corporate Gala");
+      expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
+      expect((mockQuery.mock.calls[2][1] as unknown[])[1]).toBe("profit_report_export");
+    });
+
+    test("GET /events/reports/profit/export enforces maxRows before exporting", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ count: "1001" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const res = await request(app)
+        .get("/events/reports/profit/export?maxRows=1000")
+        .set("Authorization", `Bearer ${getToken("OWNER")}`);
+
+      expect(res.status).toBe(413);
+      expect(String(mockQuery.mock.calls[1][0])).toContain("INSERT INTO event_logs");
+      expect((mockQuery.mock.calls[1][1] as unknown[])[1]).toBe("profit_report_export_blocked");
+      expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("ORDER BY profit_rows"))).toBe(false);
     });
 
     test("GET /events/reports/profit restricts access to non-financial roles", async () => {

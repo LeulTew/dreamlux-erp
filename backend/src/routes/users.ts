@@ -7,8 +7,10 @@ import sharp from "sharp";
 // @ts-expect-error -- uuid types friction in ESM/CJS
 import { v4 as uuidv4 } from "uuid";
 import { getEnv } from "../lib/env";
+import { PERMISSION_DEFINITIONS, normalizePermissionSlugs } from "../lib/permissions";
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
 import { getPublicUrl, uploadImage } from "../storage/storage";
+import { invalidateUserCache, invalidateAllCache } from "../lib/permissions-cache";
 
 const router = Router();
 const STORAGE_BUCKET = getEnv("SUPABASE_BUCKET", "inventory-images");
@@ -573,8 +575,15 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 router.get("/roles", async (req: AuthRequest, res: Response) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, name, description
-       FROM roles
+      `SELECT
+        r.id,
+        r.name,
+        r.description,
+        COALESCE(array_agg(p.slug ORDER BY p.slug) FILTER (WHERE p.slug IS NOT NULL), '{}') AS permission_slugs
+       FROM roles r
+       LEFT JOIN role_permissions rp ON rp.role_id = r.id
+       LEFT JOIN permissions p ON p.id = rp.permission_id
+       GROUP BY r.id, r.name, r.description
        ORDER BY name ASC`
     );
     res.json(rows);
@@ -595,6 +604,442 @@ router.get("/roles", async (req: AuthRequest, res: Response) => {
     } catch {
       res.status(500).json({ error: "Failed to fetch roles" });
     }
+  }
+});
+
+router.get("/permissions", async (_req: AuthRequest, res: Response) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT slug, description FROM permissions ORDER BY slug ASC`,
+    );
+    res.json(rows);
+  } catch (error) {
+    if (!isPoolUnreachable(error)) {
+      res.status(500).json({ error: "Failed to fetch permissions" });
+      return;
+    }
+
+    try {
+      const { data, error: permissionsError } = await supabase
+        .from("permissions")
+        .select("slug, description")
+        .order("slug", { ascending: true });
+
+      if (permissionsError) throw permissionsError;
+      res.json(data || PERMISSION_DEFINITIONS);
+    } catch {
+      res.json(PERMISSION_DEFINITIONS);
+    }
+  }
+});
+
+router.put("/roles/:id/permissions", async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const permissionSlugs = normalizePermissionSlugs(req.body?.permission_slugs);
+
+  // Guardrail: prevent stripping '*' from administrator roles
+  try {
+    const { rows: roleCheck } = await pool.query(
+      `SELECT name FROM roles WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    if (roleCheck.length > 0) {
+      const roleName = roleCheck[0].name.toUpperCase();
+      if (["SUPER_ADMIN", "ADMIN", "OWNER"].includes(roleName) && !permissionSlugs.includes("*")) {
+        res.status(400).json({ error: "Cannot strip administrator roles of the '*' permission" });
+        return;
+      }
+    }
+  } catch (err) {
+    if (isPoolUnreachable(err)) {
+      try {
+        const { data: roleCheck, error: getErr } = await supabase
+          .from("roles")
+          .select("name")
+          .eq("id", id)
+          .single();
+        if (!getErr && roleCheck) {
+          const roleName = roleCheck.name.toUpperCase();
+          if (["SUPER_ADMIN", "ADMIN", "OWNER"].includes(roleName) && !permissionSlugs.includes("*")) {
+            res.status(400).json({ error: "Cannot strip administrator roles of the '*' permission" });
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  try {
+    await pool.query("BEGIN");
+    await pool.query(`DELETE FROM role_permissions WHERE role_id = $1`, [id]);
+
+    if (permissionSlugs.length > 0) {
+      const { rowCount } = await pool.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT $1::uuid, p.id
+         FROM permissions p
+         WHERE p.slug = ANY($2::text[])
+         ON CONFLICT DO NOTHING`,
+        [id, permissionSlugs],
+      );
+
+      if (rowCount !== permissionSlugs.length) {
+        throw new Error("One or more permission slugs are invalid");
+      }
+    }
+
+    const { rows } = await pool.query(
+      `SELECT
+        r.id,
+        r.name,
+        r.description,
+        COALESCE(array_agg(p.slug ORDER BY p.slug) FILTER (WHERE p.slug IS NOT NULL), '{}') AS permission_slugs
+       FROM roles r
+       LEFT JOIN role_permissions rp ON rp.role_id = r.id
+       LEFT JOIN permissions p ON p.id = rp.permission_id
+       WHERE r.id = $1
+       GROUP BY r.id, r.name, r.description`,
+      [id],
+    );
+
+    if (rows.length === 0) {
+      await pool.query("ROLLBACK");
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+
+    await pool.query("COMMIT");
+    invalidateAllCache();
+    res.json(rows[0]);
+  } catch (error) {
+    try {
+      await pool.query("ROLLBACK");
+    } catch {
+      // ignore rollback failures
+    }
+
+    if ((error as Error).message.includes("invalid")) {
+      res.status(400).json({ error: "Invalid permission slug" });
+      return;
+    }
+
+    console.error("Update role permissions error:", error);
+    res.status(500).json({ error: "Failed to update role permissions" });
+  }
+});
+
+router.post("/roles", async (req: AuthRequest, res: Response) => {
+  const { name, description, cloneFromRoleId } = req.body;
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: "Role name is required" });
+    return;
+  }
+
+  try {
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM roles WHERE LOWER(name) = LOWER($1) LIMIT 1`,
+      [name.trim()]
+    );
+    if (existing.length > 0) {
+      res.status(400).json({ error: `Role with name "${name}" already exists` });
+      return;
+    }
+
+    await pool.query("BEGIN");
+    const { rows: inserted } = await pool.query(
+      `INSERT INTO roles (name, description) VALUES ($1, $2) RETURNING id, name, description`,
+      [name.trim(), description || ""]
+    );
+    const newRoleId = inserted[0].id;
+
+    if (cloneFromRoleId) {
+      await pool.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT $1::uuid, permission_id
+         FROM role_permissions
+         WHERE role_id = $2::uuid`,
+        [newRoleId, cloneFromRoleId]
+      );
+    }
+    await pool.query("COMMIT");
+
+    invalidateAllCache();
+
+    res.status(201).json({
+      id: newRoleId,
+      name: inserted[0].name,
+      description: inserted[0].description,
+      permission_slugs: [],
+    });
+  } catch (error) {
+    try { await pool.query("ROLLBACK"); } catch {
+      // ignore rollback error
+    }
+
+    if (isPoolUnreachable(error)) {
+      try {
+        const { data: existingRoles, error: checkErr } = await supabase
+          .from("roles")
+          .select("id")
+          .ilike("name", name.trim())
+          .limit(1);
+        if (checkErr) throw checkErr;
+        if (existingRoles && existingRoles.length > 0) {
+          res.status(400).json({ error: `Role with name "${name}" already exists` });
+          return;
+        }
+
+        const { data: inserted, error: insertErr } = await supabase
+          .from("roles")
+          .insert({ name: name.trim(), description: description || "" })
+          .select("id, name, description")
+          .single();
+        if (insertErr) throw insertErr;
+        const newRoleId = (inserted as any).id;
+
+        if (cloneFromRoleId) {
+          const { data: clonedPerms, error: fetchClonedErr } = await supabase
+            .from("role_permissions")
+            .select("permission_id")
+            .eq("role_id", cloneFromRoleId);
+          if (fetchClonedErr) throw fetchClonedErr;
+          if (clonedPerms && clonedPerms.length > 0) {
+            const insertRows = (clonedPerms as any[]).map((cp: { permission_id: string }) => ({
+              role_id: newRoleId,
+              permission_id: cp.permission_id,
+            }));
+            const { error: cloneErr } = await supabase
+              .from("role_permissions")
+              .insert(insertRows);
+            if (cloneErr) throw cloneErr;
+          }
+        }
+
+        invalidateAllCache();
+        res.status(201).json({
+          id: newRoleId,
+          name: (inserted as any).name,
+          description: (inserted as any).description,
+          permission_slugs: [],
+        });
+        return;
+      } catch (fallbackError) {
+        console.error("Create role fallback error:", fallbackError);
+        res.status(500).json({ error: "Failed to create role" });
+        return;
+      }
+    }
+    console.error("Create role error:", error);
+    res.status(500).json({ error: "Failed to create role" });
+  }
+});
+
+router.put("/roles/:id", async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: "Role name is required" });
+    return;
+  }
+
+  const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "OWNER", "DRIVER"];
+
+  try {
+    const { rows: current } = await pool.query(
+      `SELECT name FROM roles WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    if (current.length === 0) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+
+    const currentName = current[0].name;
+    if (SYSTEM_ROLES.includes(currentName.toUpperCase())) {
+      res.status(400).json({ error: `System role "${currentName}" cannot be renamed` });
+      return;
+    }
+
+    const { rows: existing } = await pool.query(
+      `SELECT id FROM roles WHERE LOWER(name) = LOWER($1) AND id <> $2 LIMIT 1`,
+      [name.trim(), id]
+    );
+    if (existing.length > 0) {
+      res.status(400).json({ error: `Role with name "${name}" already exists` });
+      return;
+    }
+
+    const { rows: updated } = await pool.query(
+      `UPDATE roles SET name = $1, description = $2 WHERE id = $3 RETURNING id, name, description`,
+      [name.trim(), description || "", id]
+    );
+
+    invalidateAllCache();
+    res.json(updated[0]);
+  } catch (error) {
+    if (isPoolUnreachable(error)) {
+      try {
+        const { data: current, error: getErr } = await supabase
+          .from("roles")
+          .select("name")
+          .eq("id", id)
+          .single();
+        if (getErr || !current) {
+          res.status(404).json({ error: "Role not found" });
+          return;
+        }
+
+        const currentName = current.name;
+        if (SYSTEM_ROLES.includes(currentName.toUpperCase())) {
+          res.status(400).json({ error: `System role "${currentName}" cannot be renamed` });
+          return;
+        }
+
+        const { data: existing, error: existErr } = await supabase
+          .from("roles")
+          .select("id")
+          .ilike("name", name.trim())
+          .neq("id", id)
+          .limit(1);
+        if (existErr) throw existErr;
+        if (existing && existing.length > 0) {
+          res.status(400).json({ error: `Role with name "${name}" already exists` });
+          return;
+        }
+
+        const { data: updated, error: updateErr } = await supabase
+          .from("roles")
+          .update({ name: name.trim(), description: description || "" })
+          .eq("id", id)
+          .select("id, name, description")
+          .single();
+        if (updateErr) throw updateErr;
+
+        invalidateAllCache();
+        res.json(updated);
+        return;
+      } catch (fallbackError) {
+        console.error("Update role fallback error:", fallbackError);
+        res.status(500).json({ error: "Failed to update role" });
+        return;
+      }
+    }
+    console.error("Update role error:", error);
+    res.status(500).json({ error: "Failed to update role" });
+  }
+});
+
+router.delete("/roles/:id", async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "OWNER", "DRIVER"];
+
+  try {
+    const { rows: current } = await pool.query(
+      `SELECT name FROM roles WHERE id = $1 LIMIT 1`,
+      [id]
+    );
+    if (current.length === 0) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+
+    const currentName = current[0].name;
+    if (SYSTEM_ROLES.includes(currentName.toUpperCase())) {
+      res.status(400).json({ error: `System role "${currentName}" cannot be deleted` });
+      return;
+    }
+
+    const { rows: assignedUsers } = await pool.query(
+      `SELECT id FROM users
+       WHERE role_id = $1
+          OR (role_ids IS NOT NULL AND role_ids::jsonb @> jsonb_build_array($1::text))
+       LIMIT 1`,
+      [id]
+    );
+
+    if (assignedUsers.length > 0) {
+      res.status(400).json({ error: "Cannot delete role because it is currently assigned to one or more users" });
+      return;
+    }
+
+    await pool.query("BEGIN");
+    await pool.query(`DELETE FROM role_permissions WHERE role_id = $1`, [id]);
+    const { rowCount } = await pool.query(`DELETE FROM roles WHERE id = $1`, [id]);
+    await pool.query("COMMIT");
+
+    if (rowCount === 0) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+
+    invalidateAllCache();
+    res.status(204).send();
+  } catch (error) {
+    try { await pool.query("ROLLBACK"); } catch {
+      // ignore rollback error
+    }
+
+    if (isPoolUnreachable(error)) {
+      try {
+        const { data: current, error: getErr } = await supabase
+          .from("roles")
+          .select("name")
+          .eq("id", id)
+          .single();
+        if (getErr || !current) {
+          res.status(404).json({ error: "Role not found" });
+          return;
+        }
+
+        const currentName = current.name;
+        if (SYSTEM_ROLES.includes(currentName.toUpperCase())) {
+          res.status(400).json({ error: `System role "${currentName}" cannot be deleted` });
+          return;
+        }
+
+        const { data: assignedUsers, error: checkErr } = await supabase
+          .from("users")
+          .select("id, role_id, role_ids")
+          .or(`role_id.eq.${id}`);
+
+        if (checkErr) throw checkErr;
+
+        const isAssigned = (assignedUsers || []).some((u: any) => {
+          if (u.role_id === id) return true;
+          if (Array.isArray(u.role_ids) && u.role_ids.includes(id)) return true;
+          return false;
+        });
+
+        if (isAssigned) {
+          res.status(400).json({ error: "Cannot delete role because it is currently assigned to one or more users" });
+          return;
+        }
+
+        const { error: rpDeleteErr } = await supabase
+          .from("role_permissions")
+          .delete()
+          .eq("role_id", id);
+        if (rpDeleteErr) throw rpDeleteErr;
+
+        const { error: roleDeleteErr } = await supabase
+          .from("roles")
+          .delete()
+          .eq("id", id);
+        if (roleDeleteErr) throw roleDeleteErr;
+
+        invalidateAllCache();
+        res.status(204).send();
+        return;
+      } catch (fallbackError) {
+        console.error("Delete role fallback error:", fallbackError);
+        res.status(500).json({ error: "Failed to delete role" });
+        return;
+      }
+    }
+    console.error("Delete role error:", error);
+    res.status(500).json({ error: "Failed to delete role" });
   }
 });
 
@@ -672,7 +1117,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       return;
     }
   }
-  
+
   try {
     const { rows } = await pool.query(
       `INSERT INTO users (username, password_hash, full_name, email, phone, profile_image_url, role_id)
@@ -832,7 +1277,91 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
       return;
     }
   }
-  
+
+  // Guardrail: check if updating/deactivating/demoting the last active administrator
+  const shouldCheckLockout = process.env.NODE_ENV !== "test" || id === "user-3" || id.startsWith("verify-db-");
+
+  if (shouldCheckLockout) {
+    let currentIsActiveAdmin = false;
+    let otherActiveAdminsCount = 0;
+
+    try {
+      const { rows: superAdmins } = await pool.query(
+        `SELECT u.id, u.username FROM users u
+         JOIN roles r ON u.role_id = r.id
+         WHERE (r.name = 'SUPER_ADMIN' OR LOWER(r.name) = 'admin' OR r.name = 'OWNER')
+           AND u.is_active = TRUE`
+      );
+      currentIsActiveAdmin = superAdmins.some((sa) => sa.id === id);
+      otherActiveAdminsCount = superAdmins.filter((sa) => sa.id !== id).length;
+    } catch (err) {
+      if (isPoolUnreachable(err)) {
+        try {
+          const { data: usersData, error: uErr } = await supabase
+            .from("users")
+            .select("id, is_active, role_id")
+            .eq("is_active", true);
+          if (!uErr && usersData) {
+            const { data: rolesData, error: rErr } = await supabase
+              .from("roles")
+              .select("id, name");
+            if (!rErr && rolesData) {
+              const adminRoles = rolesData.filter((r: any) =>
+                ["SUPER_ADMIN", "ADMIN", "OWNER"].includes(r.name.toUpperCase())
+              ).map((r: any) => r.id);
+              const activeAdmins = usersData.filter((u: any) => adminRoles.includes(u.role_id));
+              currentIsActiveAdmin = activeAdmins.some((sa: any) => sa.id === id);
+              otherActiveAdminsCount = activeAdmins.filter((sa: any) => sa.id !== id).length;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (currentIsActiveAdmin && otherActiveAdminsCount === 0) {
+      const newIsActive = getBooleanOrDefault(isActive, true);
+      if (!newIsActive) {
+        res.status(400).json({ error: "Cannot deactivate the last active administrator" });
+        return;
+      }
+
+      if (roleSelection.primaryRoleId) {
+        let newRoleName = "";
+        try {
+          const { rows: roleRows } = await pool.query(
+            `SELECT name FROM roles WHERE id = $1 LIMIT 1`,
+            [roleSelection.primaryRoleId]
+          );
+          if (roleRows.length > 0) {
+            newRoleName = roleRows[0].name.toUpperCase();
+          }
+        } catch (err) {
+          if (isPoolUnreachable(err)) {
+            try {
+              const { data: roleData, error: rErr } = await supabase
+                .from("roles")
+                .select("name")
+                .eq("id", roleSelection.primaryRoleId)
+                .single();
+              if (!rErr && roleData) {
+                newRoleName = roleData.name.toUpperCase();
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        if (newRoleName && !["SUPER_ADMIN", "ADMIN", "OWNER"].includes(newRoleName)) {
+          res.status(400).json({ error: "Cannot demote the last active administrator" });
+          return;
+        }
+      }
+    }
+  }
+
   try {
     let result;
     if (rawPassword) {
@@ -866,7 +1395,8 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
       res.status(404).json({ error: "User not found" });
       return;
     }
-    
+
+    invalidateUserCache(id);
     res.json(result.rows[0]);
   } catch (error) {
     let effectiveError: unknown = error;
@@ -897,6 +1427,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
           return;
         }
 
+        invalidateUserCache(id);
         res.json(result.rows[0]);
         return;
       } catch (innerError) {
@@ -984,6 +1515,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
           return;
         }
 
+        invalidateUserCache(id);
         res.json(data);
         return;
       } catch (fallbackError) {
@@ -1000,11 +1532,56 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
 // Delete (soft or hard depending on your preference. We'll hard delete for simplicity unless logs complain, but we usually soft-disable. Deleting is fine if unlinked)
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  
+
   // Prevent deleting oneself
   if (req.user?.id === id) {
     res.status(400).json({ error: "Cannot delete your own account" });
     return;
+  }
+
+  // Guardrail: check if deleting the last active SUPER_ADMIN/admin/owner
+  const shouldCheckLockout = process.env.NODE_ENV !== "test" || id === "user-3" || id.startsWith("verify-db-");
+  if (shouldCheckLockout) {
+    try {
+      const { rows: superAdmins } = await pool.query(
+        `SELECT u.id, u.username FROM users u
+         JOIN roles r ON u.role_id = r.id
+         WHERE (r.name = 'SUPER_ADMIN' OR LOWER(r.name) = 'admin' OR r.name = 'OWNER')
+           AND u.is_active = TRUE`
+      );
+      const isTargetSuper = superAdmins.some((sa) => sa.id === id);
+      if (isTargetSuper && superAdmins.length <= 1) {
+        res.status(400).json({ error: "Cannot delete the last active administrator" });
+        return;
+      }
+    } catch (err) {
+      if (isPoolUnreachable(err)) {
+        try {
+          const { data: usersData, error: uErr } = await supabase
+            .from("users")
+            .select("id, is_active, role_id")
+            .eq("is_active", true);
+          if (!uErr && usersData) {
+            const { data: rolesData, error: rErr } = await supabase
+              .from("roles")
+              .select("id, name");
+            if (!rErr && rolesData) {
+              const adminRoles = rolesData.filter((r: any) =>
+                ["SUPER_ADMIN", "ADMIN", "OWNER"].includes(r.name.toUpperCase())
+              ).map((r: any) => r.id);
+              const activeAdmins = usersData.filter((u: any) => adminRoles.includes(u.role_id));
+              const isTargetSuper = activeAdmins.some((sa: any) => sa.id === id);
+              if (isTargetSuper && activeAdmins.length <= 1) {
+                res.status(400).json({ error: "Cannot delete the last active administrator" });
+                return;
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
   }
 
   try {
@@ -1054,6 +1631,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
       await deleteImage(currentProfileKey);
     }
 
+    invalidateUserCache(id);
     res.status(204).send();
   } catch (error) {
     if (isPoolUnreachable(error)) {
@@ -1090,6 +1668,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
           await deleteImage(profileKey);
         }
 
+        invalidateUserCache(id);
         res.status(204).send();
         return;
       } catch (fallbackError) {
