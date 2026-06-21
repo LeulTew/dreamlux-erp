@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLanguage } from "@/hooks/use-language";
 import { previewEventsImport, commitEventsImport, api } from "@/lib/api";
+import { isSupportedImportFile, parseCsvText, parseXlsxBuffer } from "@/lib/import-file-parser";
 import { HiXMark, HiArrowUpTray, HiArrowDownTray, HiCheckCircle, HiExclamationTriangle } from "react-icons/hi2";
 
 interface ImportWizardProps {
@@ -22,9 +23,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Upload Mode": "Upload Mode",
     "Insert (New Events)": "Insert (New Events)",
     "Update (Edit Existing)": "Update (Edit Existing)",
-    "Drop CSV file here": "Drop CSV file here or click to browse",
-    "Only CSV files are supported": "Only CSV files are supported",
-    "csv hint": ".csv (max 500 rows)",
+    "Drop CSV file here": "Drop CSV or XLSX file here or click to browse",
+    "Only CSV files are supported": "Only CSV or XLSX files are supported",
+    "csv hint": ".csv or .xlsx (max 500 rows)",
     "Back": "Back",
     "Next": "Next",
     "Validate & Preview": "Validate & Preview",
@@ -54,8 +55,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Venue": "Venue",
     "Price": "Price",
     "Database Field": "Database Field",
-    "CSV Column": "CSV Column",
-    "Select CSV Column": "Select CSV Column...",
+    "CSV Column": "File Column",
+    "Select CSV Column": "Select file column...",
     "Skip Column": "-- Skip Column --",
     "Please map all required fields": "Please map all required fields: Event Name, Client Name, Start Date, End Date, Venue, Contract Price",
     "First Row Preview": "First Row Data Preview",
@@ -86,9 +87,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Upload Mode": "የመስቀያ ሁኔታ",
     "Insert (New Events)": "አዲስ መዝግብ (አስገባ)",
     "Update (Edit Existing)": "ነባር አሻሽል (አዘምን)",
-    "Drop CSV file here": "የCSV ፋይል እዚህ ይጣሉ ወይም ለመምረጥ ጠቅ ያድርጉ",
-    "Only CSV files are supported": "የCSV ፋይሎች ብቻ ናቸው የሚደገፉት",
-    "csv hint": ".csv (ከፍተኛ 500 ረድፎች)",
+    "Drop CSV file here": "የCSV ወይም XLSX ፋይል እዚህ ይጣሉ ወይም ለመምረጥ ጠቅ ያድርጉ",
+    "Only CSV files are supported": "የCSV ወይም XLSX ፋይሎች ብቻ ናቸው የሚደገፉት",
+    "csv hint": ".csv ወይም .xlsx (ከፍተኛ 500 ረድፎች)",
     "Back": "ተመለስ",
     "Next": "ቀጥል",
     "Validate & Preview": "አረጋግጥ እና አሳይ",
@@ -118,8 +119,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Venue": "ቦታ",
     "Price": "ዋጋ",
     "Database Field": "የስርአቱ መረጃ ክፍል",
-    "CSV Column": "የCSV ፋይል አምድ",
-    "Select CSV Column": "የCSV አምድ ይምረጡ...",
+    "CSV Column": "የፋይል አምድ",
+    "Select CSV Column": "የፋይል አምድ ይምረጡ...",
     "Skip Column": "-- አትጠቀምበት --",
     "Please map all required fields": "እባክዎን ሁሉንም አስፈላጊ ክፍሎች ያዛምዱ፡ የዝግጅት ስም፣ የደንበኛ ስም፣ መጀመሪያ ቀን፣ መጨረሻ ቀን፣ ቦታ፣ የውል ዋጋ",
     "First Row Preview": "የመጀመሪያው ረድፍ መረጃ ቅድመ-ዕይታ",
@@ -255,7 +256,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && droppedFile.name.endsWith(".csv")) {
+    if (droppedFile && isSupportedImportFile(droppedFile.name)) {
       setFile(droppedFile);
       parseFile(droppedFile);
     } else {
@@ -266,7 +267,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      if (selectedFile.name.endsWith(".csv")) {
+      if (isSupportedImportFile(selectedFile.name)) {
         setFile(selectedFile);
         parseFile(selectedFile);
       } else {
@@ -278,47 +279,15 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
   const parseFile = (fileToParse: File) => {
     setErrorMsg("");
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
+    reader.onload = async (event) => {
+      const result = event.target?.result;
+      if (!result) return;
 
-      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-      if (lines.length === 0) return;
-
-      // RFC 4180 compliant CSV parser: handles escaped double-quotes ("") inside quoted fields
-      const splitCSVLine = (line: string): string[] => {
-        const result: string[] = [];
-        let current = "";
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"') {
-            if (inQuotes && line[i + 1] === '"') {
-              // Escaped double-quote inside quoted field: "" → literal "
-              current += '"';
-              i++; // skip next quote
-            } else {
-              inQuotes = !inQuotes;
-            }
-          } else if (char === ',' && !inQuotes) {
-            result.push(current.trim());
-            current = "";
-          } else {
-            current += char;
-          }
-        }
-        result.push(current.trim());
-        return result.map(s => s.trim());
-      };
-
-      const rawHeaders = splitCSVLine(lines[0]);
-      const rawRows: string[][] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = splitCSVLine(lines[i]);
-        if (values.length > 0) {
-          rawRows.push(values);
-        }
-      }
+      const isXlsx = fileToParse.name.toLowerCase().endsWith(".xlsx");
+      const { headers: rawHeaders, rows: rawRows } = isXlsx
+        ? await parseXlsxBuffer(result as ArrayBuffer)
+        : parseCsvText(result as string);
+      if (rawHeaders.length === 0) return;
 
       setCsvHeaders(rawHeaders);
       setRawCsvRows(rawRows);
@@ -338,7 +307,11 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
       setMapping(initialMapping);
       setStep(1.5);
     };
-    reader.readAsText(fileToParse);
+    if (fileToParse.name.toLowerCase().endsWith(".xlsx")) {
+      reader.readAsArrayBuffer(fileToParse);
+    } else {
+      reader.readAsText(fileToParse);
+    }
   };
 
   const handleApplyMapping = async () => {
@@ -507,13 +480,13 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
               <div
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
-                onClick={() => document.getElementById("csv-file-input")?.click()}
+                onClick={() => document.getElementById("event-import-file-input")?.click()}
                 className="border-2 border-dashed border-border/60 [@media(hover:hover)]:hover:border-primary/50 bg-card-alt/50 [@media(hover:hover)]:hover:bg-primary-light/5 rounded-xl py-12 px-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[220px]"
               >
                 <input
-                  id="csv-file-input"
+                  id="event-import-file-input"
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx"
                   className="hidden"
                   onChange={handleFileChange}
                 />
@@ -528,7 +501,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 ) : (
                   <div>
                     <p className="text-sm font-black text-foreground">{t("Drop CSV file here")}</p>
-                    <p className="text-xs text-muted font-medium mt-1">.csv (max 500 rows)</p>
+                    <p className="text-xs text-muted font-medium mt-1">{t("csv hint")}</p>
                   </div>
                 )}
               </div>

@@ -153,7 +153,7 @@ export default function ProposalsPage() {
 
           <Link
             href="/events/proposals/new"
-            className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
+            className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
           >
             <HiPlus className="w-4 h-4" />
             {t("Add Proposal")}
@@ -256,10 +256,10 @@ export default function ProposalsPage() {
                 </thead>
                 <tbody>
                   {proposals.map((proposal, idx) => (
-                    <tr key={proposal.id} className="border-b border-border/50 hover:bg-primary-light/5 transition-all text-sm">
+                    <tr key={proposal.id} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-primary-light/5 transition-all text-sm">
                       <td className="px-6 py-4 font-mono text-muted text-xs">{(page - 1) * limit + idx + 1}</td>
                       <td className="px-6 py-4 font-bold text-foreground">
-                        <Link href={`/events/proposals/${proposal.id}`} className="hover:text-primary hover:underline">
+                        <Link href={`/events/proposals/${proposal.id}`} className="[@media(hover:hover)]:hover:text-primary [@media(hover:hover)]:hover:underline">
                           {proposal.name}
                         </Link>
                       </td>
@@ -286,7 +286,7 @@ export default function ProposalsPage() {
                       <td className="px-6 py-4 text-right">
                         <Link
                           href={`/events/proposals/${proposal.id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground rounded"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground rounded"
                         >
                           <HiEye className="w-3.5 h-3.5" />
                           View

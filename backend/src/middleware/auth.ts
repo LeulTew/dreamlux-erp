@@ -29,8 +29,12 @@ export function getEffectivePermissionSlugsFromUser(user: AuthRequest["user"]): 
 
   const explicit = normalizePermissionSlugs(user.permission_slugs);
   const mapDerived = permissionMapToSlugs(normalizePermissionMap(user.permissions));
+  if (explicit.length > 0 || mapDerived.length > 0) {
+    return [...new Set([...explicit, ...mapDerived])];
+  }
+
   const roleDerived = roleNamesToPermissionSlugs([user.role, ...(user.roles || [])]);
-  return [...new Set([...explicit, ...mapDerived, ...roleDerived])];
+  return [...new Set(roleDerived)];
 }
 
 function getEffectivePermissionSlugs(req: AuthRequest): string[] {

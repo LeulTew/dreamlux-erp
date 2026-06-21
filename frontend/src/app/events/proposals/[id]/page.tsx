@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -109,6 +109,41 @@ export default function ProposalDetailPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [actionError, setActionError] = useState("");
+  const rejectDialogRef = useRef<HTMLFormElement>(null);
+  const convertDialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const activeDialog = isRejectOpen ? rejectDialogRef.current : isConvertOpen ? convertDialogRef.current : null;
+    if (!activeDialog) return;
+
+    const focusableElements = activeDialog.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    focusableElements[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsRejectOpen(false);
+        setIsConvertOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab" || focusableElements.length === 0) return;
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        last.focus();
+        event.preventDefault();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        first.focus();
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isConvertOpen, isRejectOpen]);
 
   const { data, isLoading } = useQuery<{
     proposal: EventProposal;
@@ -252,7 +287,7 @@ export default function ProposalDetailPage() {
         {/* Back Link */}
         <button
           onClick={() => router.push("/events/proposals")}
-          className="no-print flex items-center gap-1.5 text-xs font-bold text-muted hover:text-foreground mb-6 uppercase tracking-wider"
+          className="no-print flex items-center gap-1.5 text-xs font-bold text-muted [@media(hover:hover)]:hover:text-foreground mb-6 uppercase tracking-wider"
         >
           <HiArrowLeft className="w-4 h-4" />
           {t("Back")}
@@ -283,7 +318,7 @@ export default function ProposalDetailPage() {
 
           <button
             onClick={handlePrint}
-            className="no-print flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-card border border-border text-muted hover:text-foreground transition-all"
+            className="no-print flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-card border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
           >
             <HiPrinter className="w-4 h-4" />
             {t("Print Proposal")}
@@ -471,7 +506,7 @@ export default function ProposalDetailPage() {
                 {proposal.status === "Draft" && canWrite && (
                   <button
                     onClick={() => submitMutation.mutate()}
-                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 rounded-lg border border-primary/20"
+                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-primary/20"
                   >
                     {t("Submit")}
                   </button>
@@ -481,13 +516,13 @@ export default function ProposalDetailPage() {
                   <>
                     <button
                       onClick={() => approveMutation.mutate()}
-                      className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-success text-on-success hover:opacity-90 rounded-lg border border-success/20 animate-pulse"
+                      className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-success text-on-success [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-success/20 animate-pulse"
                     >
                       {t("Approve")}
                     </button>
                     <button
                       onClick={() => setIsRejectOpen(true)}
-                      className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-danger text-on-danger hover:opacity-90 rounded-lg border border-danger/25"
+                      className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-danger text-on-danger [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-danger/25"
                     >
                       {t("Reject")}
                     </button>
@@ -497,7 +532,7 @@ export default function ProposalDetailPage() {
                 {proposal.status === "Approved" && canApprove && (
                   <button
                     onClick={() => setIsConvertOpen(true)}
-                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 rounded-lg border border-primary/20 flex items-center justify-center gap-1.5"
+                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-primary/20 flex items-center justify-center gap-1.5"
                   >
                     <HiCheckCircle className="w-4 h-4" />
                     {t("Convert to Event")}
@@ -507,7 +542,7 @@ export default function ProposalDetailPage() {
                 {(proposal.status === "Draft" || proposal.status === "Submitted" || proposal.status === "Approved") && canWrite && (
                   <button
                     onClick={() => cancelMutation.mutate()}
-                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground rounded-lg"
+                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground rounded-lg"
                   >
                     {t("Cancel")}
                   </button>
@@ -550,13 +585,17 @@ export default function ProposalDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsRejectOpen(false)} />
           <form
+            ref={rejectDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-proposal-title"
             onSubmit={(e) => {
               e.preventDefault();
               rejectMutation.mutate(rejectReason);
             }}
             className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
           >
-            <h3 className="text-base font-black text-foreground uppercase tracking-wider">{t("Rejection Modal Title")}</h3>
+            <h3 id="reject-proposal-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Rejection Modal Title")}</h3>
             
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Rejection Reason")} *</label>
@@ -574,13 +613,13 @@ export default function ProposalDetailPage() {
               <button
                 type="button"
                 onClick={() => setIsRejectOpen(false)}
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
               >
                 {t("Cancel Action")}
               </button>
               <button
                 type="submit"
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-danger text-on-danger hover:opacity-90 border border-danger/25"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-danger text-on-danger [@media(hover:hover)]:hover:opacity-90 border border-danger/25"
               >
                 {t("Reject")}
               </button>
@@ -593,8 +632,14 @@ export default function ProposalDetailPage() {
       {isConvertOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsConvertOpen(false)} />
-          <div className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4">
-            <h3 className="text-base font-black text-foreground uppercase tracking-wider">{t("Convert Modal Title")}</h3>
+          <div
+            ref={convertDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="convert-proposal-title"
+            className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
+          >
+            <h3 id="convert-proposal-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Convert Modal Title")}</h3>
             <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg text-primary text-xs font-semibold flex items-start gap-2.5">
               <HiExclamationTriangle className="w-5 h-5 shrink-0" />
               <p className="leading-relaxed">
@@ -606,13 +651,13 @@ export default function ProposalDetailPage() {
               <button
                 type="button"
                 onClick={() => setIsConvertOpen(false)}
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
               >
                 {t("Cancel Action")}
               </button>
               <button
                 onClick={() => convertMutation.mutate()}
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 border border-primary/20"
+                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
               >
                 {t("Yes, Convert")}
               </button>
