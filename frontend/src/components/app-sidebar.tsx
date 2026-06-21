@@ -59,6 +59,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "List Events": "List Events",
     Finance: "Finance",
     "Profit Reports": "Profit Reports",
+    "Event Proposals": "Event Proposals",
   },
   am: {
     Employees: "ሰራተኞች",
@@ -83,6 +84,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "List Events": "የዝግጅቶች ዝርዝር",
     Finance: "ፋይናንስ",
     "Profit Reports": "የትርፍ ሪፖርቶች",
+    "Event Proposals": "የዝግጅት ፕሮፖዛሎች",
   },
 };
 
@@ -339,6 +341,8 @@ export function AppSidebar() {
     "hr:write",
     "events:read",
     "events:write",
+    "events:proposals:write",
+    "events:proposals:approve",
     "payroll:read",
     "payroll:write",
     "expenses:approve",
@@ -349,6 +353,7 @@ export function AppSidebar() {
 
   const eventLinks = [
     { href: "/events", label: t("List Events"), active: pathname === "/events", show: hasPermission("events:read") },
+    { href: "/events/proposals", label: t("Event Proposals"), active: pathname === "/events/proposals" || pathname.startsWith("/events/proposals/"), show: hasAnyPermission(["events:proposals:write", "events:write", "events:proposals:approve"]) },
     { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasPermission("events:write") },
   ].filter(l => l.show);
 
@@ -480,7 +485,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiOutlineCalendar}
                         label={t("Events")}
-                        isActive={isActive("/events") || isActive("/hr/event-types")}
+                        isActive={isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")}
                         links={eventLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
                       />
                     ) : (
@@ -488,7 +493,7 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setEventsOpen(!eventsOpen)}
                           className={`w-full justify-between rounded-xl h-10 ${
-                            isActive("/events") || isActive("/hr/event-types") ? "text-primary font-semibold" : ""
+                            isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary font-semibold" : ""
                           }`}
                         >
                           <span className="flex items-center gap-3">

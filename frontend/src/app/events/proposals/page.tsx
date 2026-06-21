@@ -1,0 +1,347 @@
+"use client";
+import React, { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getEventProposals } from "@/lib/api";
+import { EventProposal } from "@/lib/types";
+import AuthLayout from "@/components/AuthLayout";
+import { 
+  HiInboxStack, 
+  HiPlus, 
+  HiMagnifyingGlass, 
+  HiEye 
+} from "react-icons/hi2";
+import Select from "@/components/ui/Select";
+import PaginationControls from "@/components/PaginationControls";
+import Link from "next/link";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Event Proposals": "Event Proposals",
+    "Proposal Pipeline": "Proposal Pipeline",
+    "Add Proposal": "New Proposal",
+    "Search Proposals": "Search proposals...",
+    "All Statuses": "All Statuses",
+    "Draft": "Draft",
+    "Submitted": "Submitted",
+    "Approved": "Approved",
+    "Rejected": "Rejected",
+    "Converted": "Converted",
+    "Canceled": "Canceled",
+    "Proposal Name": "Proposal Name",
+    "Client": "Client",
+    "Budget": "Budget",
+    "Estimated Profit": "Estimated Profit",
+    "Margin %": "Margin %",
+    "Status": "Status",
+    "Actions": "Actions",
+    "No proposals found": "No proposals found",
+    "Loading Proposals...": "Loading Proposals...",
+    "Total Proposals": "Total Proposals",
+    "Active Intake": "Active Intake",
+    "Conversion Rate": "Conversion Rate",
+    "Avg Margin": "Avg Margin",
+    "Date": "Requested Date"
+  },
+  am: {
+    "Event Proposals": "የዝግጅት ፕሮፖዛሎች",
+    "Proposal Pipeline": "የፕሮፖዛል መከታተያ",
+    "Add Proposal": "አዲስ ፕሮፖዛል",
+    "Search Proposals": "ፕሮፖዛል ፈልግ...",
+    "All Statuses": "ሁሉንም ሁኔታዎች",
+    "Draft": "ረቂቅ",
+    "Submitted": "የቀረበ",
+    "Approved": "የጸደቀ",
+    "Rejected": "ውድቅ የተደረገ",
+    "Converted": "የተቀየረ",
+    "Canceled": "የተሰረዘ",
+    "Proposal Name": "የፕሮፖዛል ስም",
+    "Client": "ደንበኛ",
+    "Budget": "በጀት",
+    "Estimated Profit": "የተገመተ ትርፍ",
+    "Margin %": "ህዳግ %",
+    "Status": "ሁኔታ",
+    "Actions": "ክንውኖች",
+    "No proposals found": "ምንም ፕሮፖዛል አልተገኘም",
+    "Loading Proposals...": "ፕሮፖዛል በመጫን ላይ...",
+    "Total Proposals": "ጠቅላላ ፕሮፖዛሎች",
+    "Active Intake": "በሂደት ላይ",
+    "Conversion Rate": "የመለወጥ መጠን",
+    "Avg Margin": "አማካይ ህዳግ",
+    "Date": "የተጠየቀ ቀን"
+  }
+};
+
+export default function ProposalsPage() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const limit = 10;
+
+  const { data, isLoading } = useQuery<{
+    proposals: EventProposal[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>({
+    queryKey: ["event-proposals", page, search, status],
+    queryFn: () => getEventProposals({
+      page,
+      limit,
+      search: search || undefined,
+      status: status === "all" ? undefined : status
+    }),
+  });
+
+  const proposals = useMemo(() => data?.proposals || [], [data?.proposals]);
+  const total = data?.total || 0;
+  const totalPages = data?.totalPages || 1;
+
+  // Compute local KPI stats safely from available data (active page or default)
+  const stats = useMemo(() => {
+    if (proposals.length === 0) {
+      return { totalCount: 0, activeIntake: 0, conversionRate: 0, avgMargin: 0 };
+    }
+    const totalCount = total;
+    const activeIntake = proposals.filter(p => p.status === "Submitted" || p.status === "Draft").length;
+    const convertedCount = proposals.filter(p => p.status === "Converted").length;
+    const conversionRate = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
+    const margins = proposals.map(p => Number(p.estimated_margin_percentage || 0));
+    const avgMargin = margins.length > 0 ? Math.round(margins.reduce((a, b) => a + b, 0) / margins.length) : 0;
+    return { totalCount, activeIntake, conversionRate, avgMargin };
+  }, [proposals, total]);
+
+  const getStatusBadgeClass = (statusStr: string) => {
+    switch (statusStr) {
+      case "Draft":
+        return "bg-card-alt text-muted border border-border";
+      case "Submitted":
+        return "bg-primary-light text-primary-dark border border-primary/20";
+      case "Approved":
+        return "bg-success/10 text-success border border-success/20";
+      case "Rejected":
+        return "bg-danger/10 text-danger border border-danger/20";
+      case "Converted":
+        return "bg-warning/10 text-warning border border-warning/20";
+      default:
+        return "bg-card-alt text-muted border border-border";
+    }
+  };
+
+  return (
+    <AuthLayout>
+      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+        {/* Header */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary/10 rounded-lg text-primary border border-primary/20">
+              <HiInboxStack className="w-6 h-6 md:w-7 md:h-7" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight">
+                {t("Event Proposals")}
+              </h1>
+              <p className="text-xs md:text-sm text-muted font-medium">
+                {t("Proposal Pipeline")} ({total})
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/events/proposals/new"
+            className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
+          >
+            <HiPlus className="w-4 h-4" />
+            {t("Add Proposal")}
+          </Link>
+        </header>
+
+        {/* KPI Strip */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
+            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Total Proposals")}</span>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+              {stats.totalCount}
+            </span>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
+            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Active Intake")}</span>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+              {stats.activeIntake}
+            </span>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
+            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Conversion Rate")}</span>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+              {stats.conversionRate}%
+            </span>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
+            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Avg Margin")}</span>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+              {stats.avgMargin}%
+            </span>
+          </div>
+        </div>
+
+        {/* Filters Toolbar */}
+        <div className="bg-card border border-border rounded-lg p-3.5 mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[200px] md:max-w-xs">
+            <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+            <input
+              type="text"
+              placeholder={t("Search Proposals")}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-10 pr-4 h-[44px] rounded-lg bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
+            />
+          </div>
+
+          <Select
+            options={[
+              { id: "all", label: t("All Statuses") },
+              { id: "Draft", label: t("Draft") },
+              { id: "Submitted", label: t("Submitted") },
+              { id: "Approved", label: t("Approved") },
+              { id: "Rejected", label: t("Rejected") },
+              { id: "Converted", label: t("Converted") },
+              { id: "Canceled", label: t("Canceled") }
+            ]}
+            value={status}
+            onChange={(val) => {
+              setStatus(val);
+              setPage(1);
+            }}
+            className="min-w-[150px] rounded-lg border-border"
+          />
+        </div>
+
+        {/* List content */}
+        {isLoading ? (
+          <div className="space-y-4 animate-pulse">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-16 bg-card-alt rounded-lg border border-border" />
+            ))}
+          </div>
+        ) : proposals.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-lg border border-dashed border-border text-center px-4">
+            <HiInboxStack className="w-16 h-16 text-muted mb-4 opacity-10" />
+            <h3 className="text-lg font-bold text-foreground opacity-50">
+              {t("No proposals found")}
+            </h3>
+          </div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-hidden bg-card border border-border rounded-lg">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                    <th className="px-6 py-4">#</th>
+                    <th className="px-6 py-4">{t("Proposal Name")}</th>
+                    <th className="px-6 py-4">{t("Client")}</th>
+                    <th className="px-6 py-4">{t("Date")}</th>
+                    <th className="px-6 py-4 text-right">{t("Budget")}</th>
+                    <th className="px-6 py-4 text-right">{t("Margin %")}</th>
+                    <th className="px-6 py-4">{t("Status")}</th>
+                    <th className="px-6 py-4 text-right">{t("Actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proposals.map((proposal, idx) => (
+                    <tr key={proposal.id} className="border-b border-border/50 hover:bg-primary-light/5 transition-all text-sm">
+                      <td className="px-6 py-4 font-mono text-muted text-xs">{(page - 1) * limit + idx + 1}</td>
+                      <td className="px-6 py-4 font-bold text-foreground">
+                        <Link href={`/events/proposals/${proposal.id}`} className="hover:text-primary hover:underline">
+                          {proposal.name}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="font-semibold text-foreground">{proposal.client_name}</div>
+                          {proposal.client_phone && <div className="text-xs font-mono text-muted">{proposal.client_phone}</div>}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-muted text-xs">
+                        {proposal.requested_start_date ? proposal.requested_start_date.split("T")[0] : "-"}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-foreground text-right font-mono">
+                        ETB {Number(proposal.requested_budget).toLocaleString()}
+                      </td>
+                      <td className={`px-6 py-4 font-black text-right font-mono ${proposal.estimated_margin_percentage < 25 ? "text-warning" : "text-success"}`}>
+                        {proposal.estimated_margin_percentage}%
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${getStatusBadgeClass(proposal.status)}`}>
+                          {t(proposal.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/events/proposals/${proposal.id}`}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground rounded"
+                        >
+                          <HiEye className="w-3.5 h-3.5" />
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile list */}
+            <div className="md:hidden space-y-3">
+              {proposals.map((proposal) => (
+                <Link
+                  key={proposal.id}
+                  href={`/events/proposals/${proposal.id}`}
+                  className="block p-4 bg-card border border-border rounded-lg space-y-3 active:scale-[0.98] transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-bold text-foreground text-base leading-snug">{proposal.name}</h4>
+                      <p className="text-xs text-muted font-medium mt-0.5">{proposal.client_name}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadgeClass(proposal.status)}`}>
+                      {t(proposal.status)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs border-t border-border/50 pt-2.5">
+                    <div>
+                      <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">Budget</span>
+                      <span className="font-mono text-foreground font-bold">
+                        ETB {Number(proposal.requested_budget).toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">Margin</span>
+                      <span className={`font-mono font-bold ${proposal.estimated_margin_percentage < 25 ? "text-warning" : "text-success"}`}>
+                        {proposal.estimated_margin_percentage}%
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+      </div>
+    </AuthLayout>
+  );
+}

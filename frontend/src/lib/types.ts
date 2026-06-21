@@ -429,6 +429,28 @@ export interface MonthProfitSummary {
   margin: number;
 }
 
+export interface ProfitReportRow {
+  event_id: string;
+  event_name: string;
+  event_type_name: string | null;
+  event_type_id: string | null;
+  start_date: string;
+  status: string;
+  revenue: number;
+  approved_expenses: number;
+  labor_cost: number;
+  fuel_cost: number;
+  other_cost: number;
+  pending_expense_exposure: number;
+  net_profit: number;
+  margin_percentage: number;
+  proposal_id: string | null;
+  proposal_status: string | null;
+  estimated_total_cost: number;
+  estimated_net_profit: number;
+  estimated_profit_variance: number | null;
+}
+
 export interface ProfitReportSummary {
   summary: {
     totalEvents: number;
@@ -436,9 +458,133 @@ export interface ProfitReportSummary {
     totalExpenses: number;
     netProfit: number;
     profitMargin: number;
+    pendingExpenseExposure: number;
   };
   categoryBreakdown: CategoryCost[];
   monthlyData: MonthProfitSummary[];
+  eventTypePerformance: {
+    eventType: string;
+    eventCount: number;
+    revenue: number;
+    expenses: number;
+    netProfit: number;
+    averageMargin: number;
+  }[];
+  kpis: {
+    mostProfitableEvent: ProfitReportRow | null;
+    mostProfitableEventType: {
+      eventType: string;
+      eventCount: number;
+      revenue: number;
+      expenses: number;
+      netProfit: number;
+      averageMargin: number;
+    } | null;
+    highestMarginEventType: {
+      eventType: string;
+      eventCount: number;
+      revenue: number;
+      expenses: number;
+      netProfit: number;
+      averageMargin: number;
+    } | null;
+    lowestMarginEvent: ProfitReportRow | null;
+    pendingExpenseExposure: number;
+    proposalConversionRate: number;
+  };
+  proposalVariance: {
+    events: {
+      eventId: string;
+      eventName: string;
+      proposalId: string;
+      estimatedNetProfit: number;
+      actualNetProfit: number;
+      variance: number | null;
+    }[];
+    averageVariance: number;
+  };
 }
 
+export interface EventSavedView {
+  id: string;
+  name: string;
+  user_id: string | null;
+  scope: "personal" | "role" | "global";
+  role_name: string | null;
+  columns: string[];
+  filters: {
+    field: string;
+    operator: string;
+    value?: unknown;
+  }[];
+  sort: {
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+  } | null;
+  page_size: number;
+  is_default: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
+export interface ProposalEstimateLine {
+  label: string;
+  amount: number;
+  notes?: string | null;
+  people_count?: number;
+  commission_per_person?: number;
+  km?: number;
+  fuel_price?: number;
+}
+
+export interface EventProposal {
+  id: string;
+  name: string;
+  client_name: string;
+  client_phone: string | null;
+  event_type_id: string | null;
+  event_type_name?: string | null;
+  requested_budget: number;
+  requested_start_date: string | null;
+  requested_end_date: string | null;
+  requested_start_time: string | null;
+  requested_end_time: string | null;
+  venue_location: string | null;
+  notes: string | null;
+  package_design_notes: string | null;
+  cost_breakdown: {
+    design?: ProposalEstimateLine[];
+    team?: ProposalEstimateLine[];
+    trip?: ProposalEstimateLine[];
+    other?: ProposalEstimateLine[];
+  };
+  estimated_design_cost: number;
+  estimated_team_cost: number;
+  estimated_trip_cost: number;
+  estimated_other_cost: number;
+  estimated_total_cost: number;
+  estimated_net_profit: number;
+  estimated_margin_percentage: number;
+  status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Converted" | "Canceled";
+  rejection_reason: string | null;
+  converted_event_id: string | null;
+  submitted_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventProposalLog {
+  id: string;
+  proposal_id: string;
+  user_id: string | null;
+  action: string;
+  old_status: string | null;
+  new_status: string | null;
+  note: string | null;
+  created_at: string;
+}
