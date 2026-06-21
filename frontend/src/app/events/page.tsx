@@ -434,7 +434,7 @@ export function EventsPageContent() {
   const { data: authData, isLoading: authLoading } = useQuery({
     queryKey: ["auth-permissions"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) return { permission_slugs: [], roles: [] };
       const res = await api.get("/auth/permissions");
       return res.data;

@@ -400,7 +400,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
   };
 
   const handleDownloadTemplate = async () => {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const baseUrl = api.defaults.baseURL || "";
     try {
       // Security: never put bearer tokens in URL query strings (browser history, logs, referrer leaks).
