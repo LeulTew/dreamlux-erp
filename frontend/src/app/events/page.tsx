@@ -442,7 +442,7 @@ export function EventsPageContent() {
   });
 
   const hasPermission = (slug: string) => {
-    return authData?.permission_slugs?.includes(slug) || authData?.is_superuser;
+    return authData?.is_superuser || authData?.permission_slugs?.includes(slug) || authData?.permission_slugs?.includes("*");
   };
 
   const hasProfitAccess = hasPermission("reports:profit:read");
@@ -1011,7 +1011,7 @@ export function EventsPageContent() {
                         ) : (
                           <span className="flex items-center justify-end gap-1.5 text-xs text-muted font-normal">
                             <HiLockClosed className="w-3.5 h-3.5 text-muted-foreground/30" />
-                            [🔒 Restricted]
+                            {t("Restricted")}
                           </span>
                         )}
                       </td>
@@ -1106,7 +1106,7 @@ export function EventsPageContent() {
                       ) : (
                         <span className="flex items-center gap-1 text-[11px] text-muted font-normal">
                           <HiLockClosed className="w-3 h-3 text-muted-foreground/30" />
-                          [🔒 Restricted]
+                          {t("Restricted")}
                         </span>
                       )}
                     </div>
