@@ -1,0 +1,795 @@
+"use client";
+import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { createEventProposal, submitEventProposal, getEventTypes } from "@/lib/api";
+import { EventType } from "@/lib/types";
+import AuthLayout from "@/components/AuthLayout";
+import { 
+  HiArrowRight, 
+  HiArrowLeft, 
+  HiPlus, 
+  HiTrash, 
+  HiExclamationTriangle,
+  HiCurrencyDollar
+} from "react-icons/hi2";
+import { useLanguage } from "@/hooks/use-language";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "New Proposal Intake": "New Proposal Intake",
+    "Progress": "Progress",
+    "Basics": "Basics",
+    "Estimates": "Estimates",
+    "Review": "Review",
+    "Back": "Back",
+    "Next": "Next",
+    "Create Draft": "Create Draft",
+    "Submit for Approval": "Submit for Approval",
+    "Event Name": "Event Name",
+    "Client Name": "Client Name",
+    "Client Phone": "Client Phone",
+    "Event Type": "Event Type",
+    "Select Event Type": "Select Event Type",
+    "Requested Budget": "Requested Budget (Revenue)",
+    "Start Date": "Start Date",
+    "End Date": "End Date",
+    "Start Time": "Start Time",
+    "End Time": "End Time",
+    "Venue Location": "Venue Location",
+    "Client Notes": "Client Notes / Special Requirements",
+    "Design Notes": "Design Package Notes",
+    "Cost Estimator": "Cost Estimator",
+    "Design Estimate": "Design Estimate",
+    "Team & Labor Estimate": "Team & Labor Estimate",
+    "Trip & Fuel Estimate": "Trip & Fuel Estimate",
+    "Other Expenses": "Other Expenses",
+    "Label": "Label",
+    "Amount": "Amount",
+    "Notes": "Notes",
+    "People Count": "People Count",
+    "Commission": "Commission per Person",
+    "KM": "Distance (KM)",
+    "Fuel Price": "Fuel Price",
+    "Add Row": "Add Row",
+    "Live Financial Summary": "Live Financial Summary",
+    "Revenue": "Revenue",
+    "Estimated Cost": "Estimated Cost",
+    "Net Profit": "Net Profit",
+    "Margin": "Margin",
+    "Margin Risk Warning": "Margin Risk Warning",
+    "Low margin alert. Margin is below the 25% target or profit is negative. Please review estimates.": "Low margin alert. Margin is below the 25% target or profit is negative. Please review estimates.",
+    "Draft Success": "Draft saved successfully",
+    "Submit Success": "Proposal submitted successfully",
+    "Review Details": "Review Details",
+    "Review Description": "Please verify all details and calculations before committing or submitting for approval.",
+    "phone_validation_error": "Invalid Ethiopian phone number. Use +251... or 09.../07..."
+  },
+  am: {
+    "New Proposal Intake": "አዲስ ፕሮፖዛል ማስገቢያ",
+    "Progress": "ሂደት",
+    "Basics": "መሰረታዊያን",
+    "Estimates": "ግምቶች",
+    "Review": "ክለሳ",
+    "Back": "ተመለስ",
+    "Next": "ቀጥል",
+    "Create Draft": "ረቂቅ አስቀምጥ",
+    "Submit for Approval": "ለማጽደቅ አቅርብ",
+    "Event Name": "የዝግጅት ስም",
+    "Client Name": "የደንበኛ ስም",
+    "Client Phone": "የደንበኛ ስልክ",
+    "Event Type": "የዝግጅት አይነት",
+    "Select Event Type": "የዝግጅት አይነት ምረጥ",
+    "Requested Budget": "የተጠየቀ በጀት (ገቢ)",
+    "Start Date": "የመጀመሪያ ቀን",
+    "End Date": "የማብቂያ ቀን",
+    "Start Time": "የመጀመሪያ ሰዓት",
+    "End Time": "የማብቂያ ሰዓት",
+    "Venue Location": "የቦታ አድራሻ",
+    "Client Notes": "የደንበኛ ማስታወሻዎች / ልዩ ፍላጎቶች",
+    "Design Notes": "የዲዛይን ጥቅል ማስታወሻዎች",
+    "Cost Estimator": "የወጪ መገመቻ",
+    "Design Estimate": "የዲዛይን ግምት",
+    "Team & Labor Estimate": "የሰራተኛ እና ጉልበት ግምት",
+    "Trip & Fuel Estimate": "የጉዞ እና ነዳጅ ግምት",
+    "Other Expenses": "ሌሎች ወጪዎች",
+    "Label": "መለያ",
+    "Amount": "መጠን",
+    "Notes": "ማስታወሻ",
+    "People Count": "የሰው ብዛት",
+    "Commission": "ኮሚሽን በሰው",
+    "KM": "ርቀት (KM)",
+    "Fuel Price": "የነዳጅ ዋጋ",
+    "Add Row": "ረድፍ አክል",
+    "Live Financial Summary": "የቀጥታ የፋይናንስ ማጠቃለያ",
+    "Revenue": "ገቢ",
+    "Estimated Cost": "የተገመተ ወጪ",
+    "Net Profit": "የተጣራ ትርፍ",
+    "Margin": "ህዳግ",
+    "Margin Risk Warning": "የህዳግ ስጋት ማስጠንቀቂያ",
+    "Low margin alert. Margin is below the 25% target or profit is negative. Please review estimates.": "አነስተኛ የህዳግ ማስጠንቀቂያ። ህዳጉ ከታለመው 25% በታች ነው ወይም ትርፉ አነስተኛ ነው። እባክዎን ግምቶችን ይከልሱ።",
+    "Draft Success": "ረቂቁ በተሳካ ሁኔታ ተቀምጧል",
+    "Submit Success": "ፕሮፖዛሉ በተሳካ ሁኔታ ቀርቧል",
+    "Review Details": "ዝርዝሩን ይከልሱ",
+    "Review Description": "እባክዎን ከማስገባትዎ ወይም ለማጽደቅ ከማቅረብዎ በፊት ሁሉንም ዝርዝሮች እና ስሌቶች ያረጋግጡ።",
+    "phone_validation_error": "ትክክለኛ የኢትዮጵያ ስልክ ቁጥር አይደለም። በ +251... ወይም 09.../07... ይጠቀሙ"
+  }
+};
+
+interface EstimateLine {
+  label: string;
+  amount: number;
+  notes: string;
+  people_count?: number;
+  commission_per_person?: number;
+  km?: number;
+  fuel_price?: number;
+}
+
+export default function NewProposalPage() {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const router = useRouter();
+
+  const [step, setStep] = useState(1);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Step 1: Basics Form State
+  const [name, setName] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [eventTypeId, setEventTypeId] = useState("");
+  const [requestedBudget, setRequestedBudget] = useState<number>(0);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [venueLocation, setVenueLocation] = useState("");
+  const [notes, setNotes] = useState("");
+  const [designNotes, setDesignNotes] = useState("");
+
+  // Step 2: Estimates Form State
+  const [designLines, setDesignLines] = useState<EstimateLine[]>([]);
+  const [teamLines, setTeamLines] = useState<EstimateLine[]>([]);
+  const [tripLines, setTripLines] = useState<EstimateLine[]>([]);
+  const [otherLines, setOtherLines] = useState<EstimateLine[]>([]);
+
+  // Fetch event types for dropdown
+  const { data: eventTypesData } = useQuery<EventType[]>({
+    queryKey: ["event-types"],
+    queryFn: getEventTypes
+  });
+
+  const eventTypes = eventTypesData || [];
+
+  // Live financial calculations matching backend logic
+  const financials = useMemo(() => {
+    const sumLineAmount = (lines: EstimateLine[]) => lines.reduce((sum, l) => sum + Number(l.amount || 0), 0);
+
+    const designCost = sumLineAmount(designLines);
+    const teamCost = teamLines.reduce((sum, l) => {
+      const explicit = Number(l.amount || 0);
+      const derived = Number(l.people_count || 1) * Number(l.commission_per_person || 0);
+      return sum + Math.max(explicit, derived);
+    }, 0);
+    const tripCost = sumLineAmount(tripLines);
+    const otherCost = sumLineAmount(otherLines);
+
+    const totalCost = designCost + teamCost + tripCost + otherCost;
+    const netProfit = requestedBudget - totalCost;
+    const margin = requestedBudget > 0 ? Number(((netProfit / requestedBudget) * 100).toFixed(2)) : 0;
+
+    return {
+      designCost,
+      teamCost,
+      tripCost,
+      otherCost,
+      totalCost,
+      netProfit,
+      margin
+    };
+  }, [requestedBudget, designLines, teamLines, tripLines, otherLines]);
+
+  const hasMarginRisk = financials.margin < 25 || financials.netProfit < 0;
+
+  // Phone validation
+  const validatePhone = (phoneStr: string) => {
+    if (!phoneStr) return true;
+    const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
+    return ethioRegex.test(phoneStr.replace(/\s+/g, ""));
+  };
+
+  const handleNextStep = () => {
+    setErrorMsg("");
+    if (step === 1) {
+      if (!name || !clientName || !venueLocation || requestedBudget <= 0) {
+        setErrorMsg("Please fill in all required basic fields.");
+        return;
+      }
+      if (clientPhone && !validatePhone(clientPhone)) {
+        setErrorMsg(t("phone_validation_error"));
+        return;
+      }
+      if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+        setErrorMsg("End date must be on or after start date.");
+        return;
+      }
+      setStep(2);
+    } else if (step === 2) {
+      setStep(3);
+    }
+  };
+
+  const createProposalMutation = useMutation({
+    mutationFn: createEventProposal,
+    onSuccess: (data) => {
+      router.push(`/events/proposals/${data.proposal.id}`);
+    },
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      setErrorMsg(err.response?.data?.error || err.message || "Failed to save draft");
+    }
+  });
+
+  const handleSaveDraft = () => {
+    createProposalMutation.mutate({
+      name,
+      client_name: clientName,
+      client_phone: clientPhone || null,
+      event_type_id: eventTypeId || null,
+      requested_budget: requestedBudget,
+      requested_start_date: startDate || null,
+      requested_end_date: endDate || null,
+      requested_start_time: startTime || null,
+      requested_end_time: endTime || null,
+      venue_location: venueLocation || null,
+      notes: notes || null,
+      package_design_notes: designNotes || null,
+      cost_breakdown: {
+        design: designLines,
+        team: teamLines,
+        trip: tripLines,
+        other: otherLines
+      }
+    });
+  };
+
+  const handleSubmitForApproval = async () => {
+    setErrorMsg("");
+    try {
+      const res = await createEventProposal({
+        name,
+        client_name: clientName,
+        client_phone: clientPhone || null,
+        event_type_id: eventTypeId || null,
+        requested_budget: requestedBudget,
+        requested_start_date: startDate || null,
+        requested_end_date: endDate || null,
+        requested_start_time: startTime || null,
+        requested_end_time: endTime || null,
+        venue_location: venueLocation || null,
+        notes: notes || null,
+        package_design_notes: designNotes || null,
+        cost_breakdown: {
+          design: designLines,
+          team: teamLines,
+          trip: tripLines,
+          other: otherLines
+        }
+      });
+      await submitEventProposal(res.proposal.id);
+      router.push(`/events/proposals/${res.proposal.id}`);
+    } catch (err: unknown) {
+      console.error(err);
+      const error = err as { response?: { data?: { error?: string } }; message?: string };
+      setErrorMsg(error.response?.data?.error || error.message || "Failed to submit proposal");
+    }
+  };
+
+  const addLine = (category: "design" | "team" | "trip" | "other") => {
+    const newLine = { label: "", amount: 0, notes: "" };
+    if (category === "design") setDesignLines([...designLines, newLine]);
+    if (category === "team") setTeamLines([...teamLines, { ...newLine, people_count: 1, commission_per_person: 0 }]);
+    if (category === "trip") setTripLines([...tripLines, { ...newLine, km: 0, fuel_price: 80 }]);
+    if (category === "other") setOtherLines([...otherLines, newLine]);
+  };
+
+  const updateLine = (category: "design" | "team" | "trip" | "other", idx: number, key: string, val: string | number) => {
+    const mapLine = (lines: EstimateLine[]) => lines.map((line, i) => i === idx ? { ...line, [key]: val } : line);
+    if (category === "design") setDesignLines(mapLine(designLines));
+    if (category === "team") setTeamLines(mapLine(teamLines));
+    if (category === "trip") setTripLines(mapLine(tripLines));
+    if (category === "other") setOtherLines(mapLine(otherLines));
+  };
+
+  const removeLine = (category: "design" | "team" | "trip" | "other", idx: number) => {
+    const filterLine = (lines: EstimateLine[]) => lines.filter((_, i) => i !== idx);
+    if (category === "design") setDesignLines(filterLine(designLines));
+    if (category === "team") setTeamLines(filterLine(teamLines));
+    if (category === "trip") setTripLines(filterLine(tripLines));
+    if (category === "other") setOtherLines(filterLine(otherLines));
+  };
+
+  return (
+    <AuthLayout>
+      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+        <header className="mb-6">
+          <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight uppercase">
+            {t("New Proposal Intake")}
+          </h1>
+          <div className="flex items-center gap-2 text-xs font-bold text-muted uppercase tracking-wider mt-2.5">
+            <span>{t("Progress")}:</span>
+            <span className={step === 1 ? "text-primary" : ""}>{t("Basics")}</span>
+            <span>➔</span>
+            <span className={step === 2 ? "text-primary" : ""}>{t("Estimates")}</span>
+            <span>➔</span>
+            <span className={step === 3 ? "text-primary" : ""}>{t("Review")}</span>
+          </div>
+        </header>
+
+        {errorMsg && (
+          <div className="mb-4 p-4 bg-danger/10 border border-danger/20 rounded-lg text-danger text-sm font-semibold flex items-center gap-2">
+            <HiExclamationTriangle className="w-5 h-5 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Main Form Fields */}
+          <div className="flex-1 w-full bg-card border border-border rounded-lg p-5 sm:p-6 space-y-6">
+            {step === 1 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Event Name")} *</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Name")} *</label>
+                  <input
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    required
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Phone")}</label>
+                  <input
+                    type="text"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    placeholder="e.g. +251912345678"
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Event Type")}</label>
+                  <select
+                    value={eventTypeId}
+                    onChange={(e) => setEventTypeId(e.target.value)}
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                  >
+                    <option value="">{t("Select Event Type")}</option>
+                    {eventTypes.map((type) => (
+                      <option key={type.id} value={type.id}>{type.event_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Requested Budget")} *</label>
+                  <input
+                    type="number"
+                    value={requestedBudget || ""}
+                    onChange={(e) => setRequestedBudget(Number(e.target.value))}
+                    required
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Date")}</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("End Date")}</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Time")}</label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("End Time")}</label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Venue Location")} *</label>
+                  <input
+                    type="text"
+                    value={venueLocation}
+                    onChange={(e) => setVenueLocation(e.target.value)}
+                    required
+                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Notes")}</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Design Notes")}</label>
+                  <textarea
+                    value={designNotes}
+                    onChange={(e) => setDesignNotes(e.target.value)}
+                    rows={3}
+                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="space-y-6">
+                <h3 className="text-sm font-black text-foreground uppercase tracking-wider border-b border-border/50 pb-2">
+                  {t("Cost Estimator")}
+                </h3>
+
+                {/* Design Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Design Estimate")}</h4>
+                    <button onClick={() => addLine("design")} className="text-xs font-bold text-primary flex items-center gap-1">
+                      <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
+                    </button>
+                  </div>
+                  {designLines.map((line, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                      <input
+                        type="text"
+                        placeholder={t("Label")}
+                        value={line.label}
+                        onChange={(e) => updateLine("design", idx, "label", e.target.value)}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border"
+                      />
+                      <input
+                        type="number"
+                        placeholder={t("Amount")}
+                        value={line.amount || ""}
+                        onChange={(e) => updateLine("design", idx, "amount", Number(e.target.value))}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={t("Notes")}
+                          value={line.notes}
+                          onChange={(e) => updateLine("design", idx, "notes", e.target.value)}
+                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border"
+                        />
+                        <button onClick={() => removeLine("design", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                          <HiTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Team Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Team & Labor Estimate")}</h4>
+                    <button onClick={() => addLine("team")} className="text-xs font-bold text-primary flex items-center gap-1">
+                      <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
+                    </button>
+                  </div>
+                  {teamLines.map((line, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                      <input
+                        type="text"
+                        placeholder={t("Label")}
+                        value={line.label}
+                        onChange={(e) => updateLine("team", idx, "label", e.target.value)}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border col-span-1 sm:col-span-2"
+                      />
+                      <input
+                        type="number"
+                        placeholder={t("People Count")}
+                        value={line.people_count || ""}
+                        onChange={(e) => updateLine("team", idx, "people_count", Number(e.target.value))}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                      />
+                      <input
+                        type="number"
+                        placeholder={t("Commission")}
+                        value={line.commission_per_person || ""}
+                        onChange={(e) => updateLine("team", idx, "commission_per_person", Number(e.target.value))}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                      />
+                      <div className="flex gap-2 col-span-1">
+                        <input
+                          type="number"
+                          placeholder={t("Amount")}
+                          value={line.amount || ""}
+                          onChange={(e) => updateLine("team", idx, "amount", Number(e.target.value))}
+                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        />
+                        <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                          <HiTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Trip Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Trip & Fuel Estimate")}</h4>
+                    <button onClick={() => addLine("trip")} className="text-xs font-bold text-primary flex items-center gap-1">
+                      <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
+                    </button>
+                  </div>
+                  {tripLines.map((line, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                      <input
+                        type="text"
+                        placeholder={t("Label")}
+                        value={line.label}
+                        onChange={(e) => updateLine("trip", idx, "label", e.target.value)}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border"
+                      />
+                      <input
+                        type="number"
+                        placeholder={t("KM")}
+                        value={line.km || ""}
+                        onChange={(e) => updateLine("trip", idx, "km", Number(e.target.value))}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                      />
+                      <input
+                        type="number"
+                        placeholder={t("Fuel Price")}
+                        value={line.fuel_price || ""}
+                        onChange={(e) => updateLine("trip", idx, "fuel_price", Number(e.target.value))}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          placeholder={t("Amount")}
+                          value={line.amount || ""}
+                          onChange={(e) => updateLine("trip", idx, "amount", Number(e.target.value))}
+                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        />
+                        <button onClick={() => removeLine("trip", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                          <HiTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Other Section */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Other Expenses")}</h4>
+                    <button onClick={() => addLine("other")} className="text-xs font-bold text-primary flex items-center gap-1">
+                      <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
+                    </button>
+                  </div>
+                  {otherLines.map((line, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                      <input
+                        type="text"
+                        placeholder={t("Label")}
+                        value={line.label}
+                        onChange={(e) => updateLine("other", idx, "label", e.target.value)}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border"
+                      />
+                      <input
+                        type="number"
+                        placeholder={t("Amount")}
+                        value={line.amount || ""}
+                        onChange={(e) => updateLine("other", idx, "amount", Number(e.target.value))}
+                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={t("Notes")}
+                          value={line.notes}
+                          onChange={(e) => updateLine("other", idx, "notes", e.target.value)}
+                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border"
+                        />
+                        <button onClick={() => removeLine("other", idx)} className="p-1.5 bg-danger/10 text-danger rounded hover:bg-danger hover:text-on-danger shrink-0">
+                          <HiTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-black text-foreground uppercase tracking-wider">{t("Review Details")}</h3>
+                  <p className="text-xs text-muted font-semibold mt-1">{t("Review Description")}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-t border-border/40 pt-4 text-xs font-semibold text-foreground">
+                  <div>
+                    <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Event Name")}</span>
+                    <span>{name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Client Name")}</span>
+                    <span>{clientName}</span>
+                  </div>
+                  {clientPhone && (
+                    <div>
+                      <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Client Phone")}</span>
+                      <span className="font-mono">{clientPhone}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Venue Location")}</span>
+                    <span>{venueLocation}</span>
+                  </div>
+                  {startDate && (
+                    <div>
+                      <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Start Date")}</span>
+                      <span className="font-mono">{startDate} {startTime}</span>
+                    </div>
+                  )}
+                  {endDate && (
+                    <div>
+                      <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("End Date")}</span>
+                      <span className="font-mono">{endDate} {endTime}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step Controls */}
+            <div className="flex items-center justify-between border-t border-border/40 pt-5 mt-6">
+              {step > 1 ? (
+                <button
+                  onClick={() => setStep(step - 1)}
+                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                >
+                  <HiArrowLeft className="w-4 h-4" />
+                  {t("Back")}
+                </button>
+              ) : (
+                <button
+                  onClick={() => router.push("/events/proposals")}
+                  className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground"
+                >
+                  {t("Cancel")}
+                </button>
+              )}
+
+              {step < 3 ? (
+                <button
+                  onClick={handleNextStep}
+                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 border border-primary/20"
+                >
+                  {t("Next")}
+                  <HiArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={createProposalMutation.isPending}
+                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground hover:bg-card-alt"
+                  >
+                    {t("Create Draft")}
+                  </button>
+                  <button
+                    onClick={handleSubmitForApproval}
+                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary hover:opacity-90 border border-primary/20"
+                  >
+                    {t("Submit for Approval")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sticky Live Financial Summary Card */}
+          <div className="w-full lg:w-80 shrink-0 space-y-4 sticky top-6">
+            <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
+              <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
+                <HiCurrencyDollar className="w-4 h-4 text-primary" />
+                {t("Live Financial Summary")}
+              </h3>
+
+              <div className="space-y-2.5 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Revenue")}</span>
+                  <span className="font-mono font-bold text-foreground">
+                    ETB {requestedBudget.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Estimated Cost")}</span>
+                  <span className="font-mono font-bold text-foreground">
+                    ETB {financials.totalCost.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-border/40 pt-2.5">
+                  <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Net Profit")}</span>
+                  <span className={`font-mono font-black ${financials.netProfit < 0 ? "text-danger" : "text-foreground"}`}>
+                    ETB {financials.netProfit.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Margin")}</span>
+                  <span className={`font-mono font-black ${financials.margin < 25 ? "text-warning" : "text-success"}`}>
+                    {financials.margin}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {hasMarginRisk && (
+              <div className="bg-warning/10 border border-warning/25 rounded-lg p-4 text-warning flex items-start gap-2.5 shadow-sm">
+                <HiExclamationTriangle className="w-5 h-5 shrink-0" />
+                <div className="space-y-1">
+                  <span className="text-xs font-black uppercase tracking-wider block">{t("Margin Risk Warning")}</span>
+                  <p className="text-[11px] font-semibold leading-relaxed">
+                    {t("Low margin alert. Margin is below the 25% target or profit is negative. Please review estimates.")}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </AuthLayout>
+  );
+}
