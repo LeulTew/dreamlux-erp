@@ -15,6 +15,7 @@ For every code-changing prompt, use this pipeline unless the user explicitly ask
 `Plan → Issue → Branch → Implement → Secrets Check → Verify → Commit/PR → Review/Merge → Deploy/Smoke when required`
 
 - Start with a short plan covering what will change, where, why, and any meaningful alternatives.
+- Always check and read `project-context.md` at the start of any session or task to align on architectural boundaries, active issues, and dependencies.
 - Purely conversational, diagnostic, or read-only prompts are exempt from issue/branch/commit requirements.
 - Continuing work on the same scope reuses the existing issue and branch when practical; unrelated work gets a separate issue and branch.
 - If it is unclear whether a request is continuing work or new work, state the judgment before coding so the user can redirect.

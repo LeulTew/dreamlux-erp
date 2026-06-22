@@ -7,6 +7,7 @@ These rules apply to all AI agents working in this repository.
 ## 1. Operating Mode & Workflow
 
 - Read existing files before editing.
+- Always check and read `project-context.md` at the start of every session/task to align on architectural boundaries, active issues, and dependencies.
 - Keep changes small, vertical, and testable.
 - Prefer established project patterns over new abstractions.
 - Never silently remove behavior to make implementation easier.
