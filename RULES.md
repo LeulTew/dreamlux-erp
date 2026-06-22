@@ -8,14 +8,31 @@ This document details the mandatory workflow, tooling standards, build guideline
 
 Always interact with GitHub using the `gh` tool to maintain project hygiene:
 
+### 1.0 Spec-Driven Execution Pipeline
+
+For every code-changing prompt, use this pipeline unless the user explicitly asks for read-only analysis:
+
+`Plan → Issue → Branch → Implement → Secrets Check → Verify → Commit/PR → Review/Merge → Deploy/Smoke when required`
+
+- Start with a short plan covering what will change, where, why, and any meaningful alternatives.
+- Purely conversational, diagnostic, or read-only prompts are exempt from issue/branch/commit requirements.
+- Continuing work on the same scope reuses the existing issue and branch when practical; unrelated work gets a separate issue and branch.
+- If it is unclear whether a request is continuing work or new work, state the judgment before coding so the user can redirect.
+- Keep issue checklists and PR checklists synchronized with reality. Mark an item complete only after implementation and verification are actually done.
+- Keep a durable plan note in `plans/` for substantial or multi-PR work, or use an explicitly temporary external note when the user asks not to commit plan artifacts.
+- Repository-specific DreamLux rules override generic imported constitutions. In this repo, `main` is the production/integration branch; do not switch to a generic `develop` flow unless the user explicitly changes the branch strategy.
+
 1. **Issue Management**:
    - Every task or bug must correspond to an active GitHub issue.
    - Use `gh issue list` to inspect current work, or `gh issue create` to initialize a new issue if none exists.
    - Properly label the issue (e.g. `bug`, `enhancement`) and assign it to yourself (`assign @self`).
+   - For new issues, prefer a user-story body with context, execution plan, task checklist, and expected files/areas touched.
+   - For follow-up work on an existing issue, add a concise issue comment with the new execution plan and added checklist items instead of creating duplicates.
 
 2. **Branching Strategy**:
    - Create a clean feature branch from `main` using a standard naming pattern: `feature/<issue-id>-short-name` (e.g. `feature/6-amharic-fix`).
    - Work must never be done directly on `main` unless it is a simple diagnostic/hotfix check.
+   - After every PR merge, switch back to `main`, pull fast-forward, verify `git status --short --branch` is clean, then continue from the merged target.
 
 3. **Pull Request (PR) Lifecycle**:
    - Use `gh pr create` to initiate a PR from your feature branch to the target integration branch.
@@ -23,6 +40,21 @@ Always interact with GitHub using the `gh` tool to maintain project hygiene:
    - Ensure the PR description matches the project template, references the solved issue number, and lists all completed tasks.
    - All checkmarks on the issue and PR checklists must be ticked (`[x]`) before merging.
    - Use `gh pr merge --merge` to merge once fully validated.
+   - Assign the PR to yourself when possible.
+   - Include exact verification evidence in the PR: commands run, pass/fail result, CI status, and deployment/prod-smoke URLs when applicable.
+   - Do a senior diff review before merge: inspect `git diff`, scope hygiene, regressions, security, data integrity, performance, and test coverage instead of reviewing only the happy path.
+   - If `gh` is unavailable, use connected GitHub tooling if present. If neither is available, provide exact manual issue/PR commands and do not silently skip GitHub hygiene.
+
+### 1.1 Commit, Secrets, and Local Safety
+
+- Before staging, inspect `git status`, the diff, and any new files for secrets or generated artifacts.
+- Never stage or commit `.env`, `.env.*`, private keys, tokens, passwords, connection strings, local config, build output, or other sensitive files.
+- Add or update `.gitignore` when introducing likely-sensitive or generated local artifacts; keep `.env.example` placeholder-only.
+- Never hardcode secrets or credentials. Read them from environment variables or the existing configured secret store.
+- If a secret is found in the working tree or diff, stop, do not stage it, explain what was found, and ask whether to move it to env/config and rotate it if already exposed.
+- Confirm staging/commit and push/PR intent when the user has not already explicitly asked for those actions in the current task.
+- Never use `git reset --hard`, destructive `git checkout --`, or any command that overwrites unrelated local work unless the user explicitly requests that exact destructive operation after being warned.
+- Treat unrelated dirty files as user work. Do not revert, reformat, or overwrite them.
 
 ---
 

@@ -11,6 +11,16 @@ These rules apply to all AI agents working in this repository.
 - Prefer established project patterns over new abstractions.
 - Never silently remove behavior to make implementation easier.
 - Add verification notes to every PR.
+- For any code-changing prompt, follow this pipeline: Plan -> Issue -> Branch -> Implement -> Secrets Check -> Verify -> Commit/PR -> Review/Merge -> Deploy/Smoke when required.
+- Purely read-only, diagnostic, or conversational prompts are exempt from issue, branch, plan-file, commit, and PR requirements.
+- Continuing work on the same issue/scope should reuse the existing issue and branch when practical. Unrelated work requires a separate issue and branch.
+- If the request is ambiguous between continuing work and new work, state the judgment before coding so the user can correct it.
+- Keep GitHub issue task checklists and PR checklists synchronized with the real implementation state. Only tick completed items after code, tests, and review evidence support completion.
+- For substantial or multi-PR work, keep a durable plan note in `plans/` or an explicitly temporary external note when the user asks not to commit plan artifacts.
+- Before staging, inspect `git status`, the diff, and new files for secrets or generated artifacts. Do not stage credentials, tokens, local env files, private keys, build output, or local-only config.
+- Never hardcode secrets, credentials, API keys, passwords, connection strings, or tokens. Use environment variables and keep `.env.example` placeholder-only.
+- If sensitive data appears in the diff, stop, explain what was found, add or recommend `.gitignore` protection, and ask how to proceed before committing.
+- Confirm staging/commit and push/PR intent when the user has not already explicitly requested those actions in the current task.
 
 ---
 
@@ -55,12 +65,17 @@ These rules apply to all AI agents working in this repository.
 - **Feature Branching**:
   - Main branch: `main` (production and integration).
   - Feature branches: `feature/<issue-number>-short-name` (e.g. `feature/3-event-creation`).
+- **Branch Source**: Branch from latest `main` unless the user explicitly names another target. If imported generic rules mention `develop`, `main` takes precedence for this repository.
+- **Post-Merge Hygiene**: After each merged PR, switch back to `main`, pull fast-forward, verify a clean worktree, then continue from the merged target.
 - **Commit Messages**: Commits must be prefix-based:
   - `feat(<scope>): ...` for new features.
   - `fix(<scope>): ...` for bug fixes.
   - `docs(<scope>): ...` for documentation changes.
   - `refactor(<scope>): ...` for code restructures.
   - `test(<scope>): ...` for adding/updating tests.
+- **GitHub Operations**: Use `gh` for issues, labels, assignment, PR creation, PR assignment, checklist updates, status checks, comments, and merges. If `gh` is unavailable, use connected GitHub tooling if present; otherwise provide exact manual commands and do not silently skip the workflow.
+- **PR Readiness**: PRs must reference the issue, list verification commands and outcomes, and clearly separate local QA, CI, deployment, and production smoke evidence when relevant.
+- **Senior Review Before Merge**: Inspect the actual diff for scope hygiene, regressions, security, data integrity, performance, maintainability, and tests before merging. Do not rely only on issue/PR descriptions.
 - **Self-Verification Checklist**: Before completing a task, verify against:
   - [Codebase Structure Rules](file:///.github/ai_templates/agent_structure.md) for module organization.
   - Pull request template items (type-checks, lint, migration dry-runs).
@@ -113,3 +128,14 @@ The skill enforces six groups of standards:
 ### Mandatory Pre-Ship Verification
 
 Before completing any UI task, run through the full checklist at the bottom of the skill file. Every checkbox must pass. A task is not done until the checklist is clean.
+
+---
+
+## 7. Rule Precedence & High-Risk Completion
+
+- Repository-specific DreamLux rules override generic imported constitutions when they conflict.
+- User instructions for a task override default workflow only when they are explicit and do not weaken security, data protection, production safety, or review requirements.
+- CRITICAL: Never use `git reset --hard`, destructive `git checkout --`, or any command that overwrites local work unless the user explicitly requests that exact destructive operation after being warned.
+- Always separate user/unrelated dirty work from agent changes. Do not revert, reformat, or overwrite unrelated files.
+- When production, payroll, RBAC, finance, inventory integrity, Supabase/database migrations, or event assignment integrity are involved, apply `docs/SENIOR_ISSUE_REVIEW_PROMPT.md` standards before declaring completion.
+- Do not claim 100% completion unless local QA, relevant security checks, CI, deployment when required, production smoke when required, issue checklist state, PR state, and worktree cleanliness have all been verified.
