@@ -4,8 +4,34 @@ import { generatePayrollPreviewSchema, finalizePayrollRunSchema, savePayrollDraf
 import { getMonthlyBounds, getHalfMonthBounds } from "../utils/payroll-utils";
 import { getPublicUrl } from "../storage/storage";
 import { buildPayrollLines, toPayrollEventPayloads, toPayrollLinePayloads } from "../lib/payroll-generation";
+import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
+import { hasPermissionSlug } from "../lib/permissions";
 
 const router = express.Router();
+
+function canReadPayroll(req: AuthRequest): boolean {
+  return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), "payroll:read");
+}
+
+function canWritePayroll(req: AuthRequest): boolean {
+  return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), "payroll:write");
+}
+
+function requirePayrollRead(req: AuthRequest, res: express.Response): boolean {
+  if (!canReadPayroll(req)) {
+    res.status(403).json({ error: "Forbidden: Missing payroll read permission" });
+    return false;
+  }
+  return true;
+}
+
+function requirePayrollWrite(req: AuthRequest, res: express.Response): boolean {
+  if (!canWritePayroll(req)) {
+    res.status(403).json({ error: "Forbidden: Missing payroll write permission" });
+    return false;
+  }
+  return true;
+}
 
 function toApiStatus(status: string | null | undefined): string {
   switch (status) {
@@ -56,8 +82,10 @@ async function insertPayrollAuditLog(input: {
 }
 
 // GET /payroll/runs — list runs with aggregated totals
-router.get("/runs", async (req, res) => {
+router.get("/runs", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollRead(req, res)) return;
+
     const view = req.query.view === "trash" ? "trash" : "active";
     const statusFilter = req.query.status as string | undefined;
     const yearFilter = req.query.year as string | undefined;
@@ -147,8 +175,10 @@ router.get("/runs", async (req, res) => {
 });
 
 // GET /payroll/runs/:id — single run with lines and events
-router.get("/runs/:id", async (req, res) => {
+router.get("/runs/:id", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollRead(req, res)) return;
+
     const { id } = req.params;
 
     const { data: run, error: runError } = await supabase
@@ -256,8 +286,10 @@ router.get("/runs/:id", async (req, res) => {
 });
 
 // PATCH /payroll/runs/:id/status
-router.patch("/runs/:id/status", async (req, res) => {
+router.patch("/runs/:id/status", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollWrite(req, res)) return;
+
     const { id } = req.params;
     const { status } = req.body;
 
@@ -302,8 +334,10 @@ router.patch("/runs/:id/status", async (req, res) => {
 });
 
 // DELETE /payroll/runs/:id
-router.delete("/runs/:id", async (req, res) => {
+router.delete("/runs/:id", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollWrite(req, res)) return;
+
     const { id } = req.params;
     const { data, error } = await supabase
       .from("payroll_runs")
@@ -327,8 +361,10 @@ router.delete("/runs/:id", async (req, res) => {
 });
 
 // DELETE /payroll/runs/:id/permanent
-router.delete("/runs/:id/permanent", async (req, res) => {
+router.delete("/runs/:id/permanent", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollWrite(req, res)) return;
+
     const { id } = req.params;
 
     const { error } = await supabase
@@ -348,8 +384,10 @@ router.delete("/runs/:id/permanent", async (req, res) => {
 });
 
 // POST /payroll/preview
-router.post("/preview", async (req, res) => {
+router.post("/preview", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollRead(req, res)) return;
+
     const result = generatePayrollPreviewSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.errors[0].message });
@@ -407,8 +445,10 @@ router.post("/preview", async (req, res) => {
 });
 
 // POST /payroll/drafts — save or update a draft run
-router.post("/drafts", async (req, res) => {
+router.post("/drafts", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollWrite(req, res)) return;
+
     const result = savePayrollDraftSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.errors[0].message });
@@ -567,8 +607,10 @@ router.post("/drafts", async (req, res) => {
 });
 
 // POST /payroll/runs — finalize and persist a payroll run
-router.post("/runs", async (req, res) => {
+router.post("/runs", async (req: AuthRequest, res) => {
   try {
+    if (!requirePayrollWrite(req, res)) return;
+
     const result = finalizePayrollRunSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.errors[0].message });

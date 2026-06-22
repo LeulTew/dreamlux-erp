@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, beforeAll, mock } from "bun:test";
 import request from "supertest";
+import jwt from "jsonwebtoken";
 import { getToken } from "./setup_helpers";
 import "./setup";
 
@@ -53,6 +54,21 @@ mock.module("../db/supabase", () => ({
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const AUTH = () => `Bearer ${getToken()}`;
+const PAYROLL_READ_ONLY_AUTH = () => {
+  const secret = process.env.JWT_SECRET || "dev-secret";
+  const token = jwt.sign(
+    {
+      id: "payroll-readonly-user",
+      username: "payroll-readonly",
+      role: "PAYROLL_VIEWER",
+      roles: ["PAYROLL_VIEWER"],
+      permission_slugs: ["payroll:read"],
+    },
+    secret,
+    { expiresIn: "1h" }
+  );
+  return `Bearer ${token}`;
+};
 
 const EMPLOYEE_ID = "550e8400-e29b-41d4-a716-446655440000";
 const EVENT_TYPE_ID = "660e8400-e29b-41d4-a716-446655440001";
@@ -309,6 +325,52 @@ describe("Payroll API > GET /payroll/runs", () => {
     // Should still return 200 — totals just default to 0
     expect(res.status).toBe(200);
     expect(res.body[0].total_payroll_value).toBe(0);
+  });
+});
+
+describe("Payroll API > read/write permission split", () => {
+  test("allows payroll:read users to read runs", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app)
+      .get("/payroll/runs")
+      .set("Authorization", PAYROLL_READ_ONLY_AUTH());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  test("allows payroll:read users to generate preview without persisting", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app)
+      .post("/payroll/preview")
+      .set("Authorization", PAYROLL_READ_ONLY_AUTH())
+      .send({ month: 4, year: 2026, employeeLineEvents: [] });
+
+    expect(res.status).toBe(200);
+  });
+
+  test("blocks payroll:read users from payroll mutations before DB writes", async () => {
+    const mutationRequests = [
+      request(app).post("/payroll/drafts").send(validFinalizePayload()),
+      request(app).post("/payroll/runs").send(validFinalizePayload()),
+      request(app).patch(`/payroll/runs/${RUN_ID}/status`).send({ status: "TRASH" }),
+      request(app).delete(`/payroll/runs/${RUN_ID}`),
+      request(app).delete(`/payroll/runs/${RUN_ID}/permanent`),
+    ];
+
+    for (const pendingRequest of mutationRequests) {
+      const res = await pendingRequest.set("Authorization", PAYROLL_READ_ONLY_AUTH());
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("payroll write permission");
+    }
+
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(insertPayloads).toEqual([]);
   });
 });
 
