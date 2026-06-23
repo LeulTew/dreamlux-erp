@@ -91,6 +91,7 @@ import {
 } from "react-icons/hi2";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
+import { Button } from "./ui/button";
 
 interface Props {
   item: Item;
@@ -430,33 +431,36 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
  
               <div className="pt-2 space-y-3">
                 <div className="flex gap-3">
-                  <button
+                  <Button
                     type="submit"
-                    disabled={updateMutation.isPending}
+                    loading={updateMutation.isPending}
                     className="flex-4 h-11 rounded-xl bg-primary text-background font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
                   >
-                    {updateMutation.isPending ? t("Syncing...") : t("Update Asset")}
-                  </button>
-                  <button
+                    {t("Update Asset")}
+                  </Button>
+                  <Button
                     type="button"
+                    variant="destructive"
+                    loading={deleteMutation.isPending}
                     onClick={handleDelete}
-                    disabled={deleteMutation.isPending}
-                    className="flex-1 h-11 rounded-xl bg-red-50 text-danger flex items-center justify-center hover:bg-danger hover:text-background transition-all active:scale-95 disabled:opacity-50"
-                    aria-label="Delete asset"
+                    className="flex-1 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95"
+                    aria-label={t("Delete Asset")}
                   >
                     <HiTrash className="w-4.5 h-4.5" />
-                  </button>
+                  </Button>
                 </div>
                 
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={handleReconcile}
-                  disabled={reconcileMutation.isPending || updateMutation.isPending}
+                  loading={reconcileMutation.isPending}
+                  disabled={updateMutation.isPending}
                   className="w-full h-11 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
-                  {reconcileMutation.isPending ? t("Applying Audit...") : t("Mark as Physically Verified")}
-                </button>
+                  {t("Mark as Physically Verified")}
+                </Button>
               </div>
             </form>
           </div>

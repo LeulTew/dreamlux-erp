@@ -162,7 +162,7 @@ export default function ExpenseApprovalPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <Button
                         type="button"
-                        disabled={reviewMutation.isPending}
+                        loading={reviewMutation.isPending}
                         onClick={() => reviewMutation.mutate({ id: expense.id, status: "Approved" })}
                       >
                         <HiCheckCircle className="h-4 w-4" />
@@ -171,7 +171,7 @@ export default function ExpenseApprovalPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        disabled={reviewMutation.isPending}
+                        loading={reviewMutation.isPending}
                         onClick={() => {
                           if (!comment.trim()) {
                             toast.error(t("Reason required"));

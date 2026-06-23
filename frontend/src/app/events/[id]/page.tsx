@@ -378,7 +378,7 @@ function DesignPackagePanel({
         <Button
           type="button"
           onClick={() => saveDesignMutation.mutate()}
-          disabled={saveDesignMutation.isPending}
+          loading={saveDesignMutation.isPending}
           className="w-full"
         >
           {t("Save Design")}
@@ -979,7 +979,7 @@ export default function EventWorkspacePage() {
                       onChange={(eventChange) => setAllocationNotes(eventChange.target.value)}
                       placeholder={t("Notes")}
                     />
-                    <Button type="button" onClick={() => allocationMutation.mutate()} disabled={!canAllocate} className="w-full">
+                    <Button type="button" onClick={() => allocationMutation.mutate()} loading={allocationMutation.isPending} disabled={!canAllocate} className="w-full">
                       <HiPlus className="h-4 w-4" />
                       {t("Allocate")}
                     </Button>
@@ -1008,7 +1008,7 @@ export default function EventWorkspacePage() {
                             variant="outline"
                             size="sm"
                             onClick={() => releaseMutation.mutate(allocation.id)}
-                            disabled={releaseMutation.isPending}
+                            loading={releaseMutation.isPending}
                           >
                             <HiMinusCircle className="h-4 w-4" />
                             {t("Release")}
@@ -1038,7 +1038,7 @@ export default function EventWorkspacePage() {
                         }
                         addTaskMutation.mutate();
                       }}
-                      disabled={addTaskMutation.isPending}
+                      loading={addTaskMutation.isPending}
                       className="w-full"
                     >
                       <HiPlus className="h-4 w-4" />
@@ -1149,7 +1149,7 @@ export default function EventWorkspacePage() {
                             commission_amount: Number(commissionAmt || 0),
                           });
                         }}
-                        disabled={assignEmployeeMutation.isPending}
+                        loading={assignEmployeeMutation.isPending}
                         className="w-full"
                       >
                         <HiPlus className="h-4 w-4" />
@@ -1187,7 +1187,7 @@ export default function EventWorkspacePage() {
                               variant="outline"
                               size="sm"
                               onClick={() => removeEmployeeMutation.mutate(asg.employee_id)}
-                              disabled={removeEmployeeMutation.isPending}
+                              loading={removeEmployeeMutation.isPending}
                             >
                               <HiMinusCircle className="h-4 w-4" />
                               {t("Release")}
@@ -1264,7 +1264,7 @@ export default function EventWorkspacePage() {
                             is_night_shift: nightShift,
                           });
                         }}
-                        disabled={assignVehicleMutation.isPending}
+                        loading={assignVehicleMutation.isPending}
                         className="w-full"
                       >
                         <HiPlus className="h-4 w-4" />
@@ -1296,7 +1296,7 @@ export default function EventWorkspacePage() {
                               variant="outline"
                               size="sm"
                               onClick={() => removeVehicleMutation.mutate(va.vehicle_id)}
-                              disabled={removeVehicleMutation.isPending}
+                              loading={removeVehicleMutation.isPending}
                             >
                               <HiMinusCircle className="h-4 w-4" />
                               {t("Release")}
@@ -1331,7 +1331,7 @@ export default function EventWorkspacePage() {
                       <Button
                         type="button"
                         className="w-full"
-                        disabled={createExpenseMutation.isPending}
+                        loading={createExpenseMutation.isPending}
                         onClick={() => {
                           if (!expenseDescription.trim() || Number(expenseAmount) <= 0) {
                             toast.error(t("Required"));
@@ -1343,7 +1343,7 @@ export default function EventWorkspacePage() {
                         <HiPlus className="h-4 w-4" />
                         {t("Submit Expense")}
                       </Button>
-                      <Button type="button" variant="outline" className="w-full" disabled={generateLaborMutation.isPending} onClick={() => generateLaborMutation.mutate()}>
+                      <Button type="button" variant="outline" className="w-full" loading={generateLaborMutation.isPending} onClick={() => generateLaborMutation.mutate()}>
                         {t("Generate Labor Expense")}
                       </Button>
                     </div>
@@ -1373,7 +1373,7 @@ export default function EventWorkspacePage() {
                       <Button
                         type="button"
                         className="w-full"
-                        disabled={createTripMutation.isPending}
+                        loading={createTripMutation.isPending}
                         onClick={() => {
                           if (!tripVehicleAssignmentId || !tripDestination.trim() || Number(tripDistance) <= 0 || Number(fuelPrice) <= 0) {
                             toast.error(t("Required"));

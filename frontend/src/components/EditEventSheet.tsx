@@ -12,6 +12,29 @@ import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
+import { useLanguage } from "@/hooks/use-language";
+import { Button } from "./ui/button";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Edit Event": "Edit Event",
+    "Create Event": "Create Event",
+    "Save Changes": "Save Changes",
+    "Delete Event": "Delete Event",
+    "Managing event details": "Managing event details",
+    "Register a new event schedule": "Register a new event schedule",
+    "Required": "Required",
+  },
+  am: {
+    "Edit Event": "ዝግጅት ማስተካከያ",
+    "Create Event": "አዲስ ዝግጅት ፍጠር",
+    "Save Changes": "ለውጦችን አስቀምጥ",
+    "Delete Event": "ዝግጅቱን ሰርዝ",
+    "Managing event details": "የዝግጅት ዝርዝሮችን ማስተዳደር",
+    "Register a new event schedule": "አዲስ የዝግጅት መርሃግብር ይመዝግቡ",
+    "Required": "አስፈላጊ",
+  }
+};
 
 const eventValidationSchema = z.object({
   name: z.string().min(1, "Event name is required"),
@@ -39,6 +62,8 @@ interface EditEventSheetProps {
 }
 
 export default function EditEventSheet({ event, onClose, onSuccess }: EditEventSheetProps) {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -158,8 +183,8 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       <ResponsiveDrawer
         isOpen={true}
         onClose={onClose}
-        title={event ? "Edit Event" : "Create Event"}
-        subtitle={event ? `Managing event details` : "Register a new event schedule"}
+        title={event ? t("Edit Event") : t("Create Event")}
+        subtitle={event ? t("Managing event details") : t("Register a new event schedule")}
       >
         {/* Warning Banner for Completed Event Locks */}
         {isCompleted && (
@@ -368,23 +393,24 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
           {/* Form Actions */}
           {!isReadOnly && (
             <div className="flex gap-3 pt-4">
-              <button
+              <Button
                 type="submit"
-                disabled={saveMutation.isPending}
+                loading={saveMutation.isPending}
                 className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
               >
-                {saveMutation.isPending ? "Saving..." : event ? "Save Changes" : "Create Event"}
-              </button>
+                {event ? t("Save Changes") : t("Create Event")}
+              </Button>
               {event && (
-                <button
+                <Button
                   type="button"
-                  disabled={deleteMutation.isPending}
+                  variant="destructive"
+                  loading={deleteMutation.isPending}
                   onClick={() => setShowDeleteModal(true)}
-                  className="w-11 h-11 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all group shrink-0"
-                  title="Delete Event"
+                  className="w-11 h-11 rounded-xl flex items-center justify-center transition-all group shrink-0"
+                  title={t("Delete Event")}
                 >
                   <HiTrash className="w-5 h-5 group-hover:scale-105 transition-transform" />
-                </button>
+                </Button>
               )}
             </div>
           )}

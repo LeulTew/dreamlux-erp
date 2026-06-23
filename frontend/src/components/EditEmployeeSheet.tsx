@@ -11,6 +11,7 @@ import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentifica
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
+import { Button } from "./ui/button";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -41,6 +42,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save Changes": "Save Changes",
     "Updating...": "Updating...",
     "Delete Record": "Delete Record",
+    "Delete Permanently": "Delete Permanently",
     "Delete Warning": "This action will move the record to trash. Are you sure?",
     "Failed to process image": "Failed to process image",
     "Department added!": "Department added!",
@@ -73,6 +75,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save Changes": "ለውጦችን አስቀምጥ",
     "Updating...": "በማዘመን ላይ...",
     "Delete Record": "መዝገብ ሰርዝ",
+    "Delete Permanently": "በቋሚነት ሰርዝ",
     "Delete Warning": "ይህ ተግባር መዝገቡን ወደ ቆሻሻ መጣያ ያዛውረዋል። እርግጠኛ ነዎት?",
     "Failed to process image": "ፎቶውን ለማዘጋጀት አልተሳካም",
     "Department added!": "ክፍል በተሳካ ሁኔታ ታክሏል!",
@@ -624,22 +627,23 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
           {/* Form Actions */}
           <div className="flex gap-3 mt-6">
-            <button
+            <Button
               type="submit"
-              disabled={updateMutation.isPending}
-              className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+              loading={updateMutation.isPending}
+              className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all"
             >
-              {updateMutation.isPending ? t("Updating...") : t("Save Changes")}
-            </button>
-            <button
+              {t("Save Changes")}
+            </Button>
+            <Button
               type="button"
-              disabled={deleteMutation.isPending}
+              variant="destructive"
+              loading={deleteMutation.isPending}
               onClick={() => setShowDeleteModal(true)}
-              className="w-11 h-11 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all group shrink-0"
-              title="Delete Permanently"
+              className="w-11 h-11 rounded-xl flex items-center justify-center transition-all group shrink-0"
+              title={t("Delete Permanently")}
             >
               <HiTrash className="w-5 h-5 group-hover:scale-105 transition-transform" />
-            </button>
+            </Button>
           </div>
         </form>
       </ResponsiveDrawer>
