@@ -610,7 +610,7 @@ export default function InsertEmployeePage() {
                       <button
                         type="button"
                         onClick={() => setIsAddingDepartment(true)}
-                        className="w-10 h-10 rounded-2xl bg-primary text-on-primary hover:bg-primary/90 transition-all shadow-premium flex items-center justify-center"
+                        className="w-10 h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.95] transition-all flex items-center justify-center shadow-premium"
                         title="Add New Department"
                       >
                         <HiPlus className="w-5 h-5" />
@@ -728,13 +728,15 @@ export default function InsertEmployeePage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={createMutation.isPending}
-            className="w-full py-4 rounded-2xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
-          </button>
+          <div className="flex justify-center pt-4">
+            <button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="w-full max-w-xs py-3 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-[0.15em] text-xs shadow-premium hover:bg-primary-dark hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
+            </button>
+          </div>
         </form>
       </div>
     </AuthLayout>

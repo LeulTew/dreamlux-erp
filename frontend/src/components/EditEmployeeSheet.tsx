@@ -630,7 +630,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             <Button
               type="submit"
               loading={updateMutation.isPending}
-              className="flex-1 h-11 rounded-2xl bg-primary text-on-primary font-semibold text-sm hover:bg-primary/90 active:scale-[0.98] transition-all"
+              className="flex-1 h-11 rounded-2xl bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.98] transition-all"
             >
               {t("Save Changes")}
             </Button>

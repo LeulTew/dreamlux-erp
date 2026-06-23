@@ -346,30 +346,30 @@ export default function InsertAssetPage() {
             />
           </div>
 
-          <div className="flex gap-4 pt-6">
+          <div className="flex justify-end gap-3 pt-6">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="px-6 py-3 rounded-2xl bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest"
+            >
+              {t("Reset")}
+            </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="flex-[3] py-4 rounded-2xl bg-primary text-on-primary font-black uppercase tracking-widest shadow-premium hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-3"
+              className="px-8 py-3 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest shadow-premium hover:bg-primary-dark hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-2"
             >
               {createMutation.isPending ? (
                 <>
-                  <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                   {t("Saving...")}
                 </>
               ) : (
                 <>
-                  <HiPhoto className="w-5 h-5" />
+                  <HiPhoto className="w-4 h-4" />
                   {t("Confirm Entry")}
                 </>
               )}
-            </button>
-            <button
-              type="button"
-              onClick={resetForm}
-              className="flex-[1] py-4 rounded-2xl bg-card-alt text-foreground font-black uppercase tracking-widest border border-border hover:bg-border/70 transition-all text-xs"
-            >
-              {t("Reset")}
             </button>
           </div>
         </form>
