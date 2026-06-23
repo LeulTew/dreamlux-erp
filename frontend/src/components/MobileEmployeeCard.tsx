@@ -1,6 +1,7 @@
 import { Employee } from "@/lib/types";
 import { HiIdentification, HiPhone, HiTrash, HiPencilSquare, HiArrowUturnLeft, HiCheckCircle } from "react-icons/hi2";
 import Image from "next/image";
+import { DeleteButton } from "@/components/ui/DeleteButton";
 
 interface MobileEmployeeCardProps {
   employee: Employee;
@@ -124,13 +125,11 @@ export default function MobileEmployeeCard({
                  </button>
                  {/* Single delete — only when not in select mode */}
                  {!selectMode && (
-                   <button
-                     onClick={(e) => { e.stopPropagation(); onDelete?.(employee); }}
-                     className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
-                     title="Delete permanently"
-                   >
-                     <HiTrash className="w-4 h-4" />
-                   </button>
+                   <DeleteButton
+                      onClick={(e) => { e.stopPropagation(); onDelete?.(employee); }}
+                      tooltipText="Delete permanently"
+                      iconSize={16}
+                    />
                  )}
                </div>
              ) : editMode ? (
@@ -175,15 +174,14 @@ export default function MobileEmployeeCard({
                     >
                       <HiPencilSquare className="w-4 h-4" />
                     </button>
-                    <button
+                    <DeleteButton
                       onClick={(e) => {
                         e.stopPropagation();
                         onDelete?.(employee);
                       }}
-                      className="p-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
-                    >
-                      <HiTrash className="w-4 h-4" />
-                    </button>
+                      tooltipText="Move to Trash"
+                      iconSize={16}
+                    />
                   </div>
                 </>
              )}

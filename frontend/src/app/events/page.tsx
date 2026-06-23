@@ -1,4 +1,5 @@
 "use client";
+import { DeleteButton } from "@/components/ui/DeleteButton";
 import React, { useEffect, useState, useMemo, Suspense, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -24,8 +25,7 @@ import {
   HiArrowDownTray,
   HiArrowUpTray,
   HiLockClosed,
-  HiTrash,
-  HiDocumentDuplicate,
+    HiDocumentDuplicate,
   HiStar,
   HiPrinter,
   HiXMark
@@ -814,13 +814,11 @@ export function EventsPageContent() {
                   >
                     <HiDocumentDuplicate className="w-4 h-4" />
                   </button>
-                  <button
+                  <DeleteButton
                     onClick={() => setIsDeleteViewOpen(activeViewId)}
-                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-danger"
-                    title={t("Delete")}
-                  >
-                    <HiTrash className="w-4 h-4" />
-                  </button>
+                    tooltipText={lang === "en" ? "Delete Saved View" : "የተቀመጠ እይታን ሰርዝ"}
+                    iconSize={16}
+                  />
                 </div>
               )}
 

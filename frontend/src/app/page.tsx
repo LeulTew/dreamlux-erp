@@ -1,4 +1,5 @@
 "use client";
+import { DeleteButton } from "@/components/ui/DeleteButton";
 import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -274,13 +275,11 @@ function buildColumns(
                 {t("Restore")}
               </button>
               {!selectMode && (
-                <button
+                <DeleteButton
                   onClick={() => singleDelete(row.original.id)}
-                  className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
-                  title="Delete permanently"
-                >
-                  <HiTrash className="w-3.5 h-3.5" />
-                </button>
+                  tooltipText={lang === "en" ? "Delete permanently" : "በቋሚነት አስወግድ"}
+                  iconSize={14}
+                />
               )}
             </>
           ) : (
@@ -292,13 +291,11 @@ function buildColumns(
               >
                 <HiPencilSquare className="w-4 h-4" />
               </button>
-              <button
+              <DeleteButton
                 onClick={() => setDeletingEmployee(row.original)}
-                className="p-2 rounded-lg hover:bg-red-50 text-muted hover:text-danger transition-all"
-                title="Move to Trash"
-              >
-                <HiTrash className="w-4 h-4" />
-              </button>
+                tooltipText={lang === "en" ? "Move to Trash" : "ወደ መጣያ ውሰድ"}
+                iconSize={16}
+              />
             </>
           )}
         </div>

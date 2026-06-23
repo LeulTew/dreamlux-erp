@@ -1,6 +1,7 @@
 "use client";
 import { Item } from "@/lib/types";
-import { HiExclamationTriangle, HiPencilSquare, HiTrash } from "react-icons/hi2";
+import { HiExclamationTriangle, HiPencilSquare } from "react-icons/hi2";
+import { DeleteButton } from "@/components/ui/DeleteButton";
 
 interface Props {
   item: Item;
@@ -59,15 +60,14 @@ export default function MobileAssetCard({ item, onEdit, onDelete }: Props) {
         >
           <HiPencilSquare className="w-5 h-5" />
         </button>
-        <button
+        <DeleteButton
           onClick={(e) => {
             e.stopPropagation();
             onDelete?.(item);
           }}
-          className="p-2.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white transition-all shadow-sm active:scale-[0.95]"
-        >
-          <HiTrash className="w-5 h-5" />
-        </button>
+          tooltipText="Delete"
+          iconSize={18}
+        />
       </div>
     </div>
   );

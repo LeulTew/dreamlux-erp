@@ -1,4 +1,5 @@
 "use client";
+import { DeleteButton } from "@/components/ui/DeleteButton";
 import { Suspense, useState, useCallback, useMemo, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -331,13 +332,11 @@ function buildColumns(
                   <HiMiniArrowUturnLeft className="w-4 h-4" />
                 </button>
               ) : (
-                <button
+                <DeleteButton
                   onClick={() => setItemToDelete(row.original)}
-                  className="p-2 rounded-lg hover:bg-red-50 text-muted hover:text-danger transition-all"
-                  title={t("Delete")}
-                >
-                  <HiTrash className="w-4 h-4" />
-                </button>
+                  tooltipText={lang === "en" ? "Delete" : "ሰርዝ"}
+                  iconSize={16}
+                />
               )}
             </div>
           )}

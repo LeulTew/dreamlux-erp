@@ -617,13 +617,13 @@ export default function AuthLayout({
   const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
-    const savedWidth = localStorage.getItem("dreamlux_page_width");
-    setTimeout(() => {
+    Promise.resolve().then(() => {
       setMounted(true);
+      const savedWidth = localStorage.getItem("dreamlux_page_width");
       if (savedWidth === "full" || savedWidth === "contained") {
         setPageWidth(savedWidth);
       }
-    }, 0);
+    });
   }, []);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
