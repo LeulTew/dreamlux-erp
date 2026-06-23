@@ -5,16 +5,16 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-semibold tracking-wide whitespace-nowrap transition-all duration-300 ease-out outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg]:transition-transform [&_svg]:duration-300 ease-out group-hover/button:translate-x-1",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-2xl border border-transparent bg-clip-padding text-sm font-semibold tracking-wide whitespace-nowrap transition-all duration-300 ease-out outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg]:transition-transform [&_svg]:duration-300 ease-out group-hover/button:translate-x-1",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/95 hover:shadow-lg hover:shadow-primary/25",
+          "bg-primary text-primary-foreground hover:bg-primary/80 hover:shadow-lg hover:shadow-primary/25 dark:bg-amber-600 dark:text-white dark:hover:bg-amber-700 dark:hover:shadow-lg dark:hover:shadow-amber-600/30",
         outline:
-          "border-primary/30 bg-primary-light/30 text-primary-dark hover:bg-primary-light/60 hover:border-primary/60 dark:text-primary dark:bg-primary-light/10 dark:hover:bg-primary-light/20",
+          "border-primary/30 bg-primary-light/30 text-primary-dark hover:bg-primary hover:text-primary-foreground hover:border-transparent dark:border-primary-dark/40 dark:bg-primary-light/10 dark:text-primary dark:hover:bg-primary dark:hover:text-primary-foreground dark:hover:border-transparent",
         secondary:
-          "bg-card text-foreground border border-border/80 hover:bg-card-alt hover:border-border dark:bg-card-alt dark:border-border/30 dark:hover:bg-border/25",
+          "bg-card text-foreground border border-border/80 hover:bg-primary-light hover:text-primary-dark hover:border-primary/30 dark:bg-card-alt dark:border-border/30 dark:text-foreground dark:hover:bg-primary-light/10 dark:hover:text-primary dark:hover:border-primary/30",
         ghost:
           "hover:bg-muted/10 hover:text-foreground aria-expanded:bg-muted/10 aria-expanded:text-foreground dark:hover:bg-muted/20",
         destructive:

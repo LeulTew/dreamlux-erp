@@ -1,7 +1,6 @@
 import { Employee } from "@/lib/types";
 import { HiIdentification, HiPhone, HiTrash, HiPencilSquare, HiArrowUturnLeft, HiCheckCircle } from "react-icons/hi2";
 import Image from "next/image";
-import { DeleteButton } from "@/components/ui/DeleteButton";
 
 interface MobileEmployeeCardProps {
   employee: Employee;
@@ -124,13 +123,15 @@ export default function MobileEmployeeCard({
                    Restore
                  </button>
                  {/* Single delete — only when not in select mode */}
-                 {!selectMode && (
-                   <DeleteButton
+                  {!selectMode && (
+                    <button
                       onClick={(e) => { e.stopPropagation(); onDelete?.(employee); }}
-                      tooltipText="Delete permanently"
-                      iconSize={16}
-                    />
-                 )}
+                      className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
+                      title="Delete permanently"
+                    >
+                      <HiTrash className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                </div>
              ) : editMode ? (
                 <button
@@ -174,14 +175,16 @@ export default function MobileEmployeeCard({
                     >
                       <HiPencilSquare className="w-4 h-4" />
                     </button>
-                    <DeleteButton
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onDelete?.(employee);
                       }}
-                      tooltipText="Move to Trash"
-                      iconSize={16}
-                    />
+                      className="p-2 rounded-lg hover:bg-red-50 text-muted hover:text-danger transition-all"
+                      title="Move to Trash"
+                    >
+                      <HiTrash className="w-4 h-4" />
+                    </button>
                   </div>
                 </>
              )}

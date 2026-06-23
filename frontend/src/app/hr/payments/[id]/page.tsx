@@ -4,7 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { HiOutlineArrowUturnLeft, HiPrinter, HiExclamationTriangle, HiTrash, HiTableCells, HiDocumentArrowDown } from "react-icons/hi2";
+import { HiOutlineArrowUturnLeft, HiPrinter, HiExclamationTriangle, HiTableCells, HiDocumentArrowDown, HiTrash } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRun, exportPayrollExcel, exportPayrollCSV, updatePayrollRunStatus } from "@/lib/api";
 import { useState, useMemo } from "react";
@@ -247,7 +247,7 @@ export default function PaymentRunDetailPage() {
                 </button>
                 <button 
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="p-2.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all active:scale-[0.98]"
+                  className="p-2.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all active:scale-[0.98] shadow-md shadow-rose-500/10"
                   title={t("Move to Trash")}
                 >
                   <HiTrash className="w-5 h-5" />

@@ -1,17 +1,17 @@
 "use client";
-
 import Link from "next/link";
 import { format } from "date-fns";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRuns, updatePayrollRunStatus, exportPayrollPDF, permanentlyDeletePayrollRun } from "@/lib/api";
-import { HiPlusCircle, HiClock, HiOutlineChevronRight, HiPencilSquare, HiTrash, HiPrinter, HiArrowUturnLeft, HiArrowPath } from "react-icons/hi2";
+import { HiClock, HiOutlineChevronRight, HiPencilSquare, HiPrinter, HiArrowUturnLeft, HiArrowPath, HiTrash } from "react-icons/hi2";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/hooks/use-language";
+import { FancyButton } from "@/components/ui/FancyButton";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -89,6 +89,7 @@ function PaymentsPageContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const searchParams = useSearchParams();
+  const router = useRouter();
   const selectedMonth = format(new Date(), "yyyy-MM");
   const queryClient = useQueryClient();
   const [view, setView] = useState<"active" | "trash">("active");
@@ -241,13 +242,11 @@ function PaymentsPageContent() {
               <HiArrowPath className={`w-4 h-4 transition-transform duration-700 ${isRefetching ? 'animate-spin' : 'group-hover:rotate-180'}`} />
             </button>
 
-            <Link
-              href={`/hr/payments/run?date=${selectedMonth}`}
-              className="inline-flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 active:scale-95 whitespace-nowrap"
+            <FancyButton
+              onClick={() => router.push(`/hr/payments/run?date=${selectedMonth}`)}
             >
-              <HiPlusCircle className="w-4 h-4" />
               {t("New Payout")}
-            </Link>
+            </FancyButton>
           </div>
         </div>
 

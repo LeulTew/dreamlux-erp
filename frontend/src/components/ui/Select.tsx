@@ -40,7 +40,7 @@ export default function Select({ options, value, onChange, placeholder = "Select
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-card-alt border border-border/50 text-sm font-semibold text-foreground hover:bg-border/30 transition-all outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+        className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-card-alt border border-border/50 text-sm font-semibold text-foreground hover:bg-primary-light hover:text-primary-dark hover:border-primary/30 dark:hover:bg-primary-light/10 dark:hover:text-primary dark:hover:border-primary/30 transition-all duration-300 ease-out outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
       >
         <span className={selectedOption ? "text-foreground font-semibold" : "text-muted font-medium"}>
           {selectedOption ? selectedOption.label : placeholder}
