@@ -23,7 +23,7 @@ export function PillButton({
           gap: 8px;
           padding: 8px 20px;
           border: 1px solid var(--border, rgba(128,128,128,0.35));
-          border-radius: 16px;
+          border-radius: var(--radius-2xl, 22px);
           transition: all 0.2s ease-in;
           position: relative;
           overflow: hidden;

@@ -17,7 +17,7 @@ export function FancyButton({
         .fancy-${uniqueId} {
           background-color: transparent;
           border: 2px solid var(--foreground, #000000);
-          border-radius: 16px;
+          border-radius: var(--radius-2xl, 22px);
           box-sizing: border-box;
           color: var(--foreground, #000000);
           cursor: pointer;
@@ -124,13 +124,13 @@ export function FancyButton({
         .fancy-${uniqueId}:hover {
           color: var(--background, #ffffff);
           background: var(--foreground, #000000);
-          border-radius: 16px;
+          border-radius: var(--radius-2xl, 22px);
         }
 
         .dark .fancy-${uniqueId}:hover {
           color: #09090b;
           background: #ffffff;
-          border-radius: 16px;
+          border-radius: var(--radius-2xl, 22px);
         }
 
         .fancy-${uniqueId}:hover::before {
