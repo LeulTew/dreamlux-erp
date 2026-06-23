@@ -7,7 +7,7 @@ import Image from "next/image";
 import { updateEmployee, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import { Employee, SalaryLevel, EventType, EmployeesResponse } from "@/lib/types";
 import toast from "react-hot-toast";
-import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification } from "react-icons/hi2";
+import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
@@ -519,35 +519,60 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Department */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 col-span-1">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Department")}</label>
-                  <div className="flex gap-2">
-                    {isAddingDepartment ? (
-                      <div className="flex-1 flex gap-2">
-                         <input
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Select
+                        options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
+                        value={formData.department_id}
+                        onChange={(val) => setFormData({...formData, department_id: val})}
+                        placeholder={t("Select Department")}
+                        className="flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingDepartment(!isAddingDepartment)}
+                        className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-sm ${
+                          isAddingDepartment
+                            ? "bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 rotate-45"
+                            : "bg-primary text-primary-foreground hover:bg-primary-dark"
+                        }`}
+                        title={isAddingDepartment ? t("Cancel") : t("Add Department")}
+                      >
+                        <HiPlus className="w-5 h-5 transition-transform duration-300" />
+                      </button>
+                    </div>
+
+                    {isAddingDepartment && (
+                      <div className="flex gap-2 p-2 bg-card-alt/50 border border-border/40 rounded-xl animate-in slide-in-from-top-2 duration-200">
+                        <input
                           type="text"
                           autoFocus
+                          placeholder={t("New Department Name")}
                           value={newDepartment}
                           onChange={(e) => setNewDepartment(e.target.value)}
-                          className="flex-1 h-11 px-4 rounded-xl border border-primary bg-card-alt text-sm outline-none"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddDepartment();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setIsAddingDepartment(false);
+                              setNewDepartment("");
+                            }
+                          }}
+                          className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs outline-none text-foreground focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
                         />
-                        <button type="button" onClick={handleAddDepartment} className="w-11 h-11 rounded-xl bg-primary text-on-primary hover:bg-primary-dark transition-all flex items-center justify-center shrink-0">
-                          <HiPlus className="w-4.5 h-4.5" />
+                        <button
+                          type="button"
+                          onClick={handleAddDepartment}
+                          className="px-3 h-9 rounded-lg bg-primary text-primary-foreground hover:bg-primary-dark transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
+                        >
+                          <HiCheck className="w-4 h-4" />
+                          {t("Add")}
                         </button>
                       </div>
-                    ) : (
-                      <>
-                        <Select
-                          options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
-                          value={formData.department_id}
-                          onChange={(val) => setFormData({...formData, department_id: val})}
-                          placeholder={t("Select Department")}
-                          className="flex-1"
-                        />
-                        <button type="button" onClick={() => setIsAddingDepartment(true)} className="w-11 h-11 rounded-xl bg-primary text-on-primary hover:bg-primary-dark transition-all flex items-center justify-center shrink-0 shadow-sm" title="Add Department">
-                          <HiPlus className="w-4.5 h-4.5" />
-                        </button>
-                      </>
                     )}
                   </div>
                 </div>
@@ -626,23 +651,26 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
           </div>
 
           {/* Form Actions */}
-          <div className="flex gap-3 mt-6">
-            <Button
-              type="submit"
-              loading={updateMutation.isPending}
-              className="flex-1 h-11 rounded-2xl bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.98] transition-all"
-            >
-              {t("Save Changes")}
-            </Button>
+          <div className="flex justify-end items-center gap-3 mt-8 pt-4 border-t border-border/40">
             <Button
               type="button"
               variant="destructive"
               loading={deleteMutation.isPending}
               onClick={() => setShowDeleteModal(true)}
-              className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all group shrink-0"
+              className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
               title={t("Delete Permanently")}
             >
-              <HiTrash className="w-5 h-5 group-hover:scale-105 transition-transform" />
+              <HiTrash className="w-4.5 h-4.5" />
+              {t("Delete")}
+            </Button>
+            
+            <Button
+              type="submit"
+              loading={updateMutation.isPending}
+              className="h-10 px-6 rounded-xl bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+            >
+              <HiCheck className="w-4.5 h-4.5" />
+              {t("Save Changes")}
             </Button>
           </div>
         </form>

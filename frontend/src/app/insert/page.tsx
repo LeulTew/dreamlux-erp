@@ -6,7 +6,7 @@ import Image from "next/image";
 import { createEmployee, getNextEmployeeId, getDepartments, createDepartment, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import AuthLayout from "@/components/AuthLayout";
 import toast from "react-hot-toast";
-import { HiXMark, HiUserPlus, HiIdentification, HiPlus, HiExclamationCircle } from "react-icons/hi2";
+import { HiXMark, HiUserPlus, HiIdentification, HiPlus, HiExclamationCircle, HiCheck } from "react-icons/hi2";
 import { z } from "zod";
 import { SalaryLevel, EventType } from "@/lib/types";
 import Select from "@/components/ui/Select";
@@ -572,50 +572,58 @@ export default function InsertEmployeePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Department (Optional)")}</label>
-                <div className="flex gap-2">
-                  {isAddingDepartment ? (
-                    <div className="flex-1 flex gap-2">
-                       <input
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Select
+                      options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
+                      value={formData.department_id}
+                      onChange={(val) => setFormData({...formData, department_id: val})}
+                      placeholder={t("Select Department")}
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingDepartment(!isAddingDepartment)}
+                      className={`w-10 h-10 rounded-lg transition-all flex items-center justify-center shrink-0 shadow-premium ${
+                        isAddingDepartment
+                          ? "bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 rotate-45"
+                          : "bg-primary text-primary-foreground hover:bg-primary-dark"
+                      }`}
+                      title={isAddingDepartment ? t("Cancel") : t("Add Department")}
+                    >
+                      <HiPlus className="w-5 h-5 transition-transform duration-300" />
+                    </button>
+                  </div>
+
+                  {isAddingDepartment && (
+                    <div className="flex gap-2 p-2 bg-card-alt/55 border border-border/30 rounded-xl animate-in slide-in-from-top-2 duration-200">
+                      <input
                         type="text"
                         autoFocus
+                        placeholder={t("New Department Name")}
                         value={newDepartment}
                         onChange={(e) => setNewDepartment(e.target.value)}
-                        placeholder={t("New department")}
-                        className="flex-1 px-4 py-3 rounded-xl border border-primary bg-card-alt text-foreground outline-none transition-all"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddDepartment();
+                          } else if (e.key === "Escape") {
+                            e.preventDefault();
+                            setIsAddingDepartment(false);
+                            setNewDepartment("");
+                          }
+                        }}
+                        className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs outline-none text-foreground focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
                       />
                       <button
                         type="button"
                         onClick={handleAddDepartment}
-                        className="px-4 py-3 rounded-xl bg-primary text-on-primary hover:bg-primary-dark transition-all"
+                        className="px-3 h-9 rounded-lg bg-primary text-primary-foreground hover:bg-primary-dark transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
                       >
+                        <HiCheck className="w-4 h-4" />
                         {t("Add")}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingDepartment(false)}
-                        className="px-4 py-3 rounded-xl bg-card-alt border border-border text-muted hover:text-foreground transition-all"
-                      >
-                        <HiXMark className="w-5 h-5" />
-                      </button>
                     </div>
-                  ) : (
-                    <>
-                      <Select
-                        options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
-                        value={formData.department_id}
-                        onChange={(val) => setFormData({...formData, department_id: val})}
-                        placeholder={t("Select Department")}
-                        className="flex-1"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingDepartment(true)}
-                        className="w-10 h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.95] transition-all flex items-center justify-center shadow-premium"
-                        title="Add New Department"
-                      >
-                        <HiPlus className="w-5 h-5" />
-                      </button>
-                    </>
                   )}
                 </div>
               </div>
