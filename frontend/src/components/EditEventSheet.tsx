@@ -396,7 +396,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               <Button
                 type="submit"
                 loading={saveMutation.isPending}
-                className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+                className="flex-1 h-11 rounded-2xl bg-primary text-on-primary font-semibold text-sm hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {event ? t("Save Changes") : t("Create Event")}
               </Button>
@@ -406,7 +406,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                   variant="destructive"
                   loading={deleteMutation.isPending}
                   onClick={() => setShowDeleteModal(true)}
-                  className="w-11 h-11 rounded-xl flex items-center justify-center transition-all group shrink-0"
+                  className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all group shrink-0"
                   title={t("Delete Event")}
                 >
                   <HiTrash className="w-5 h-5 group-hover:scale-105 transition-transform" />

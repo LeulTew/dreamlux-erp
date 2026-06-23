@@ -610,7 +610,7 @@ export default function InsertEmployeePage() {
                       <button
                         type="button"
                         onClick={() => setIsAddingDepartment(true)}
-                        className="w-10 h-10 rounded-full bg-primary text-on-primary hover:bg-primary-dark transition-all shadow-premium flex items-center justify-center"
+                        className="w-10 h-10 rounded-2xl bg-primary text-on-primary hover:bg-primary/90 transition-all shadow-premium flex items-center justify-center"
                         title="Add New Department"
                       >
                         <HiPlus className="w-5 h-5" />
@@ -731,7 +731,7 @@ export default function InsertEmployeePage() {
           <button
             type="submit"
             disabled={createMutation.isPending}
-            className="w-full py-4 rounded-3xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl bg-primary text-on-primary font-black uppercase tracking-[0.2em] shadow-premium hover:bg-primary/90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
           </button>
