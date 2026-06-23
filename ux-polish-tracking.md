@@ -3,10 +3,10 @@
 This document tracks our progress, active branch, next steps, and pull requests for the UI/UX polish.
 
 ## Overall Status
-- **Current Step**: Task 2: Button System Hardening
-- **Active Branch**: `feature/25-button-system-polish`
+- **Current Step**: Task 3: Sortable Table Interaction System
+- **Active Branch**: None
 - **Active Pull Request**: None
-- **Completion Progress**: 0/5 Phases Completed
+- **Completion Progress**: 1/5 Phases Completed
 
 ---
 
@@ -14,8 +14,8 @@ This document tracks our progress, active branch, next steps, and pull requests 
 
 | Phase | Description | Branch Name | Status | PR Links / Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| **Phase 1** | Button System Hardening | `feature/25-button-system-polish` | *In Progress* | Active |
-| **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | *Not Started* | |
+| **Phase 1** | Button System Hardening | `feature/25-button-system-polish` | **Completed** | [PR #60](https://github.com/LeulTew/dreamlux-erp/pull/60) |
+| **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | *Not Started* | Active next |
 | **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | *Not Started* | |
 | **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | *Not Started* | |
 | **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | *Not Started* | |
