@@ -1,0 +1,35 @@
+name: Reopen Incomplete Issues
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  reopen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for unchecked checkboxes
+        id: check
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          # Read body and check for unchecked tasks like - [ ] or * [ ]
+          if echo "$ISSUE_BODY" | grep -qE '^[[:space:]]*[-*+[:digit:].]*[[:space:]]*\[[[:space:]]+\]'; then
+            echo "incomplete=true" >> $GITHUB_OUTPUT
+            echo "Found incomplete checklist items."
+          else
+            echo "incomplete=false" >> $GITHUB_OUTPUT
+            echo "No incomplete checklist items found."
+          fi
+
+      - name: Reopen issue and comment
+        if: steps.check.outputs.incomplete == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: |
+          gh issue reopen "$ISSUE_URL"
+          gh issue comment "$ISSUE_URL" --body "⚠️ This issue has been reopened automatically because there are still unchecked items in the checklist."

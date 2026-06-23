@@ -610,28 +610,24 @@ export default function AuthLayout({
 }) {
   const router = useRouter();
   const { isPreviewActive, previewRoleName, clearPreview } = useAuth();
-  const [status] = useState<
-    "checking" | "authenticated" | "unauthenticated"
-  >(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
-      if (token) return "authenticated";
-      return "unauthenticated";
-    }
-    return "checking";
-  });
+  const [mounted, setMounted] = useState(false);
   const { lang } = useLanguage();
-  const [pageWidth, setPageWidth] = useState<"full" | "contained">(() => {
-    if (typeof window !== "undefined") {
-      const savedWidth = localStorage.getItem("dreamlux_page_width");
-      if (savedWidth === "full" || savedWidth === "contained") {
-        return savedWidth;
-      }
-    }
-    return "full";
-  });
+  const [pageWidth, setPageWidth] = useState<"full" | "contained">("full");
   const [showAbout, setShowAbout] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    const savedWidth = localStorage.getItem("dreamlux_page_width");
+    setTimeout(() => {
+      setMounted(true);
+      if (savedWidth === "full" || savedWidth === "contained") {
+        setPageWidth(savedWidth);
+      }
+    }, 0);
+  }, []);
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const status = mounted ? (token ? "authenticated" : "unauthenticated") : "checking";
 
   useEffect(() => {
     if (status === "unauthenticated") {

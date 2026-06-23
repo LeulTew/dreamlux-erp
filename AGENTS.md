@@ -77,7 +77,7 @@ These rules apply to all AI agents working in this repository.
   - `test(<scope>): ...` for adding/updating tests.
 - **GitHub Operations**: Prefer `gh` for issues, labels, assignment, PRs, checklist updates, status checks, comments, and merges. If `gh` is unavailable, use the connected GitHub tooling if present; otherwise provide exact manual commands and do not silently skip the workflow.
 - **PR Readiness**: PR descriptions must reference the issue, list verification commands and outcomes, and separate local QA, CI, deployment, and production smoke evidence when relevant.
-- **Merge Discipline**: Do not merge until local verification, senior diff review, and required GitHub checks are clean. After merge, return to `main`, pull fast-forward, verify a clean worktree, and deploy when the task requires production release.
+- **Merge Discipline**: DO NOT merge any pull requests or proceed to subsequent task phases/issues unless the user explicitly gives authorization in a prompt. Keep all PRs open as drafts or ready for review, and do not advance past the current phase until instructed. Even when authorized, do not merge until local verification, senior diff review, and required GitHub checks are clean. After authorized merge, return to `main`, pull fast-forward, verify a clean worktree, and deploy when the task requires production release.
 - **Self-Verification Checklist**: Before completing a task, verify against:
   - [Codebase Structure Rules](file:///.github/ai_templates/agent_structure.md) for module organization.
   - Pull request template items (type-checks, lint, migration dry-runs).
