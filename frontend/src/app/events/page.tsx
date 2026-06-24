@@ -32,6 +32,8 @@ import {
   HiXMark
 } from "react-icons/hi2";
 
+import Select from "@/components/ui/Select";
+
 import EditEventSheet from "@/components/EditEventSheet";
 import PaginationControls from "@/components/PaginationControls";
 import Link from "next/link";
@@ -314,7 +316,7 @@ const DATE_RANGE_OPTIONS = [
   { id: "last_month", label: "Last Month" }
 ];
 
-export function EventsPageContent() {
+function EventsPageContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
@@ -778,25 +780,23 @@ export function EventsPageContent() {
               </div>
 
               {/* Saved view dropdown selector */}
-              <div className="relative">
-                <select
-                  value={activeViewId}
-                  onChange={(e) => {
-                    const view = savedViews.find(v => v.id === e.target.value);
-                    if (view) handleApplyView(view);
-                    else handleClearFilters();
-                  }}
-                  className="pl-3 pr-8 h-[44px] text-xs font-bold uppercase tracking-wider rounded-2xl bg-card-alt border border-border outline-none appearance-none cursor-pointer focus:ring-1 focus:ring-primary/30"
-                >
-                  <option value="">{t("Saved Views")}</option>
-                  {savedViews.map((view) => (
-                    <option key={view.id} value={view.id}>
-                      {view.name} ({t(view.scope)})
-                    </option>
-                  ))}
-                </select>
-                <HiBookmark className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
-              </div>
+              <Select
+                options={savedViews.map((view) => ({
+                  id: view.id,
+                  label: `${view.name} (${t(view.scope)})`
+                }))}
+                value={activeViewId || ""}
+                onChange={(val) => {
+                  const view = savedViews.find(v => String(v.id) === String(val));
+                  if (view) handleApplyView(view);
+                  else handleClearFilters();
+                }}
+                placeholder={t("Saved Views")}
+                className="min-w-[160px] max-w-[200px]"
+                icon={HiBookmark}
+                triggerClassName="w-full flex items-center justify-between px-4 h-[44px] rounded-2xl bg-card-alt border border-border/50 text-xs font-black uppercase tracking-wider text-muted hover:text-foreground hover:bg-primary-light/5 hover:border-primary/30 dark:hover:bg-primary-light/10 dark:hover:text-primary dark:hover:border-primary/30 transition-all duration-300 ease-out outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                valueClassName="text-xs font-black uppercase tracking-wider truncate mr-1.5"
+              />
 
               {/* Saved view controls */}
               {activeViewId && (
@@ -942,7 +942,7 @@ export function EventsPageContent() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-hidden bg-card border border-border rounded-2xl table-container">
+            <div className="hidden md:block overflow-hidden bg-card border border-border rounded-2xl 2xl:rounded-4xl table-container">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">

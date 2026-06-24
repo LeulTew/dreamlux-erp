@@ -35,7 +35,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Syncing...": "Syncing...",
     "Mark as Physically Verified": "Mark as Physically Verified",
     "Applying Audit...": "Applying Audit...",
-    "by": "by"
+    "by": "by",
+    "Reset Changes": "Reset Changes",
+    "Changes reset": "Changes reset"
   },
   am: {
     "Edit Asset": "የንብረት መረጃ ማስተካከያ",
@@ -74,7 +76,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Update Asset": "ንብረት አዘምን",
     "Syncing...": "በማመሳሰል ላይ...",
     "Mark as Physically Verified": "በአካል መኖሩን አረጋግጥ",
-    "Applying Audit...": "ኦዲት በማስተካከል ላይ..."
+    "Applying Audit...": "ኦዲት በማስተካከል ላይ...",
+    "Reset Changes": "ለውጦችን መልስ",
+    "Changes reset": "ለውጦች ተመልሰዋል"
   }
 };
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -82,12 +86,13 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { updateItem, getStores, rotateImage, deleteItem, reconcileItems } from "@/lib/api";
 import { Item, Store } from "@/lib/types";
-import toast from "react-hot-toast";
+import { notify } from "@/lib/toast";
 import {
   HiCamera,
   HiArrowPath,
   HiTrash,
   HiCheckCircle,
+  HiCheck,
 } from "react-icons/hi2";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
@@ -114,6 +119,16 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
   );
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  const handleReset = () => {
+    setName(item.name);
+    setQuantity(String(item.quantity));
+    setOfficeId(item.store.id);
+    setDescription(item.description || "");
+    setImagePreview(item.image_url);
+    setImageFile(null);
+    notify.success(t("Changes reset"));
+  };
+
   const { data: offices = [] } = useQuery<Store[]>({
     queryKey: ["offices"],
     queryFn: getStores,
@@ -122,21 +137,21 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
   const updateMutation = useMutation({
     mutationFn: (formData: FormData) => updateItem(item.id, formData),
     onSuccess: () => {
-      toast.success("Asset updated!");
+      notify.success("Success", "Asset updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
       onClose();
     },
     onError: () => {
-      toast.error("Failed to update asset");
+      notify.error("Error", "Failed to update asset");
     },
   });
 
   const rotateMutation = useMutation({
     mutationFn: () => rotateImage(item.id),
     onSuccess: (data) => {
-      toast.success("Image rotated");
+      notify.success("Success", "Image rotated successfully");
       if (data.image_url) {
         setImagePreview(data.image_url + "?t=" + Date.now());
       }
@@ -144,21 +159,21 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: () => {
-      toast.error("Rotation failed");
+      notify.error("Error", "Rotation failed");
     },
   });
 
   const reconcileMutation = useMutation({
     mutationFn: (qty: number) => reconcileItems([{ id: item.id, quantity: qty }]),
     onSuccess: () => {
-      toast.success("Count reconciled!");
+      notify.success("Success", "Count reconciled successfully!");
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
       onClose();
     },
     onError: () => {
-      toast.error("Reconciliation failed");
+      notify.error("Error", "Reconciliation failed");
     },
   });
 
@@ -171,7 +186,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
   const deleteMutation = useMutation({
     mutationFn: () => deleteItem(item.id),
     onSuccess: () => {
-      toast.success("Asset deleted");
+      notify.success("Success", "Asset deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
@@ -179,7 +194,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       onDeleted?.();
     },
     onError: () => {
-      toast.error("Delete failed");
+      notify.error("Error", "Delete failed");
     },
   });
 
@@ -191,11 +206,11 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!["image/jpeg", "image/png"].includes(file.type)) {
-      toast.error("Only JPEG/PNG allowed");
+      notify.error("Error", "Only JPEG/PNG images are allowed");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image must be under 10MB");
+      notify.error("Error", "Image must be under 10MB");
       return;
     }
     setImageFile(file);
@@ -232,7 +247,8 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
         title={t("Edit Asset")}
         subtitle={`${t("Updating")} ${item.name}`}
       >
-        <div className="lg:grid lg:grid-cols-2 lg:gap-8 items-start">
+        <form onSubmit={handleSubmit} className="space-y-6 pb-12">
+          <div className="lg:grid lg:grid-cols-2 lg:gap-8 items-start">
             {/* Left: Image & Quick Stats */}
             <div className="space-y-4">
               <div
@@ -302,7 +318,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   </div>
                 )}
               </div>
- 
+
               {imagePreview && (
                 <button
                   type="button"
@@ -314,7 +330,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   {rotateMutation.isPending ? t("Rotating...") : t("Rotate Asset 90°")}
                 </button>
               )}
- 
+
               {/* Reconciliation Info */}
               {(item.last_counted_at || item.last_counted_by) && (
                 <div className="p-4 rounded-xl bg-card-alt/50 border border-border/40 shadow-sm">
@@ -340,9 +356,9 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                 </div>
               )}
             </div>
- 
+
             {/* Right: Form Fields */}
-            <form onSubmit={handleSubmit} className="mt-8 lg:mt-0 space-y-4">
+            <div className="mt-8 lg:mt-0 space-y-4">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -351,7 +367,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                 onChange={handleImageSelect}
                 className="hidden"
               />
- 
+
               <div className="space-y-1.5">
                 <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   {t("Reference Name")}
@@ -364,7 +380,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                 />
               </div>
- 
+
               <div className="space-y-1.5">
                 <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   {t("Adjust Stock Count")}
@@ -393,7 +409,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   </button>
                 </div>
               </div>
- 
+
               <div className="space-y-1.5">
                 <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   {t("Assigned Location")}
@@ -415,7 +431,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   ))}
                 </div>
               </div>
- 
+
               <div className="space-y-1.5">
                 <label className="text-[11px] uppercase font-semibold text-muted-foreground/90 tracking-wider px-1">
                   {t("Internal Notes")}
@@ -428,42 +444,58 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-card-alt text-foreground font-medium focus:ring-2 focus:ring-primary/20 transition-all resize-none outline-none leading-relaxed text-sm"
                 />
               </div>
- 
-              <div className="pt-2 space-y-3">
-                <div className="flex gap-3">
-                  <Button
-                    type="submit"
-                    loading={updateMutation.isPending}
-                    className="flex-4 h-11 rounded-xl bg-primary text-background font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 border border-primary/20"
-                  >
-                    {t("Update Asset")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    loading={deleteMutation.isPending}
-                    onClick={handleDelete}
-                    className="flex-1 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95"
-                    aria-label={t("Delete Asset")}
-                  >
-                    <HiTrash className="w-4.5 h-4.5" />
-                  </Button>
-                </div>
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleReconcile}
-                  loading={reconcileMutation.isPending}
-                  disabled={updateMutation.isPending}
-                  className="w-full h-11 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
-                  {t("Mark as Physically Verified")}
-                </Button>
-              </div>
-            </form>
+            </div>
           </div>
+
+          {/* Form Actions Footer */}
+          <div className="flex flex-wrap justify-between items-center gap-3 mt-8 pt-4 border-t border-border/40">
+            {/* Left side: Reconcile Button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReconcile}
+              loading={reconcileMutation.isPending}
+              disabled={updateMutation.isPending}
+              className="h-10 px-4 rounded-xl bg-card border border-border text-foreground font-semibold text-xs uppercase tracking-wider hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
+              {t("Mark as Physically Verified")}
+            </Button>
+            
+            {/* Right side: Delete, Reset, Save Changes */}
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="destructive"
+                loading={deleteMutation.isPending}
+                onClick={handleDelete}
+                className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                title={t("Delete Asset")}
+              >
+                <HiTrash className="w-4.5 h-4.5" />
+                {t("Delete")}
+              </Button>
+              
+              <Button
+                type="button"
+                onClick={handleReset}
+                className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+              >
+                <HiArrowPath className="w-4.5 h-4.5" />
+                {t("Reset Changes")}
+              </Button>
+              
+              <Button
+                type="submit"
+                loading={updateMutation.isPending}
+                className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+              >
+                <HiCheck className="w-4.5 h-4.5" />
+                {t("Save Changes")}
+              </Button>
+            </div>
+          </div>
+        </form>
       </ResponsiveDrawer>
       <DeleteConfirmModal
         isOpen={showDeleteModal}

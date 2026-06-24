@@ -27,6 +27,13 @@ Relates to #25
 | 8 | **Radius standardisation – Events page** | `app/events/page.tsx` | Changed every `rounded-lg` button, input, select, modal, card, and drawer to `rounded-2xl`. Covers: toolbar, search, saved-views dropdown, filter builder, export dropdown, save-view modal, delete-view modal, mobile cards, skeleton loaders. |
 | 9 | **Revert DeleteButton** | `components/ui/DeleteButton.tsx` *(deleted)* | Removed animated DeleteButton component and its test file. Restored original plain `<button>` trash toggles in employees, assets, and payments pages. |
 | 10 | **Events page JSX fix** | `app/events/page.tsx` | Fixed JSX corruption in save-view / delete-view modal section caused by a bad multi-replace merge. |
+| 11 | **Select component upgrade** | `components/ui/Select.tsx` | Added support for custom trigger styling (`triggerClassName`), custom value styling (`valueClassName`), and a custom right-aligned icon. |
+| 12 | **Reset changes & action buttons** | `components/EditEventSheet.tsx`, `components/EditAssetSheet.tsx` | Implemented "Reset Changes" button to revert form fields to database values. Restructured asset form container to be single-form layout. Symmetrically styled drawer footers (Delete left-aligned; Reset/Save right-aligned). |
+| 13 | **Event Proposals UI redesign** | `app/events/proposals/page.tsx` | Upgraded "New Proposal" CTA to indigo style, redesigned all 4 KPI cards (with glassmorphic glowing blur, group scales, and custom icons), and updated table/toolbar container border-radii to `rounded-2xl` / `2xl:rounded-4xl`. |
+| 14 | **Intake Workflow Actions redesign** | `app/events/proposals/[id]/page.tsx` | Repositioned Approve/Reject workflow buttons to be side-by-side, compact, and styled with desaturated indicator colors (emerald/rose tints) for optimal text contrast and premium design. |
+| 15 | **Border radius standardization** | HR Finance Pages | Aligned list tables, cards, and toolbars to premium `rounded-2xl` and `rounded-xl` tokens on Expense Approvals (`hr/expenses/approve/page.tsx`), Profit Reports (`hr/reports/profit/page.tsx`), and Salary Levels (`hr/salary-levels/page.tsx`). |
+| 16 | **Mobile spacing fix** | `app/assets/insert/page.tsx` | Added `pb-12` bottom padding to page container so mobile submit buttons don't cut off. |
+| 17 | **Typecheck & compile fixes** | `components/ui/PillButton.tsx`, `app/events/page.tsx` | Fixed `PillButtonProps` to accept/destructure `variant` prop. Corrected EventsPageContent named export declaration to satisfy Next.js page routing requirements. |
 
 ---
 

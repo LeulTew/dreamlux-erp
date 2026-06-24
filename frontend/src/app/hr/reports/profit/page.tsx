@@ -228,7 +228,7 @@ export default function FinancialDashboardPage() {
     return (
       <AuthLayout>
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-lg bg-danger/10 flex items-center justify-center text-danger mb-4 border border-danger/20">
+          <div className="w-16 h-16 rounded-2xl bg-danger/10 flex items-center justify-center text-danger mb-4 border border-danger/20">
             <HiLockClosed className="h-8 w-8" />
           </div>
           <h2 className="text-xl font-bold text-foreground">{t("Forbidden: Insufficient privileges")}</h2>
@@ -318,7 +318,7 @@ export default function FinancialDashboardPage() {
         <div className="flex flex-col gap-4 border-b border-border/50 pb-5 lg:flex-row lg:items-end lg:justify-between no-print">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-primary/30 bg-primary-light text-primary-dark">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/30 bg-primary-light text-primary-dark">
                 <HiArrowTrendingUp className="h-6 w-6" />
               </div>
               <div className="min-w-0">
@@ -336,7 +336,7 @@ export default function FinancialDashboardPage() {
         </div>
 
         {/* Filters Toolbar Container */}
-        <div className="toolbar-container bg-card border border-border rounded-lg p-3.5 space-y-3.5 no-print">
+        <div className="toolbar-container bg-card border border-border rounded-2xl p-3.5 space-y-3.5 no-print">
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
               <div className="relative flex-1 max-w-xs">
@@ -346,14 +346,14 @@ export default function FinancialDashboardPage() {
                   placeholder={t("Search events...")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 h-[44px] rounded-lg bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
+                  className="w-full pl-10 pr-4 h-[44px] rounded-xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
                 />
               </div>
 
               <select
                 value={eventTypeId}
                 onChange={(e) => setEventTypeId(e.target.value)}
-                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-lg bg-card-alt border border-border outline-none"
+                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-xl bg-card-alt border border-border outline-none"
               >
                 <option value="">{t("Select Type")}</option>
                 {eventTypes.map((type) => (
@@ -364,7 +364,7 @@ export default function FinancialDashboardPage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-lg bg-card-alt border border-border outline-none"
+                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-xl bg-card-alt border border-border outline-none"
               >
                 <option value="">{t("Select Status")}</option>
                 <option value="Planned">{t("Planned")}</option>
@@ -394,13 +394,13 @@ export default function FinancialDashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setIsExportOpen(!isExportOpen)}
-                  className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
+                  className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                 >
                   <HiArrowDownTray className="w-4 h-4" />
                   {t("Export")}
                 </button>
                 {isExportOpen && (
-                  <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-lg shadow-massive z-10 py-1">
+                  <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-xl shadow-massive z-10 py-1">
                     <button
                       onClick={() => handleExport("csv")}
                       className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt"
@@ -447,7 +447,7 @@ export default function FinancialDashboardPage() {
             <Skeleton className="h-64 w-full" />
           </div>
         ) : isError || !data ? (
-          <div className="rounded-lg border border-border bg-card p-8 text-center text-muted">
+          <div className="rounded-2xl border border-border bg-card p-8 text-center text-muted">
             {t("Workspace unavailable")}
           </div>
         ) : (
@@ -455,27 +455,27 @@ export default function FinancialDashboardPage() {
             
             {/* KPI Cards Strip */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Total Revenue")}</div>
                 <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">{formatCurrency(data.summary.totalRevenue)}</div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Total Approved Expenses")}</div>
                 <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">{formatCurrency(data.summary.totalExpenses)}</div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Net Profit")}</div>
                 <div className={`mt-2 text-xl font-black font-mono tabular-nums ${data.summary.netProfit >= 0 ? "text-success" : "text-danger"}`}>
                   {formatCurrency(data.summary.netProfit)}
                 </div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Profit Margin")}</div>
                 <div className={`mt-2 text-xl font-black font-mono ${data.summary.profitMargin >= 25 ? "text-success" : "text-warning"}`}>
                   {data.summary.profitMargin.toFixed(1)}%
                 </div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4 col-span-2 lg:col-span-1">
+              <div className="rounded-2xl border border-border bg-card p-4 col-span-2 lg:col-span-1">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Pending Expense Exposure")}</div>
                 <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">
                   {formatCurrency(data.summary.pendingExpenseExposure)}
@@ -487,7 +487,7 @@ export default function FinancialDashboardPage() {
             {activeTab === "overview" && (
               <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 {/* Trend Chart */}
-                <section className="rounded-lg border border-border bg-card p-5">
+                <section className="rounded-2xl border border-border bg-card p-5">
                   <div className="mb-4 flex items-center gap-2">
                     <HiArrowTrendingUp className="h-5 w-5 text-primary-dark" />
                     <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Profit Trend")}</h2>
@@ -560,7 +560,7 @@ export default function FinancialDashboardPage() {
                 </section>
 
                 {/* KPI highlights lists */}
-                <section className="rounded-lg border border-border bg-card p-5 space-y-4">
+                <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
                   <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
                     {t("Key Performance Indicators")}
                   </h3>
@@ -590,7 +590,7 @@ export default function FinancialDashboardPage() {
 
             {/* Monthly View */}
             {(activeTab === "monthly" || !activeTab) && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiCalendarDays className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Monthly View")}</h2>
@@ -637,7 +637,7 @@ export default function FinancialDashboardPage() {
 
             {/* Event Type Performance View */}
             {activeTab === "eventTypes" && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiChartBar className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Event Type Performance")}</h2>
@@ -684,7 +684,7 @@ export default function FinancialDashboardPage() {
 
             {/* Category Breakdown View */}
             {activeTab === "categories" && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiChartBar className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Category Breakdown")}</h2>
@@ -728,7 +728,7 @@ export default function FinancialDashboardPage() {
 
             {/* Proposal Variance View */}
             {activeTab === "variance" && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiArrowTrendingUp className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Proposal Variance")}</h2>

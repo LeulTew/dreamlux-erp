@@ -6,7 +6,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { updateEmployee, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import { Employee, SalaryLevel, EventType, EmployeesResponse } from "@/lib/types";
-import toast from "react-hot-toast";
+import { notify } from "@/lib/toast";
 import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck, HiArrowPath } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
@@ -153,7 +153,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     setFormErrors({});
     setIsAddingDepartment(false);
     setNewDepartment("");
-    toast.success(t("Changes reset"));
+    notify.success(t("Changes reset"));
   };
 
   const [newDepartment, setNewDepartment] = useState("");
@@ -186,11 +186,11 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     mutationFn: (id: string) => deleteEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee deleted successfully");
+      notify.success("Employee Deleted", "Employee deleted successfully");
       onClose();
     },
     onError: () => {
-      toast.error("Failed to delete employee");
+      notify.error("Deletion Failed", "Failed to delete employee");
     },
   });
 
@@ -201,7 +201,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       const skippedEventPrices = dropped.includes("event_prices") || updated?._warning?.includes("event_prices");
 
       if (skippedEventPrices) {
-        toast.error("Employee saved, but event rates were not persisted. Please run DB migration for event_prices.");
+        notify.error("Event Rates Warning", "Employee saved, but event rates were not persisted. Please run DB migration for event_prices.");
         queryClient.invalidateQueries({ queryKey: ["employees"] });
         return;
       }
@@ -225,13 +225,13 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         }
       );
 
-      toast.success("Employee updated!");
+      notify.success("Success", "Employee updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       onClose();
     },
     onError: (err: AxiosError<{ error?: string; details?: string }>) => {
       const message = err.response?.data?.error || err.response?.data?.details || "Update failed";
-      toast.error(message);
+      notify.error("Update Failed", message);
     },
   });
 
@@ -302,7 +302,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       };
       reader.readAsDataURL(compressed);
     } catch {
-      toast.error(t("Failed to process image"));
+      notify.error(t("Failed to process image"));
     }
   };
 
@@ -316,12 +316,12 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       setFormData(prev => ({ ...prev, department_id: res.id }));
       setNewDepartment("");
       setIsAddingDepartment(false);
-      toast.success(t("Department added!"));
+      notify.success(t("Department added!"));
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.error || t("Failed to add department"));
+        notify.error(t("Failed to add department"), err.response?.data?.error);
       } else {
-        toast.error(t("Failed to add department"));
+        notify.error(t("Failed to add department"));
       }
     }
   };
@@ -338,7 +338,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         errors[field] = issue.message;
       });
       setFormErrors(errors);
-      toast.error(t("Please fix the mistakes in the form"));
+      notify.error(t("Please fix the mistakes in the form"));
       return;
     }
     setFormErrors({});

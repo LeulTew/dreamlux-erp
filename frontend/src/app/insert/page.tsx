@@ -5,7 +5,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { createEmployee, getNextEmployeeId, getDepartments, createDepartment, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import AuthLayout from "@/components/AuthLayout";
-import toast from "react-hot-toast";
+import { notify } from "@/lib/toast";
 import { HiXMark, HiUserPlus, HiIdentification, HiPlus, HiExclamationCircle, HiCheck } from "react-icons/hi2";
 import { z } from "zod";
 import { SalaryLevel, EventType } from "@/lib/types";
@@ -172,12 +172,12 @@ export default function InsertEmployeePage() {
   const createMutation = useMutation({
     mutationFn: (fd: FormData) => createEmployee(fd),
     onSuccess: () => {
-      toast.success(t("Employee created successfully!"));
+      notify.success(t("Employee created successfully!"));
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       resetForm();
     },
     onError: (err: AxiosError<{ error: string }>) => {
-      toast.error(err.response?.data?.error || t("Failed to create employee"));
+      notify.error(t("Failed to create employee"), err.response?.data?.error);
     },
   });
 
@@ -269,7 +269,7 @@ export default function InsertEmployeePage() {
         };
         reader.readAsDataURL(compressed);
       } catch {
-        toast.error(t("Failed to process image"));
+        notify.error(t("Failed to process image"));
       }
     },
     [t],
@@ -283,12 +283,12 @@ export default function InsertEmployeePage() {
       setFormData(prev => ({ ...prev, department_id: res.id }));
       setNewDepartment("");
       setIsAddingDepartment(false);
-      toast.success(t("Department added!"));
+      notify.success(t("Department added!"));
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.error || t("Failed to add department"));
+        notify.error(t("Failed to add department"), err.response?.data?.error);
       } else {
-        toast.error(t("Failed to add department"));
+        notify.error(t("Failed to add department"));
       }
     }
   };
@@ -320,7 +320,7 @@ export default function InsertEmployeePage() {
         errors[field] = issue.message;
       });
       setFormErrors(errors);
-      toast.error(t("Please fix the errors in the form"));
+      notify.error(t("Please fix the errors in the form"));
       return;
     }
     setFormErrors({});

@@ -3,12 +3,14 @@ import * as React from "react"
 export interface PillButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   className?: string;
   icon?: React.ReactNode;
+  variant?: string;
 }
 
 export function PillButton({
   children,
   className,
   icon,
+  variant,
   ...props
 }: PillButtonProps) {
   const uniqueId = React.useId().replace(/:/g, "-");
