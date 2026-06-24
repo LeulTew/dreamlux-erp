@@ -4,10 +4,9 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { HiCheckCircle, HiXCircle } from "react-icons/hi2";
+import { HiCheckCircle, HiXCircle, HiClipboardDocumentList } from "react-icons/hi2";
 
 import AuthLayout from "@/components/AuthLayout";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import PaginationControls from "@/components/PaginationControls";
@@ -15,6 +14,7 @@ import { getPendingEventExpenses, reviewEventExpense } from "@/lib/api";
 import type { EventExpense } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -61,6 +61,15 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Consumables: "የሚጠቀሙ እቃዎች",
     Other: "ሌላ",
   },
+};
+
+const categoryStyles: Record<string, string> = {
+  Fuel: "bg-orange-500/10 text-orange-500 border-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400 dark:border-orange-500/30",
+  Labor: "bg-blue-500/10 text-blue-500 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30",
+  Transportation: "bg-purple-500/10 text-purple-500 border-purple-500/20 dark:bg-purple-500/20 dark:text-purple-400 dark:border-purple-500/30",
+  "Equipment Rental": "bg-indigo-500/10 text-indigo-500 border-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-400 dark:border-indigo-500/30",
+  Consumables: "bg-teal-500/10 text-teal-500 border-teal-500/20 dark:bg-teal-500/20 dark:text-teal-400 dark:border-teal-500/30",
+  Other: "bg-slate-500/10 text-slate-500 border-slate-500/20 dark:bg-slate-500/20 dark:text-slate-400 dark:border-slate-500/30",
 };
 
 function formatCurrency(value?: number | string | null) {
@@ -128,10 +137,24 @@ export default function ExpenseApprovalPage() {
 
   return (
     <AuthLayout>
-      <div className="page-container-lg space-y-5">
-        <div className="border-b border-border pb-5">
-          <h1 className="text-2xl font-black text-foreground">{t("Expense Approval Queue")}</h1>
-          <p className="mt-1 text-sm text-muted">{t("Review pending event expenses before they affect event cost and profit.")}</p>
+      <div className="page-container-lg space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-5">
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
+              <HiClipboardDocumentList className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black text-foreground tracking-tight">{t("Expense Approval Queue")}</h1>
+                <span className="px-2.5 py-0.5 text-[10px] font-black bg-primary/10 text-primary rounded-full uppercase tracking-wider animate-pulse">
+                  {expenses.length} {t("Pending")}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground font-semibold leading-relaxed">
+                {t("Review pending event expenses before they affect event cost and profit.")}
+              </p>
+            </div>
+          </div>
         </div>
 
         {expensesQuery.isLoading ? (
@@ -140,45 +163,78 @@ export default function ExpenseApprovalPage() {
             <Skeleton className="h-20 w-full" />
           </div>
         ) : expenses.length === 0 ? (
-          <div className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-8 text-center text-sm text-muted">{t("No pending expenses.")}</div>
-                 ) : (
-          <div className="space-y-4">
-            <div className="divide-y divide-border rounded-2xl 2xl:rounded-4xl border border-border bg-card">
+          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted">{t("No pending expenses.")}</div>
+        ) : (
+          <div className="space-y-5">
+            <div className="space-y-4">
               {paginatedExpenses.map((expense: EventExpense) => {
                 const comment = reviewComments[expense.id] || "";
+                const categoryClass = categoryStyles[expense.category] || "bg-card-alt text-muted border-border/80";
+                
                 return (
-                  <div key={expense.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_280px]">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="font-bold text-foreground">{expense.event_name || t("Event")}</h2>
-                        <span className="rounded border border-border bg-card-alt px-2 py-0.5 text-xs font-semibold text-muted">{t(expense.category)}</span>
+                  <div
+                    key={expense.id}
+                    className="grid gap-6 p-5 lg:grid-cols-[1fr_300px] bg-card border border-border/70 rounded-2xl shadow-sm hover:shadow-md hover:border-border/90 transition-all duration-300 relative overflow-hidden group"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/60 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    
+                    <div className="min-w-0 flex flex-col justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <h2 className="text-base font-extrabold text-foreground tracking-tight group-hover:text-primary transition-colors">
+                            {expense.event_name || t("Event")}
+                          </h2>
+                          <span className={cn("rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider", categoryClass)}>
+                            {t(expense.category)}
+                          </span>
+                        </div>
+                        
+                        <p className="mt-2 text-xs font-semibold text-muted-foreground leading-relaxed">
+                          {expense.description || <span className="italic opacity-60">No description provided</span>}
+                        </p>
                       </div>
-                      <div className="mt-2 grid gap-2 text-sm text-muted sm:grid-cols-2">
-                        <div>{t("Client")}: <span className="font-semibold text-foreground">{expense.client_name || "-"}</span></div>
-                        <div>{t("Amount")}: <span className="font-semibold text-foreground">{formatCurrency(expense.amount)}</span></div>
-                        <div className="sm:col-span-2">{expense.description}</div>
-                        <div>{t("Submitted")}: <span className="font-semibold text-foreground">{expense.submitted_by_name || "-"}</span></div>
+
+                      <div className="mt-4 pt-4 border-t border-border/45 grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] uppercase font-bold tracking-wider opacity-60">{t("Client")}</span>
+                          <span className="font-extrabold text-foreground">{expense.client_name || "-"}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] uppercase font-bold tracking-wider opacity-60">{t("Submitted")}</span>
+                          <span className="font-extrabold text-foreground">{expense.submitted_by_name || "-"}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] uppercase font-bold tracking-wider opacity-60">{t("Amount")}</span>
+                          <span className="font-black text-amber-500 text-sm tracking-wide">{formatCurrency(expense.amount)}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Input
-                        value={comment}
-                        onChange={(eventChange) => setReviewComments((current) => ({ ...current, [expense.id]: eventChange.target.value }))}
-                        placeholder={t("Review comment")}
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
+
+                    <div className="flex flex-col justify-center gap-3 bg-card-alt/30 p-4 rounded-xl border border-border/40">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">
+                          {t("Review comment")}
+                        </label>
+                        <Input
+                          value={comment}
+                          onChange={(eventChange) => setReviewComments((current) => ({ ...current, [expense.id]: eventChange.target.value }))}
+                          placeholder={t("Enter comment or reject reason...")}
+                          className="bg-card border-border/80 focus:border-primary/50 text-xs h-[40px] rounded-lg"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
                           type="button"
-                          loading={reviewMutation.isPending}
+                          disabled={reviewMutation.isPending}
                           onClick={() => reviewMutation.mutate({ id: expense.id, status: "Approved" })}
+                          className="h-10 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-500/10 hover:from-emerald-600 hover:to-emerald-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <HiCheckCircle className="h-4 w-4" />
-                          {t("Approve")}
-                        </Button>
-                        <Button
+                          <span>{t("Approve")}</span>
+                        </button>
+                        <button
                           type="button"
-                          variant="outline"
-                          loading={reviewMutation.isPending}
+                          disabled={reviewMutation.isPending}
                           onClick={() => {
                             if (!comment.trim()) {
                               toast.error(t("Reason required"));
@@ -186,10 +242,11 @@ export default function ExpenseApprovalPage() {
                             }
                             reviewMutation.mutate({ id: expense.id, status: "Rejected", rejected_reason: comment });
                           }}
+                          className="h-10 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-rose-500 via-rose-600 to-rose-700 text-white shadow-md shadow-rose-500/10 hover:from-rose-600 hover:to-rose-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <HiXCircle className="h-4 w-4" />
-                          {t("Reject")}
-                        </Button>
+                          <span>{t("Reject")}</span>
+                        </button>
                       </div>
                     </div>
                   </div>

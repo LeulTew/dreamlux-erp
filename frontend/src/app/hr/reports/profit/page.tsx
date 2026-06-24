@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport, getEventTypes, getProfitReportExportUrl, api } from "@/lib/api";
 import Select from "@/components/ui/Select";
+import DatePicker from "@/components/ui/DatePicker";
 import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";
 import { EventType, ProfitReportSummary } from "@/lib/types";
@@ -406,11 +407,11 @@ export default function FinancialDashboardPage() {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Start Date")}</span>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-36 bg-card-alt h-[44px] text-xs" />
+                <DatePicker value={startDate} onChange={(val) => setStartDate(val)} className="w-36 h-[44px]" />
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("End Date")}</span>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-36 bg-card-alt h-[44px] text-xs" />
+                <DatePicker value={endDate} onChange={(val) => setEndDate(val)} className="w-36 h-[44px]" />
               </div>
 
               {/* Export Popover */}
