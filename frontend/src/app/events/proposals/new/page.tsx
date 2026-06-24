@@ -19,7 +19,8 @@ import {
   HiOutlineMapPin,
   HiOutlinePresentationChartBar,
   HiOutlineQuestionMarkCircle,
-  HiArrowTopRightOnSquare
+  HiArrowTopRightOnSquare,
+  HiInboxStack
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -84,7 +85,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Add Event Type": "Add Event Type",
     "Event Type Name": "Event Type Name",
     "Description": "Description",
-    "Save": "Save"
+    "Save": "Save",
+    "New Proposal Subtitle": "Fill in all 3 steps to create a proposal"
   },
   am: {
     "New Proposal Intake": "አዲስ ፕሮፖዛል ማስገቢያ",
@@ -146,7 +148,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Add Event Type": "አዲስ የዝግጅት አይነት",
     "Event Type Name": "የዝግጅት አይነት ስም",
     "Description": "መግለጫ",
-    "Save": "አስቀምጥ"
+    "Save": "አስቀምጥ",
+    "New Proposal Subtitle": "ሁሉም 3 ደረጃዎችን ሙሉ ፕሮፖዛሉን ለመፍጠር"
   }
 };
 
@@ -388,10 +391,16 @@ export default function NewProposalPage() {
   return (
     <AuthLayout>
       <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
-        <header className="mb-6">
-          <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight uppercase">
-            {t("New Proposal Intake")}
-          </h1>
+        <header className="mb-6 flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/20">
+            <HiInboxStack className="w-6 h-6 md:w-7 md:h-7" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight">
+              {t("New Proposal Intake")}
+            </h1>
+            <p className="text-xs text-muted font-medium mt-0.5">{t("New Proposal Subtitle")}</p>
+          </div>
           
           {/* Stepper progress tracker */}
           <div className="flex items-center justify-center max-w-xl mx-auto my-6 select-none w-full px-2">
@@ -864,7 +873,7 @@ export default function NewProposalPage() {
               {step > 1 ? (
                 <button
                   onClick={() => setStep(step - 1)}
-                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
+                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98]"
                 >
                   <HiArrowLeft className="w-4 h-4" />
                   {t("Back")}
@@ -872,7 +881,7 @@ export default function NewProposalPage() {
               ) : (
                 <button
                   onClick={() => router.push("/events/proposals")}
-                  className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
+                  className="h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98]"
                 >
                   {t("Cancel")}
                 </button>
@@ -881,7 +890,7 @@ export default function NewProposalPage() {
               {step < 3 ? (
                 <button
                   onClick={handleNextStep}
-                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
+                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98]"
                 >
                   {t("Next")}
                   <HiArrowRight className="w-4 h-4" />
@@ -891,13 +900,13 @@ export default function NewProposalPage() {
                   <button
                     onClick={handleSaveDraft}
                     disabled={createProposalMutation.isPending}
-                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt"
+                    className="h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer"
                   >
                     {t("Create Draft")}
                   </button>
                   <button
                     onClick={handleSubmitForApproval}
-                    className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
+                    className="h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] cursor-pointer"
                   >
                     {t("Submit for Approval")}
                   </button>

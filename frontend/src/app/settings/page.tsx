@@ -85,7 +85,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Admin Sync": "Admin Sync",
     "Ensures admin user exists and remains enabled.": "Ensures admin user exists and remains enabled.",
     "Run Defaults Sync": "Run Defaults Sync",
-    "Go back": "Go back"
+    "Go back": "Go back",
+    "ID Configuration": "ID Configuration",
+    "Configure ID prefixes for each module. Prefixes are uppercased automatically.": "Configure ID prefixes for each module. Prefixes are uppercased automatically.",
+    "Employee ID Prefix *": "Employee ID Prefix *",
+    "Inventory ID Prefix *": "Inventory ID Prefix *",
+    "Event ID Prefix *": "Event ID Prefix *"
   },
   am: {
     "Global Admin Settings": "አጠቃላይ የአስተዳዳሪ ቅንጅቶች",
@@ -129,7 +134,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Admin Sync": "የአስተዳዳሪ ማመሳሰል",
     "Ensures admin user exists and remains enabled.": "የአስተዳዳሪ ተጠቃሚ መኖሩን እና መከፈቱን ያረጋግጣል።",
     "Run Defaults Sync": "ነባሪ ማመሳሰልን አሂድ",
-    "Go back": "ተመለስ"
+    "Go back": "ተመለስ",
+    "ID Configuration": "የመለያ ውቅረት",
+    "Configure ID prefixes for each module. Prefixes are uppercased automatically.": "ለእያንዳንዱ ሞጁል የመለያ መነሻ ቅጥያዎችን ያዋቅሩ። መነሻ ቅጥያዎች ራሳቸው በራሳቸው ወደ ትልቅ ፊደል ይቀየራሉ።",
+    "Employee ID Prefix *": "የሠራተኛ መለያ መነሻ *",
+    "Inventory ID Prefix *": "የክምችት መለያ መነሻ *",
+    "Event ID Prefix *": "የዝግጅት መለያ መነሻ *"
   }
 };
 
@@ -157,6 +167,8 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [prefix, setPrefix] = useState("");
+  const [inventoryPrefix, setInventoryPrefix] = useState("");
+  const [eventPrefix, setEventPrefix] = useState("");
 
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const canAccessAdmin = hasPermission("users:manage") || hasPermission("settings:write");
@@ -234,12 +246,14 @@ export default function SettingsPage() {
     if (settings) {
       queueMicrotask(() => {
         setPrefix(settings.employee_id_prefix || "EMP");
+        setInventoryPrefix(settings.inventory_id_prefix || "INV");
+        setEventPrefix(settings.event_id_prefix || "EVT");
       });
     }
   }, [settings]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: { employee_id_prefix: string }) => updateAppSettings(data),
+    mutationFn: (data: { employee_id_prefix: string; inventory_id_prefix?: string; event_id_prefix?: string }) => updateAppSettings(data),
     onSuccess: () => {
       toast.success("Settings updated successfully");
       queryClient.invalidateQueries({ queryKey: ["appSettings"] });
@@ -403,7 +417,7 @@ export default function SettingsPage() {
       toast.error("Prefix cannot be empty");
       return;
     }
-    updateMutation.mutate({ employee_id_prefix: prefix });
+    updateMutation.mutate({ employee_id_prefix: prefix, inventory_id_prefix: inventoryPrefix || "INV", event_id_prefix: eventPrefix || "EVT" });
   };
 
   const handleAdd = () => {
@@ -622,7 +636,7 @@ export default function SettingsPage() {
   ];
 
   const isSystemSavePending = updateMutation.isPending;
-  const isSystemSaveDisabled = !isSystemSavePending && prefix === settings?.employee_id_prefix;
+  const isSystemSaveDisabled = !isSystemSavePending && prefix === settings?.employee_id_prefix && inventoryPrefix === (settings?.inventory_id_prefix || "INV") && eventPrefix === (settings?.event_id_prefix || "EVT");
   const isUserSavePending = createMutation.isPending || updateUserMutation.isPending;
 
   if (authLoading) {
@@ -745,14 +759,15 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => bootstrapMutation.mutate()}
-                      className="h-10 px-4 rounded-lg bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
+                      className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
                       disabled={bootstrapMutation.isPending}
                     >
+                      <HiArrowPath className="w-4 h-4" />
                       {bootstrapMutation.isPending ? t("Syncing...") : t("Sync Default Users")}
                     </button>
                     <button
                       onClick={handleAdd}
-                      className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold shadow-sm flex items-center gap-2"
+                      className="h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-semibold shadow-sm flex items-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
                     >
                       <HiOutlinePlus className="w-4 h-4" />
                       {t("New User")}
@@ -910,21 +925,72 @@ export default function SettingsPage() {
             {activeTab === "system" && (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="glass-card rounded-xl p-6 shadow-sm space-y-6">
-                  <h2 className="text-lg font-bold text-foreground tracking-tight">{t("Employee ID Configuration")}</h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground tracking-tight">{t("ID Configuration")}</h2>
+                    <p className="text-xs text-muted mt-1">{t("Configure ID prefixes for each module. Prefixes are uppercased automatically.")}</p>
+                  </div>
 
-                  <div className="space-y-2 max-w-md">
-                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">{t("ID Prefix *")}</label>
-                    <input
-                      type="text"
-                      required
-                      value={prefix}
-                      onChange={(e) => setPrefix(e.target.value.toUpperCase())}
-                      placeholder="e.g. EMP"
-                      className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
-                    />
-                    <p className="text-xs text-muted px-1 pt-2 font-medium opacity-60">
-                      {lang === "am" ? `ይህ መነሻ ቅጥያ ተከታታይ የሠራተኛ መለያዎችን ያመነጫል (ለምሳሌ ${prefix || "EMP"}001)።` : `This prefix generates sequential employee IDs (for example ${prefix || "EMP"}001).`}
-                    </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Employee ID */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-primary"></span>
+                          {t("Employee ID Prefix *")}
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={prefix}
+                        onChange={(e) => setPrefix(e.target.value.toUpperCase())}
+                        placeholder="e.g. EMP"
+                        className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                      />
+                      <p className="text-xs text-muted px-1 font-medium opacity-60">
+                        {lang === "am" ? `ለምሳሌ: ${prefix || "EMP"}001` : `Example: ${prefix || "EMP"}001`}
+                      </p>
+                    </div>
+
+                    {/* Inventory/Asset ID */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          {t("Inventory ID Prefix *")}
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        value={inventoryPrefix}
+                        onChange={(e) => setInventoryPrefix(e.target.value.toUpperCase())}
+                        placeholder="e.g. INV"
+                        className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                      />
+                      <p className="text-xs text-muted px-1 font-medium opacity-60">
+                        {lang === "am" ? `ለምሳሌ: ${inventoryPrefix || "INV"}001` : `Example: ${inventoryPrefix || "INV"}001`}
+                      </p>
+                    </div>
+
+                    {/* Event ID */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                          {t("Event ID Prefix *")}
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        value={eventPrefix}
+                        onChange={(e) => setEventPrefix(e.target.value.toUpperCase())}
+                        placeholder="e.g. EVT"
+                        className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                      />
+                      <p className="text-xs text-muted px-1 font-medium opacity-60">
+                        {lang === "am" ? `ለምሳሌ: ${eventPrefix || "EVT"}001` : `Example: ${eventPrefix || "EVT"}001`}
+                      </p>
+                    </div>
                   </div>
                 </div>
 

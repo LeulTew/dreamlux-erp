@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { createEvent, updateEvent, deleteEvent, getEventTypes } from "@/lib/api";
 import { Event, EventType } from "@/lib/types";
 import { notify } from "@/lib/toast";
-import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser, HiArrowPath, HiCheck } from "react-icons/hi2";
+import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser, HiArrowPath, HiCheck, HiArrowTopRightOnSquare } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
@@ -26,6 +27,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Required": "Required",
     "Reset Changes": "Reset Changes",
     "Changes reset": "Changes reset",
+    "Workspace": "Workspace",
+    "Open Event Workspace": "Open Event Workspace",
   },
   am: {
     "Edit Event": "ዝግጅት ማስተካከያ",
@@ -37,6 +40,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Required": "አስፈላጊ",
     "Reset Changes": "ለውጦችን መልስ",
     "Changes reset": "ለውጦች ተመልሰዋል",
+    "Workspace": "የስራ ቦታ",
+    "Open Event Workspace": "Open Event Workspace",
   }
 };
 
@@ -416,6 +421,17 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
           {/* Form Actions */}
           {!isReadOnly && (
             <div className="flex justify-end items-center gap-3 mt-8 pt-4 border-t border-border/40">
+              {event && (
+                <Link
+                  href={`/events/${event.id}`}
+                  className="h-10 px-4 rounded-xl bg-card-alt border border-border text-muted hover:text-foreground text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                  title={t('Open Event Workspace')}
+                >
+                  <HiArrowTopRightOnSquare className="w-4 h-4" />
+                  {t('Workspace')}
+                </Link>
+              )}
+
               {event && (
                 <Button
                   type="button"

@@ -947,7 +947,11 @@ export const createDepartment = (name: string) =>
 export const getAppSettings = () =>
   api.get("/settings").then((r) => r.data);
 
-export const updateAppSettings = (data: { employee_id_prefix: string }) =>
+export const updateAppSettings = (data: {
+  employee_id_prefix: string;
+  inventory_id_prefix?: string;
+  event_id_prefix?: string;
+}) =>
   api.patch("/settings", data).then((r) => r.data);
 
 export const getBackendHealth = () =>

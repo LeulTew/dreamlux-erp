@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass } from "react-icons/hi2";
+import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass, HiArrowPath } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport, getEventTypes, getProfitReportExportUrl, api } from "@/lib/api";
+import Select from "@/components/ui/Select";
 import { useLanguage } from "@/hooks/use-language";
 import { EventType, ProfitReportSummary } from "@/lib/types";
 
@@ -350,32 +351,33 @@ export default function FinancialDashboardPage() {
                 />
               </div>
 
-              <select
+              <Select
+                options={[
+                  { id: "", label: t("Select Type") },
+                  ...eventTypes.map((type) => ({ id: type.id, label: type.event_name }))
+                ]}
                 value={eventTypeId}
-                onChange={(e) => setEventTypeId(e.target.value)}
-                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-xl bg-card-alt border border-border outline-none"
-              >
-                <option value="">{t("Select Type")}</option>
-                {eventTypes.map((type) => (
-                  <option key={type.id} value={type.id}>{type.event_name}</option>
-                ))}
-              </select>
+                onChange={(val) => setEventTypeId(val)}
+                className="min-w-[160px]"
+              />
 
-              <select
+              <Select
+                options={[
+                  { id: "", label: t("Select Status") },
+                  { id: "Planned", label: t("Planned") },
+                  { id: "Ongoing", label: t("Ongoing") },
+                  { id: "Completed", label: t("Completed") }
+                ]}
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-xl bg-card-alt border border-border outline-none"
-              >
-                <option value="">{t("Select Status")}</option>
-                <option value="Planned">{t("Planned")}</option>
-                <option value="Ongoing">{t("Ongoing")}</option>
-                <option value="Completed">{t("Completed")}</option>
-              </select>
+                onChange={(val) => setStatus(val)}
+                className="min-w-[150px]"
+              />
 
               <button
                 onClick={handleResetFilters}
-                className="text-xs font-bold text-danger [@media(hover:hover)]:hover:underline uppercase tracking-wider"
+                className="h-[44px] px-4 text-xs font-black uppercase tracking-wider rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] flex items-center gap-1.5"
               >
+                <HiArrowPath className="w-3.5 h-3.5" />
                 {t("Reset")}
               </button>
             </div>

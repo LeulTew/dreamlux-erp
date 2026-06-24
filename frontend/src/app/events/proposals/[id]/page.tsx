@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   getEventProposal, 
@@ -19,7 +20,8 @@ import {
   HiPrinter, 
   HiArrowLeft, 
   HiExclamationTriangle,
-  HiCurrencyDollar
+  HiCurrencyDollar,
+  HiArrowTopRightOnSquare
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -58,7 +60,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Yes, Convert": "Yes, Convert",
     "Cancel Action": "Cancel",
     "Print Proposal": "Print / PDF",
-    "Back": "Back to Proposals"
+    "Back": "Back to Proposals",
+    "Linked Event": "Linked Event",
+    "Open Event Workspace": "Open Event Workspace"
   },
   am: {
     "Proposal Details": "የፕሮፖዛል ዝርዝሮች",
@@ -94,7 +98,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Yes, Convert": "አዎ፣ ቀይር",
     "Cancel Action": "ተመለስ",
     "Print Proposal": "ሪፖርት አትም",
-    "Back": "ወደ ፕሮፖዛሎች ተመለስ"
+    "Back": "ወደ ፕሮፖዛሎች ተመለስ",
+    "Linked Event": "የተያያዘ ዝግጅት",
+    "Open Event Workspace": "የዝግጅቱን ቦርድ ክፈት"
   }
 };
 
@@ -549,6 +555,24 @@ export default function ProposalDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Linked Event Panel */}
+            {proposal.converted_event_id && (
+              <div className="bg-card border border-border rounded-xl p-5 space-y-3 no-print">
+                <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  {t('Linked Event')}
+                </h3>
+                <p className="text-[11px] text-muted font-medium">This proposal was converted into a live event. Open the event workspace to manage it.</p>
+                <Link
+                  href={`/events/${proposal.converted_event_id}`}
+                  className="flex items-center justify-center gap-1.5 w-full h-10 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all border border-indigo-600/20 shadow-md shadow-indigo-600/10"
+                >
+                  <HiArrowTopRightOnSquare className="w-4 h-4" />
+                  {t('Open Event Workspace')}
+                </Link>
+              </div>
+            )}
 
             {/* Audit Logs History */}
             <div className="bg-card border border-border rounded-lg p-5 space-y-3 logs-panel no-print">
