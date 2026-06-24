@@ -379,7 +379,7 @@ function DesignPackagePanel({
           type="button"
           onClick={() => saveDesignMutation.mutate()}
           loading={saveDesignMutation.isPending}
-          className="w-full"
+          className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
         >
           {t("Save Design")}
         </Button>
@@ -979,7 +979,13 @@ export default function EventWorkspacePage() {
                       onChange={(eventChange) => setAllocationNotes(eventChange.target.value)}
                       placeholder={t("Notes")}
                     />
-                    <Button type="button" onClick={() => allocationMutation.mutate()} loading={allocationMutation.isPending} disabled={!canAllocate} className="w-full">
+                    <Button 
+                      type="button" 
+                      onClick={() => allocationMutation.mutate()} 
+                      loading={allocationMutation.isPending} 
+                      disabled={!canAllocate} 
+                      className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                    >
                       <HiPlus className="h-4 w-4" />
                       {t("Allocate")}
                     </Button>
@@ -1039,7 +1045,7 @@ export default function EventWorkspacePage() {
                         addTaskMutation.mutate();
                       }}
                       loading={addTaskMutation.isPending}
-                      className="w-full"
+                      className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                     >
                       <HiPlus className="h-4 w-4" />
                       {t("Add Task")}
@@ -1150,7 +1156,7 @@ export default function EventWorkspacePage() {
                           });
                         }}
                         loading={assignEmployeeMutation.isPending}
-                        className="w-full"
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                       >
                         <HiPlus className="h-4 w-4" />
                         {t("Assign")}
@@ -1265,7 +1271,7 @@ export default function EventWorkspacePage() {
                           });
                         }}
                         loading={assignVehicleMutation.isPending}
-                        className="w-full"
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                       >
                         <HiPlus className="h-4 w-4" />
                         {t("Assign")}
@@ -1330,7 +1336,7 @@ export default function EventWorkspacePage() {
                       <Input value={receiptKey} onChange={(eventChange) => setReceiptKey(eventChange.target.value)} placeholder={t("Receipt Key")} />
                       <Button
                         type="button"
-                        className="w-full"
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                         loading={createExpenseMutation.isPending}
                         onClick={() => {
                           if (!expenseDescription.trim() || Number(expenseAmount) <= 0) {
@@ -1343,7 +1349,13 @@ export default function EventWorkspacePage() {
                         <HiPlus className="h-4 w-4" />
                         {t("Submit Expense")}
                       </Button>
-                      <Button type="button" variant="outline" className="w-full" loading={generateLaborMutation.isPending} onClick={() => generateLaborMutation.mutate()}>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border" 
+                        loading={generateLaborMutation.isPending} 
+                        onClick={() => generateLaborMutation.mutate()}
+                      >
                         {t("Generate Labor Expense")}
                       </Button>
                     </div>
@@ -1372,7 +1384,7 @@ export default function EventWorkspacePage() {
                       </div>
                       <Button
                         type="button"
-                        className="w-full"
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                         loading={createTripMutation.isPending}
                         onClick={() => {
                           if (!tripVehicleAssignmentId || !tripDestination.trim() || Number(tripDistance) <= 0 || Number(fuelPrice) <= 0) {

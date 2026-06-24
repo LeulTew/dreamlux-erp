@@ -7,7 +7,7 @@ import { getEventTypes, createEventType, updateEventType, deleteEventType } from
 import { EventType } from "@/lib/types";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { HiOutlineTrash, HiPlus, HiXMark } from "react-icons/hi2";
+import { HiOutlineTrash, HiPlus, HiXMark, HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import EventCard from "./EventCard";
 import { packMasonry } from "@/lib/masonry-engine";
@@ -28,7 +28,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Computing Layout...": "Computing Layout...",
     "Nothing here yet. Add an event above.": "Nothing here yet. Add an event above.",
     "Move to Trash": "Move to Trash",
-    "Are you sure you want to soft-delete this event type?": "Are you sure you want to soft-delete this event type? It will be moved to the trash and can be restored later."
+    "Are you sure you want to soft-delete this event type?": "Are you sure you want to soft-delete this event type? It will be moved to the trash and can be restored later.",
+    "of": "of",
+    "Showing": "Showing",
+    "items": "items"
   },
   am: {
     "Event Payments": "የክስተት ክፍያዎች",
@@ -43,7 +46,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Computing Layout...": "አቀማመጥ በመስራት ላይ...",
     "Nothing here yet. Add an event above.": "እስካሁን ምንም ነገር የለም። ከላይ ክስተት ይጨምሩ።",
     "Move to Trash": "ወደ መጣያ ውሰድ",
-    "Are you sure you want to soft-delete this event type?": "ይህንን የክስተት አይነት ወደ መጣያ ለመውሰድ እርግጠኛ ነዎት? በኋላ መልሰው ሊያገኟቸው ይችላሉ።"
+    "Are you sure you want to soft-delete this event type?": "ይህንን የክስተት አይነት ወደ መጣያ ለመውሰድ እርግጠኛ ነዎት? በኋላ መልሰው ሊያገኟቸው ይችላሉ።",
+    "of": "ከ",
+    "Showing": "እየታየ ያለው",
+    "items": "አይነቶች"
   }
 };
 
@@ -73,6 +79,26 @@ export default function EventTypesPage() {
   
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
+  const totalPages = useMemo(() => {
+    if (!events) return 1;
+    return Math.ceil(events.length / ITEMS_PER_PAGE);
+  }, [events]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedEvents = useMemo(() => {
+    if (!events) return [];
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return events.slice(start, start + ITEMS_PER_PAGE);
+  }, [events, currentPage]);
+
   const masonryParams = useMemo(() => {
     let columns = 3;
     if (viewportWidth < 640) columns = 1;
@@ -86,10 +112,10 @@ export default function EventTypesPage() {
   }, [viewportWidth]);
 
   const masonryResult = useMemo(() => {
-    if (!events) return { items: [], containerHeight: 0 };
+    if (!paginatedEvents) return { items: [], containerHeight: 0 };
     // We pass empty overrides or adjust masonry engine to ignore levelsCount
-    return packMasonry(events, masonryParams, editingConfigs);
-  }, [events, masonryParams, editingConfigs]);
+    return packMasonry(paginatedEvents, masonryParams, editingConfigs);
+  }, [paginatedEvents, masonryParams, editingConfigs]);
 
   const createMut = useMutation({
     mutationFn: (data: { event_name: string; description: string }) => createEventType(data),
@@ -261,6 +287,52 @@ export default function EventTypesPage() {
             </div>
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 border-t border-border/50 pt-6">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+              {t("Showing")} {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, events?.length || 0)} - {Math.min(currentPage * ITEMS_PER_PAGE, events?.length || 0)} {t("of")} {events?.length} {t("items")}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className="w-10 h-10 rounded-xl bg-card border border-border text-muted hover:text-foreground transition-all hover:bg-card-alt flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none active:scale-[0.98] shadow-sm cursor-pointer"
+              >
+                <HiChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const pageNum = idx + 1;
+                  const isSelected = pageNum === currentPage;
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-10 h-10 rounded-xl text-xs font-black transition-all active:scale-[0.98] cursor-pointer ${
+                        isSelected 
+                          ? "bg-primary text-on-primary shadow-premium" 
+                          : "bg-card border border-border text-muted hover:text-foreground hover:bg-card-alt"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                className="w-10 h-10 rounded-xl bg-card border border-border text-muted hover:text-foreground transition-all hover:bg-card-alt flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none active:scale-[0.98] shadow-sm cursor-pointer"
+              >
+                <HiChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
 
