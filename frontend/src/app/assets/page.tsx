@@ -385,6 +385,38 @@ function AssetsContent() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
 
   useEffect(() => {
+    const urlStore = searchParams.get("store") || "all";
+    if (urlStore !== officeFilter) {
+      setOfficeFilter(urlStore);
+    }
+
+    const urlFilter = searchParams.get("filter") === "low-stock" ? "low-stock" : "all";
+    if (urlFilter !== stockFilter) {
+      setStockFilter(urlFilter);
+    }
+
+    const urlQ = searchParams.get("q") || "";
+    if (urlQ !== searchInput) {
+      setSearchInput(urlQ);
+    }
+
+    const urlFrom = searchParams.get("from") || "";
+    if (urlFrom !== fromDateTime) {
+      setFromDateTime(urlFrom);
+    }
+
+    const urlTo = searchParams.get("to") || "";
+    if (urlTo !== toDateTime) {
+      setToDateTime(urlTo);
+    }
+
+    const urlReconcile = searchParams.get("reconcile") === "true";
+    if (urlReconcile !== reconcileMode) {
+      setReconcileMode(urlReconcile);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
       setSearchTerm(searchInput.trim());
       setPage(1);
