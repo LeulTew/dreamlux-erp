@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass, HiArrowPath } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport, getEventTypes, getProfitReportExportUrl, api } from "@/lib/api";
 import Select from "@/components/ui/Select";

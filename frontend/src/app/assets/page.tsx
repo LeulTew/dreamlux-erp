@@ -387,33 +387,34 @@ function AssetsContent() {
   useEffect(() => {
     const urlStore = searchParams.get("store") || "all";
     if (urlStore !== officeFilter) {
-      setOfficeFilter(urlStore);
+      setTimeout(() => setOfficeFilter(urlStore), 0);
     }
 
     const urlFilter = searchParams.get("filter") === "low-stock" ? "low-stock" : "all";
     if (urlFilter !== stockFilter) {
-      setStockFilter(urlFilter);
+      setTimeout(() => setStockFilter(urlFilter), 0);
     }
 
     const urlQ = searchParams.get("q") || "";
     if (urlQ !== searchInput) {
-      setSearchInput(urlQ);
+      setTimeout(() => setSearchInput(urlQ), 0);
     }
 
     const urlFrom = searchParams.get("from") || "";
     if (urlFrom !== fromDateTime) {
-      setFromDateTime(urlFrom);
+      setTimeout(() => setFromDateTime(urlFrom), 0);
     }
 
     const urlTo = searchParams.get("to") || "";
     if (urlTo !== toDateTime) {
-      setToDateTime(urlTo);
+      setTimeout(() => setToDateTime(urlTo), 0);
     }
 
     const urlReconcile = searchParams.get("reconcile") === "true";
     if (urlReconcile !== reconcileMode) {
-      setReconcileMode(urlReconcile);
+      setTimeout(() => setReconcileMode(urlReconcile), 0);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {

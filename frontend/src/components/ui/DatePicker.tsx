@@ -62,8 +62,10 @@ export default function DatePicker({
 
   const [timeState, setTimeState] = useState(getInitial12HourState);
 
-  // Keep viewDate and time selection updated when value changes externally
-  useEffect(() => {
+  // Synchronize viewDate and time selection when value changes externally (done during render to avoid useEffect warnings)
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     if (parsedDate) {
       setViewDate(parsedDate);
       const rawHour = parsedDate.getHours();
@@ -71,7 +73,7 @@ export default function DatePicker({
       const hour12 = rawHour % 12 === 0 ? 12 : rawHour % 12;
       setTimeState({ hour12, minute: parsedDate.getMinutes(), ampm });
     }
-  }, [value]);
+  }
 
   // Scroll active elements into view when calendar opens
   useEffect(() => {
@@ -176,7 +178,7 @@ export default function DatePicker({
     }
   };
 
-  const handleTimeSelect = (type: "hour" | "minute" | "ampm", val: any) => {
+  const handleTimeSelect = (type: "hour" | "minute" | "ampm", val: number | "AM" | "PM") => {
     const nextState = { ...timeState };
     if (type === "hour") nextState.hour12 = val;
     if (type === "minute") nextState.minute = val;
