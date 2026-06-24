@@ -178,18 +178,20 @@ export default function DatePicker({
     }
   };
 
-  const handleTimeSelect = (type: "hour" | "minute" | "ampm", val: number | "AM" | "PM") => {
+  function handleTimeSelect(type: "hour" | "minute", val: number): void;
+  function handleTimeSelect(type: "ampm", val: "AM" | "PM"): void;
+  function handleTimeSelect(type: "hour" | "minute" | "ampm", val: number | "AM" | "PM") {
     const nextState = { ...timeState };
-    if (type === "hour") nextState.hour12 = val;
-    if (type === "minute") nextState.minute = val;
-    if (type === "ampm") nextState.ampm = val;
+    if (type === "hour" && typeof val === "number") nextState.hour12 = val;
+    if (type === "minute" && typeof val === "number") nextState.minute = val;
+    if (type === "ampm" && typeof val !== "number") nextState.ampm = val;
     
     setTimeState(nextState);
     
     const baseDate = parsedDate || new Date();
     const formatted = getFormattedValue(baseDate, nextState.hour12, nextState.minute, nextState.ampm);
     onChange(formatted);
-  };
+  }
 
   // Format display string
   const formatTime = (date: Date) => {
