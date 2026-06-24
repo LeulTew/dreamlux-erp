@@ -729,29 +729,14 @@ function AssetsContent() {
   return (
     <div className="page-container pb-12">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/40">
+        <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/40">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground tracking-tight">{t("Assets")}</h1>
               <p className="text-sm text-muted font-medium">{total} {t("Total Records")}</p>
             </div>
           </div>
-          {!authLoading && canManageAssets && (
-            <>
-              <PillButton
-                onClick={() => router.push("/assets/insert")}
-                variant="primary"
-                className="h-11 px-6 text-sm font-bold shadow-md shadow-amber-500/10"
-                icon={
-                  <HiPlus className="w-4.5 h-4.5" />
-                }
-              >
-                {t("Add Asset")}
-              </PillButton>
-              <div className="w-px h-6 bg-border hidden sm:block mx-1" />
-            </>
-          )}
-        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
             <Button
                onClick={handleExportPDF}
                variant="secondary"
@@ -831,11 +816,27 @@ function AssetsContent() {
               variant={selectMode ? "outline" : "secondary"}
               className="hidden md:flex px-4 py-2 text-sm font-medium h-auto"
             >
-              <HiTableCells className="w-4 h-4" />
+              <HiTableCells className="w-4.5 h-4.5" />
               {selectMode ? t("Cancel Selection") : t("Select")}
             </Button>
-        </div>
-      </header>
+
+            {!authLoading && canManageAssets && (
+              <>
+                <div className="w-px h-6 bg-border hidden sm:block mx-1" />
+                <PillButton
+                  onClick={() => router.push("/assets/insert")}
+                  variant="primary"
+                  className="h-11 px-6 text-sm font-bold shadow-md shadow-amber-500/10"
+                  icon={
+                    <HiPlus className="w-4.5 h-4.5" />
+                  }
+                >
+                  {t("Add Asset")}
+                </PillButton>
+              </>
+            )}
+          </div>
+        </header>
 
       {selectMode && !showTrash && (
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4">
