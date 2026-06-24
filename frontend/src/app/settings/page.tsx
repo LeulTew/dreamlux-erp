@@ -680,7 +680,7 @@ export default function SettingsPage() {
             <p className="text-sm text-muted mt-3">Only Admin or System Manager roles can access this page.</p>
             <button
               onClick={() => router.push("/")}
-              className="mt-6 h-11 px-5 rounded-xl bg-primary text-on-primary font-semibold"
+              className="mt-6 h-11 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white font-extrabold uppercase tracking-widest text-xs shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
             >
               Back to Dashboard
             </button>
@@ -926,7 +926,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => bootstrapMutation.mutate()}
-                      className="inline-flex items-center gap-2 h-10 px-6 rounded-full bg-[#d9a84e] text-black text-xs font-black uppercase tracking-widest hover:bg-[#c2923c] transition-all active:scale-[0.96] cursor-pointer disabled:opacity-50"
+                      className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-card-alt border border-border text-xs font-black uppercase tracking-widest hover:bg-border transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
                       disabled={bootstrapMutation.isPending}
                     >
                       <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
@@ -934,7 +934,7 @@ export default function SettingsPage() {
                     </button>
                     <button
                       onClick={handleAdd}
-                      className="h-10 px-6 rounded-full bg-[#d9a84e] text-black text-xs font-black uppercase tracking-widest shadow-premium flex items-center gap-2 hover:bg-[#c2923c] active:scale-[0.96] transition-all cursor-pointer"
+                      className="h-10 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 flex items-center gap-2 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
                     >
                       <HiOutlinePlus className="w-4 h-4" />
                       {t("New User")}
@@ -1071,7 +1071,7 @@ export default function SettingsPage() {
                         <p className="text-muted font-medium mb-3">{t("No users found in database.")}</p>
                         <button
                           onClick={() => bootstrapMutation.mutate()}
-                          className="h-10 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-1.5"
+                          className="h-10 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 inline-flex items-center gap-1.5 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer disabled:opacity-50"
                           disabled={bootstrapMutation.isPending}
                         >
                           <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
@@ -1229,12 +1229,12 @@ export default function SettingsPage() {
                     <button
                       type="submit"
                       disabled={isSystemSavePending || isSystemSaveDisabled}
-                      className={`h-11 px-8 rounded-full font-black text-xs uppercase tracking-widest shadow-premium transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.96] ${
+                      className={`h-11 px-8 rounded-xl font-black text-xs uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] ${
                         isSystemSavePending
-                          ? "bg-[#d9a84e]/70 text-black/70 cursor-wait"
+                          ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white opacity-90 cursor-wait"
                           : isSystemSaveDisabled
                             ? "bg-card-alt text-muted-foreground/30 border border-border/40 cursor-not-allowed"
-                            : "bg-[#d9a84e] text-black hover:bg-[#c2923c]"
+                            : "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02]"
                       }`}
                     >
                       <HiShieldCheck className={`w-4 h-4 ${isSystemSavePending ? "animate-pulse" : ""}`} />
@@ -1276,7 +1276,7 @@ export default function SettingsPage() {
                       </p>
                       <button
                         onClick={() => bootstrapMutation.mutate()}
-                        className="mt-3 h-10 px-6 rounded-full bg-[#d9a84e] text-black text-xs font-black uppercase tracking-widest transition-all active:scale-[0.96] disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+                        className="mt-3 h-10 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
                         disabled={bootstrapMutation.isPending}
                       >
                         <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
@@ -1600,13 +1600,13 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={isUserSavePending}
-                    className={`h-10 px-6 text-xs font-black uppercase tracking-widest rounded-full shadow-premium transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.96] ${
+                    className={`h-10 px-5 text-xs font-black uppercase tracking-widest rounded-xl shadow-sm transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.97] ${
                       isUserSavePending
-                        ? "bg-[#d9a84e]/70 text-black/70 cursor-wait"
-                        : "bg-[#d9a84e] text-black hover:bg-[#c2923c]"
+                        ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white opacity-90 cursor-wait"
+                        : "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02]"
                     }`}
                   >
-                    <HiShieldCheck className={`w-4 h-4 ${isUserSavePending ? "animate-pulse" : ""}`} />
+                    <HiShieldCheck className={`w-3.5 h-3.5 ${isUserSavePending ? "animate-pulse" : ""}`} />
                     {isUserSavePending ? t("Saving...") : t("Save User")}
                   </button>
                 </div>

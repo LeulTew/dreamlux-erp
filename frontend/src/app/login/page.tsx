@@ -129,7 +129,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || !username.trim() || !password.trim()}
-            className="w-full h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white font-extrabold uppercase tracking-widest text-xs shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? (
               <>

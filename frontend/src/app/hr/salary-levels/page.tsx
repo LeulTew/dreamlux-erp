@@ -191,7 +191,7 @@ function SalaryLevelsContent() {
               <button
                 type="submit"
                 disabled={createMut.isPending || updateMut.isPending}
-                className="h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-premium cursor-pointer"
+                className="h-11 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {form.id ? (
                   <span>{t("Update Level")}</span>

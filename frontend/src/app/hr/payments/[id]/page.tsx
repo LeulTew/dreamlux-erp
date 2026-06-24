@@ -214,7 +214,7 @@ export default function PaymentRunDetailPage() {
 
             <button
               onClick={() => setIsPrintModalOpen(true)}
-              className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:opacity-90 transition-all active:scale-[0.98] shadow-sm"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white rounded-lg text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
             >
               <HiPrinter className="w-4 h-4" />
               {t("Print PDF")}
