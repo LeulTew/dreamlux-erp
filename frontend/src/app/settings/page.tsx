@@ -999,7 +999,7 @@ export default function SettingsPage() {
                               <td className="px-5 py-3 text-right space-x-2">
                                 <button
                                   onClick={() => handleEdit(user)}
-                                  className="p-2 rounded-lg border border-border bg-card-alt text-foreground hover:bg-primary/10 hover:text-primary dark:hover:text-foreground transition-colors"
+                                  className="p-2 rounded-lg border border-border bg-card-alt text-foreground hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 active:scale-[0.93] inline-flex items-center justify-center cursor-pointer"
                                   title={t("Edit")}
                                 >
                                   <HiOutlinePencil className="w-4 h-4" />
@@ -1307,8 +1307,8 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="px-4 md:px-6 pt-4 pb-3 border-b border-border/30 bg-card-alt/30 relative z-0">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 p-1 bg-card rounded-xl border border-border/50">
+            <div className="px-4 md:px-6 pt-4 pb-3 border-b border-border/30 bg-card-alt/20 relative z-0">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-1 p-1 bg-card-alt/80 backdrop-blur-md rounded-xl border border-border/60">
                 {modalTabs.map((tab) => {
                   const selected = userModalTab === tab.id;
                   return (
@@ -1316,16 +1316,20 @@ export default function SettingsPage() {
                       key={tab.id}
                       type="button"
                       onClick={() => setUserModalTab(tab.id)}
-                      className={`relative px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all active:scale-[0.97] cursor-pointer ${
-                        selected ? "text-on-primary" : "text-muted hover:text-foreground"
+                      className={`relative px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 cursor-pointer select-none active:scale-[0.97] ${
+                        selected 
+                          ? "text-white" 
+                          : dark
+                            ? "text-slate-350 hover:text-white"
+                            : "text-slate-650 hover:text-slate-905"
                       }`}
                     >
                       <span className="relative z-10">{tab.label}</span>
                       {selected && (
                         <motion.div
                           layoutId="activeModalTab"
-                          className="absolute inset-0 bg-primary rounded-lg shadow-sm z-0"
-                          transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                          className="absolute inset-0 bg-gradient-to-r from-[#d97706] to-[#b45309] rounded-lg shadow-premium z-0"
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
                         />
                       )}
                     </button>
@@ -1576,7 +1580,7 @@ export default function SettingsPage() {
                       closeModal();
                       setDeleteId(selectedUser.id);
                     }}
-                    className="text-red-500 hover:text-red-600 text-xs font-black uppercase tracking-wider transition-colors py-2"
+                    className="text-red-500 hover:text-red-600 hover:underline text-xs font-black uppercase tracking-widest transition-all duration-300 py-2 active:scale-[0.97] cursor-pointer"
                   >
                     {t("Delete User")}
                   </button>
@@ -1588,7 +1592,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="h-10 px-5 text-xs font-black uppercase tracking-wider text-muted hover:text-foreground transition-colors rounded-xl bg-card-alt border border-border"
+                    className="h-10 px-5 text-xs font-black uppercase tracking-widest text-foreground hover:bg-card-alt hover:border-primary/50 transition-all duration-300 rounded-xl bg-card border border-border shadow-sm active:scale-[0.97] cursor-pointer"
                   >
                     {t("Cancel")}
                   </button>
@@ -1596,12 +1600,13 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={isUserSavePending}
-                    className={`h-10 px-5 text-xs font-black uppercase tracking-wider rounded-xl shadow-sm transition-colors ${
+                    className={`h-10 px-5 text-xs font-black uppercase tracking-widest rounded-xl shadow-sm transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.97] ${
                       isUserSavePending
                         ? "bg-primary text-on-primary opacity-90 cursor-wait"
-                        : "bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
+                        : "bg-primary text-on-primary hover:opacity-90 hover:shadow-premium"
                     }`}
                   >
+                    <HiShieldCheck className={`w-3.5 h-3.5 ${isUserSavePending ? "animate-pulse" : ""}`} />
                     {isUserSavePending ? t("Saving...") : t("Save User")}
                   </button>
                 </div>
