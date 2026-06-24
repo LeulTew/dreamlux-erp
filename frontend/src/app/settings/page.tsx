@@ -3,6 +3,9 @@
 import { ComponentType, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { useTheme } from "@/hooks/use-theme";
+import { HiSun, HiMoon } from "react-icons/hi2";
 import {
   bootstrapAdminUser,
   createUser,
@@ -95,7 +98,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Configure ID prefixes for each module. Prefixes are uppercased automatically.": "Configure ID prefixes for each module. Prefixes are uppercased automatically.",
     "Employee ID Prefix *": "Employee ID Prefix *",
     "Inventory ID Prefix *": "Inventory ID Prefix *",
-    "Event ID Prefix *": "Event ID Prefix *"
+    "Event ID Prefix *": "Event ID Prefix *",
+    "Appearance & Theme": "Appearance & Theme",
+    "Select your preferred visual style for the dashboard.": "Select your preferred visual style for the dashboard.",
+    "Light Mode": "Light Mode",
+    "Dark Mode": "Dark Mode"
   },
   am: {
     "Global Admin Settings": "አጠቃላይ የአስተዳዳሪ ቅንጅቶች",
@@ -149,7 +156,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Configure ID prefixes for each module. Prefixes are uppercased automatically.": "ለእያንዳንዱ ሞጁል የመለያ መነሻ ቅጥያዎችን ያዋቅሩ። መነሻ ቅጥያዎች ራሳቸው በራሳቸው ወደ ትልቅ ፊደል ይቀየራሉ።",
     "Employee ID Prefix *": "የሠራተኛ መለያ መነሻ *",
     "Inventory ID Prefix *": "የክምችት መለያ መነሻ *",
-    "Event ID Prefix *": "የዝግጅት መለያ መነሻ *"
+    "Event ID Prefix *": "የዝግጅት መለያ መነሻ *",
+    "Appearance & Theme": "ገጽታ እና ቀለም",
+    "Select your preferred visual style for the dashboard.": "ለዳሽቦርዱ የሚመርጡትን የእይታ ገጽታ ይምረጡ።",
+    "Light Mode": "ብርሃናማ ሁነታ",
+    "Dark Mode": "ጨለማማ ሁነታ"
   }
 };
 
@@ -174,6 +185,7 @@ export default function SettingsPage() {
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { dark, toggle: toggleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [prefix, setPrefix] = useState("");
@@ -712,8 +724,8 @@ export default function SettingsPage() {
           </button>
         </header>
 
-        <section className="glass-card rounded-2xl p-1 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <section className="bg-card-alt border border-border/50 rounded-2xl p-1.5 shadow-sm relative z-0">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const selected = activeTab === tab.id;
@@ -721,12 +733,19 @@ export default function SettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-black uppercase tracking-widest transition-all active:scale-[0.97] cursor-pointer ${
-                    selected ? "bg-primary text-on-primary shadow-premium" : "bg-card-alt text-muted hover:text-foreground hover:bg-card-alt/80 border border-transparent hover:border-border/30"
+                  className={`relative flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-black uppercase tracking-widest transition-all active:scale-[0.97] cursor-pointer ${
+                    selected ? "text-on-primary" : "text-muted hover:text-foreground"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
+                  <Icon className="w-4 h-4 relative z-10" />
+                  <span className="relative z-10">{tab.label}</span>
+                  {selected && (
+                    <motion.div
+                      layoutId="activeSettingsTab"
+                      className="absolute inset-0 bg-primary rounded-xl shadow-premium z-0"
+                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                    />
+                  )}
                 </button>
               );
             })}
@@ -974,10 +993,10 @@ export default function SettingsPage() {
 
                     <div className="md:hidden space-y-3">
                       {users?.map((user) => (
-                        <button
+                        <div
                           key={user.id}
                           onClick={() => handleEdit(user)}
-                          className="w-full text-left rounded-xl border border-border bg-card p-4"
+                          className="w-full text-left rounded-xl border border-border bg-card p-4 cursor-pointer"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
@@ -998,7 +1017,7 @@ export default function SettingsPage() {
                                 e.stopPropagation();
                                 setDeleteId(user.id);
                               }}
-                              className="p-2 rounded-lg bg-red-500/10 text-red-600"
+                              className="p-2 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
                             >
                               <HiOutlineTrash className="w-4 h-4" />
                             </button>
@@ -1016,7 +1035,7 @@ export default function SettingsPage() {
                               {user.is_active ? t("Active") : t("Inactive")}
                             </span>
                           </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
 
@@ -1039,91 +1058,161 @@ export default function SettingsPage() {
             )}
 
             {activeTab === "system" && (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="glass-card rounded-xl p-6 shadow-sm space-y-6">
+              <div className="space-y-6">
+                {/* Theme / Appearance Toggle Component */}
+                <div className="glass-card rounded-xl p-6 shadow-sm space-y-4">
                   <div>
-                    <h2 className="text-lg font-bold text-foreground tracking-tight">{t("ID Configuration")}</h2>
-                    <p className="text-xs text-muted mt-1">{t("Configure ID prefixes for each module. Prefixes are uppercased automatically.")}</p>
+                    <h2 className="text-lg font-bold text-foreground tracking-tight">{t("Appearance & Theme")}</h2>
+                    <p className="text-xs text-muted mt-1">{t("Select your preferred visual style for the dashboard.")}</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Employee ID */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-primary"></span>
-                          {t("Employee ID Prefix *")}
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={prefix}
-                        onChange={(e) => setPrefix(e.target.value.toUpperCase())}
-                        placeholder="e.g. EMP"
-                        className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
-                      />
-                      <p className="text-xs text-muted px-1 font-medium opacity-60">
-                        {lang === "am" ? `ለምሳሌ: ${prefix || "EMP"}001` : `Example: ${prefix || "EMP"}001`}
-                      </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Light Mode Selector Card */}
+                    <div
+                      onClick={() => { if (dark) toggleTheme(); }}
+                      className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 relative select-none ${
+                        !dark
+                          ? "border-primary bg-primary/5 shadow-premium-sm"
+                          : "border-border bg-card-alt hover:border-border/80 hover:bg-card-alt/80"
+                      }`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                        !dark ? "bg-primary text-on-primary" : "bg-card text-muted-foreground"
+                      }`}>
+                        <HiSun className="w-6 h-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xs font-black uppercase tracking-wider ${!dark ? "text-primary" : "text-foreground"}`}>
+                          {t("Light Mode")}
+                        </p>
+                        <p className="text-[10px] text-muted font-medium mt-1">Clean and crisp interface</p>
+                      </div>
+                      {!dark && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Inventory/Asset ID */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                          {t("Inventory ID Prefix *")}
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        value={inventoryPrefix}
-                        onChange={(e) => setInventoryPrefix(e.target.value.toUpperCase())}
-                        placeholder="e.g. INV"
-                        className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
-                      />
-                      <p className="text-xs text-muted px-1 font-medium opacity-60">
-                        {lang === "am" ? `ለምሳሌ: ${inventoryPrefix || "INV"}001` : `Example: ${inventoryPrefix || "INV"}001`}
-                      </p>
-                    </div>
-
-                    {/* Event ID */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                          {t("Event ID Prefix *")}
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        value={eventPrefix}
-                        onChange={(e) => setEventPrefix(e.target.value.toUpperCase())}
-                        placeholder="e.g. EVT"
-                        className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
-                      />
-                      <p className="text-xs text-muted px-1 font-medium opacity-60">
-                        {lang === "am" ? `ለምሳሌ: ${eventPrefix || "EVT"}001` : `Example: ${eventPrefix || "EVT"}001`}
-                      </p>
+                    {/* Dark Mode Selector Card */}
+                    <div
+                      onClick={() => { if (!dark) toggleTheme(); }}
+                      className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 relative select-none ${
+                        dark
+                          ? "border-primary bg-primary/5 shadow-premium-sm"
+                          : "border-border bg-card-alt hover:border-border/80 hover:bg-card-alt/80"
+                      }`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                        dark ? "bg-primary text-on-primary" : "bg-card text-muted-foreground"
+                      }`}>
+                        <HiMoon className="w-6 h-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xs font-black uppercase tracking-wider ${dark ? "text-primary" : "text-foreground"}`}>
+                          {t("Dark Mode")}
+                        </p>
+                        <p className="text-[10px] text-muted font-medium mt-1">Sleek, low-light workspace</p>
+                      </div>
+                      {dark && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isSystemSavePending || isSystemSaveDisabled}
-                  className={`w-full h-11 rounded-xl font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2 ${
-                    isSystemSavePending
-                      ? "bg-primary text-on-primary opacity-90 cursor-wait"
-                      : isSystemSaveDisabled
-                        ? "bg-card-alt text-muted"
-                        : "bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
-                  }`}
-                >
-                  {isSystemSavePending ? t("Saving...") : t("Save System Settings")}
-                </button>
-              </form>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="glass-card rounded-xl p-6 shadow-sm space-y-6">
+                    <div>
+                      <h2 className="text-lg font-bold text-foreground tracking-tight">{t("ID Configuration")}</h2>
+                      <p className="text-xs text-muted mt-1">{t("Configure ID prefixes for each module. Prefixes are uppercased automatically.")}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Employee ID */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-primary"></span>
+                            {t("Employee ID Prefix *")}
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={prefix}
+                          onChange={(e) => setPrefix(e.target.value.toUpperCase())}
+                          placeholder="e.g. EMP"
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                        />
+                        <p className="text-xs text-muted px-1 font-medium opacity-60">
+                          {lang === "am" ? `ለምሳሌ: ${prefix || "EMP"}001` : `Example: ${prefix || "EMP"}001`}
+                        </p>
+                      </div>
+
+                      {/* Inventory/Asset ID */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            {t("Inventory ID Prefix *")}
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={inventoryPrefix}
+                          onChange={(e) => setInventoryPrefix(e.target.value.toUpperCase())}
+                          placeholder="e.g. INV"
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                        />
+                        <p className="text-xs text-muted px-1 font-medium opacity-60">
+                          {lang === "am" ? `ለምሳሌ: ${inventoryPrefix || "INV"}001` : `Example: ${inventoryPrefix || "INV"}001`}
+                        </p>
+                      </div>
+
+                      {/* Event ID */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            {t("Event ID Prefix *")}
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={eventPrefix}
+                          onChange={(e) => setEventPrefix(e.target.value.toUpperCase())}
+                          placeholder="e.g. EVT"
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                        />
+                        <p className="text-xs text-muted px-1 font-medium opacity-60">
+                          {lang === "am" ? `ለምሳሌ: ${eventPrefix || "EVT"}001` : `Example: ${eventPrefix || "EVT"}001`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSystemSavePending || isSystemSaveDisabled}
+                    className={`w-full h-11 rounded-xl font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2 ${
+                      isSystemSavePending
+                        ? "bg-primary text-on-primary opacity-90 cursor-wait"
+                        : isSystemSaveDisabled
+                          ? "bg-card-alt text-muted"
+                          : "bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
+                    }`}
+                  >
+                    {isSystemSavePending ? t("Saving...") : t("Save System Settings")}
+                  </button>
+                </form>
+              </div>
             )}
 
             {activeTab === "database" && (
@@ -1188,21 +1277,30 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="px-4 md:px-6 pt-4 pb-2 border-b border-border/30 bg-card">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {modalTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setUserModalTab(tab.id)}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-                      userModalTab === tab.id
-                        ? "bg-primary text-on-primary"
-                        : "bg-card-alt text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+            <div className="px-4 md:px-6 pt-4 pb-3 border-b border-border/30 bg-card-alt/30 relative z-0">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 p-1 bg-card rounded-xl border border-border/50">
+                {modalTabs.map((tab) => {
+                  const selected = userModalTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setUserModalTab(tab.id)}
+                      className={`relative px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all active:scale-[0.97] cursor-pointer ${
+                        selected ? "text-on-primary" : "text-muted hover:text-foreground"
+                      }`}
+                    >
+                      <span className="relative z-10">{tab.label}</span>
+                      {selected && (
+                        <motion.div
+                          layoutId="activeModalTab"
+                          className="absolute inset-0 bg-primary rounded-lg shadow-sm z-0"
+                          transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1313,35 +1411,54 @@ export default function SettingsPage() {
               )}
 
               {userModalTab === "access" && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Roles *</label>
-                    <div className="rounded-xl border border-border bg-card-alt p-3 space-y-2">
+                    <label className="block text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">{t("Roles *")}</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {roles.map((r) => {
                         const checked = formData.roleIds.includes(r.id);
                         return (
-                          <label key={r.id} className="flex items-start gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleRoleSelection(r.id)}
-                              className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/50"
-                            />
-                            <span className="text-sm text-foreground font-medium">
-                              {r.name}
-                              <span className="text-xs text-muted ml-1">{r.description || ""}</span>
-                            </span>
-                          </label>
+                          <div
+                            key={r.id}
+                            onClick={() => toggleRoleSelection(r.id)}
+                            className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 select-none ${
+                              checked
+                                ? "border-primary bg-primary/5 shadow-premium-sm"
+                                : "border-border bg-card hover:border-border/80 hover:bg-card-alt/30"
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                              checked
+                                ? "bg-primary border-primary text-on-primary"
+                                : "border-muted-foreground/30 bg-card-alt"
+                            }`}>
+                              {checked && (
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black uppercase tracking-wider ${checked ? "text-primary" : "text-foreground"}`}>
+                                {r.name}
+                              </p>
+                              {r.description && (
+                                <p className="text-[10px] text-muted font-medium mt-1 leading-tight line-clamp-2">
+                                  {r.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
-                    <p className="text-[11px] text-muted mt-1">
+                    <p className="text-[11px] text-muted mt-2 px-1">
                       Multiple roles are supported; the first checked role is used as primary for compatibility.
                     </p>
                   </div>
 
                   <div className="pt-2">
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Resolved Effective Permissions</label>
+                    <label className="block text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">Resolved Effective Permissions</label>
                     {effectivePermissions.length === 0 ? (
                       <div className="text-xs text-muted-foreground p-3 border border-dashed border-border rounded-xl bg-card-alt">
                         No permissions resolved. Select at least one role.
@@ -1354,9 +1471,9 @@ export default function SettingsPage() {
                             * (Full System Access)
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-1.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                             {effectivePermissions.map((slug) => (
-                              <div key={slug} className="text-xs font-semibold text-foreground font-mono bg-card border border-border/50 px-2 py-1 rounded-lg truncate" title={slug}>
+                              <div key={slug} className="text-[10px] font-semibold text-foreground font-mono bg-card border border-border/50 px-2 py-1.5 rounded-lg truncate" title={slug}>
                                 {slug}
                               </div>
                             ))}
@@ -1366,17 +1483,33 @@ export default function SettingsPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 pt-1">
-                    <input
-                      type="checkbox"
-                      id="isActive"
-                      checked={formData.isActive}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.checked }))}
-                      className="w-5 h-5 rounded border-border text-primary focus:ring-primary/50"
-                    />
-                    <label htmlFor="isActive" className="text-sm font-semibold text-foreground">
-                      Account Enabled
-                    </label>
+                  <div 
+                    onClick={() => setFormData((prev) => ({ ...prev, isActive: !prev.isActive }))}
+                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-3 select-none mt-2 ${
+                      formData.isActive
+                        ? "border-emerald-500 bg-emerald-500/5"
+                        : "border-border bg-card hover:border-border/80 hover:bg-card-alt/30"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${
+                      formData.isActive
+                        ? "bg-emerald-500 border-emerald-500 text-white"
+                        : "border-muted-foreground/30 bg-card-alt"
+                    }`}>
+                      {formData.isActive && (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      )}
+                    </div>
+                    <div>
+                      <p className={`text-xs font-black uppercase tracking-wider ${formData.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                        {lang === "am" ? "መለያው ንቁ ነው" : "Account Active & Enabled"}
+                      </p>
+                      <p className="text-[10px] text-muted font-medium mt-0.5 leading-none">
+                        {lang === "am" ? "ይህ መለያ ወደ ሲስተሙ መግባት ይችላል" : "Allows this user to authenticate and access the system."}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
