@@ -7,7 +7,7 @@ import Image from "next/image";
 import { updateEmployee, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import { Employee, SalaryLevel, EventType, EmployeesResponse } from "@/lib/types";
 import toast from "react-hot-toast";
-import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck } from "react-icons/hi2";
+import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck, HiArrowPath } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
@@ -40,6 +40,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Rates": "Event Rates",
     "Rates Description": "Set custom rates for this employee. These prices will be used during payroll calculation.",
     "Save Changes": "Save Changes",
+    "Reset Changes": "Reset Changes",
+    "Changes reset": "Changes reset",
     "Updating...": "Updating...",
     "Delete Record": "Delete Record",
     "Delete Permanently": "Delete Permanently",
@@ -73,6 +75,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Rates": "የዝግጅት ተመኖች",
     "Rates Description": "ለዚህ ሰራተኛ ብጁ ተመኖችን ይወስኑ። እነዚህ ዋጋዎች በደመወዝ ስሌት ወቅት ጥቅም ላይ ይውላሉ።",
     "Save Changes": "ለውጦችን አስቀምጥ",
+    "Reset Changes": "ለውጦችን መልስ",
+    "Changes reset": "ለውጦች ተመልሰዋል",
     "Updating...": "በማዘመን ላይ...",
     "Delete Record": "መዝገብ ሰርዝ",
     "Delete Permanently": "በቋሚነት ሰርዝ",
@@ -128,6 +132,29 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
   });
   const [eventPrices, setEventPrices] = useState<Record<string, number>>(employee.event_prices || {});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const handleReset = () => {
+    setFormData({
+      full_name: employee.full_name,
+      employee_id: employee.employee_id,
+      department_id: employee.department_id || "",
+      phone: employee.phone || "",
+      email: employee.email || "",
+      salary_level: employee.salary_level || "",
+      office_id: employee.office_id || "",
+    });
+    setEventPrices(employee.event_prices || {});
+    setFrontPreview(employee.id_card_front_url);
+    setBackPreview(employee.id_card_back_url);
+    setProfilePreview(employee.profile_photo_url || null);
+    setFrontFile(null);
+    setBackFile(null);
+    setProfileFile(null);
+    setFormErrors({});
+    setIsAddingDepartment(false);
+    setNewDepartment("");
+    toast.success(t("Changes reset"));
+  };
 
   const [newDepartment, setNewDepartment] = useState("");
   const [isAddingDepartment, setIsAddingDepartment] = useState(false);
@@ -536,7 +563,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                         className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-sm ${
                           isAddingDepartment
                             ? "bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 rotate-45"
-                            : "bg-primary text-primary-foreground hover:bg-primary-dark"
+                            : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                         }`}
                         title={isAddingDepartment ? t("Cancel") : t("Add Department")}
                       >
@@ -567,7 +594,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                         <button
                           type="button"
                           onClick={handleAddDepartment}
-                          className="px-3 h-9 rounded-lg bg-primary text-primary-foreground hover:bg-primary-dark transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
+                          className="px-3 h-9 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
                         >
                           <HiCheck className="w-4 h-4" />
                           {t("Add")}
@@ -663,11 +690,20 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               <HiTrash className="w-4.5 h-4.5" />
               {t("Delete")}
             </Button>
+
+            <Button
+              type="button"
+              onClick={handleReset}
+              className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+            >
+              <HiArrowPath className="w-4.5 h-4.5" />
+              {t("Reset Changes")}
+            </Button>
             
             <Button
               type="submit"
               loading={updateMutation.isPending}
-              className="h-10 px-6 rounded-xl bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+              className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
             >
               <HiCheck className="w-4.5 h-4.5" />
               {t("Save Changes")}

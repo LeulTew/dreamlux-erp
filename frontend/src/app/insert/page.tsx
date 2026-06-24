@@ -584,10 +584,10 @@ export default function InsertEmployeePage() {
                     <button
                       type="button"
                       onClick={() => setIsAddingDepartment(!isAddingDepartment)}
-                      className={`w-10 h-10 rounded-lg transition-all flex items-center justify-center shrink-0 shadow-premium ${
+                      className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-premium ${
                         isAddingDepartment
                           ? "bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 rotate-45"
-                          : "bg-primary text-primary-foreground hover:bg-primary-dark"
+                          : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                       }`}
                       title={isAddingDepartment ? t("Cancel") : t("Add Department")}
                     >
@@ -618,7 +618,7 @@ export default function InsertEmployeePage() {
                       <button
                         type="button"
                         onClick={handleAddDepartment}
-                        className="px-3 h-9 rounded-lg bg-primary text-primary-foreground hover:bg-primary-dark transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
+                        className="px-3 h-9 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
                       >
                         <HiCheck className="w-4 h-4" />
                         {t("Add")}
@@ -740,7 +740,7 @@ export default function InsertEmployeePage() {
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="w-full max-w-xs py-3 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-[0.15em] text-xs shadow-premium hover:bg-primary-dark hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full max-w-xs py-3 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-[0.15em] text-xs shadow-premium hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
             </button>

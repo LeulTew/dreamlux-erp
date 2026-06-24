@@ -350,18 +350,18 @@ export default function InsertAssetPage() {
             <button
               type="button"
               onClick={resetForm}
-              className="px-6 py-3 rounded-2xl bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest"
+              className="px-6 py-3 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
             >
               {t("Reset")}
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="px-8 py-3 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest shadow-premium hover:bg-primary-dark hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-2"
+              className="px-8 py-3 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-widest shadow-premium hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-2"
             >
               {createMutation.isPending ? (
                 <>
-                  <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   {t("Saving...")}
                 </>
               ) : (

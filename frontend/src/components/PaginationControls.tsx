@@ -1,5 +1,6 @@
 import * as React from "react";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
+import Select from "./ui/Select";
 
 interface PaginationControlsProps {
   page: number;
@@ -61,17 +62,12 @@ export default function PaginationControls({
         {onPageSizeChange && (
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">Show:</span>
-            <select
+            <Select
+              options={pageSizeOptions.map((opt) => ({ id: opt, label: String(opt) }))}
               value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="bg-card-alt border border-border rounded-full text-xs font-bold px-3 py-1 outline-none focus:ring-2 focus:ring-primary/25 cursor-pointer text-foreground"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => onPageSizeChange(Number(val))}
+              className="min-w-20 inline-block"
+            />
           </div>
         )}
 
