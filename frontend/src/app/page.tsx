@@ -344,14 +344,14 @@ function EmployeesPageContent() {
 
   const handleExportCSV = async () => {
     setExportingCSV(true);
-    try { await exportEmployeeCSV(officeId); } 
+    try { await exportEmployeeCSV(officeId); }
     catch (e) { console.error("Export Failed", e); }
     finally { setExportingCSV(false); }
   };
-  
+
   const handleExportExcel = async () => {
     setExportingExcel(true);
-    try { await exportEmployeeExcel(officeId); } 
+    try { await exportEmployeeExcel(officeId); }
     catch (e) { console.error("Export Failed", e); }
     finally { setExportingExcel(false); }
   };
@@ -581,7 +581,7 @@ function EmployeesPageContent() {
           >
             {sortOrder === "asc" ? "↑" : "↓"}
           </Button>
-          
+
           <button
             onClick={() => { setShowTrash(!showTrash); setPage(1); }}
             className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-2xl text-xs 2xl:text-sm font-semibold transition-all ${
@@ -778,10 +778,10 @@ function EmployeesPageContent() {
 
           <div className="md:hidden space-y-3">
             {employees.map((emp) => (
-              <MobileEmployeeCard 
-                key={emp.id} 
-                employee={emp} 
-                onTap={setEditingEmployee} 
+              <MobileEmployeeCard
+                key={emp.id}
+                employee={emp}
+                onTap={setEditingEmployee}
                 editMode={editMode}
                 onUpdate={debouncedUpdate}
                 onDelete={showTrash ? (employee) => handleSinglePermanentDelete(employee.id) : setEmployeeToDelete}
@@ -811,18 +811,18 @@ function EmployeesPageContent() {
       )}
 
       {editingEmployee && (
-          <EditEmployeeSheet 
-            employee={editingEmployee} 
+          <EditEmployeeSheet
+            employee={editingEmployee}
             onClose={() => {
               setEditingEmployee(null);
               if (searchParams.get("edit")) {
                 router.replace(pathname, { scroll: false });
               }
-            }} 
+            }}
           />
         )}
 
-      <DeleteConfirmModal 
+      <DeleteConfirmModal
         isOpen={!!employeeToDelete}
         onClose={() => setEmployeeToDelete(null)}
         onConfirm={() => employeeToDelete && deleteMutation.mutate(employeeToDelete.id)}

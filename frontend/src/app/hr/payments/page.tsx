@@ -103,9 +103,9 @@ function PaymentsPageContent() {
 
   const { data: runs, isLoading, isRefetching, refetch } = useQuery<PayrollRunRow[]>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder],
-    queryFn: () => getPayrollRuns({ 
-      view, 
-      year: yearFilter === "ALL" ? undefined : yearFilter, 
+    queryFn: () => getPayrollRuns({
+      view,
+      year: yearFilter === "ALL" ? undefined : yearFilter,
       status: statusFilter === "ALL" ? undefined : statusFilter,
       sortBy,
       sortOrder
@@ -200,7 +200,7 @@ function PaymentsPageContent() {
               {t("Payroll snaphosts & history")}
             </p>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-1 rounded-xl border border-border/50 bg-card-alt p-1">
               <button
@@ -233,7 +233,7 @@ function PaymentsPageContent() {
               onClick={handleSync}
               disabled={isRefetching}
               className={`
-                group inline-flex items-center justify-center w-10 h-10 rounded-xl border border-border/60 
+                group inline-flex items-center justify-center w-10 h-10 rounded-xl border border-border/60
                 bg-card/50 backdrop-blur-xl text-foreground hover:bg-muted transition-all active:scale-95
                 ${isRefetching ? 'opacity-50 cursor-not-allowed' : ''}
               `}
@@ -253,7 +253,7 @@ function PaymentsPageContent() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-card/40 backdrop-blur-md p-4 rounded-2xl border border-border/50 shadow-sm">
           <div className="space-y-1.5">
             <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">{t("Year")}</label>
-            <select 
+            <select
               value={yearFilter}
               onChange={(e) => { setYearFilter(e.target.value); setPage(1); }}
               className="w-full h-10 px-4 py-2 bg-card border border-border/80 rounded-xl text-xs font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
@@ -267,7 +267,7 @@ function PaymentsPageContent() {
 
           <div className="space-y-1.5">
             <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">{t("Status")}</label>
-            <select 
+            <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="w-full h-10 px-4 py-2 bg-card border border-border/80 rounded-xl text-xs font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
@@ -280,7 +280,7 @@ function PaymentsPageContent() {
 
           <div className="space-y-1.5">
             <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">{t("Sort By")}</label>
-            <select 
+            <select
               value={sortBy}
               onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
               className="w-full h-10 px-4 py-2 bg-card border border-border/80 rounded-xl text-xs font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
@@ -356,7 +356,7 @@ function PaymentsPageContent() {
                   }`}
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-[4rem] -mr-4 -mt-4 transition-transform group-hover:scale-110 pointer-events-none" />
-                  
+
                   <div className="flex flex-col gap-6 md:flex-row md:items-center relative z-10">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -446,7 +446,7 @@ function PaymentsPageContent() {
           </div>
         )}
 
-        <DeleteConfirmModal 
+        <DeleteConfirmModal
           isOpen={!!confirmState}
           onClose={() => setConfirmState(null)}
           onConfirm={executeConfirmAction}

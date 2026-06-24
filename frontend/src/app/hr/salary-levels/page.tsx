@@ -71,12 +71,9 @@ function SalaryLevelsContent() {
   const [page, setPage] = useState(1);
   const limit = 10;
   const totalPages = Math.ceil((levels?.length || 0) / limit) || 1;
+  const safePage = Math.min(page, totalPages);
 
-  useEffect(() => {
-    setPage(1);
-  }, [levels?.length]);
-
-  const paginatedLevels = levels ? levels.slice((page - 1) * limit, page * limit) : [];
+  const paginatedLevels = levels ? levels.slice((safePage - 1) * limit, safePage * limit) : [];
 
   const { data: deleteImpact, isLoading: isDeleteImpactLoading } = useQuery<{ salary_level_id: string; level_name: string; active_employee_count: number }>({
     queryKey: ["salary-level-delete-impact", deleteId],
@@ -164,29 +161,29 @@ function SalaryLevelsContent() {
             <HiOutlineTrash className="w-4 h-4" /> {t("TRASH")}
           </Link>
         </header>
-        
+
         <div className="bg-card p-6 rounded-2xl 2xl:rounded-4xl shadow-premium border border-border mb-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
-          
+
           <form onSubmit={handleSubmit} className="relative z-10 flex gap-6 items-end flex-wrap">
             <div className="flex-1 min-w-50">
               <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">{t("Level Name")}</label>
-              <input 
-                type="text" required value={form.level_name} 
-                onChange={e => setForm({...form, level_name: e.target.value})} 
-                className="w-full h-11 px-4 bg-card-alt border border-border/80 rounded-xl font-mono text-sm font-semibold uppercase placeholder:text-muted-foreground/30 outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground" 
-                placeholder="e.g. L1" 
+              <input
+                type="text" required value={form.level_name}
+                onChange={e => setForm({...form, level_name: e.target.value})}
+                className="w-full h-11 px-4 bg-card-alt border border-border/80 rounded-xl font-mono text-sm font-semibold uppercase placeholder:text-muted-foreground/30 outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground"
+                placeholder="e.g. L1"
               />
             </div>
             <div className="flex-1 min-w-50">
               <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">{t("Base Rate (ETB)")}</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">ETB</span>
-                <input 
-                  type="number" min="0" required value={form.base_salary} 
-                  onChange={e => setForm({...form, base_salary: e.target.value})} 
-                  className="w-full pl-12 pr-4 h-11 bg-card-alt border border-border/80 rounded-xl font-mono text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground" 
-                  placeholder="5000" 
+                <input
+                  type="number" min="0" required value={form.base_salary}
+                  onChange={e => setForm({...form, base_salary: e.target.value})}
+                  className="w-full pl-12 pr-4 h-11 bg-card-alt border border-border/80 rounded-xl font-mono text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground"
+                  placeholder="5000"
                 />
               </div>
             </div>
@@ -272,12 +269,12 @@ function SalaryLevelsContent() {
             </table>
           </div>
           {levels && levels.length > limit && (
-            <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+            <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />
           )}
         </div>
       </div>
 
-      <DeleteConfirmModal 
+      <DeleteConfirmModal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={() => deleteId && deleteMut.mutate(deleteId)}

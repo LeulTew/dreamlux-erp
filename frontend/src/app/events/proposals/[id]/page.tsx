@@ -3,22 +3,22 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  getEventProposal, 
-  submitEventProposal, 
-  approveEventProposal, 
-  rejectEventProposal, 
-  cancelEventProposal, 
+import {
+  getEventProposal,
+  submitEventProposal,
+  approveEventProposal,
+  rejectEventProposal,
+  cancelEventProposal,
   convertEventProposal,
   api
 } from "@/lib/api";
 import { EventProposal, EventProposalLog } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
-import { 
-  HiInboxStack, 
-  HiCheckCircle, 
-  HiPrinter, 
-  HiArrowLeft, 
+import {
+  HiInboxStack,
+  HiCheckCircle,
+  HiPrinter,
+  HiArrowLeft,
   HiExclamationTriangle,
   HiCurrencyDollar,
   HiArrowTopRightOnSquare
@@ -333,10 +333,10 @@ export default function ProposalDetailPage() {
 
         {/* Primary layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start print-grid">
-          
+
           {/* Main Info */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Basics Card */}
             <div className="bg-card border border-border rounded-lg p-5 space-y-4">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
@@ -466,7 +466,7 @@ export default function ProposalDetailPage() {
 
           {/* Sticky Actions Sidebar */}
           <div className="space-y-6 sticky top-6 w-full shrink-0">
-            
+
             {/* Live Financial Totals */}
             <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
@@ -620,7 +620,7 @@ export default function ProposalDetailPage() {
             className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
           >
             <h3 id="reject-proposal-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Rejection Modal Title")}</h3>
-            
+
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Rejection Reason")} *</label>
               <textarea

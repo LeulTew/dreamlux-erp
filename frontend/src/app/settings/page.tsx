@@ -759,7 +759,7 @@ export default function SettingsPage() {
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
+
                   {/* Card 1: Users Overview with Circular Progress */}
                   <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-slate-700/50 p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110" />
@@ -774,18 +774,18 @@ export default function SettingsPage() {
                           <p className="text-xs text-slate-300 font-bold uppercase tracking-wider mt-1">{t("Registered Accounts")}</p>
                         </div>
                       </div>
-                      
+
                       {/* Interactive Circular Progress SVG */}
                       <div className="relative w-16 h-16 shrink-0">
                         <svg className="w-full h-full transform -rotate-90">
                           <circle cx="32" cy="32" r="26" stroke="rgba(255,255,255,0.06)" strokeWidth="6" fill="transparent" />
-                          <circle 
-                            cx="32" 
-                            cy="32" 
-                            r="26" 
-                            stroke="var(--color-primary)" 
-                            strokeWidth="6" 
-                            fill="transparent" 
+                          <circle
+                            cx="32"
+                            cy="32"
+                            r="26"
+                            stroke="var(--color-primary)"
+                            strokeWidth="6"
+                            fill="transparent"
                             strokeDasharray={2 * Math.PI * 26}
                             strokeDashoffset={2 * Math.PI * 26 * (1 - (userStats.total > 0 ? userStats.active / userStats.total : 0))}
                             strokeLinecap="round"
@@ -797,7 +797,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="mt-6 pt-4 border-t border-slate-700/50 flex justify-between items-center text-xs">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -878,7 +878,7 @@ export default function SettingsPage() {
                     </div>
                     <span className="text-[9px] font-black font-mono text-muted bg-card-alt px-2 py-0.5 rounded border border-border uppercase tracking-widest">{t("Real-time")}</span>
                   </div>
-                  
+
                   <div className="font-mono text-[10px] bg-slate-950 text-slate-400 p-4 rounded-xl space-y-1.5 border border-slate-800 shadow-inner">
                     <p className="text-emerald-400">{"[info] Initializing system diagnostic audit suite..."}</p>
                     <p>{`[info] Database connection state: connected to supabase (pooler)`}</p>
@@ -1483,7 +1483,7 @@ export default function SettingsPage() {
                     )}
                   </div>
 
-                  <div 
+                  <div
                     onClick={() => setFormData((prev) => ({ ...prev, isActive: !prev.isActive }))}
                     className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-3 select-none mt-2 ${
                       formData.isActive

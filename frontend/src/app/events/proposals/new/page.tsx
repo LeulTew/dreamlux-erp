@@ -6,11 +6,11 @@ import { createEventProposal, submitEventProposal, getEventTypes, createEventTyp
 import { EventType } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import Select from "@/components/ui/Select";
-import { 
-  HiArrowRight, 
-  HiArrowLeft, 
-  HiPlus, 
-  HiTrash, 
+import {
+  HiArrowRight,
+  HiArrowLeft,
+  HiPlus,
+  HiTrash,
   HiExclamationTriangle,
   HiOutlineCalendar,
   HiOutlinePhone,
@@ -403,7 +403,7 @@ export default function NewProposalPage() {
               <p className="text-xs text-muted font-medium mt-0.5 break-words">{t("New Proposal Subtitle")}</p>
             </div>
           </div>
-          
+
           {/* Stepper progress tracker */}
           <div className="flex items-center justify-center select-none w-full lg:w-auto max-w-md px-2">
             {/* Step 1 */}
@@ -980,7 +980,7 @@ export default function NewProposalPage() {
               <p className="text-xs text-muted font-semibold leading-relaxed">
                 {t("Make sure to fill all required fields to get accurate estimates.")}
               </p>
-              <button 
+              <button
                 type="button"
                 onClick={() => window.open("/docs/guidelines", "_blank")}
                 className="w-full h-10 mt-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card-alt text-xs font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:bg-border/30 transition-all cursor-pointer active:scale-95"
@@ -1041,10 +1041,10 @@ export default function NewProposalPage() {
             <div className="flex flex-col items-end">
               <span className="text-[9px] text-muted uppercase tracking-wider block">{t("Margin")}</span>
               <span className={`font-mono font-black ${
-                financials.netProfit < 0 || financials.margin < 10 
-                  ? "text-danger" 
-                  : financials.margin < 25 
-                    ? "text-warning" 
+                financials.netProfit < 0 || financials.margin < 10
+                  ? "text-danger"
+                  : financials.margin < 25
+                    ? "text-warning"
                     : "text-success"
               }`}>
                 {financials.margin}%

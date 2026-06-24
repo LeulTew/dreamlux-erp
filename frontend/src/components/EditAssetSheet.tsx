@@ -268,11 +268,11 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                       }`}
                       unoptimized={isDataUrl}
                     />
-                    
+
                     {/* Progress Overlay */}
                     <AnimatePresence>
                       {updateMutation.isPending && (
-                        <motion.div 
+                        <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
@@ -280,7 +280,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                           className="absolute inset-0 bg-primary/20 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
                         >
                           <motion.div
-                            animate={{ 
+                            animate={{
                               scale: [1, 1.1, 1],
                               rotate: [0, 10, -10, 0]
                             }}
@@ -293,7 +293,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                             {imageFile ? "Converting to WebP & Syncing..." : t("Syncing...")}
                           </p>
                           <div className="mt-4 w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                            <motion.div 
+                            <motion.div
                               className="h-full bg-white"
                               animate={{ x: [-128, 128] }}
                               transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -311,7 +311,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted">{t("Tap to change photo")}</span>
                   </div>
                 )}
-                
+
                 {!updateMutation.isPending && (
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
                     <span className="bg-background text-foreground px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider shadow-massive">{t("Update Image")}</span>
@@ -339,8 +339,8 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-bold text-muted">{t("Last Reconciled")}</span>
                       <span className="text-xs font-bold text-foreground">
-                        {item.last_counted_at ? new Date(item.last_counted_at).toLocaleDateString(undefined, { 
-                          month: 'short', day: 'numeric', year: 'numeric' 
+                        {item.last_counted_at ? new Date(item.last_counted_at).toLocaleDateString(undefined, {
+                          month: 'short', day: 'numeric', year: 'numeric'
                         }) : "Pending"}
                       </span>
                     </div>
@@ -461,7 +461,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
               {t("Mark as Physically Verified")}
             </Button>
-            
+
             {/* Right side: Delete, Reset, Save Changes */}
             <div className="flex items-center gap-3">
               <Button
@@ -475,7 +475,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                 <HiTrash className="w-4.5 h-4.5" />
                 {t("Delete")}
               </Button>
-              
+
               <Button
                 type="button"
                 onClick={handleReset}
@@ -484,7 +484,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                 <HiArrowPath className="w-4.5 h-4.5" />
                 {t("Reset Changes")}
               </Button>
-              
+
               <Button
                 type="submit"
                 loading={updateMutation.isPending}

@@ -204,7 +204,7 @@ export default function InsertAssetPage() {
                       className="absolute inset-0 bg-primary/20 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-10"
                     >
                       <motion.div
-                        animate={{ 
+                        animate={{
                           scale: [1, 1.1, 1],
                           rotate: [0, 10, -10, 0]
                         }}
@@ -217,7 +217,7 @@ export default function InsertAssetPage() {
                         {t("Processing & Syncing...")}
                       </p>
                       <div className="mt-4 w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                        <motion.div 
+                        <motion.div
                           className="h-full bg-white"
                           animate={{ x: [-128, 128] }}
                           transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}

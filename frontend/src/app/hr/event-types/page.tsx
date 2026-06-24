@@ -72,11 +72,11 @@ export default function EventTypesPage() {
     queryFn: getEventTypes
   });
 
-  const [form, setForm] = useState({ 
-    event_name: "", 
+  const [form, setForm] = useState({
+    event_name: "",
     description: ""
   });
-  
+
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,18 +86,13 @@ export default function EventTypesPage() {
     if (!events) return 1;
     return Math.ceil(events.length / ITEMS_PER_PAGE);
   }, [events]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages, currentPage]);
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedEvents = useMemo(() => {
     if (!events) return [];
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const start = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
     return events.slice(start, start + ITEMS_PER_PAGE);
-  }, [events, currentPage]);
+  }, [events, safeCurrentPage]);
 
   const masonryParams = useMemo(() => {
     let columns = 3;
@@ -146,7 +141,7 @@ export default function EventTypesPage() {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Duplicate check
     const isDuplicate = events?.some(ev => ev.event_name.toLowerCase() === form.event_name.toLowerCase());
     if (isDuplicate) {
@@ -154,8 +149,8 @@ export default function EventTypesPage() {
       return;
     }
 
-    createMut.mutate({ 
-      event_name: form.event_name, 
+    createMut.mutate({
+      event_name: form.event_name,
       description: form.description
     });
   };
@@ -180,13 +175,13 @@ export default function EventTypesPage() {
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1 pl-1">{t("Professional Rate Engine")}</p>
           </div>
           <div className="flex gap-3 sm:gap-4 w-full sm:w-auto">
-            <Link 
-              href="/hr/event-types/trash" 
+            <Link
+              href="/hr/event-types/trash"
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-danger/10 text-danger rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-danger/20 transition-all shadow-sm border border-danger/20"
             >
               <HiOutlineTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t("TRASH")}
             </Link>
-            <button 
+            <button
               onClick={() => setShowAddForm(!showAddForm)}
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
                 showAddForm ? 'bg-muted text-foreground' : 'bg-primary text-on-primary hover:bg-primary-dark shadow-primary/20'
@@ -200,10 +195,10 @@ export default function EventTypesPage() {
             </button>
           </div>
         </div>
-        
+
         <AnimatePresence>
           {showAddForm && (
-            <motion.div 
+            <motion.div
               initial={{ height: 0, opacity: 0, marginBottom: 0 }}
               animate={{ height: "auto", opacity: 1, marginBottom: 40 }}
               exit={{ height: 0, opacity: 0, marginBottom: 0 }}
@@ -221,20 +216,20 @@ export default function EventTypesPage() {
                   <div className="flex gap-6 items-end flex-wrap">
                     <div className="flex-2 min-w-70">
                       <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">{t("Event Name")}</label>
-                      <input 
-                        type="text" required value={form.event_name} 
-                        onChange={e => setForm({...form, event_name: e.target.value})} 
-                        className="w-full px-5 py-3.5 bg-card-alt border border-border/80 rounded-2xl text-sm font-black uppercase placeholder:text-muted-foreground/30 outline-none focus:ring-4 focus:ring-primary/10 transition-all focus:border-primary/50 text-foreground" 
-                        placeholder="e.g. Wedding Setup" 
+                      <input
+                        type="text" required value={form.event_name}
+                        onChange={e => setForm({...form, event_name: e.target.value})}
+                        className="w-full px-5 py-3.5 bg-card-alt border border-border/80 rounded-2xl text-sm font-black uppercase placeholder:text-muted-foreground/30 outline-none focus:ring-4 focus:ring-primary/10 transition-all focus:border-primary/50 text-foreground"
+                        placeholder="e.g. Wedding Setup"
                       />
                     </div>
                     <div className="flex-3 min-w-70">
                       <label className="block text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest leading-none">{t("Description")}</label>
-                      <input 
-                        type="text" value={form.description} 
-                        onChange={e => setForm({...form, description: e.target.value})} 
-                        className="w-full px-5 py-3.5 bg-card-alt border border-border/80 rounded-2xl text-sm font-medium placeholder:text-muted-foreground/30 outline-none focus:ring-4 focus:ring-primary/10 transition-all focus:border-primary/50 text-foreground" 
-                        placeholder="Optional description..." 
+                      <input
+                        type="text" value={form.description}
+                        onChange={e => setForm({...form, description: e.target.value})}
+                        className="w-full px-5 py-3.5 bg-card-alt border border-border/80 rounded-2xl text-sm font-medium placeholder:text-muted-foreground/30 outline-none focus:ring-4 focus:ring-primary/10 transition-all focus:border-primary/50 text-foreground"
+                        placeholder="Optional description..."
                       />
                     </div>
                     <button
@@ -273,7 +268,7 @@ export default function EventTypesPage() {
                       height
                     }}
                   >
-                    <EventCard 
+                    <EventCard
                       event={event}
                       onUpdate={(id, data) => updateMut.mutateAsync({ id, data })}
                       onDelete={(id) => setDeleteId(id)}
@@ -291,12 +286,12 @@ export default function EventTypesPage() {
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 border-t border-border/50 pt-6">
             <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-              {t("Showing")} {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, events?.length || 0)} - {Math.min(currentPage * ITEMS_PER_PAGE, events?.length || 0)} {t("of")} {events?.length} {t("items")}
+              {t("Showing")} {Math.min((safeCurrentPage - 1) * ITEMS_PER_PAGE + 1, events?.length || 0)} - {Math.min(safeCurrentPage * ITEMS_PER_PAGE, events?.length || 0)} {t("of")} {events?.length} {t("items")}
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                disabled={currentPage === 1}
+                disabled={safeCurrentPage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 className="w-10 h-10 rounded-xl bg-card border border-border text-muted hover:text-foreground transition-all hover:bg-card-alt flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none active:scale-[0.98] shadow-sm cursor-pointer"
               >
@@ -305,15 +300,15 @@ export default function EventTypesPage() {
               <div className="flex items-center gap-1">
                 {Array.from({ length: totalPages }).map((_, idx) => {
                   const pageNum = idx + 1;
-                  const isSelected = pageNum === currentPage;
+                  const isSelected = pageNum === safeCurrentPage;
                   return (
                     <button
                       key={pageNum}
                       type="button"
                       onClick={() => setCurrentPage(pageNum)}
                       className={`w-10 h-10 rounded-xl text-xs font-black transition-all active:scale-[0.98] cursor-pointer ${
-                        isSelected 
-                          ? "bg-primary text-on-primary shadow-premium" 
+                        isSelected
+                          ? "bg-primary text-on-primary shadow-premium"
                           : "bg-card border border-border text-muted hover:text-foreground hover:bg-card-alt"
                       }`}
                     >
@@ -324,7 +319,7 @@ export default function EventTypesPage() {
               </div>
               <button
                 type="button"
-                disabled={currentPage === totalPages}
+                disabled={safeCurrentPage === totalPages}
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 className="w-10 h-10 rounded-xl bg-card border border-border text-muted hover:text-foreground transition-all hover:bg-card-alt flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none active:scale-[0.98] shadow-sm cursor-pointer"
               >
@@ -336,7 +331,7 @@ export default function EventTypesPage() {
 
       </div>
 
-      <DeleteConfirmModal 
+      <DeleteConfirmModal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={() => deleteId && deleteMut.mutate(deleteId)}

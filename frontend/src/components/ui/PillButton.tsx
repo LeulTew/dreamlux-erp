@@ -3,17 +3,18 @@ import * as React from "react"
 export interface PillButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   className?: string;
   icon?: React.ReactNode;
-  variant?: string;
+  variant?: "primary" | "default" | "secondary" | "outline" | "destructive";
 }
 
 export function PillButton({
   children,
   className,
   icon,
-  variant,
+  variant = "default",
   ...props
 }: PillButtonProps) {
   const uniqueId = React.useId().replace(/:/g, "-");
+  const variantClass = `bubble-btn-${uniqueId}--${variant}`;
 
   return (
     <>
@@ -36,6 +37,27 @@ export function PillButton({
           background: transparent;
           z-index: 1;
           height: 44px;
+        }
+
+        .bubble-btn-${uniqueId}--primary,
+        .bubble-btn-${uniqueId}--default {
+          border-color: var(--primary, #d4af37);
+          color: var(--foreground, #000000);
+        }
+
+        .bubble-btn-${uniqueId}--secondary {
+          background: var(--card, transparent);
+          color: var(--foreground, #000000);
+        }
+
+        .bubble-btn-${uniqueId}--outline {
+          background: transparent;
+          color: var(--foreground, #000000);
+        }
+
+        .bubble-btn-${uniqueId}--destructive {
+          border-color: var(--danger, #dc2626);
+          color: var(--danger, #dc2626);
         }
 
         .dark .bubble-btn-${uniqueId} {
@@ -65,7 +87,7 @@ export function PillButton({
           top: 180%;
           width: 160%;
           height: 190%;
-          background-color: #39bda7;
+          background-color: var(--primary, #d4af37);
           border-radius: 50%;
           display: block;
           transition: all 0.5s 0.1s cubic-bezier(0.55, 0, 0.1, 1);
@@ -74,24 +96,34 @@ export function PillButton({
 
         .bubble-btn-${uniqueId}:hover {
           color: #ffffff;
-          border-color: #39bda7;
+          border-color: var(--primary, #d4af37);
         }
 
         .dark .bubble-btn-${uniqueId}:hover {
           color: #ffffff;
-          border-color: #39bda7;
+          border-color: var(--primary, #d4af37);
         }
 
         .bubble-btn-${uniqueId}:hover:before {
           top: -35%;
-          background-color: #39bda7;
+          background-color: var(--primary, #d4af37);
           transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
         }
 
         .bubble-btn-${uniqueId}:hover:after {
           top: -45%;
-          background-color: #39bda7;
+          background-color: var(--primary, #d4af37);
           transform: translateX(-50%) scaleY(1.3) scaleX(0.8);
+        }
+
+        .bubble-btn-${uniqueId}--destructive:after,
+        .bubble-btn-${uniqueId}--destructive:hover:before,
+        .bubble-btn-${uniqueId}--destructive:hover:after {
+          background-color: var(--danger, #dc2626);
+        }
+
+        .bubble-btn-${uniqueId}--destructive:hover {
+          border-color: var(--danger, #dc2626);
         }
 
         .bubble-btn-${uniqueId} .btn-icon-${uniqueId} {
@@ -103,7 +135,7 @@ export function PillButton({
       `}</style>
       <button
         type="button"
-        className={`bubble-btn-${uniqueId} ${className || ""}`}
+        className={`bubble-btn-${uniqueId} ${variantClass} ${className || ""}`}
         {...props}
       >
         {icon && <span className={`btn-icon-${uniqueId}`}>{icon}</span>}

@@ -18,7 +18,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 router.patch("/", async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { employee_id_prefix, inventory_id_prefix, event_id_prefix } = req.body;
-    
+
     // Only allow updating known fields
     const updates: any = {};
     if (typeof employee_id_prefix === "string") {
@@ -30,12 +30,12 @@ router.patch("/", async (req: AuthRequest, res: Response): Promise<void> => {
     if (typeof event_id_prefix === "string") {
       updates.event_id_prefix = event_id_prefix.trim().toUpperCase();
     }
-    
+
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: "No valid fields provided" });
       return;
     }
-    
+
     const newSettings = await updateSettings(updates);
     res.json(newSettings);
   } catch {

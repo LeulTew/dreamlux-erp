@@ -15,10 +15,10 @@ interface MobileEmployeeCardProps {
   selectMode?: boolean;
 }
 
-export default function MobileEmployeeCard({ 
-  employee, 
-  onTap, 
-  editMode, 
+export default function MobileEmployeeCard({
+  employee,
+  onTap,
+  editMode,
   onUpdate,
   onDelete,
   showTrash,
@@ -99,7 +99,7 @@ export default function MobileEmployeeCard({
               </>
             )}
           </div>
-          
+
           <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
              {showTrash ? (
                <div className="flex items-center gap-2 w-full">

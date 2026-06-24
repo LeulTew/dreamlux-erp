@@ -73,6 +73,8 @@ export default function ExpenseApprovalPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [reviewComments, setReviewComments] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
 
@@ -109,6 +111,11 @@ export default function ExpenseApprovalPage() {
     },
   });
 
+  const expenses = expensesQuery.data || [];
+  const totalPages = Math.ceil(expenses.length / limit) || 1;
+  const safePage = Math.min(page, totalPages);
+  const paginatedExpenses = expenses.slice((safePage - 1) * limit, safePage * limit);
+
   if (authLoading || !isAuthenticated || !hasPermission("expenses:approve")) {
     return (
       <AuthLayout>
@@ -118,17 +125,6 @@ export default function ExpenseApprovalPage() {
       </AuthLayout>
     );
   }
-
-  const [page, setPage] = useState(1);
-  const limit = 10;
-  const expenses = expensesQuery.data || [];
-  const totalPages = Math.ceil(expenses.length / limit) || 1;
-
-  useEffect(() => {
-    setPage(1);
-  }, [expenses.length]);
-
-  const paginatedExpenses = expenses.slice((page - 1) * limit, page * limit);
 
   return (
     <AuthLayout>
@@ -200,7 +196,7 @@ export default function ExpenseApprovalPage() {
                 );
               })}
             </div>
-            <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+            <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />
           </div>
         )}
       </div>

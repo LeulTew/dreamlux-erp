@@ -481,7 +481,7 @@ function EventProfitPanel({
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-lg border border-border bg-card p-4">
           <h2 className="mb-4 text-base font-bold text-foreground">{t("Category Breakdown")}</h2>
-          
+
           {profit.totalExpenses === 0 ? (
             <div className="p-8 text-center text-sm text-muted">
               {t("No approved expenses yet. Profit is same as contract price.")}
@@ -524,7 +524,7 @@ function EventProfitPanel({
         <section className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
           <div>
             <h2 className="mb-4 text-base font-bold text-foreground">{t("Category Breakdown")}</h2>
-            
+
             {profit.totalExpenses === 0 ? (
               <div className="flex h-48 items-center justify-center text-sm text-muted">
                 {t("No approved expenses yet. Profit is same as contract price.")}
@@ -544,7 +544,7 @@ function EventProfitPanel({
                       </span>
                     </div>
                   </div>
-                  
+
                   <svg width="100%" height="24" className="rounded-md overflow-hidden bg-muted">
                     {chartSegments.map((seg, idx: number) => (
                       <rect
@@ -979,11 +979,11 @@ export default function EventWorkspacePage() {
                       onChange={(eventChange) => setAllocationNotes(eventChange.target.value)}
                       placeholder={t("Notes")}
                     />
-                    <Button 
-                      type="button" 
-                      onClick={() => allocationMutation.mutate()} 
-                      loading={allocationMutation.isPending} 
-                      disabled={!canAllocate} 
+                    <Button
+                      type="button"
+                      onClick={() => allocationMutation.mutate()}
+                      loading={allocationMutation.isPending}
+                      disabled={!canAllocate}
                       className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                     >
                       <HiPlus className="h-4 w-4" />
@@ -1349,11 +1349,11 @@ export default function EventWorkspacePage() {
                         <HiPlus className="h-4 w-4" />
                         {t("Submit Expense")}
                       </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border" 
-                        loading={generateLaborMutation.isPending} 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
+                        loading={generateLaborMutation.isPending}
                         onClick={() => generateLaborMutation.mutate()}
                       >
                         {t("Generate Labor Expense")}

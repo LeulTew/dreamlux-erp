@@ -253,7 +253,7 @@ export default function InsertEmployeePage() {
 
       try {
         const compressed = await compressImage(file);
-        
+
         if (side === "front") setFrontFile(compressed);
         else if (side === "back") setBackFile(compressed);
         else setProfileFile(compressed);
@@ -296,7 +296,7 @@ export default function InsertEmployeePage() {
   const handlePhoneChange = (val: string) => {
     const clean = val.replace(/[^\d+]/g, "");
     setFormData({ ...formData, phone: clean });
-    
+
     const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
     if (clean && !ethioRegex.test(clean.replace(/\s+/g, ""))) {
       setFormErrors(prev => ({ ...prev, phone: t("Phone Error Hint") }));
@@ -360,7 +360,7 @@ export default function InsertEmployeePage() {
           {/* Profile Photo */}
           <div className="flex flex-col items-center gap-4">
              <div className="relative group">
-                <div 
+                <div
                   className={`w-32 h-32 rounded-full border-4 border-dashed overflow-hidden flex items-center justify-center transition-all bg-card-alt ${
                     profilePreview ? "border-primary/50" : "border-border hover:border-primary/30"
                   }`}
@@ -371,7 +371,7 @@ export default function InsertEmployeePage() {
                     <HiUserPlus className="w-10 h-10 text-muted opacity-30" />
                   )}
                 </div>
-                
+
                 {profilePreview && (
                   <button
                     type="button"
@@ -382,7 +382,7 @@ export default function InsertEmployeePage() {
                   </button>
                 )}
              </div>
-             
+
              <div className="flex gap-2">
                 <button
                   type="button"
@@ -445,7 +445,7 @@ export default function InsertEmployeePage() {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex gap-2">
                  <button
                    type="button"
@@ -476,7 +476,7 @@ export default function InsertEmployeePage() {
                  </button>
               </div>
             </div>
- 
+
             {/* Back */}
             <div className="space-y-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted px-1 flex justify-between">
@@ -628,7 +628,7 @@ export default function InsertEmployeePage() {
                 </div>
               </div>
             </div>
- 
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Office / Branch (Optional)")}</label>
@@ -675,7 +675,7 @@ export default function InsertEmployeePage() {
                 {formErrors.email && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.email}</p>}
               </div>
             </div>
- 
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Base Salary")}</label>
@@ -705,7 +705,7 @@ export default function InsertEmployeePage() {
             <p className="text-[10px] text-muted px-1 font-medium leading-relaxed">
               {t("Rates Description")}
             </p>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {eventTypes.map((et) => (
                 <div key={et.id} className="bg-card-alt p-4 rounded-2xl border border-border flex flex-col gap-2.5 group hover:border-primary/30 transition-all shadow-premium-sm">

@@ -4,10 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { getEventProposals } from "@/lib/api";
 import { EventProposal } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
-import { 
-  HiInboxStack, 
-  HiPlus, 
-  HiMagnifyingGlass, 
+import {
+  HiInboxStack,
+  HiPlus,
+  HiMagnifyingGlass,
   HiEye,
   HiArrowPath,
   HiCheckCircle,

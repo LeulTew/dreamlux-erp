@@ -2,23 +2,23 @@
 import React, { useEffect, useState, useMemo, Suspense, useRef } from "react";
 import { PillButton } from "@/components/ui/PillButton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  getEvents, 
-  getEventSavedViews, 
-  createEventSavedView, 
-  deleteEventSavedView, 
-  duplicateEventSavedView, 
+import {
+  getEvents,
+  getEventSavedViews,
+  createEventSavedView,
+  deleteEventSavedView,
+  duplicateEventSavedView,
   setDefaultEventSavedView,
   getEventsExportUrl,
   api
 } from "@/lib/api";
 import { Event, EventsResponse, EventSavedView } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
-import { 
-  HiCalendar, 
-  HiPlus, 
-  HiMagnifyingGlass, 
-  HiPencilSquare, 
+import {
+  HiCalendar,
+  HiPlus,
+  HiMagnifyingGlass,
+  HiPencilSquare,
   HiArrowTopRightOnSquare,
   HiAdjustmentsHorizontal,
   HiBookmark,
@@ -623,10 +623,10 @@ function EventsPageContent() {
 
   const handleRemoveFilterRule = (index: number) => {
     const nextRules = filters.filter((_, i: number) => i !== index);
-    updateUrl({ 
+    updateUrl({
       filters: nextRules.length > 0 ? btoa(JSON.stringify(nextRules)) : null,
-      page: "1", 
-      viewId: null 
+      page: "1",
+      viewId: null
     });
   };
 
@@ -765,7 +765,7 @@ function EventsPageContent() {
         {/* Compact Integrated Toolbar Container */}
         <div className="toolbar-container bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 mb-6 space-y-3 no-print">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            
+
             {/* Search and Saved Views dropdown */}
             <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
               <div className="relative flex-1 max-w-sm min-w-[180px]">

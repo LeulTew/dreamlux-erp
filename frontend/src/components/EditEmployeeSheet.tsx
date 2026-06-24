@@ -376,7 +376,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 {/* Profile Photo */}
                 <div className="sm:col-span-1 flex flex-col items-center justify-center gap-3 bg-card-alt/30 p-4 rounded-xl border border-border/50">
                   <div className="relative group">
-                    <div 
+                    <div
                       className={`relative w-20 h-20 rounded-full border-4 border-dashed overflow-hidden flex items-center justify-center transition-all bg-card-alt ${
                         profilePreview ? "border-primary/30" : "border-border hover:border-primary/20"
                       }`}
@@ -387,7 +387,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                         <HiUserPlus className="w-6 h-6 text-muted opacity-30" />
                       )}
                     </div>
-                    
+
                     {profilePreview && (
                       <button
                         type="button"
@@ -398,7 +398,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -644,7 +644,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 <p className="text-[10px] text-muted px-1 font-medium leading-relaxed">
                   {t("Rates Description")}
                 </p>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {eventTypes.map((et) => (
                     <div key={et.id} className="bg-card-alt p-3 py-2.5 rounded-xl border border-border flex flex-col gap-2 group hover:border-primary/30 transition-all">
@@ -699,7 +699,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               <HiArrowPath className="w-4.5 h-4.5" />
               {t("Reset Changes")}
             </Button>
-            
+
             <Button
               type="submit"
               loading={updateMutation.isPending}

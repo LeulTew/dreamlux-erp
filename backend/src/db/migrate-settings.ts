@@ -23,7 +23,7 @@ async function run() {
   `);
 
   await client.query(`
-    INSERT INTO app_settings (id, employee_id_prefix, inventory_id_prefix, event_id_prefix) 
+    INSERT INTO app_settings (id, employee_id_prefix, inventory_id_prefix, event_id_prefix)
     VALUES (1, 'EMP', 'INV', 'EVT')
     ON CONFLICT (id) DO UPDATE SET
       inventory_id_prefix = EXCLUDED.inventory_id_prefix,

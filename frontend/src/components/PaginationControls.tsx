@@ -56,7 +56,7 @@ export default function PaginationControls({
 
   return (
     <div className="mt-4 2xl:mt-8 flex flex-col md:flex-row items-center justify-between gap-4 bg-card px-6 py-3.5 rounded-full border border-border shadow-soft w-full">
-      
+
       {/* Left: Page Size Selector & Results Text */}
       <div className="flex items-center gap-4 flex-wrap justify-center md:justify-start">
         {onPageSizeChange && (
@@ -135,7 +135,7 @@ export default function PaginationControls({
           <HiChevronRight className="w-4 h-4" />
         </button>
       </div>
-      
+
     </div>
   );
 }

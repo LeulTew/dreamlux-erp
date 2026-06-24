@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass, HiArrowPath } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
@@ -157,10 +157,6 @@ export default function FinancialDashboardPage() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  useEffect(() => {
-    setPage(1);
-  }, [activeTab]);
-
   // Retrieve permissions list from backend auth query
   const { data: authData, isLoading: authLoading } = useQuery({
     queryKey: ["auth-permissions"],
@@ -219,6 +215,12 @@ export default function FinancialDashboardPage() {
     setEventTypeId("");
     setStatus("");
     setSearch("");
+    setPage(1);
+  };
+
+  const handleTabChange = (tab: "overview" | "monthly" | "eventTypes" | "categories" | "variance") => {
+    setActiveTab(tab);
+    setPage(1);
   };
 
   // Immediate 403 authorization guard to avoid layout flashing
@@ -247,13 +249,21 @@ export default function FinancialDashboardPage() {
   }
 
   const monthlyData = data?.monthlyData || [];
-  const paginatedMonthlyData = monthlyData.slice((page - 1) * limit, page * limit);
+  const monthlyTotalPages = Math.ceil(monthlyData.length / limit) || 1;
+  const safeMonthlyPage = Math.min(page, monthlyTotalPages);
+  const paginatedMonthlyData = monthlyData.slice((safeMonthlyPage - 1) * limit, safeMonthlyPage * limit);
   const eventTypePerformance = data?.eventTypePerformance || [];
-  const paginatedEventTypePerformance = eventTypePerformance.slice((page - 1) * limit, page * limit);
+  const eventTypeTotalPages = Math.ceil(eventTypePerformance.length / limit) || 1;
+  const safeEventTypePage = Math.min(page, eventTypeTotalPages);
+  const paginatedEventTypePerformance = eventTypePerformance.slice((safeEventTypePage - 1) * limit, safeEventTypePage * limit);
   const categoryBreakdown = data?.categoryBreakdown || [];
-  const paginatedCategoryBreakdown = categoryBreakdown.slice((page - 1) * limit, page * limit);
+  const categoryTotalPages = Math.ceil(categoryBreakdown.length / limit) || 1;
+  const safeCategoryPage = Math.min(page, categoryTotalPages);
+  const paginatedCategoryBreakdown = categoryBreakdown.slice((safeCategoryPage - 1) * limit, safeCategoryPage * limit);
   const proposalVariance = data?.proposalVariance?.events || [];
-  const paginatedProposalVariance = proposalVariance.slice((page - 1) * limit, page * limit);
+  const proposalTotalPages = Math.ceil(proposalVariance.length / limit) || 1;
+  const safeProposalPage = Math.min(page, proposalTotalPages);
+  const paginatedProposalVariance = proposalVariance.slice((safeProposalPage - 1) * limit, safeProposalPage * limit);
 
   // Generate SVG trend chart coordinates
   const maxVal = Math.max(...monthlyData.map((m) => Math.max(m.revenue, m.expenses)), 1000);
@@ -444,7 +454,7 @@ export default function FinancialDashboardPage() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as "overview" | "monthly" | "eventTypes" | "categories" | "variance")}
+              onClick={() => handleTabChange(tab.id as "overview" | "monthly" | "eventTypes" | "categories" | "variance")}
               className={`px-4 py-2.5 text-xs font-black uppercase tracking-wider border-b-2 transition-all ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted [@media(hover:hover)]:hover:text-foreground"}`}
             >
               {tab.label}
@@ -465,7 +475,7 @@ export default function FinancialDashboardPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            
+
             {/* KPI Cards Strip */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
               <div className="rounded-2xl border border-border bg-card p-4">
@@ -646,7 +656,7 @@ export default function FinancialDashboardPage() {
                       </table>
                     </div>
                     {monthlyData.length > limit && (
-                      <PaginationControls page={page} totalPages={Math.ceil(monthlyData.length / limit) || 1} onPageChange={setPage} />
+                      <PaginationControls page={safeMonthlyPage} totalPages={monthlyTotalPages} onPageChange={setPage} />
                     )}
                   </div>
                 )}
@@ -698,7 +708,7 @@ export default function FinancialDashboardPage() {
                       </table>
                     </div>
                     {eventTypePerformance.length > limit && (
-                      <PaginationControls page={page} totalPages={Math.ceil(eventTypePerformance.length / limit) || 1} onPageChange={setPage} />
+                      <PaginationControls page={safeEventTypePage} totalPages={eventTypeTotalPages} onPageChange={setPage} />
                     )}
                   </div>
                 )}
@@ -747,7 +757,7 @@ export default function FinancialDashboardPage() {
                       </table>
                     </div>
                     {categoryBreakdown.length > limit && (
-                      <PaginationControls page={page} totalPages={Math.ceil(categoryBreakdown.length / limit) || 1} onPageChange={setPage} />
+                      <PaginationControls page={safeCategoryPage} totalPages={categoryTotalPages} onPageChange={setPage} />
                     )}
                   </div>
                 )}
@@ -795,7 +805,7 @@ export default function FinancialDashboardPage() {
                       </table>
                     </div>
                     {proposalVariance.length > limit && (
-                      <PaginationControls page={page} totalPages={Math.ceil(proposalVariance.length / limit) || 1} onPageChange={setPage} />
+                      <PaginationControls page={safeProposalPage} totalPages={proposalTotalPages} onPageChange={setPage} />
                     )}
                   </div>
                 )}

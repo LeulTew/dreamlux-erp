@@ -89,8 +89,8 @@ export default function Select({
                         setIsOpen(false);
                       }}
                       className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-all flex items-center justify-between group/opt ${
-                        String(option.id) === String(value) 
-                          ? "bg-primary/10 text-primary" 
+                        String(option.id) === String(value)
+                          ? "bg-primary/10 text-primary"
                           : "text-foreground hover:bg-card-alt hover:pl-5"
                       }`}
                     >
