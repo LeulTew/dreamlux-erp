@@ -343,7 +343,7 @@ export default function InsertEmployeePage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-2xl mx-auto pb-12">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 pb-32">
         <header className="flex items-center justify-between mb-8">
            <div className="flex items-center gap-3">
              <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-premium">
@@ -357,393 +357,403 @@ export default function InsertEmployeePage() {
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Profile Photo */}
-          <div className="flex flex-col items-center gap-4">
-             <div className="relative group">
-                <div
-                  className={`w-32 h-32 rounded-full border-4 border-dashed overflow-hidden flex items-center justify-center transition-all bg-card-alt ${
-                    profilePreview ? "border-primary/50" : "border-border hover:border-primary/30"
-                  }`}
-                >
-                  {profilePreview ? (
-                    <Image src={profilePreview} alt="Profile" fill className="object-cover" unoptimized />
-                  ) : (
-                    <HiUserPlus className="w-10 h-10 text-muted opacity-30" />
-                  )}
-                </div>
-
-                {profilePreview && (
-                  <button
-                    type="button"
-                    onClick={() => { setProfilePreview(null); setProfileFile(null); }}
-                    className="absolute -top-1 -right-1 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70 shadow-premium"
-                  >
-                    <HiXMark className="w-5 h-5" />
-                  </button>
-                )}
-             </div>
-
-             <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.capture = 'user';
-                    input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "profile");
-                    input.click();
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all"
-                >
-                  {t("Take Photo")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "profile");
-                    input.click();
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-card-alt border border-border text-muted text-xs font-bold hover:bg-border transition-all"
-                >
-                  {t("Upload File")}
-                </button>
-             </div>
-             <p className="text-[10px] uppercase font-bold text-muted tracking-widest">{t("Employee Photo (Optional)")}</p>
-          </div>
-
-          {/* ID Card Images */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Front */}
-            <div className="space-y-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted px-1 flex justify-between">
-                 <span>{t("ID Card Front *")}</span>
-              </label>
-              <div
-                className={`relative aspect-[1.6/1] rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden bg-card-alt ${
-                  frontPreview ? "border-primary/50 bg-card" : "border-border hover:border-primary/30"
-                }`}
-              >
-                {frontPreview ? (
-                  <>
-                    <Image src={frontPreview} alt="Front" fill className="object-cover" unoptimized />
-                    <button
-                      type="button"
-                      onClick={() => { setFrontPreview(null); setFrontFile(null); }}
-                      className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70"
-                    >
-                      <HiXMark className="w-5 h-5" />
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-center p-4">
-                    <HiIdentification className="w-10 h-10 text-muted mx-auto mb-2 opacity-30" />
-                    <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">{t("Front View")}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                 <button
-                   type="button"
-                   onClick={() => {
-                     const input = document.createElement('input');
-                     input.type = 'file';
-                     input.accept = 'image/*';
-                     input.capture = 'environment';
-                     input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "front");
-                     input.click();
-                   }}
-                   className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
-                 >
-                   {t("Take Pic")}
-                 </button>
-                 <button
-                   type="button"
-                   onClick={() => {
-                     const input = document.createElement('input');
-                     input.type = 'file';
-                     input.accept = 'image/*';
-                     input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "front");
-                     input.click();
-                   }}
-                   className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
-                 >
-                   {t("Upload")}
-                 </button>
-              </div>
-            </div>
-
-            {/* Back */}
-            <div className="space-y-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted px-1 flex justify-between">
-                 <span>{t("ID Card Back *")}</span>
-              </label>
-              <div
-                className={`relative aspect-[1.6/1] rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden bg-card-alt ${
-                  backPreview ? "border-primary/50 bg-card" : "border-border hover:border-primary/30"
-                }`}
-              >
-                {backPreview ? (
-                  <>
-                    <Image src={backPreview} alt="Back" fill className="object-cover" unoptimized />
-                    <button
-                      type="button"
-                      onClick={() => { setBackPreview(null); setBackFile(null); }}
-                      className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70"
-                    >
-                      <HiXMark className="w-5 h-5" />
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-center p-4">
-                    <HiIdentification className="w-10 h-10 text-muted mx-auto mb-2 opacity-30" />
-                    <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">{t("Back View")}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                 <button
-                   type="button"
-                   onClick={() => {
-                     const input = document.createElement('input');
-                     input.type = 'file';
-                     input.accept = 'image/*';
-                     input.capture = 'environment';
-                     input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "back");
-                     input.click();
-                   }}
-                   className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
-                 >
-                   {t("Take Pic")}
-                 </button>
-                 <button
-                   type="button"
-                   onClick={() => {
-                     const input = document.createElement('input');
-                     input.type = 'file';
-                     input.accept = 'image/*';
-                     input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "back");
-                     input.click();
-                   }}
-                   className="flex-1 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2"
-                 >
-                   {t("Upload")}
-                 </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Basic Info */}
-          <div className="bg-card rounded-3xl border border-border p-6 shadow-sm space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Full Name *")}</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                  placeholder={t("Full Name Placeholder")}
-                  className={`w-full px-4 py-3 rounded-xl border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.full_name ? "border-red-500" : "border-border"
-                  }`}
-                />
-                {formErrors.full_name && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.full_name}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Employee ID *")}</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.employee_id}
-                  onChange={(e) => setFormData({...formData, employee_id: e.target.value})}
-                  placeholder={t("Employee ID Placeholder")}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Department (Optional)")}</label>
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Select
-                      options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
-                      value={formData.department_id}
-                      onChange={(val) => setFormData({...formData, department_id: val})}
-                      placeholder={t("Select Department")}
-                      className="flex-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingDepartment(!isAddingDepartment)}
-                      className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-premium ${
-                        isAddingDepartment
-                          ? "bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 rotate-45"
-                          : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Visual Uploads Card */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Profile Photo */}
+              <div className="bg-card rounded-3xl border border-border p-6 shadow-sm flex flex-col items-center gap-4">
+                 <div className="relative group">
+                    <div
+                      className={`w-32 h-32 rounded-full border-4 border-dashed overflow-hidden flex items-center justify-center transition-all bg-card-alt ${
+                        profilePreview ? "border-primary/50" : "border-border hover:border-primary/30"
                       }`}
-                      title={isAddingDepartment ? t("Cancel") : t("Add Department")}
                     >
-                      <HiPlus className="w-5 h-5 transition-transform duration-300" />
-                    </button>
-                  </div>
+                      {profilePreview ? (
+                        <Image src={profilePreview} alt="Profile" fill className="object-cover" unoptimized />
+                      ) : (
+                        <HiUserPlus className="w-10 h-10 text-muted opacity-30" />
+                      )}
+                    </div>
 
-                  {isAddingDepartment && (
-                    <div className="flex gap-2 p-2 bg-card-alt/55 border border-border/30 rounded-xl animate-in slide-in-from-top-2 duration-200">
-                      <input
-                        type="text"
-                        autoFocus
-                        placeholder={t("New Department Name")}
-                        value={newDepartment}
-                        onChange={(e) => setNewDepartment(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddDepartment();
-                          } else if (e.key === "Escape") {
-                            e.preventDefault();
-                            setIsAddingDepartment(false);
-                            setNewDepartment("");
-                          }
-                        }}
-                        className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs outline-none text-foreground focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
-                      />
+                    {profilePreview && (
                       <button
                         type="button"
-                        onClick={handleAddDepartment}
-                        className="px-3 h-9 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
+                        onClick={() => { setProfilePreview(null); setProfileFile(null); }}
+                        className="absolute -top-1 -right-1 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70 shadow-premium cursor-pointer"
                       >
-                        <HiCheck className="w-4 h-4" />
-                        {t("Add")}
+                        <HiXMark className="w-5 h-5" />
                       </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+                    )}
+                 </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Office / Branch (Optional)")}</label>
-                <Select
-                  options={stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []}
-                  value={formData.office_id}
-                  onChange={(val) => setFormData({...formData, office_id: val})}
-                  placeholder={t("Select Office")}
-                />
+                 <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.capture = 'user';
+                        input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "profile");
+                        input.click();
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer"
+                    >
+                      {t("Take Photo")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "profile");
+                        input.click();
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-card-alt border border-border text-muted text-xs font-bold hover:bg-border transition-all cursor-pointer"
+                    >
+                      {t("Upload File")}
+                    </button>
+                 </div>
+                 <p className="text-[10px] uppercase font-bold text-muted tracking-widest">{t("Employee Photo (Optional)")}</p>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1 flex justify-between">
-                  <span>{t("Phone *")}</span>
-                  <span className="text-[10px] normal-case opacity-60">{t("Phone Hint")}</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    required
-                    value={formData.phone}
-                    onChange={(e) => handlePhoneChange(e.target.value)}
-                    placeholder="09... or +251..."
-                    className={`w-full px-4 py-3 rounded-xl border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                      formErrors.phone ? "border-red-500 pr-10" : "border-border"
+              {/* ID Card Images */}
+              <div className="bg-card rounded-3xl border border-border p-6 shadow-sm space-y-6">
+                {/* Front */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted px-1 flex justify-between">
+                     <span>{t("ID Card Front *")}</span>
+                  </label>
+                  <div
+                    className={`relative aspect-[1.6/1] rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden bg-card-alt ${
+                      frontPreview ? "border-primary/50 bg-card" : "border-border hover:border-primary/30"
                     }`}
-                  />
-                  {formErrors.phone && <HiExclamationCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-500" />}
-                </div>
-                {formErrors.phone && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.phone}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-tight px-1 text-muted opacity-60 italic">{t("Email (Optional)")}</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  placeholder="john@example.com"
-                  className={`w-full px-4 py-3 rounded-xl border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
-                    formErrors.email ? "border-red-500" : "border-border"
-                  }`}
-                />
-                {formErrors.email && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.email}</p>}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Base Salary")}</label>
-                <Select
-                  options={salaryLevels.map((level) => ({
-                    id: level.level_name,
-                    label: `${level.level_name} - ETB ${Number(level.base_salary).toLocaleString()}`
-                  }))}
-                  value={formData.salary_level}
-                  onChange={(val) => setFormData({...formData, salary_level: val})}
-                  placeholder={t("Select Level")}
-                />
-                <p className="text-[10px] font-bold text-muted px-1">
-                  {selectedSalaryLevel
-                    ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
-                    : t("Select a salary level to view the amount")}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-card rounded-3xl border border-border p-6 shadow-sm space-y-6">
-            <div className="flex items-center gap-2 px-1">
-              <HiPlus className="w-5 h-5 text-primary" />
-              <h3 className="text-sm font-black uppercase tracking-widest text-foreground">{t("Event Rates")}</h3>
-            </div>
-            <p className="text-[10px] text-muted px-1 font-medium leading-relaxed">
-              {t("Rates Description")}
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {eventTypes.map((et) => (
-                <div key={et.id} className="bg-card-alt p-4 rounded-2xl border border-border flex flex-col gap-2.5 group hover:border-primary/30 transition-all shadow-premium-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-foreground font-bold uppercase tracking-wider truncate mr-2" title={et.event_name}>{et.event_name}</span>
-                    <span className="text-[9px] text-muted font-black uppercase tracking-tight shrink-0">ETB</span>
+                  >
+                    {frontPreview ? (
+                      <>
+                        <Image src={frontPreview} alt="Front" fill className="object-cover" unoptimized />
+                        <button
+                          type="button"
+                          onClick={() => { setFrontPreview(null); setFrontFile(null); }}
+                          className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70 cursor-pointer"
+                        >
+                          <HiXMark className="w-5 h-5" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-center p-4">
+                        <HiIdentification className="w-10 h-10 text-muted mx-auto mb-2 opacity-30" />
+                        <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">{t("Front View")}</p>
+                      </div>
+                    )}
                   </div>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    value={eventPrices[et.id] ?? ""}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEventPrices(prev => {
-                        const next = { ...prev };
-                        if (val === "") {
-                          delete next[et.id];
-                        } else {
-                          next[et.id] = Number(val);
-                        }
-                        return next;
-                      });
-                    }}
-                    className="bg-background border border-border rounded-xl px-3 py-2 text-foreground text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-muted/60 no-spinner w-full"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="flex justify-center pt-4">
-            <button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="w-full max-w-xs py-3 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-[0.15em] text-xs shadow-premium hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
-            </button>
+                  <div className="flex gap-2">
+                     <button
+                       type="button"
+                       onClick={() => {
+                         const input = document.createElement('input');
+                         input.type = 'file';
+                         input.accept = 'image/*';
+                         input.capture = 'environment';
+                         input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "front");
+                         input.click();
+                       }}
+                       className="flex-1 px-3 py-2 rounded-xl bg-card-alt border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2 cursor-pointer"
+                     >
+                       {t("Take Pic")}
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         const input = document.createElement('input');
+                         input.type = 'file';
+                         input.accept = 'image/*';
+                         input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "front");
+                         input.click();
+                       }}
+                       className="flex-1 px-3 py-2 rounded-xl bg-card-alt border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2 cursor-pointer"
+                     >
+                       {t("Upload")}
+                     </button>
+                  </div>
+                </div>
+
+                {/* Back */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted px-1 flex justify-between">
+                     <span>{t("ID Card Back *")}</span>
+                  </label>
+                  <div
+                    className={`relative aspect-[1.6/1] rounded-3xl border-2 border-dashed transition-all flex flex-col items-center justify-center overflow-hidden bg-card-alt ${
+                      backPreview ? "border-primary/50 bg-card" : "border-border hover:border-primary/30"
+                    }`}
+                  >
+                    {backPreview ? (
+                      <>
+                        <Image src={backPreview} alt="Back" fill className="object-cover" unoptimized />
+                        <button
+                          type="button"
+                          onClick={() => { setBackPreview(null); setBackFile(null); }}
+                          className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/70 cursor-pointer"
+                        >
+                          <HiXMark className="w-5 h-5" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-center p-4">
+                        <HiIdentification className="w-10 h-10 text-muted mx-auto mb-2 opacity-30" />
+                        <p className="text-xs font-bold text-muted/50 uppercase tracking-widest">{t("Back View")}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                     <button
+                       type="button"
+                       onClick={() => {
+                         const input = document.createElement('input');
+                         input.type = 'file';
+                         input.accept = 'image/*';
+                         input.capture = 'environment';
+                         input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "back");
+                         input.click();
+                       }}
+                       className="flex-1 px-3 py-2 rounded-xl bg-card-alt border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2 cursor-pointer"
+                     >
+                       {t("Take Pic")}
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         const input = document.createElement('input');
+                         input.type = 'file';
+                         input.accept = 'image/*';
+                         input.onchange = (e) => handleImageSelect(e as unknown as React.ChangeEvent<HTMLInputElement>, "back");
+                         input.click();
+                       }}
+                       className="flex-1 px-3 py-2 rounded-xl bg-card-alt border border-border text-foreground text-xs font-bold hover:bg-border transition-all flex items-center justify-center gap-2 cursor-pointer"
+                     >
+                       {t("Upload")}
+                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Forms / Fields */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Basic Info */}
+              <div className="bg-card rounded-3xl border border-border p-6 shadow-sm space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Full Name *")}</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                      placeholder={t("Full Name Placeholder")}
+                      className={`w-full px-4 py-3 rounded-xl border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.full_name ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                    {formErrors.full_name && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.full_name}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Employee ID *")}</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.employee_id}
+                      onChange={(e) => setFormData({...formData, employee_id: e.target.value})}
+                      placeholder={t("Employee ID Placeholder")}
+                      className="w-full px-4 py-3 rounded-xl border border-border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Department (Optional)")}</label>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Select
+                          options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
+                          value={formData.department_id}
+                          onChange={(val) => setFormData({...formData, department_id: val})}
+                          placeholder={t("Select Department")}
+                          className="flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingDepartment(!isAddingDepartment)}
+                          className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-premium cursor-pointer ${
+                            isAddingDepartment
+                              ? "bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 rotate-45"
+                              : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                          }`}
+                          title={isAddingDepartment ? t("Cancel") : t("Add Department")}
+                        >
+                          <HiPlus className="w-5 h-5 transition-transform duration-300" />
+                        </button>
+                      </div>
+
+                      {isAddingDepartment && (
+                        <div className="flex gap-2 p-2 bg-card-alt/55 border border-border/30 rounded-xl animate-in slide-in-from-top-2 duration-200">
+                          <input
+                            type="text"
+                            autoFocus
+                            placeholder={t("New Department Name")}
+                            value={newDepartment}
+                            onChange={(e) => setNewDepartment(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddDepartment();
+                              } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                setIsAddingDepartment(false);
+                                setNewDepartment("");
+                              }
+                            }}
+                            className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs outline-none text-foreground focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddDepartment}
+                            className="px-3 h-9 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0 cursor-pointer"
+                          >
+                            <HiCheck className="w-4 h-4" />
+                            {t("Add")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Office / Branch (Optional)")}</label>
+                    <Select
+                      options={stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []}
+                      value={formData.office_id}
+                      onChange={(val) => setFormData({...formData, office_id: val})}
+                      placeholder={t("Select Office")}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase text-muted tracking-tight px-1 flex justify-between">
+                      <span>{t("Phone *")}</span>
+                      <span className="text-[10px] normal-case opacity-60">{t("Phone Hint")}</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="tel"
+                        required
+                        value={formData.phone}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        placeholder="09... or +251..."
+                        className={`w-full px-4 py-3 rounded-xl border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                          formErrors.phone ? "border-red-500 pr-10" : "border-border"
+                        }`}
+                      />
+                      {formErrors.phone && <HiExclamationCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-500" />}
+                    </div>
+                    {formErrors.phone && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.phone}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-tight px-1 text-muted opacity-60 italic">{t("Email (Optional)")}</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="john@example.com"
+                      className={`w-full px-4 py-3 rounded-xl border bg-card-alt text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
+                        formErrors.email ? "border-red-500" : "border-border"
+                      }`}
+                    />
+                    {formErrors.email && <p className="text-[10px] text-red-500 font-bold px-1">{formErrors.email}</p>}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Base Salary")}</label>
+                    <Select
+                      options={salaryLevels.map((level) => ({
+                        id: level.level_name,
+                        label: `${level.level_name} - ETB ${Number(level.base_salary).toLocaleString()}`
+                      }))}
+                      value={formData.salary_level}
+                      onChange={(val) => setFormData({...formData, salary_level: val})}
+                      placeholder={t("Select Level")}
+                    />
+                    <p className="text-[10px] font-bold text-muted px-1">
+                      {selectedSalaryLevel
+                        ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
+                        : t("Select a salary level to view the amount")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Rates */}
+              <div className="bg-card rounded-3xl border border-border p-6 shadow-sm space-y-6">
+                <div className="flex items-center gap-2 px-1">
+                  <HiPlus className="w-5 h-5 text-primary" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">{t("Event Rates")}</h3>
+                </div>
+                <p className="text-[10px] text-muted px-1 font-medium leading-relaxed">
+                  {t("Rates Description")}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {eventTypes.map((et) => (
+                    <div key={et.id} className="bg-card-alt p-4 rounded-2xl border border-border flex flex-col gap-2.5 group hover:border-primary/30 transition-all shadow-premium-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-foreground font-bold uppercase tracking-wider truncate mr-2" title={et.event_name}>{et.event_name}</span>
+                        <span className="text-[9px] text-muted font-black uppercase tracking-tight shrink-0">ETB</span>
+                      </div>
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        value={eventPrices[et.id] ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEventPrices(prev => {
+                            const next = { ...prev };
+                            if (val === "") {
+                              delete next[et.id];
+                            } else {
+                              next[et.id] = Number(val);
+                            }
+                            return next;
+                          });
+                        }}
+                        className="bg-background border border-border rounded-xl px-3 py-2 text-foreground text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all placeholder:text-muted/60 no-spinner w-full"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-center pt-4">
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="w-full max-w-xs py-3.5 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-[0.15em] text-xs shadow-premium hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </div>

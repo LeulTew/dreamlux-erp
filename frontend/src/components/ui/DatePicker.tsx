@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useRef, useEffect } from "react";
-import { HiCalendarDays, HiChevronLeft, HiChevronRight, HiCheck } from "react-icons/hi2";
+import { HiCalendarDays, HiChevronLeft, HiChevronRight, HiCheck, HiXMark } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 
 interface DatePickerProps {
@@ -237,16 +237,53 @@ export default function DatePicker({
 
   return (
     <div ref={containerRef} className={cn("relative inline-block w-full", className)}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between h-[44px] px-3.5 rounded-xl border border-border bg-card-alt text-foreground text-xs font-semibold tracking-wide transition-all duration-200 outline-none hover:bg-border/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 select-none text-left cursor-pointer"
-      >
-        <span className={cn(!displayValue && "text-muted-foreground/60")}>
-          {displayValue || placeholder}
-        </span>
-        <HiCalendarDays className="w-4 h-4 text-muted-foreground/75" />
-      </button>
+      <style>{`
+        .datepicker-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(217, 119, 6, 0.35) transparent !important;
+        }
+        .datepicker-scrollbar::-webkit-scrollbar {
+          width: 3px !important;
+        }
+        .datepicker-scrollbar::-webkit-scrollbar-track {
+          background: transparent !important;
+        }
+        .datepicker-scrollbar::-webkit-scrollbar-thumb {
+          background-color: rgba(217, 119, 6, 0.35) !important;
+          border-radius: 9999px !important;
+        }
+      `}</style>
+      <div className="relative w-full">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "w-full flex items-center justify-between h-[44px] pl-3.5 pr-10 rounded-xl border border-border bg-card-alt text-foreground text-xs font-semibold tracking-wide transition-all duration-200 outline-none hover:bg-border/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 select-none text-left cursor-pointer",
+            displayValue ? "pr-14" : "pr-10"
+          )}
+        >
+          <span className={cn(!displayValue && "text-muted-foreground/60")}>
+            {displayValue || placeholder}
+          </span>
+        </button>
+        
+        {/* Remove/Clear Button */}
+        {value && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange("");
+            }}
+            className="absolute right-9 top-1/2 -translate-y-1/2 p-1 text-muted-foreground/40 hover:text-foreground/80 rounded-full hover:bg-border/60 transition-all cursor-pointer z-10"
+            title="Clear date"
+          >
+            <HiXMark className="w-3.5 h-3.5" />
+          </button>
+        )}
+        
+        <HiCalendarDays className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/75 pointer-events-none" />
+      </div>
 
       {isOpen && (
         <div
@@ -315,7 +352,7 @@ export default function DatePicker({
                     className={cn(
                       "w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center relative",
                       active
-                        ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 scale-105"
+                        ? "bg-amber-600 text-white hover:bg-amber-700 shadow-sm"
                         : today
                         ? "border border-primary text-primary hover:bg-primary/5"
                         : "text-foreground hover:bg-card-alt"
@@ -341,6 +378,34 @@ export default function DatePicker({
                 </button>
               ))}
             </div>
+            {/* Action Buttons: Today / Reset */}
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40 select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  const today = new Date();
+                  setViewDate(today);
+                  const formatted = getFormattedValue(today, timeState.hour12, timeState.minute, timeState.ampm);
+                  onChange(formatted);
+                  if (!showTime) {
+                    setIsOpen(false);
+                  }
+                }}
+                className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange("");
+                  setIsOpen(false);
+                }}
+                className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-500 hover:text-rose-700 dark:hover:text-rose-400 transition-colors cursor-pointer"
+              >
+                Reset
+              </button>
+            </div>
           </div>
 
           {/* Time Picker Panel (Side-by-Side) */}
@@ -351,8 +416,11 @@ export default function DatePicker({
               </div>
               
               <div className="flex gap-1 h-[145px] overflow-hidden justify-center items-center">
-                {/* Hours column */}
-                <div ref={hourScrollRef} className="h-full overflow-y-auto scrollbar-none flex flex-col gap-1 w-10 text-center">
+                {/* Hours column (thin scrollbar) */}
+                <div 
+                  ref={hourScrollRef} 
+                  className="h-full overflow-y-auto flex flex-col gap-1 w-10 text-center datepicker-scrollbar"
+                >
                   {hoursList.map((h) => {
                     const isSel = timeState.hour12 === h;
                     return (
@@ -364,7 +432,7 @@ export default function DatePicker({
                         className={cn(
                           "py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer block w-full",
                           isSel
-                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm"
+                            ? "bg-amber-600 text-white shadow-sm"
                             : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
                         )}
                       >
@@ -376,8 +444,11 @@ export default function DatePicker({
 
                 <span className="text-foreground font-black pb-1 shrink-0">:</span>
 
-                {/* Minutes column */}
-                <div ref={minuteScrollRef} className="h-full overflow-y-auto scrollbar-none flex flex-col gap-1 w-10 text-center">
+                {/* Minutes column (thin scrollbar) */}
+                <div 
+                  ref={minuteScrollRef} 
+                  className="h-full overflow-y-auto flex flex-col gap-1 w-10 text-center datepicker-scrollbar"
+                >
                   {minutesList.map((m) => {
                     const isSel = timeState.minute === m;
                     return (
@@ -389,7 +460,7 @@ export default function DatePicker({
                         className={cn(
                           "py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer block w-full",
                           isSel
-                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm"
+                            ? "bg-amber-600 text-white shadow-sm"
                             : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
                         )}
                       >
@@ -411,7 +482,7 @@ export default function DatePicker({
                         className={cn(
                           "py-2 text-xs font-black rounded-lg transition-all cursor-pointer block w-full",
                           isSel
-                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm"
+                            ? "bg-amber-600 text-white shadow-sm"
                             : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
                         )}
                       >
@@ -422,13 +493,13 @@ export default function DatePicker({
                 </div>
               </div>
 
-              {/* Done button */}
+              {/* Done button (Toned down soft styling) */}
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="w-full h-8 mt-3 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md hover:shadow-lg active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full h-8 mt-3 rounded-lg text-xs font-semibold uppercase tracking-wider bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 hover:border-amber-500/35 active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
               >
-                <HiCheck className="w-3.5 h-3.5" />
+                <HiCheck className="w-3.5 h-3.5 animate-pulse" />
                 Done
               </button>
             </div>

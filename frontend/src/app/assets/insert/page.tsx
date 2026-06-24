@@ -165,7 +165,7 @@ export default function InsertAssetPage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-xl mx-auto px-4 md:px-0 pb-32">
+      <div className="max-w-5xl mx-auto px-4 md:px-6 pb-32">
         <header className="mb-10 flex items-center gap-4 pt-6 pb-2">
           <button
             onClick={() => router.back()}
@@ -179,198 +179,211 @@ export default function InsertAssetPage() {
           </div>
         </header>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              {t("Photo")} <span className="text-danger">*</span>
-            </label>
-            {imagePreview ? (
-              <div className="relative w-full aspect-4/3 rounded-2xl overflow-hidden border-2 border-primary/20 bg-card">
-                <Image
-                  src={imagePreview}
-                  alt="Preview"
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Visual Upload Card */}
+            <div className="lg:col-span-5">
+              <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+                <label className="block text-xs font-black uppercase tracking-wider text-muted px-1">
+                  {t("Photo")} <span className="text-danger">*</span>
+                </label>
+                
+                {imagePreview ? (
+                  <div className="relative w-full aspect-4/3 rounded-2xl overflow-hidden border-2 border-primary/20 bg-card">
+                    <Image
+                      src={imagePreview}
+                      alt="Preview"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
 
-                {/* Loading Overlay */}
-                <AnimatePresence>
-                  {createMutation.isPending && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 bg-primary/20 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-10"
-                    >
-                      <motion.div
-                        animate={{
-                          scale: [1, 1.1, 1],
-                          rotate: [0, 10, -10, 0]
-                        }}
-                        transition={{ repeat: Infinity, duration: 2 }}
-                        className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 shadow-massive"
-                      >
-                        <span className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-                      </motion.div>
-                      <p className="text-white font-black text-[10px] uppercase tracking-[0.2em] drop-shadow-md">
-                        {t("Processing & Syncing...")}
-                      </p>
-                      <div className="mt-4 w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                    {/* Loading Overlay */}
+                    <AnimatePresence>
+                      {createMutation.isPending && (
                         <motion.div
-                          className="h-full bg-white"
-                          animate={{ x: [-128, 128] }}
-                          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 bg-primary/20 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-10"
+                        >
+                          <motion.div
+                            animate={{
+                              scale: [1, 1.1, 1],
+                              rotate: [0, 10, -10, 0]
+                            }}
+                            transition={{ repeat: Infinity, duration: 2 }}
+                            className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 shadow-massive"
+                          >
+                            <span className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+                          </motion.div>
+                          <p className="text-white font-black text-[10px] uppercase tracking-[0.2em] drop-shadow-md">
+                            {t("Processing & Syncing...")}
+                          </p>
+                          <div className="mt-4 w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                            <motion.div
+                              className="h-full bg-white"
+                              animate={{ x: [-128, 128] }}
+                              transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                <button
-                  type="button"
-                  disabled={createMutation.isPending}
-                  onClick={() => {
-                    setImagePreview(null);
-                    setImageFile(null);
-                  }}
-                  className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors disabled:opacity-0"
-                >
-                  <HiXMark className="w-5 h-5" />
-                </button>
+                    <button
+                      type="button"
+                      disabled={createMutation.isPending}
+                      onClick={() => {
+                        setImagePreview(null);
+                        setImageFile(null);
+                      }}
+                      className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors disabled:opacity-0"
+                    >
+                      <HiXMark className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full aspect-4/3 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 bg-card-alt hover:bg-primary-light/30 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer"
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-primary-light flex items-center justify-center">
+                      <HiCamera className="w-7 h-7 text-primary" />
+                    </div>
+                    <div className="text-center px-4">
+                      <p className="text-sm font-medium text-foreground">{t("Tap to take a photo")}</p>
+                      <p className="text-xs text-muted mt-0.5">
+                        {t("or choose from gallery - JPEG/PNG - Max 10MB")}
+                      </p>
+                    </div>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  capture="environment"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full aspect-4/3 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 bg-card-alt hover:bg-primary-light/30 transition-all flex flex-col items-center justify-center gap-3 cursor-pointer"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-primary-light flex items-center justify-center">
-                  <HiCamera className="w-7 h-7 text-primary" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">{t("Tap to take a photo")}</p>
-                  <p className="text-xs text-muted mt-0.5">
-                    {t("or choose from gallery - JPEG/PNG - Max 10MB")}
-                  </p>
-                </div>
-              </button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png"
-              capture="environment"
-              onChange={handleImageSelect}
-              className="hidden"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              {t("Item Name")} <span className="text-danger">*</span>
-            </label>
-            <input
-              ref={nameInputRef}
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("e.g. Printer Ink Cartridge")}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] uppercase font-black text-muted tracking-widest mb-3 px-1">
-              {t("Select Office Location")} <span className="text-danger">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {offices.map((office) => (
-                <button
-                  key={office.id}
-                  type="button"
-                  onClick={() => setOfficeId(office.id)}
-                  className={`flex-1 min-w-30 px-4 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${
-                    officeId === office.id
-                      ? "bg-primary text-on-primary shadow-premium"
-                      : "bg-card border border-border text-muted hover:bg-card-alt"
-                  }`}
-                >
-                  {office.name}
-                </button>
-              ))}
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              {t("Quantity")} <span className="text-danger">*</span>
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setQuantity(String(Math.max(0, parseInt(quantity || "0", 10) - 1)))
-                }
-                className="w-12 h-12 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary-light transition-all"
-              >
-                -
-              </button>
-              <input
-                type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                min="0"
-                className="w-20 text-center px-3 py-3 rounded-xl border border-border bg-card text-foreground font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setQuantity(String(parseInt(quantity || "0", 10) + 1))}
-                className="w-12 h-12 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary-light transition-all"
-              >
-                +
-              </button>
+            {/* Right Column: Asset Details Card */}
+            <div className="lg:col-span-7">
+              <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-6">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-muted px-1 mb-2">
+                    {t("Item Name")} <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t("e.g. Printer Ink Cartridge")}
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-card-alt text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-muted px-1 mb-2">
+                    {t("Select Office Location")} <span className="text-danger">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {offices.map((office) => (
+                      <button
+                        key={office.id}
+                        type="button"
+                        onClick={() => setOfficeId(office.id)}
+                        className={`px-3 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 text-center truncate ${
+                          officeId === office.id
+                            ? "bg-primary text-on-primary shadow-premium"
+                            : "bg-card-alt border border-border text-muted hover:bg-border/40"
+                        }`}
+                      >
+                        {office.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-muted px-1 mb-2">
+                      {t("Quantity")} <span className="text-danger">*</span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setQuantity(String(Math.max(0, parseInt(quantity || "0", 10) - 1)))
+                        }
+                        className="w-12 h-12 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary-light transition-all cursor-pointer"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        min="0"
+                        className="w-20 text-center px-3 py-3 rounded-xl border border-border bg-card text-foreground font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(String(parseInt(quantity || "0", 10) + 1))}
+                        className="w-12 h-12 rounded-xl bg-card-alt border border-border flex items-center justify-center text-lg font-bold hover:bg-primary-light transition-all cursor-pointer"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-muted px-1 mb-2">
+                    {t("Description")} <span className="text-muted font-normal normal-case">{t("optional")}</span>
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={t("Add a brief description...")}
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-card-alt text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="px-6 py-3 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10 cursor-pointer"
+                  >
+                    {t("Reset")}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createMutation.isPending}
+                    className="px-8 py-3 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-widest shadow-premium hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {createMutation.isPending ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        {t("Saving...")}
+                      </>
+                    ) : (
+                      <>
+                        <HiPhoto className="w-4 h-4" />
+                        {t("Confirm Entry")}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              {t("Description")} <span className="text-muted font-normal">{t("optional")}</span>
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("Add a brief description...")}
-              rows={3}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-6">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="px-6 py-3 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
-            >
-              {t("Reset")}
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="px-8 py-3 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-widest shadow-premium hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xs flex items-center justify-center gap-2"
-            >
-              {createMutation.isPending ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {t("Saving...")}
-                </>
-              ) : (
-                <>
-                  <HiPhoto className="w-4 h-4" />
-                  {t("Confirm Entry")}
-                </>
-              )}
-            </button>
           </div>
         </form>
         <div className="h-16 w-full" />

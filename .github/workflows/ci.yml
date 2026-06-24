@@ -29,13 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v1
         with:
-          node-version: 20
+          bun-version: latest
       - name: Install dependencies
-        run: cd frontend && npm install
+        run: cd frontend && bun install
       - name: Build
-        run: cd frontend && npm run build
+        run: cd frontend && bun run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3000
