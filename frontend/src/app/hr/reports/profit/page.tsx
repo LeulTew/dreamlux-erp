@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass, HiArrowPath } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport, getEventTypes, getProfitReportExportUrl, api } from "@/lib/api";
 import Select from "@/components/ui/Select";
+import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";
 import { EventType, ProfitReportSummary } from "@/lib/types";
 
@@ -153,6 +154,12 @@ export default function FinancialDashboardPage() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "monthly" | "eventTypes" | "categories" | "variance">("overview");
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const limit = 10;
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab]);
 
   // Retrieve permissions list from backend auth query
   const { data: authData, isLoading: authLoading } = useQuery({
@@ -240,9 +247,13 @@ export default function FinancialDashboardPage() {
   }
 
   const monthlyData = data?.monthlyData || [];
+  const paginatedMonthlyData = monthlyData.slice((page - 1) * limit, page * limit);
   const eventTypePerformance = data?.eventTypePerformance || [];
+  const paginatedEventTypePerformance = eventTypePerformance.slice((page - 1) * limit, page * limit);
   const categoryBreakdown = data?.categoryBreakdown || [];
+  const paginatedCategoryBreakdown = categoryBreakdown.slice((page - 1) * limit, page * limit);
   const proposalVariance = data?.proposalVariance?.events || [];
+  const paginatedProposalVariance = proposalVariance.slice((page - 1) * limit, page * limit);
 
   // Generate SVG trend chart coordinates
   const maxVal = Math.max(...monthlyData.map((m) => Math.max(m.revenue, m.expenses)), 1000);
@@ -603,35 +614,40 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Month/Year")}</th>
-                          <th className="px-6 py-4 text-center">{t("Event Count")}</th>
-                          <th className="px-6 py-4 text-right">{t("Revenue")}</th>
-                          <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
-                          <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Margin")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthlyData.map((row) => (
-                          <tr key={row.month} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                            <td className="px-6 py-4 font-mono">{row.month}</td>
-                            <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.profit >= 0 ? "text-success" : "text-danger"}`}>
-                              {formatCurrency(row.profit)}
-                            </td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.margin >= 25 ? "text-success" : "text-warning"}`}>
-                              {row.margin.toFixed(1)}%
-                            </td>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Month/Year")}</th>
+                            <th className="px-6 py-4 text-center">{t("Event Count")}</th>
+                            <th className="px-6 py-4 text-right">{t("Revenue")}</th>
+                            <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
+                            <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Margin")}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {paginatedMonthlyData.map((row) => (
+                            <tr key={row.month} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                              <td className="px-6 py-4 font-mono">{row.month}</td>
+                              <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.profit >= 0 ? "text-success" : "text-danger"}`}>
+                                {formatCurrency(row.profit)}
+                              </td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.margin >= 25 ? "text-success" : "text-warning"}`}>
+                                {row.margin.toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {monthlyData.length > limit && (
+                      <PaginationControls page={page} totalPages={Math.ceil(monthlyData.length / limit) || 1} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>
@@ -650,35 +666,40 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Event Type")}</th>
-                          <th className="px-6 py-4 text-center">{t("Event Count")}</th>
-                          <th className="px-6 py-4 text-right">{t("Revenue")}</th>
-                          <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
-                          <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Average Margin")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {eventTypePerformance.map((row) => (
-                          <tr key={row.eventType} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                            <td className="px-6 py-4 font-bold">{row.eventType}</td>
-                            <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.netProfit >= 0 ? "text-success" : "text-danger"}`}>
-                              {formatCurrency(row.netProfit)}
-                            </td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.averageMargin >= 25 ? "text-success" : "text-warning"}`}>
-                              {row.averageMargin.toFixed(1)}%
-                            </td>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Event Type")}</th>
+                            <th className="px-6 py-4 text-center">{t("Event Count")}</th>
+                            <th className="px-6 py-4 text-right">{t("Revenue")}</th>
+                            <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
+                            <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Average Margin")}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {paginatedEventTypePerformance.map((row) => (
+                            <tr key={row.eventType} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                              <td className="px-6 py-4 font-bold">{row.eventType}</td>
+                              <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.netProfit >= 0 ? "text-success" : "text-danger"}`}>
+                                {formatCurrency(row.netProfit)}
+                              </td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.averageMargin >= 25 ? "text-success" : "text-warning"}`}>
+                                {row.averageMargin.toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {eventTypePerformance.length > limit && (
+                      <PaginationControls page={page} totalPages={Math.ceil(eventTypePerformance.length / limit) || 1} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>
@@ -697,32 +718,37 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Category")}</th>
-                          <th className="px-6 py-4 text-right">{t("Amount")}</th>
-                          <th className="px-6 py-4 text-right">%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {categoryBreakdown.map((row) => {
-                          const percentage = data.summary.totalExpenses > 0 ? (row.amount / data.summary.totalExpenses) * 100 : 0;
-                          const colorClass = colors[row.category as keyof typeof colors] || "bg-slate-500";
-                          return (
-                            <tr key={row.category} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                              <td className="px-6 py-4 flex items-center gap-2 font-bold">
-                                <span className={`h-2.5 w-2.5 rounded-full ${colorClass}`} />
-                                {t(row.category)}
-                              </td>
-                              <td className="px-6 py-4 text-right font-mono font-bold">{formatCurrency(row.amount)}</td>
-                              <td className="px-6 py-4 text-right font-mono text-muted">{percentage.toFixed(1)}%</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Category")}</th>
+                            <th className="px-6 py-4 text-right">{t("Amount")}</th>
+                            <th className="px-6 py-4 text-right">%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedCategoryBreakdown.map((row) => {
+                            const percentage = data.summary.totalExpenses > 0 ? (row.amount / data.summary.totalExpenses) * 100 : 0;
+                            const colorClass = colors[row.category as keyof typeof colors] || "bg-slate-500";
+                            return (
+                              <tr key={row.category} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                                <td className="px-6 py-4 flex items-center gap-2 font-bold">
+                                  <span className={`h-2.5 w-2.5 rounded-full ${colorClass}`} />
+                                  {t(row.category)}
+                                </td>
+                                <td className="px-6 py-4 text-right font-mono font-bold">{formatCurrency(row.amount)}</td>
+                                <td className="px-6 py-4 text-right font-mono text-muted">{percentage.toFixed(1)}%</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {categoryBreakdown.length > limit && (
+                      <PaginationControls page={page} totalPages={Math.ceil(categoryBreakdown.length / limit) || 1} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>
@@ -741,31 +767,36 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Event Name")}</th>
-                          <th className="px-6 py-4">{t("Proposal ID")}</th>
-                          <th className="px-6 py-4 text-right">{t("Estimated Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Actual Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Variance")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposalVariance.map((row) => (
-                          <tr key={row.eventId} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                            <td className="px-6 py-4 font-bold">{row.eventName}</td>
-                            <td className="px-6 py-4 font-mono text-muted text-[10px]">{row.proposalId}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.estimatedNetProfit)}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.actualNetProfit)}</td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${(row.variance || 0) < 0 ? "text-danger" : "text-success"}`}>
-                              {row.variance !== null ? formatCurrency(row.variance) : "-"}
-                            </td>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Event Name")}</th>
+                            <th className="px-6 py-4">{t("Proposal ID")}</th>
+                            <th className="px-6 py-4 text-right">{t("Estimated Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Actual Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Variance")}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {paginatedProposalVariance.map((row) => (
+                            <tr key={row.eventId} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                              <td className="px-6 py-4 font-bold">{row.eventName}</td>
+                              <td className="px-6 py-4 font-mono text-muted text-[10px]">{row.proposalId}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.estimatedNetProfit)}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.actualNetProfit)}</td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${(row.variance || 0) < 0 ? "text-danger" : "text-success"}`}>
+                                {row.variance !== null ? formatCurrency(row.variance) : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {proposalVariance.length > limit && (
+                      <PaginationControls page={page} totalPages={Math.ceil(proposalVariance.length / limit) || 1} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>

@@ -10,6 +10,7 @@ import { getSalaryLevels, createSalaryLevel, updateSalaryLevel, deleteSalaryLeve
 import { SalaryLevel } from "@/lib/types";
 import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -66,6 +67,16 @@ function SalaryLevelsContent() {
   const [form, setForm] = useState<{ id?: string, level_name: string, base_salary: string }>({ level_name: "", base_salary: "" });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const highlightedId = searchParams.get("highlight");
+
+  const [page, setPage] = useState(1);
+  const limit = 10;
+  const totalPages = Math.ceil((levels?.length || 0) / limit) || 1;
+
+  useEffect(() => {
+    setPage(1);
+  }, [levels?.length]);
+
+  const paginatedLevels = levels ? levels.slice((page - 1) * limit, page * limit) : [];
 
   const { data: deleteImpact, isLoading: isDeleteImpactLoading } = useQuery<{ salary_level_id: string; level_name: string; active_employee_count: number }>({
     queryKey: ["salary-level-delete-impact", deleteId],
@@ -203,61 +214,66 @@ function SalaryLevelsContent() {
           </form>
         </div>
 
-        <div className="bg-card rounded-2xl shadow-premium border border-border overflow-hidden p-2">
-          <table className="w-full text-left text-sm border-separate border-spacing-0">
-            <thead>
-              <tr className="bg-muted/30">
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Level Name")}</th>
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Monthly Base (ETB)")}</th>
-                <th className="px-4 sm:px-8 py-4 sm:py-5 text-right text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Actions")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {isLoading ? (
-                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground animate-pulse">{t("Initializing data structure...")}</td></tr>
-              ) : levels?.length === 0 ? (
-                <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-card-alt">{t("No salary levels config detected")}</td></tr>
-              ) : (
-                levels?.map(lvl => (
-                  <tr
-                    key={lvl.id}
-                    className={`transition-colors group ${
-                      highlightedId === lvl.id
-                        ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
-                        : "hover:bg-primary/2"
-                    }`}
-                  >
-                    <td className="px-4 sm:px-8 py-4 sm:py-6">
-                      <button
-                        onClick={() => {
+        <div className="space-y-4">
+          <div className="bg-card rounded-2xl shadow-premium border border-border overflow-hidden p-2">
+            <table className="w-full text-left text-sm border-separate border-spacing-0">
+              <thead>
+                <tr className="bg-muted/30">
+                  <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Level Name")}</th>
+                  <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Monthly Base (ETB)")}</th>
+                  <th className="px-4 sm:px-8 py-4 sm:py-5 text-right text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Actions")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {isLoading ? (
+                  <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground animate-pulse">{t("Initializing data structure...")}</td></tr>
+                ) : levels?.length === 0 ? (
+                  <tr><td colSpan={3} className="p-16 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-card-alt">{t("No salary levels config detected")}</td></tr>
+                ) : (
+                  paginatedLevels.map(lvl => (
+                    <tr
+                      key={lvl.id}
+                      className={`transition-colors group ${
+                        highlightedId === lvl.id
+                          ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
+                          : "hover:bg-primary/2"
+                      }`}
+                    >
+                      <td className="px-4 sm:px-8 py-4 sm:py-6">
+                        <button
+                          onClick={() => {
+                            setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="inline-flex items-center justify-center min-w-10 px-3 py-1 bg-foreground text-background rounded-lg font-semibold text-xs uppercase tracking-wider hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+                        >
+                          {lvl.level_name}
+                        </button>
+                      </td>
+                      <td className="px-4 sm:px-8 py-4 sm:py-6">
+                        <div className="flex flex-col">
+                          <span className="text-base sm:text-lg font-bold tracking-tight text-foreground">
+                            ETB {Number(lvl.base_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-widest mt-0.5 opacity-60">{t("Gross Base Monthly")}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 sm:px-8 py-4 sm:py-6 text-right space-x-2 sm:space-x-4 opacity-100 md:opacity-20 group-hover:opacity-100 transition-all duration-300">
+                        <button onClick={() => {
                           setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
                           window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className="inline-flex items-center justify-center min-w-10 px-3 py-1 bg-foreground text-background rounded-lg font-semibold text-xs uppercase tracking-wider hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-                      >
-                        {lvl.level_name}
-                      </button>
-                    </td>
-                    <td className="px-4 sm:px-8 py-4 sm:py-6">
-                      <div className="flex flex-col">
-                        <span className="text-base sm:text-lg font-bold tracking-tight text-foreground">
-                          ETB {Number(lvl.base_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-widest mt-0.5 opacity-60">{t("Gross Base Monthly")}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 sm:px-8 py-4 sm:py-6 text-right space-x-2 sm:space-x-4 opacity-100 md:opacity-20 group-hover:opacity-100 transition-all duration-300">
-                      <button onClick={() => {
-                        setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }} className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">{t("Edit")}</button>
-                      <button onClick={() => setDeleteId(lvl.id)} className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">{t("Delete")}</button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                        }} className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">{t("Edit")}</button>
+                        <button onClick={() => setDeleteId(lvl.id)} className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">{t("Delete")}</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {levels && levels.length > limit && (
+            <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+          )}
         </div>
       </div>
 

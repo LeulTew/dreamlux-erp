@@ -10,6 +10,7 @@ import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import PaginationControls from "@/components/PaginationControls";
 import { getPendingEventExpenses, reviewEventExpense } from "@/lib/api";
 import type { EventExpense } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
@@ -118,7 +119,16 @@ export default function ExpenseApprovalPage() {
     );
   }
 
+  const [page, setPage] = useState(1);
+  const limit = 10;
   const expenses = expensesQuery.data || [];
+  const totalPages = Math.ceil(expenses.length / limit) || 1;
+
+  useEffect(() => {
+    setPage(1);
+  }, [expenses.length]);
+
+  const paginatedExpenses = expenses.slice((page - 1) * limit, page * limit);
 
   return (
     <AuthLayout>
@@ -135,59 +145,62 @@ export default function ExpenseApprovalPage() {
           </div>
         ) : expenses.length === 0 ? (
           <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted">{t("No pending expenses.")}</div>
-        ) : (
-          <div className="divide-y divide-border rounded-2xl border border-border bg-card">
-            {expenses.map((expense: EventExpense) => {
-              const comment = reviewComments[expense.id] || "";
-              return (
-                <div key={expense.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_280px]">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-bold text-foreground">{expense.event_name || t("Event")}</h2>
-                      <span className="rounded border border-border bg-card-alt px-2 py-0.5 text-xs font-semibold text-muted">{t(expense.category)}</span>
+                 ) : (
+          <div className="space-y-4">
+            <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+              {paginatedExpenses.map((expense: EventExpense) => {
+                const comment = reviewComments[expense.id] || "";
+                return (
+                  <div key={expense.id} className="grid gap-4 p-4 lg:grid-cols-[1fr_280px]">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="font-bold text-foreground">{expense.event_name || t("Event")}</h2>
+                        <span className="rounded border border-border bg-card-alt px-2 py-0.5 text-xs font-semibold text-muted">{t(expense.category)}</span>
+                      </div>
+                      <div className="mt-2 grid gap-2 text-sm text-muted sm:grid-cols-2">
+                        <div>{t("Client")}: <span className="font-semibold text-foreground">{expense.client_name || "-"}</span></div>
+                        <div>{t("Amount")}: <span className="font-semibold text-foreground">{formatCurrency(expense.amount)}</span></div>
+                        <div className="sm:col-span-2">{expense.description}</div>
+                        <div>{t("Submitted")}: <span className="font-semibold text-foreground">{expense.submitted_by_name || "-"}</span></div>
+                      </div>
                     </div>
-                    <div className="mt-2 grid gap-2 text-sm text-muted sm:grid-cols-2">
-                      <div>{t("Client")}: <span className="font-semibold text-foreground">{expense.client_name || "-"}</span></div>
-                      <div>{t("Amount")}: <span className="font-semibold text-foreground">{formatCurrency(expense.amount)}</span></div>
-                      <div className="sm:col-span-2">{expense.description}</div>
-                      <div>{t("Submitted")}: <span className="font-semibold text-foreground">{expense.submitted_by_name || "-"}</span></div>
+                    <div className="space-y-2">
+                      <Input
+                        value={comment}
+                        onChange={(eventChange) => setReviewComments((current) => ({ ...current, [expense.id]: eventChange.target.value }))}
+                        placeholder={t("Review comment")}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          loading={reviewMutation.isPending}
+                          onClick={() => reviewMutation.mutate({ id: expense.id, status: "Approved" })}
+                        >
+                          <HiCheckCircle className="h-4 w-4" />
+                          {t("Approve")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          loading={reviewMutation.isPending}
+                          onClick={() => {
+                            if (!comment.trim()) {
+                              toast.error(t("Reason required"));
+                              return;
+                            }
+                            reviewMutation.mutate({ id: expense.id, status: "Rejected", rejected_reason: comment });
+                          }}
+                        >
+                          <HiXCircle className="h-4 w-4" />
+                          {t("Reject")}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Input
-                      value={comment}
-                      onChange={(eventChange) => setReviewComments((current) => ({ ...current, [expense.id]: eventChange.target.value }))}
-                      placeholder={t("Review comment")}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        type="button"
-                        loading={reviewMutation.isPending}
-                        onClick={() => reviewMutation.mutate({ id: expense.id, status: "Approved" })}
-                      >
-                        <HiCheckCircle className="h-4 w-4" />
-                        {t("Approve")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        loading={reviewMutation.isPending}
-                        onClick={() => {
-                          if (!comment.trim()) {
-                            toast.error(t("Reason required"));
-                            return;
-                          }
-                          reviewMutation.mutate({ id: expense.id, status: "Rejected", rejected_reason: comment });
-                        }}
-                      >
-                        <HiXCircle className="h-4 w-4" />
-                        {t("Reject")}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
         )}
       </div>
