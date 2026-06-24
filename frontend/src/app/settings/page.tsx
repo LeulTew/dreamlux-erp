@@ -736,18 +736,20 @@ export default function SettingsPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`relative flex items-center justify-center gap-2.5 rounded-xl py-3.5 px-4 text-xs font-black uppercase tracking-widest transition-all duration-300 cursor-pointer select-none ${
                     selected 
-                      ? "text-on-primary font-extrabold" 
-                      : "text-muted hover:text-foreground hover:bg-card-alt/50 active:scale-[0.98]"
+                      ? "text-white" 
+                      : dark
+                        ? "text-slate-350 hover:text-white"
+                        : "text-slate-600 hover:text-slate-905"
                   }`}
                 >
-                  <Icon className={`w-4.5 h-4.5 transition-all duration-300 ${
-                    selected ? "scale-110 text-on-primary" : "text-muted-foreground/75"
+                  <Icon className={`w-4.5 h-4.5 transition-all duration-300 relative z-10 ${
+                    selected ? "scale-110 text-white" : "text-muted-foreground/75"
                   }`} />
                   <span className="relative z-10">{tab.label}</span>
                   {selected && (
                     <motion.div
                       layoutId="activeSettingsTab"
-                      className="absolute inset-0 bg-gradient-to-r from-primary via-primary/95 to-primary-light/90 rounded-xl shadow-premium z-0"
+                      className="absolute inset-0 bg-gradient-to-r from-[#d97706] to-[#b45309] rounded-xl shadow-premium z-0"
                       transition={{ type: "spring", stiffness: 380, damping: 30 }}
                     />
                   )}
@@ -768,26 +770,26 @@ export default function SettingsPage() {
                   {/* Card 1: Users Overview with Circular Progress */}
                   <div className={`relative overflow-hidden rounded-2xl p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl border ${
                     dark 
-                      ? "bg-gradient-to-br from-slate-900 to-slate-800 text-white border-slate-700/50" 
+                      ? "bg-[#0b162c] text-white border-[#1e293b]/60" 
                       : "bg-gradient-to-br from-white to-slate-50 text-slate-800 border-indigo-100/80 shadow-premium-sm"
                   }`}>
                     <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110 ${
-                      dark ? "bg-primary/10" : "bg-indigo-500/5"
+                      dark ? "bg-[#f59e0b]/5" : "bg-indigo-500/5"
                     }`} />
                     <div className="flex items-start justify-between">
                       <div className="space-y-2">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${
                           dark 
-                            ? "bg-primary/20 text-primary-light border-primary/30" 
+                            ? "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20" 
                             : "bg-indigo-50 text-indigo-600 border-indigo-100"
                         }`}>
                           <HiUsers className="w-3.5 h-3.5" />
                           {t("System Users")}
                         </span>
                         <div className="mt-2">
-                          <p className="text-4xl font-black tracking-tight">{userStats.total}</p>
+                          <p className={`text-4xl font-black tracking-tight ${dark ? "text-white" : "text-slate-900"}`}>{userStats.total}</p>
                           <p className={`text-xs font-bold uppercase tracking-wider mt-1 ${
-                            dark ? "text-slate-300" : "text-slate-550"
+                            dark ? "text-white" : "text-slate-550"
                           }`}>{t("Registered Accounts")}</p>
                         </div>
                       </div>
@@ -818,11 +820,11 @@ export default function SettingsPage() {
                     </div>
 
                     <div className={`mt-6 pt-4 border-t flex justify-between items-center text-xs ${
-                      dark ? "border-slate-700/50" : "border-indigo-100"
+                      dark ? "border-slate-700/40" : "border-indigo-100"
                     }`}>
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className={`font-semibold ${dark ? "text-slate-200" : "text-slate-700"}`}>{userStats.active} {t("Active")}</span>
+                        <span className={`font-semibold ${dark ? "text-white" : "text-slate-700"}`}>{userStats.active} {t("Active")}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-slate-400">
                         <span className="w-2 h-2 rounded-full bg-slate-500" />
@@ -900,10 +902,14 @@ export default function SettingsPage() {
                     <span className="text-[9px] font-black font-mono text-muted bg-card-alt px-2 py-0.5 rounded border border-border uppercase tracking-widest">{t("Real-time")}</span>
                   </div>
 
-                  <div className="font-mono text-[10px] bg-slate-950 text-slate-400 p-4 rounded-xl space-y-1.5 border border-slate-800 shadow-inner">
-                    <p className="text-emerald-400">{"[info] Initializing system diagnostic audit suite..."}</p>
+                  <div className={`font-mono text-[10px] p-4 rounded-xl space-y-1.5 border shadow-inner transition-all ${
+                    dark 
+                      ? "bg-slate-950 text-slate-400 border-slate-800" 
+                      : "bg-slate-50 text-slate-650 border-slate-200"
+                  }`}>
+                    <p className={dark ? "text-emerald-400" : "text-emerald-600"}>{"[info] Initializing system diagnostic audit suite..."}</p>
                     <p>{`[info] Database connection state: connected to supabase (pooler)`}</p>
-                    <p className="text-indigo-400">{`[info] Active settings context: loaded prefixes [emp=${settings?.employee_id_prefix || "EMP"}, inv=${settings?.inventory_id_prefix || "INV"}, evt=${settings?.event_id_prefix || "EVT"}]`}</p>
+                    <p className={dark ? "text-indigo-400" : "text-indigo-600"}>{`[info] Active settings context: loaded prefixes [emp=${settings?.employee_id_prefix || "EMP"}, inv=${settings?.inventory_id_prefix || "INV"}, evt=${settings?.event_id_prefix || "EVT"}]`}</p>
                     <p>{`[debug] Last REST query returned status ${health?.status === "ok" ? "200 OK" : "500 ERROR"} in 12ms`}</p>
                   </div>
                 </div>
