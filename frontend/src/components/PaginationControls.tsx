@@ -112,9 +112,9 @@ export default function PaginationControls({
                 <button
                   key={item}
                   onClick={() => onPageChange(item)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-full text-xs sm:text-sm font-bold transition-all ${
+                  className={`w-8 h-8 flex items-center justify-center rounded-full text-xs sm:text-sm font-black transition-all duration-300 ${
                     isActive
-                      ? "bg-primary text-on-primary shadow-md shadow-primary/20 scale-105"
+                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20 scale-105"
                       : "text-foreground/80 hover:bg-card-alt border border-transparent hover:border-border"
                   }`}
                 >

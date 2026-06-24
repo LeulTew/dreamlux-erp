@@ -453,13 +453,13 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                   <div className="flex rounded-lg border border-border overflow-hidden">
                     <button
                       onClick={() => setMode("insert")}
-                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "insert" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
+                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "insert" ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                     >
                       {t("Insert (New Events)")}
                     </button>
                     <button
                       onClick={() => setMode("update")}
-                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "update" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
+                      className={`px-4 py-2 text-xs font-black transition-all ${mode === "update" ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                     >
                       {t("Update (Edit Existing)")}
                     </button>
@@ -696,7 +696,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
               <button
                 type="button"
                 disabled
-                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary opacity-50 transition-all border border-primary/20"
+                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white opacity-50 transition-all border border-amber-600/20"
               >
                 {t("Next")}
               </button>
@@ -722,7 +722,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 type="button"
                 onClick={handleApplyMapping}
                 disabled={isLoading}
-                className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 disabled:opacity-50 disabled:scale-100 transition-all border border-primary/20"
+                className="flex items-center gap-1.5 h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] disabled:opacity-50 disabled:scale-100 transition-all border border-amber-600/20 cursor-pointer"
               >
                 {isLoading ? t("Validating") : t("Validate & Preview")}
               </button>
@@ -742,7 +742,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
                 type="button"
                 onClick={handleCommit}
                 disabled={!validationResult?.valid || isCommitting}
-                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 disabled:opacity-50 disabled:scale-100 transition-all border border-primary/20"
+                className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] disabled:opacity-50 disabled:scale-100 transition-all border border-amber-600/20 cursor-pointer"
               >
                 {isCommitting ? t("Importing") : t("Confirm Commit")}
               </button>
@@ -753,7 +753,7 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
             <button
               type="button"
               onClick={onClose}
-              className="w-full h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 transition-all border border-primary/20"
+              className="w-full h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all cursor-pointer border border-amber-600/20"
             >
               {t("Finish")}
             </button>

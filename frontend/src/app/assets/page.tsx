@@ -875,9 +875,9 @@ function AssetsContent() {
                 setStockFilter("all");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${
                 stockFilter === "all"
-                  ? "bg-primary text-on-primary shadow-sm"
+                  ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.97]"
                   : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
