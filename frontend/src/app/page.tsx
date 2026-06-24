@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/PillButton";
 import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -66,7 +68,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No employees found": "No employees found",
     "Loading Dashboard...": "Loading Dashboard...",
     "Selected": "Selected",
-    "Delete": "Delete"
+    "Delete": "Delete",
+    "Delete permanently": "Delete permanently",
+    "Move to Trash": "Move to Trash"
   },
   am: {
     "Employees": "ሰራተኞች",
@@ -277,7 +281,7 @@ function buildColumns(
                 <button
                   onClick={() => singleDelete(row.original.id)}
                   className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
-                  title="Delete permanently"
+                  title={t("Delete permanently")}
                 >
                   <HiTrash className="w-3.5 h-3.5" />
                 </button>
@@ -295,7 +299,7 @@ function buildColumns(
               <button
                 onClick={() => setDeletingEmployee(row.original)}
                 className="p-2 rounded-lg hover:bg-red-50 text-muted hover:text-danger transition-all"
-                title="Move to Trash"
+                title={t("Move to Trash")}
               >
                 <HiTrash className="w-4 h-4" />
               </button>
@@ -340,21 +344,21 @@ function EmployeesPageContent() {
 
   const handleExportCSV = async () => {
     setExportingCSV(true);
-    try { await exportEmployeeCSV(officeId); } 
+    try { await exportEmployeeCSV(officeId); }
     catch (e) { console.error("Export Failed", e); }
     finally { setExportingCSV(false); }
   };
-  
+
   const handleExportExcel = async () => {
     setExportingExcel(true);
-    try { await exportEmployeeExcel(officeId); } 
+    try { await exportEmployeeExcel(officeId); }
     catch (e) { console.error("Export Failed", e); }
     finally { setExportingExcel(false); }
   };
-  const limit = 10;
+  const [limit, setLimit] = useState(10);
 
   const { data, isLoading } = useQuery<EmployeesResponse>({
-    queryKey: ["employees", page, search, showTrash, officeId, departmentId, sortBy, sortOrder],
+    queryKey: ["employees", page, limit, search, showTrash, officeId, departmentId, sortBy, sortOrder],
     queryFn: () => getEmployees(page, limit, search, showTrash ? "trash" : "active", officeId, departmentId, sortBy, sortOrder),
   });
 
@@ -534,7 +538,7 @@ function EmployeesPageContent() {
                 placeholder={t("Search")}
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="w-full pl-9 2xl:pl-10 pr-3 2xl:pr-4 h-9 2xl:h-11 rounded-lg 2xl:rounded-xl bg-card-alt border border-border/20 focus:ring-2 focus:ring-primary/20 transition-all text-xs 2xl:text-sm outline-none shadow-sm"
+                className="w-full pl-9 2xl:pl-10 pr-3 2xl:pr-4 h-9 2xl:h-11 rounded-2xl bg-card-alt border border-border/20 focus:ring-2 focus:ring-primary/20 transition-all text-xs 2xl:text-sm outline-none shadow-sm"
              />
           </div>
 
@@ -545,7 +549,7 @@ function EmployeesPageContent() {
             ]}
             value={officeId}
             onChange={(val) => { setOfficeId(val); setPage(1); }}
-            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-lg [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-xl 2xl:[&>button]:text-sm"
+            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
           />
 
           <Select
@@ -555,7 +559,7 @@ function EmployeesPageContent() {
             ]}
             value={departmentId}
             onChange={(val) => { setDepartmentId(val); setPage(1); }}
-            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-lg [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-xl 2xl:[&>button]:text-sm"
+            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
           />
 
           <Select
@@ -566,21 +570,24 @@ function EmployeesPageContent() {
             ]}
             value={sortBy}
             onChange={(val) => { setSortBy(val); setPage(1); }}
-            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-lg [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-xl 2xl:[&>button]:text-sm"
+            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
           />
 
-          <button
+          <Button
             onClick={() => { setSortOrder(sortOrder === "asc" ? "desc" : "asc"); setPage(1); }}
-            className="flex items-center justify-center w-9 h-9 2xl:w-11 2xl:h-11 rounded-lg 2xl:rounded-xl bg-card-alt border border-border text-muted hover:text-foreground transition-all"
+            variant="secondary"
+            className="w-9 h-9 2xl:w-11 2xl:h-11 p-0"
             title={sortOrder === "asc" ? "Sort Ascending" : "Sort Descending"}
           >
             {sortOrder === "asc" ? "↑" : "↓"}
-          </button>
-          
+          </Button>
+
           <button
             onClick={() => { setShowTrash(!showTrash); setPage(1); }}
-            className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all ${
-              showTrash ? "bg-red-500 text-white shadow-sm" : "bg-card-alt text-foreground border border-border hover:bg-border/50"
+            className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-2xl text-xs 2xl:text-sm font-semibold transition-all ${
+              showTrash
+                ? "bg-rose-500/90 text-white shadow-sm hover:bg-rose-600"
+                : "bg-card-alt text-muted border border-border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 dark:hover:border-rose-900"
             }`}
           >
             <HiTrash className="w-4 h-4" />
@@ -588,65 +595,67 @@ function EmployeesPageContent() {
           </button>
 
           {!showTrash && (
-            <button
+            <PillButton
               onClick={() => router.push("/insert")}
-              className="flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold bg-primary text-background shadow-sm hover:opacity-90 active:scale-[0.98] transition-all"
+              className="h-9 2xl:h-11 px-4 2xl:px-6 text-xs 2xl:text-sm font-bold"
+              icon={
+                <HiPlus className="w-4 h-4" />
+              }
             >
-              <HiPlus className="w-4 h-4" />
               {t("Add Employee")}
-            </button>
+            </PillButton>
           )}
 
           {!showTrash && (
-            <button
+            <Button
               onClick={() => setEditMode(!editMode)}
-              className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all ${
-                editMode ? "bg-primary text-on-primary shadow-sm" : "bg-card-alt text-foreground border border-border hover:bg-border/50"
-              }`}
+              variant={editMode ? "outline" : "secondary"}
+              className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
             >
               <HiPencilSquare className="w-4 h-4" />
               {editMode ? t("Done") : t("Quick Edit")}
-            </button>
+            </Button>
           )}
 
           {showTrash && (
             <>
-              <button
+              <Button
                 onClick={() => {
                   setSelectMode(!selectMode);
                   if (selectMode) setSelectedIds(new Set());
                 }}
-                className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all border ${
-                  selectMode ? "bg-primary/10 text-primary border-primary/30" : "bg-card-alt text-foreground border-border hover:bg-border/50"
-                }`}
+                variant={selectMode ? "outline" : "secondary"}
+                className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                 </svg>
                 {selectMode ? `${selectedIds.size} ${t("Selected")}` : t("Select")}
-              </button>
+              </Button>
               {selectMode && selectedIds.size > 0 && (
-                <button
+                <Button
                   onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl bg-red-600 text-white text-xs 2xl:text-sm font-semibold shadow-sm hover:bg-red-700 active:scale-95 transition-all"
+                  variant="destructive"
+                  className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
                 >
                   <HiTrash className="w-4 h-4" />
                   {t("Delete")} {selectedIds.size}
-                </button>
+                </Button>
               )}
             </>
           )}
 
           {!showTrash && (
             <div className="relative">
-	              <button
+	              <Button
 	                onClick={() => setExportMenuOpen(!exportMenuOpen)}
-	                className={`flex items-center gap-1.5 2xl:gap-2 h-9 2xl:h-11 px-3 2xl:px-4 rounded-lg 2xl:rounded-xl text-xs 2xl:text-sm font-semibold transition-all border ${exportMenuOpen ? "bg-primary text-on-primary border-primary" : "bg-card-alt text-foreground border-border hover:bg-border/50"}`}
-              >
+	                variant={exportMenuOpen ? "default" : "secondary"}
+	                className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
+	              >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                 {t("Export")}
                 <svg className={`w-3.5 h-3.5 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-              </button>
+              </Button>
               <AnimatePresence>
                 {exportMenuOpen && (
                   <>
@@ -769,10 +778,10 @@ function EmployeesPageContent() {
 
           <div className="md:hidden space-y-3">
             {employees.map((emp) => (
-              <MobileEmployeeCard 
-                key={emp.id} 
-                employee={emp} 
-                onTap={setEditingEmployee} 
+              <MobileEmployeeCard
+                key={emp.id}
+                employee={emp}
+                onTap={setEditingEmployee}
                 editMode={editMode}
                 onUpdate={debouncedUpdate}
                 onDelete={showTrash ? (employee) => handleSinglePermanentDelete(employee.id) : setEmployeeToDelete}
@@ -790,23 +799,30 @@ function EmployeesPageContent() {
             page={page}
             totalPages={Math.max(1, totalPages)}
             onPageChange={setPage}
+            pageSize={limit}
+            onPageSizeChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            totalItems={total}
+            pageSizeOptions={[10, 20, 50, 100]}
           />
         </>
       )}
 
       {editingEmployee && (
-          <EditEmployeeSheet 
-            employee={editingEmployee} 
+          <EditEmployeeSheet
+            employee={editingEmployee}
             onClose={() => {
               setEditingEmployee(null);
               if (searchParams.get("edit")) {
                 router.replace(pathname, { scroll: false });
               }
-            }} 
+            }}
           />
         )}
 
-      <DeleteConfirmModal 
+      <DeleteConfirmModal
         isOpen={!!employeeToDelete}
         onClose={() => setEmployeeToDelete(null)}
         onConfirm={() => employeeToDelete && deleteMutation.mutate(employeeToDelete.id)}

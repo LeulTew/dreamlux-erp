@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass } from "react-icons/hi2";
+import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass, HiArrowPath } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport, getEventTypes, getProfitReportExportUrl, api } from "@/lib/api";
+import Select from "@/components/ui/Select";
+import DatePicker from "@/components/ui/DatePicker";
+import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";
 import { EventType, ProfitReportSummary } from "@/lib/types";
 
@@ -152,6 +154,8 @@ export default function FinancialDashboardPage() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "monthly" | "eventTypes" | "categories" | "variance">("overview");
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   // Retrieve permissions list from backend auth query
   const { data: authData, isLoading: authLoading } = useQuery({
@@ -211,6 +215,12 @@ export default function FinancialDashboardPage() {
     setEventTypeId("");
     setStatus("");
     setSearch("");
+    setPage(1);
+  };
+
+  const handleTabChange = (tab: "overview" | "monthly" | "eventTypes" | "categories" | "variance") => {
+    setActiveTab(tab);
+    setPage(1);
   };
 
   // Immediate 403 authorization guard to avoid layout flashing
@@ -228,7 +238,7 @@ export default function FinancialDashboardPage() {
     return (
       <AuthLayout>
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-lg bg-danger/10 flex items-center justify-center text-danger mb-4 border border-danger/20">
+          <div className="w-16 h-16 rounded-2xl bg-danger/10 flex items-center justify-center text-danger mb-4 border border-danger/20">
             <HiLockClosed className="h-8 w-8" />
           </div>
           <h2 className="text-xl font-bold text-foreground">{t("Forbidden: Insufficient privileges")}</h2>
@@ -239,9 +249,21 @@ export default function FinancialDashboardPage() {
   }
 
   const monthlyData = data?.monthlyData || [];
+  const monthlyTotalPages = Math.ceil(monthlyData.length / limit) || 1;
+  const safeMonthlyPage = Math.min(page, monthlyTotalPages);
+  const paginatedMonthlyData = monthlyData.slice((safeMonthlyPage - 1) * limit, safeMonthlyPage * limit);
   const eventTypePerformance = data?.eventTypePerformance || [];
+  const eventTypeTotalPages = Math.ceil(eventTypePerformance.length / limit) || 1;
+  const safeEventTypePage = Math.min(page, eventTypeTotalPages);
+  const paginatedEventTypePerformance = eventTypePerformance.slice((safeEventTypePage - 1) * limit, safeEventTypePage * limit);
   const categoryBreakdown = data?.categoryBreakdown || [];
+  const categoryTotalPages = Math.ceil(categoryBreakdown.length / limit) || 1;
+  const safeCategoryPage = Math.min(page, categoryTotalPages);
+  const paginatedCategoryBreakdown = categoryBreakdown.slice((safeCategoryPage - 1) * limit, safeCategoryPage * limit);
   const proposalVariance = data?.proposalVariance?.events || [];
+  const proposalTotalPages = Math.ceil(proposalVariance.length / limit) || 1;
+  const safeProposalPage = Math.min(page, proposalTotalPages);
+  const paginatedProposalVariance = proposalVariance.slice((safeProposalPage - 1) * limit, safeProposalPage * limit);
 
   // Generate SVG trend chart coordinates
   const maxVal = Math.max(...monthlyData.map((m) => Math.max(m.revenue, m.expenses)), 1000);
@@ -318,7 +340,7 @@ export default function FinancialDashboardPage() {
         <div className="flex flex-col gap-4 border-b border-border/50 pb-5 lg:flex-row lg:items-end lg:justify-between no-print">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-primary/30 bg-primary-light text-primary-dark">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/30 bg-primary-light text-primary-dark">
                 <HiArrowTrendingUp className="h-6 w-6" />
               </div>
               <div className="min-w-0">
@@ -336,7 +358,7 @@ export default function FinancialDashboardPage() {
         </div>
 
         {/* Filters Toolbar Container */}
-        <div className="toolbar-container bg-card border border-border rounded-lg p-3.5 space-y-3.5 no-print">
+        <div className="toolbar-container bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 space-y-3.5 no-print">
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
               <div className="relative flex-1 max-w-xs">
@@ -346,36 +368,37 @@ export default function FinancialDashboardPage() {
                   placeholder={t("Search events...")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 h-[44px] rounded-lg bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
+                  className="w-full pl-10 pr-4 h-[44px] rounded-xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
                 />
               </div>
 
-              <select
+              <Select
+                options={[
+                  { id: "", label: t("Select Type") },
+                  ...eventTypes.map((type) => ({ id: type.id, label: type.event_name }))
+                ]}
                 value={eventTypeId}
-                onChange={(e) => setEventTypeId(e.target.value)}
-                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-lg bg-card-alt border border-border outline-none"
-              >
-                <option value="">{t("Select Type")}</option>
-                {eventTypes.map((type) => (
-                  <option key={type.id} value={type.id}>{type.event_name}</option>
-                ))}
-              </select>
+                onChange={(val) => setEventTypeId(val)}
+                className="min-w-[160px]"
+              />
 
-              <select
+              <Select
+                options={[
+                  { id: "", label: t("Select Status") },
+                  { id: "Planned", label: t("Planned") },
+                  { id: "Ongoing", label: t("Ongoing") },
+                  { id: "Completed", label: t("Completed") }
+                ]}
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="px-3 h-[44px] text-xs font-bold uppercase tracking-wider rounded-lg bg-card-alt border border-border outline-none"
-              >
-                <option value="">{t("Select Status")}</option>
-                <option value="Planned">{t("Planned")}</option>
-                <option value="Ongoing">{t("Ongoing")}</option>
-                <option value="Completed">{t("Completed")}</option>
-              </select>
+                onChange={(val) => setStatus(val)}
+                className="min-w-[150px]"
+              />
 
               <button
                 onClick={handleResetFilters}
-                className="text-xs font-bold text-danger [@media(hover:hover)]:hover:underline uppercase tracking-wider"
+                className="h-[44px] px-4 text-xs font-black uppercase tracking-wider rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] flex items-center gap-1.5"
               >
+                <HiArrowPath className="w-3.5 h-3.5" />
                 {t("Reset")}
               </button>
             </div>
@@ -383,24 +406,24 @@ export default function FinancialDashboardPage() {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Start Date")}</span>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-36 bg-card-alt h-[44px] text-xs" />
+                <DatePicker value={startDate} onChange={(val) => setStartDate(val)} className="w-36 h-[44px]" />
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("End Date")}</span>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-36 bg-card-alt h-[44px] text-xs" />
+                <DatePicker value={endDate} onChange={(val) => setEndDate(val)} className="w-36 h-[44px]" />
               </div>
 
               {/* Export Popover */}
               <div className="relative">
                 <button
                   onClick={() => setIsExportOpen(!isExportOpen)}
-                  className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
+                  className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                 >
                   <HiArrowDownTray className="w-4 h-4" />
                   {t("Export")}
                 </button>
                 {isExportOpen && (
-                  <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-lg shadow-massive z-10 py-1">
+                  <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-xl shadow-massive z-10 py-1">
                     <button
                       onClick={() => handleExport("csv")}
                       className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt"
@@ -431,7 +454,7 @@ export default function FinancialDashboardPage() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as "overview" | "monthly" | "eventTypes" | "categories" | "variance")}
+              onClick={() => handleTabChange(tab.id as "overview" | "monthly" | "eventTypes" | "categories" | "variance")}
               className={`px-4 py-2.5 text-xs font-black uppercase tracking-wider border-b-2 transition-all ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted [@media(hover:hover)]:hover:text-foreground"}`}
             >
               {tab.label}
@@ -447,35 +470,35 @@ export default function FinancialDashboardPage() {
             <Skeleton className="h-64 w-full" />
           </div>
         ) : isError || !data ? (
-          <div className="rounded-lg border border-border bg-card p-8 text-center text-muted">
+          <div className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-8 text-center text-muted">
             {t("Workspace unavailable")}
           </div>
         ) : (
           <div className="space-y-6">
-            
+
             {/* KPI Cards Strip */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Total Revenue")}</div>
                 <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">{formatCurrency(data.summary.totalRevenue)}</div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Total Approved Expenses")}</div>
                 <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">{formatCurrency(data.summary.totalExpenses)}</div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Net Profit")}</div>
                 <div className={`mt-2 text-xl font-black font-mono tabular-nums ${data.summary.netProfit >= 0 ? "text-success" : "text-danger"}`}>
                   {formatCurrency(data.summary.netProfit)}
                 </div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Profit Margin")}</div>
                 <div className={`mt-2 text-xl font-black font-mono ${data.summary.profitMargin >= 25 ? "text-success" : "text-warning"}`}>
                   {data.summary.profitMargin.toFixed(1)}%
                 </div>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4 col-span-2 lg:col-span-1">
+              <div className="rounded-2xl border border-border bg-card p-4 col-span-2 lg:col-span-1">
                 <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Pending Expense Exposure")}</div>
                 <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">
                   {formatCurrency(data.summary.pendingExpenseExposure)}
@@ -487,7 +510,7 @@ export default function FinancialDashboardPage() {
             {activeTab === "overview" && (
               <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 {/* Trend Chart */}
-                <section className="rounded-lg border border-border bg-card p-5">
+                <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                   <div className="mb-4 flex items-center gap-2">
                     <HiArrowTrendingUp className="h-5 w-5 text-primary-dark" />
                     <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Profit Trend")}</h2>
@@ -560,7 +583,7 @@ export default function FinancialDashboardPage() {
                 </section>
 
                 {/* KPI highlights lists */}
-                <section className="rounded-lg border border-border bg-card p-5 space-y-4">
+                <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5 space-y-4">
                   <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
                     {t("Key Performance Indicators")}
                   </h3>
@@ -590,7 +613,7 @@ export default function FinancialDashboardPage() {
 
             {/* Monthly View */}
             {(activeTab === "monthly" || !activeTab) && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiCalendarDays className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Monthly View")}</h2>
@@ -601,35 +624,40 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Month/Year")}</th>
-                          <th className="px-6 py-4 text-center">{t("Event Count")}</th>
-                          <th className="px-6 py-4 text-right">{t("Revenue")}</th>
-                          <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
-                          <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Margin")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthlyData.map((row) => (
-                          <tr key={row.month} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                            <td className="px-6 py-4 font-mono">{row.month}</td>
-                            <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.profit >= 0 ? "text-success" : "text-danger"}`}>
-                              {formatCurrency(row.profit)}
-                            </td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.margin >= 25 ? "text-success" : "text-warning"}`}>
-                              {row.margin.toFixed(1)}%
-                            </td>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Month/Year")}</th>
+                            <th className="px-6 py-4 text-center">{t("Event Count")}</th>
+                            <th className="px-6 py-4 text-right">{t("Revenue")}</th>
+                            <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
+                            <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Margin")}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {paginatedMonthlyData.map((row) => (
+                            <tr key={row.month} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                              <td className="px-6 py-4 font-mono">{row.month}</td>
+                              <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.profit >= 0 ? "text-success" : "text-danger"}`}>
+                                {formatCurrency(row.profit)}
+                              </td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.margin >= 25 ? "text-success" : "text-warning"}`}>
+                                {row.margin.toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {monthlyData.length > limit && (
+                      <PaginationControls page={safeMonthlyPage} totalPages={monthlyTotalPages} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>
@@ -637,7 +665,7 @@ export default function FinancialDashboardPage() {
 
             {/* Event Type Performance View */}
             {activeTab === "eventTypes" && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiChartBar className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Event Type Performance")}</h2>
@@ -648,35 +676,40 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Event Type")}</th>
-                          <th className="px-6 py-4 text-center">{t("Event Count")}</th>
-                          <th className="px-6 py-4 text-right">{t("Revenue")}</th>
-                          <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
-                          <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Average Margin")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {eventTypePerformance.map((row) => (
-                          <tr key={row.eventType} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                            <td className="px-6 py-4 font-bold">{row.eventType}</td>
-                            <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.netProfit >= 0 ? "text-success" : "text-danger"}`}>
-                              {formatCurrency(row.netProfit)}
-                            </td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${row.averageMargin >= 25 ? "text-success" : "text-warning"}`}>
-                              {row.averageMargin.toFixed(1)}%
-                            </td>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Event Type")}</th>
+                            <th className="px-6 py-4 text-center">{t("Event Count")}</th>
+                            <th className="px-6 py-4 text-right">{t("Revenue")}</th>
+                            <th className="px-6 py-4 text-right">{t("Approved Expenses")}</th>
+                            <th className="px-6 py-4 text-right">{t("Net Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Average Margin")}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {paginatedEventTypePerformance.map((row) => (
+                            <tr key={row.eventType} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                              <td className="px-6 py-4 font-bold">{row.eventType}</td>
+                              <td className="px-6 py-4 text-center font-bold">{row.eventCount}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.revenue)}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.expenses)}</td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.netProfit >= 0 ? "text-success" : "text-danger"}`}>
+                                {formatCurrency(row.netProfit)}
+                              </td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${row.averageMargin >= 25 ? "text-success" : "text-warning"}`}>
+                                {row.averageMargin.toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {eventTypePerformance.length > limit && (
+                      <PaginationControls page={safeEventTypePage} totalPages={eventTypeTotalPages} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>
@@ -684,7 +717,7 @@ export default function FinancialDashboardPage() {
 
             {/* Category Breakdown View */}
             {activeTab === "categories" && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiChartBar className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Category Breakdown")}</h2>
@@ -695,32 +728,37 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Category")}</th>
-                          <th className="px-6 py-4 text-right">{t("Amount")}</th>
-                          <th className="px-6 py-4 text-right">%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {categoryBreakdown.map((row) => {
-                          const percentage = data.summary.totalExpenses > 0 ? (row.amount / data.summary.totalExpenses) * 100 : 0;
-                          const colorClass = colors[row.category as keyof typeof colors] || "bg-slate-500";
-                          return (
-                            <tr key={row.category} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                              <td className="px-6 py-4 flex items-center gap-2 font-bold">
-                                <span className={`h-2.5 w-2.5 rounded-full ${colorClass}`} />
-                                {t(row.category)}
-                              </td>
-                              <td className="px-6 py-4 text-right font-mono font-bold">{formatCurrency(row.amount)}</td>
-                              <td className="px-6 py-4 text-right font-mono text-muted">{percentage.toFixed(1)}%</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Category")}</th>
+                            <th className="px-6 py-4 text-right">{t("Amount")}</th>
+                            <th className="px-6 py-4 text-right">%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedCategoryBreakdown.map((row) => {
+                            const percentage = data.summary.totalExpenses > 0 ? (row.amount / data.summary.totalExpenses) * 100 : 0;
+                            const colorClass = colors[row.category as keyof typeof colors] || "bg-slate-500";
+                            return (
+                              <tr key={row.category} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                                <td className="px-6 py-4 flex items-center gap-2 font-bold">
+                                  <span className={`h-2.5 w-2.5 rounded-full ${colorClass}`} />
+                                  {t(row.category)}
+                                </td>
+                                <td className="px-6 py-4 text-right font-mono font-bold">{formatCurrency(row.amount)}</td>
+                                <td className="px-6 py-4 text-right font-mono text-muted">{percentage.toFixed(1)}%</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {categoryBreakdown.length > limit && (
+                      <PaginationControls page={safeCategoryPage} totalPages={categoryTotalPages} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>
@@ -728,7 +766,7 @@ export default function FinancialDashboardPage() {
 
             {/* Proposal Variance View */}
             {activeTab === "variance" && (
-              <section className="rounded-lg border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiArrowTrendingUp className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Proposal Variance")}</h2>
@@ -739,31 +777,36 @@ export default function FinancialDashboardPage() {
                     {t("No data found for the selected date range.")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                          <th className="px-6 py-4">{t("Event Name")}</th>
-                          <th className="px-6 py-4">{t("Proposal ID")}</th>
-                          <th className="px-6 py-4 text-right">{t("Estimated Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Actual Profit")}</th>
-                          <th className="px-6 py-4 text-right">{t("Variance")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proposalVariance.map((row) => (
-                          <tr key={row.eventId} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
-                            <td className="px-6 py-4 font-bold">{row.eventName}</td>
-                            <td className="px-6 py-4 font-mono text-muted text-[10px]">{row.proposalId}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.estimatedNetProfit)}</td>
-                            <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.actualNetProfit)}</td>
-                            <td className={`px-6 py-4 text-right font-mono font-bold ${(row.variance || 0) < 0 ? "text-danger" : "text-success"}`}>
-                              {row.variance !== null ? formatCurrency(row.variance) : "-"}
-                            </td>
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                            <th className="px-6 py-4">{t("Event Name")}</th>
+                            <th className="px-6 py-4">{t("Proposal ID")}</th>
+                            <th className="px-6 py-4 text-right">{t("Estimated Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Actual Profit")}</th>
+                            <th className="px-6 py-4 text-right">{t("Variance")}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {paginatedProposalVariance.map((row) => (
+                            <tr key={row.eventId} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
+                              <td className="px-6 py-4 font-bold">{row.eventName}</td>
+                              <td className="px-6 py-4 font-mono text-muted text-[10px]">{row.proposalId}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.estimatedNetProfit)}</td>
+                              <td className="px-6 py-4 text-right font-mono">{formatCurrency(row.actualNetProfit)}</td>
+                              <td className={`px-6 py-4 text-right font-mono font-bold ${(row.variance || 0) < 0 ? "text-danger" : "text-success"}`}>
+                                {row.variance !== null ? formatCurrency(row.variance) : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {proposalVariance.length > limit && (
+                      <PaginationControls page={safeProposalPage} totalPages={proposalTotalPages} onPageChange={setPage} />
+                    )}
                   </div>
                 )}
               </section>

@@ -93,7 +93,7 @@ export default function ReconcileReviewModal({
                  <button
                   onClick={onConfirm}
                   disabled={isSubmitting}
-                  className="flex-1 h-11 bg-primary text-on-primary rounded-xl font-semibold text-sm shadow-sm hover:opacity-95 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 h-11 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSubmitting ? "Syncing..." : (
                     <>

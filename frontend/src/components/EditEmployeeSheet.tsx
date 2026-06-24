@@ -6,11 +6,12 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { updateEmployee, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import { Employee, SalaryLevel, EventType, EmployeesResponse } from "@/lib/types";
-import toast from "react-hot-toast";
-import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification } from "react-icons/hi2";
+import { notify } from "@/lib/toast";
+import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck, HiArrowPath } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
+import { Button } from "./ui/button";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -39,8 +40,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Rates": "Event Rates",
     "Rates Description": "Set custom rates for this employee. These prices will be used during payroll calculation.",
     "Save Changes": "Save Changes",
+    "Reset Changes": "Reset Changes",
+    "Changes reset": "Changes reset",
     "Updating...": "Updating...",
     "Delete Record": "Delete Record",
+    "Delete Permanently": "Delete Permanently",
     "Delete Warning": "This action will move the record to trash. Are you sure?",
     "Failed to process image": "Failed to process image",
     "Department added!": "Department added!",
@@ -71,8 +75,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Rates": "የዝግጅት ተመኖች",
     "Rates Description": "ለዚህ ሰራተኛ ብጁ ተመኖችን ይወስኑ። እነዚህ ዋጋዎች በደመወዝ ስሌት ወቅት ጥቅም ላይ ይውላሉ።",
     "Save Changes": "ለውጦችን አስቀምጥ",
+    "Reset Changes": "ለውጦችን መልስ",
+    "Changes reset": "ለውጦች ተመልሰዋል",
     "Updating...": "በማዘመን ላይ...",
     "Delete Record": "መዝገብ ሰርዝ",
+    "Delete Permanently": "በቋሚነት ሰርዝ",
     "Delete Warning": "ይህ ተግባር መዝገቡን ወደ ቆሻሻ መጣያ ያዛውረዋል። እርግጠኛ ነዎት?",
     "Failed to process image": "ፎቶውን ለማዘጋጀት አልተሳካም",
     "Department added!": "ክፍል በተሳካ ሁኔታ ታክሏል!",
@@ -126,6 +133,29 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
   const [eventPrices, setEventPrices] = useState<Record<string, number>>(employee.event_prices || {});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  const handleReset = () => {
+    setFormData({
+      full_name: employee.full_name,
+      employee_id: employee.employee_id,
+      department_id: employee.department_id || "",
+      phone: employee.phone || "",
+      email: employee.email || "",
+      salary_level: employee.salary_level || "",
+      office_id: employee.office_id || "",
+    });
+    setEventPrices(employee.event_prices || {});
+    setFrontPreview(employee.id_card_front_url);
+    setBackPreview(employee.id_card_back_url);
+    setProfilePreview(employee.profile_photo_url || null);
+    setFrontFile(null);
+    setBackFile(null);
+    setProfileFile(null);
+    setFormErrors({});
+    setIsAddingDepartment(false);
+    setNewDepartment("");
+    notify.success(t("Changes reset"));
+  };
+
   const [newDepartment, setNewDepartment] = useState("");
   const [isAddingDepartment, setIsAddingDepartment] = useState(false);
 
@@ -156,11 +186,11 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     mutationFn: (id: string) => deleteEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success("Employee deleted successfully");
+      notify.success("Employee Deleted", "Employee deleted successfully");
       onClose();
     },
     onError: () => {
-      toast.error("Failed to delete employee");
+      notify.error("Deletion Failed", "Failed to delete employee");
     },
   });
 
@@ -171,7 +201,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       const skippedEventPrices = dropped.includes("event_prices") || updated?._warning?.includes("event_prices");
 
       if (skippedEventPrices) {
-        toast.error("Employee saved, but event rates were not persisted. Please run DB migration for event_prices.");
+        notify.error("Event Rates Warning", "Employee saved, but event rates were not persisted. Please run DB migration for event_prices.");
         queryClient.invalidateQueries({ queryKey: ["employees"] });
         return;
       }
@@ -195,13 +225,13 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         }
       );
 
-      toast.success("Employee updated!");
+      notify.success("Success", "Employee updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       onClose();
     },
     onError: (err: AxiosError<{ error?: string; details?: string }>) => {
       const message = err.response?.data?.error || err.response?.data?.details || "Update failed";
-      toast.error(message);
+      notify.error("Update Failed", message);
     },
   });
 
@@ -272,7 +302,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       };
       reader.readAsDataURL(compressed);
     } catch {
-      toast.error(t("Failed to process image"));
+      notify.error(t("Failed to process image"));
     }
   };
 
@@ -286,12 +316,12 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       setFormData(prev => ({ ...prev, department_id: res.id }));
       setNewDepartment("");
       setIsAddingDepartment(false);
-      toast.success(t("Department added!"));
+      notify.success(t("Department added!"));
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
-        toast.error(err.response?.data?.error || t("Failed to add department"));
+        notify.error(t("Failed to add department"), err.response?.data?.error);
       } else {
-        toast.error(t("Failed to add department"));
+        notify.error(t("Failed to add department"));
       }
     }
   };
@@ -308,7 +338,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         errors[field] = issue.message;
       });
       setFormErrors(errors);
-      toast.error(t("Please fix the mistakes in the form"));
+      notify.error(t("Please fix the mistakes in the form"));
       return;
     }
     setFormErrors({});
@@ -346,7 +376,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 {/* Profile Photo */}
                 <div className="sm:col-span-1 flex flex-col items-center justify-center gap-3 bg-card-alt/30 p-4 rounded-xl border border-border/50">
                   <div className="relative group">
-                    <div 
+                    <div
                       className={`relative w-20 h-20 rounded-full border-4 border-dashed overflow-hidden flex items-center justify-center transition-all bg-card-alt ${
                         profilePreview ? "border-primary/30" : "border-border hover:border-primary/20"
                       }`}
@@ -357,7 +387,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                         <HiUserPlus className="w-6 h-6 text-muted opacity-30" />
                       )}
                     </div>
-                    
+
                     {profilePreview && (
                       <button
                         type="button"
@@ -368,7 +398,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -516,35 +546,60 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Department */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 col-span-1">
                   <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Department")}</label>
-                  <div className="flex gap-2">
-                    {isAddingDepartment ? (
-                      <div className="flex-1 flex gap-2">
-                         <input
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Select
+                        options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
+                        value={formData.department_id}
+                        onChange={(val) => setFormData({...formData, department_id: val})}
+                        placeholder={t("Select Department")}
+                        className="flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingDepartment(!isAddingDepartment)}
+                        className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-sm ${
+                          isAddingDepartment
+                            ? "bg-secondary text-foreground border border-border/80 hover:bg-secondary/60 rotate-45"
+                            : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                        }`}
+                        title={isAddingDepartment ? t("Cancel") : t("Add Department")}
+                      >
+                        <HiPlus className="w-5 h-5 transition-transform duration-300" />
+                      </button>
+                    </div>
+
+                    {isAddingDepartment && (
+                      <div className="flex gap-2 p-2 bg-card-alt/50 border border-border/40 rounded-xl animate-in slide-in-from-top-2 duration-200">
+                        <input
                           type="text"
                           autoFocus
+                          placeholder={t("New Department Name")}
                           value={newDepartment}
                           onChange={(e) => setNewDepartment(e.target.value)}
-                          className="flex-1 h-11 px-4 rounded-xl border border-primary bg-card-alt text-sm outline-none"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddDepartment();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setIsAddingDepartment(false);
+                              setNewDepartment("");
+                            }
+                          }}
+                          className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs outline-none text-foreground focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
                         />
-                        <button type="button" onClick={handleAddDepartment} className="w-11 h-11 rounded-xl bg-primary text-on-primary hover:bg-primary-dark transition-all flex items-center justify-center shrink-0">
-                          <HiPlus className="w-4.5 h-4.5" />
+                        <button
+                          type="button"
+                          onClick={handleAddDepartment}
+                          className="px-3 h-9 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all flex items-center justify-center gap-1 shadow-sm text-xs font-semibold shrink-0"
+                        >
+                          <HiCheck className="w-4 h-4" />
+                          {t("Add")}
                         </button>
                       </div>
-                    ) : (
-                      <>
-                        <Select
-                          options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
-                          value={formData.department_id}
-                          onChange={(val) => setFormData({...formData, department_id: val})}
-                          placeholder={t("Select Department")}
-                          className="flex-1"
-                        />
-                        <button type="button" onClick={() => setIsAddingDepartment(true)} className="w-11 h-11 rounded-xl bg-primary text-on-primary hover:bg-primary-dark transition-all flex items-center justify-center shrink-0 shadow-sm" title="Add Department">
-                          <HiPlus className="w-4.5 h-4.5" />
-                        </button>
-                      </>
                     )}
                   </div>
                 </div>
@@ -589,7 +644,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 <p className="text-[10px] text-muted px-1 font-medium leading-relaxed">
                   {t("Rates Description")}
                 </p>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {eventTypes.map((et) => (
                     <div key={et.id} className="bg-card-alt p-3 py-2.5 rounded-xl border border-border flex flex-col gap-2 group hover:border-primary/30 transition-all">
@@ -623,23 +678,36 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
           </div>
 
           {/* Form Actions */}
-          <div className="flex gap-3 mt-6">
-            <button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
-            >
-              {updateMutation.isPending ? t("Updating...") : t("Save Changes")}
-            </button>
-            <button
+          <div className="flex justify-end items-center gap-3 mt-8 pt-4 border-t border-border/40">
+            <Button
               type="button"
-              disabled={deleteMutation.isPending}
+              variant="destructive"
+              loading={deleteMutation.isPending}
               onClick={() => setShowDeleteModal(true)}
-              className="w-11 h-11 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all group shrink-0"
-              title="Delete Permanently"
+              className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+              title={t("Delete Permanently")}
             >
-              <HiTrash className="w-5 h-5 group-hover:scale-105 transition-transform" />
-            </button>
+              <HiTrash className="w-4.5 h-4.5" />
+              {t("Delete")}
+            </Button>
+
+            <Button
+              type="button"
+              onClick={handleReset}
+              className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+            >
+              <HiArrowPath className="w-4.5 h-4.5" />
+              {t("Reset Changes")}
+            </Button>
+
+            <Button
+              type="submit"
+              loading={updateMutation.isPending}
+              className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+            >
+              <HiCheck className="w-4.5 h-4.5" />
+              {t("Save Changes")}
+            </Button>
           </div>
         </form>
       </ResponsiveDrawer>

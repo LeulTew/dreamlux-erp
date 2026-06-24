@@ -17,9 +17,23 @@ interface SelectProps {
   className?: string;
   onAdd?: () => void;
   addLabel?: string;
+  triggerClassName?: string;
+  valueClassName?: string;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
-export default function Select({ options, value, onChange, placeholder = "Select...", className = "", onAdd, addLabel }: SelectProps) {
+export default function Select({
+  options,
+  value,
+  onChange,
+  placeholder = "Select...",
+  className = "",
+  onAdd,
+  addLabel,
+  triggerClassName = "",
+  valueClassName = "",
+  icon: CustomIcon
+}: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,12 +54,16 @@ export default function Select({ options, value, onChange, placeholder = "Select
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-card-alt border border-border/50 text-sm font-semibold text-foreground hover:bg-border/30 transition-all outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+        className={triggerClassName || "w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-card-alt border border-border/50 text-sm font-semibold text-foreground hover:bg-primary-light hover:text-primary-dark hover:border-primary/30 dark:hover:bg-primary-light/10 dark:hover:text-primary dark:hover:border-primary/30 transition-all duration-300 ease-out outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"}
       >
-        <span className={selectedOption ? "text-foreground font-semibold" : "text-muted font-medium"}>
+        <span className={valueClassName || (selectedOption ? "text-foreground font-semibold" : "text-muted font-medium")}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <HiChevronDown className={`w-4 h-4 text-muted transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        {CustomIcon ? (
+          <CustomIcon className="w-4 h-4 text-muted shrink-0" />
+        ) : (
+          <HiChevronDown className={`w-4 h-4 text-muted transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        )}
       </button>
 
       <AnimatePresence>
@@ -55,7 +73,7 @@ export default function Select({ options, value, onChange, placeholder = "Select
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute z-[100] w-full mt-2 bg-card border border-border shadow-lg rounded-lg overflow-hidden py-1"
+            className="absolute z-[100] w-full mt-2 bg-card border border-border shadow-lg rounded-xl overflow-hidden py-1"
           >
             <div className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col">
               {options.length === 0 && !onAdd ? (
@@ -71,8 +89,8 @@ export default function Select({ options, value, onChange, placeholder = "Select
                         setIsOpen(false);
                       }}
                       className={`w-full text-left px-4 py-2.5 text-sm font-semibold transition-all flex items-center justify-between group/opt ${
-                        String(option.id) === String(value) 
-                          ? "bg-primary/10 text-primary" 
+                        String(option.id) === String(value)
+                          ? "bg-primary/10 text-primary"
                           : "text-foreground hover:bg-card-alt hover:pl-5"
                       }`}
                     >

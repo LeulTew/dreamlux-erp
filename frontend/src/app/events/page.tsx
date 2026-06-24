@@ -1,23 +1,24 @@
 "use client";
 import React, { useEffect, useState, useMemo, Suspense, useRef } from "react";
+import { PillButton } from "@/components/ui/PillButton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  getEvents, 
-  getEventSavedViews, 
-  createEventSavedView, 
-  deleteEventSavedView, 
-  duplicateEventSavedView, 
+import {
+  getEvents,
+  getEventSavedViews,
+  createEventSavedView,
+  deleteEventSavedView,
+  duplicateEventSavedView,
   setDefaultEventSavedView,
   getEventsExportUrl,
   api
 } from "@/lib/api";
 import { Event, EventsResponse, EventSavedView } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
-import { 
-  HiCalendar, 
-  HiPlus, 
-  HiMagnifyingGlass, 
-  HiPencilSquare, 
+import {
+  HiCalendar,
+  HiPlus,
+  HiMagnifyingGlass,
+  HiPencilSquare,
   HiArrowTopRightOnSquare,
   HiAdjustmentsHorizontal,
   HiBookmark,
@@ -30,6 +31,8 @@ import {
   HiPrinter,
   HiXMark
 } from "react-icons/hi2";
+
+import Select from "@/components/ui/Select";
 
 import EditEventSheet from "@/components/EditEventSheet";
 import PaginationControls from "@/components/PaginationControls";
@@ -313,7 +316,7 @@ const DATE_RANGE_OPTIONS = [
   { id: "last_month", label: "Last Month" }
 ];
 
-export function EventsPageContent() {
+function EventsPageContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
@@ -357,7 +360,7 @@ export function EventsPageContent() {
   const [newViewRoleName, setNewViewRoleName] = useState("");
   const [newViewIsDefault, setNewViewIsDefault] = useState(false);
 
-  const limit = 10;
+  const [limit, setLimit] = useState(10);
 
   // Refs and hooks for dialog accessibility (focus trap and Escape key listener)
   const saveViewModalRef = useRef<HTMLFormElement>(null);
@@ -480,7 +483,7 @@ export function EventsPageContent() {
 
   // Fetch events list
   const { data, isLoading } = useQuery<EventsResponse>({
-    queryKey: ["events", page, search, status, dateParams.start_date, dateParams.end_date, sortBy, sortOrder, filterLogic, filters],
+    queryKey: ["events", page, limit, search, status, dateParams.start_date, dateParams.end_date, sortBy, sortOrder, filterLogic, filters],
     queryFn: () => getEvents(
       page,
       limit,
@@ -620,10 +623,10 @@ export function EventsPageContent() {
 
   const handleRemoveFilterRule = (index: number) => {
     const nextRules = filters.filter((_, i: number) => i !== index);
-    updateUrl({ 
+    updateUrl({
       filters: nextRules.length > 0 ? btoa(JSON.stringify(nextRules)) : null,
-      page: "1", 
-      viewId: null 
+      page: "1",
+      viewId: null
     });
   };
 
@@ -715,7 +718,7 @@ export function EventsPageContent() {
         {/* Header Title */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 rounded-lg text-primary border border-primary/20">
+            <div className="p-2.5 bg-primary/10 rounded-2xl text-primary border border-primary/20">
               <HiCalendar className="w-6 h-6 md:w-7 md:h-7" />
             </div>
             <div>
@@ -731,7 +734,7 @@ export function EventsPageContent() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/events/proposals"
-              className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border"
+              className="flex items-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border"
             >
               {t("Proposals")}
             </Link>
@@ -739,27 +742,30 @@ export function EventsPageContent() {
               <>
                 <button
                   onClick={() => setIsImportOpen(true)}
-                  className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border transition-all"
+                  className="flex items-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border transition-all"
                 >
                   <HiArrowUpTray className="w-4 h-4 text-primary" />
                   {t("Import")}
                 </button>
-                <button
+                <PillButton
                   onClick={() => setIsAddOpen(true)}
-                  className="flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
+                  variant="primary"
+                  className="h-[44px] px-6 text-sm font-bold shadow-md shadow-amber-500/10"
+                  icon={
+                    <HiPlus className="w-4 h-4" />
+                  }
                 >
-                  <HiPlus className="w-4 h-4" />
                   {t("Add Event")}
-                </button>
+                </PillButton>
               </>
             )}
           </div>
         </header>
 
         {/* Compact Integrated Toolbar Container */}
-        <div className="toolbar-container bg-card border border-border rounded-lg p-3.5 mb-6 space-y-3 no-print">
+        <div className="toolbar-container bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 mb-6 space-y-3 no-print">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            
+
             {/* Search and Saved Views dropdown */}
             <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[260px]">
               <div className="relative flex-1 max-w-sm min-w-[180px]">
@@ -769,37 +775,35 @@ export function EventsPageContent() {
                   placeholder={t("Search")}
                   value={search}
                   onChange={(e) => updateUrl({ search: e.target.value, page: "1" })}
-                  className="w-full pl-10 pr-4 h-[44px] rounded-lg bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
+                  className="w-full pl-10 pr-4 h-[44px] rounded-2xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
                 />
               </div>
 
               {/* Saved view dropdown selector */}
-              <div className="relative">
-                <select
-                  value={activeViewId}
-                  onChange={(e) => {
-                    const view = savedViews.find(v => v.id === e.target.value);
-                    if (view) handleApplyView(view);
-                    else handleClearFilters();
-                  }}
-                  className="pl-3 pr-8 h-[44px] text-xs font-bold uppercase tracking-wider rounded-lg bg-card-alt border border-border outline-none appearance-none cursor-pointer focus:ring-1 focus:ring-primary/30"
-                >
-                  <option value="">{t("Saved Views")}</option>
-                  {savedViews.map((view) => (
-                    <option key={view.id} value={view.id}>
-                      {view.name} ({t(view.scope)})
-                    </option>
-                  ))}
-                </select>
-                <HiBookmark className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
-              </div>
+              <Select
+                options={savedViews.map((view) => ({
+                  id: view.id,
+                  label: `${view.name} (${t(view.scope)})`
+                }))}
+                value={activeViewId || ""}
+                onChange={(val) => {
+                  const view = savedViews.find(v => String(v.id) === String(val));
+                  if (view) handleApplyView(view);
+                  else handleClearFilters();
+                }}
+                placeholder={t("Saved Views")}
+                className="min-w-[160px] max-w-[200px]"
+                icon={HiBookmark}
+                triggerClassName="w-full flex items-center justify-between px-4 h-[44px] rounded-2xl bg-card-alt border border-border/50 text-xs font-black uppercase tracking-wider text-muted hover:text-foreground hover:bg-primary-light/5 hover:border-primary/30 dark:hover:bg-primary-light/10 dark:hover:text-primary dark:hover:border-primary/30 transition-all duration-300 ease-out outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+                valueClassName="text-xs font-black uppercase tracking-wider truncate mr-1.5"
+              />
 
               {/* Saved view controls */}
               {activeViewId && (
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setDefaultViewMutation.mutate(activeViewId)}
-                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-warning"
+                    className="p-2.5 rounded-2xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-warning"
                     title={t("Default View")}
                   >
                     <HiStar className="w-4 h-4" />
@@ -809,14 +813,14 @@ export function EventsPageContent() {
                       const active = savedViews.find(v => v.id === activeViewId);
                       if (active) duplicateViewMutation.mutate({ id: active.id, name: `${active.name} Copy` });
                     }}
-                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
+                    className="p-2.5 rounded-2xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
                     title={t("Duplicate")}
                   >
                     <HiDocumentDuplicate className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setIsDeleteViewOpen(activeViewId)}
-                    className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-danger"
+                    className="p-2.5 rounded-2xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-danger"
                     title={t("Delete")}
                   >
                     <HiTrash className="w-4 h-4" />
@@ -827,7 +831,7 @@ export function EventsPageContent() {
               {filters.length > 0 && !activeViewId && (
                 <button
                   onClick={() => setIsSaveViewOpen(true)}
-                  className="px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-lg bg-card-alt text-primary [@media(hover:hover)]:hover:bg-primary/5 border border-primary/20 flex items-center gap-1.5"
+                  className="px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-2xl bg-card-alt text-primary [@media(hover:hover)]:hover:bg-primary/5 border border-primary/20 flex items-center gap-1.5"
                 >
                   <HiBookmark className="w-4 h-4" />
                   {t("Save Current View")}
@@ -837,7 +841,7 @@ export function EventsPageContent() {
 
             {/* Quick date filters & drawers triggers */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-lg border border-border overflow-hidden bg-card-alt">
+              <div className="flex rounded-2xl border border-border overflow-hidden bg-card-alt">
                 {DATE_RANGE_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}
@@ -852,7 +856,7 @@ export function EventsPageContent() {
               {/* Advanced filter builder button */}
               <button
                 onClick={() => setIsFiltersOpen(true)}
-                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-primary bg-primary/5 text-primary" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"}`}
+                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-primary bg-primary/5 text-primary" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"}`}
               >
                 <HiAdjustmentsHorizontal className="w-4 h-4" />
                 {t("Filters")}
@@ -868,13 +872,13 @@ export function EventsPageContent() {
               <div className="relative">
                 <button
                   onClick={() => setIsExportOpen(!isExportOpen)}
-                  className="p-2.5 rounded-lg bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground flex items-center justify-center"
+                  className="p-2.5 rounded-2xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground flex items-center justify-center"
                   title={t("Export")}
                 >
                   <HiArrowDownTray className="w-5 h-5" />
                 </button>
                 {isExportOpen && (
-                  <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-lg shadow-massive z-10 py-1">
+                  <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-2xl shadow-massive z-10 py-1">
                     <button
                       onClick={() => handleExport("csv")}
                       className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt"
@@ -925,11 +929,11 @@ export function EventsPageContent() {
         {isLoading ? (
           <div className="space-y-4 animate-pulse">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 bg-card-alt rounded-lg border border-border" />
+              <div key={i} className="h-16 bg-card-alt rounded-2xl border border-border" />
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-lg border border-dashed border-border text-center px-4">
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-2xl border border-dashed border-border text-center px-4">
             <HiCalendar className="w-16 h-16 text-muted mb-4 opacity-10" />
             <h3 className="text-lg font-bold text-foreground opacity-50">
               {t("No events found")}
@@ -938,7 +942,7 @@ export function EventsPageContent() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-hidden bg-card border border-border rounded-lg table-container">
+            <div className="hidden md:block overflow-hidden bg-card border border-border rounded-2xl 2xl:rounded-4xl table-container">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
@@ -1055,7 +1059,7 @@ export function EventsPageContent() {
                 <div
                   key={event.id}
                   onClick={() => setEditingEvent(event)}
-                  className="p-4 bg-card border border-border rounded-lg space-y-3 active:scale-[0.98] transition-all cursor-pointer"
+                  className="p-4 bg-card border border-border rounded-2xl space-y-3 active:scale-[0.98] transition-all cursor-pointer"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -1127,6 +1131,13 @@ export function EventsPageContent() {
               page={page}
               totalPages={Math.max(1, totalPages)}
               onPageChange={(p) => updateUrl({ page: String(p) })}
+              pageSize={limit}
+              onPageSizeChange={(newLimit) => {
+                setLimit(newLimit);
+                updateUrl({ page: "1" });
+              }}
+              totalItems={total}
+              pageSizeOptions={[10, 20, 50, 100]}
             />
           </>
         )}
@@ -1143,7 +1154,7 @@ export function EventsPageContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Logic")}</label>
-              <div className="flex rounded-lg border border-border overflow-hidden">
+              <div className="flex rounded-2xl border border-border overflow-hidden">
                 <button
                   onClick={() => updateUrl({ filterLogic: "and", page: "1" })}
                   className={`px-3 py-1.5 text-[10px] font-bold transition-all ${filterLogic === "and" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
@@ -1168,12 +1179,12 @@ export function EventsPageContent() {
 
           <div className="flex flex-col gap-3">
             {filters.map((rule, idx: number) => (
-              <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 p-3 rounded-lg border border-border bg-card-alt">
+              <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 p-3 rounded-2xl border border-border bg-card-alt">
                 {/* Field Selector */}
                 <select
                   value={rule.field}
                   onChange={(e) => handleUpdateFilterRule(idx, "field", e.target.value)}
-                  className="flex-1 px-3 py-2 text-xs font-semibold rounded bg-card border border-border outline-none"
+                  className="flex-1 px-3 py-2 text-xs font-semibold rounded-2xl bg-card border border-border outline-none"
                 >
                   {FIELD_OPTIONS.map((f) => (
                     <option key={f.key} value={f.key}>{t(f.label)}</option>
@@ -1190,7 +1201,7 @@ export function EventsPageContent() {
                       <select
                         value={rule.operator}
                         onChange={(e) => handleUpdateFilterRule(idx, "operator", e.target.value)}
-                        className="w-full sm:w-44 px-3 py-2 text-xs font-semibold rounded bg-card border border-border outline-none"
+                        className="w-full sm:w-44 px-3 py-2 text-xs font-semibold rounded-2xl bg-card border border-border outline-none"
                       >
                         {compatibleOps.map((op) => (
                           <option key={op.id} value={op.id}>{t(op.label)}</option>
@@ -1205,7 +1216,7 @@ export function EventsPageContent() {
                   (() => {
                     const fieldMeta = FIELD_OPTIONS.find(f => f.key === rule.field);
                     const fieldType = fieldMeta?.type || "text";
-                    const inputCls = "flex-1 px-3 py-2 text-xs font-semibold rounded bg-card border border-border outline-none text-foreground";
+                    const inputCls = "flex-1 px-3 py-2 text-xs font-semibold rounded-2xl bg-card border border-border outline-none text-foreground";
 
                     if (rule.operator === "between") {
                       const parts = ((rule.value as string) || "").split("|");
@@ -1304,7 +1315,7 @@ export function EventsPageContent() {
                 {/* Remove button */}
                 <button
                   onClick={() => handleRemoveFilterRule(idx)}
-                  className="w-8 h-8 rounded bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger flex items-center justify-center transition-all shrink-0 self-end sm:self-auto"
+                  className="w-8 h-8 rounded-2xl bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger flex items-center justify-center transition-all shrink-0 self-end sm:self-auto"
                 >
                   <HiXMark className="w-4 h-4" />
                 </button>
@@ -1313,7 +1324,7 @@ export function EventsPageContent() {
 
             <button
               onClick={handleAddFilterRule}
-              className="mt-2 h-[44px] border border-dashed border-primary/35 [@media(hover:hover)]:hover:bg-primary/5 rounded-lg text-primary text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]"
+              className="mt-2 h-[44px] border border-dashed border-primary/35 [@media(hover:hover)]:hover:bg-primary/5 rounded-2xl text-primary text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]"
             >
               <HiPlus className="w-4 h-4" />
               {t("Add Rule")}
@@ -1323,7 +1334,7 @@ export function EventsPageContent() {
           <div className="flex justify-end gap-2 border-t border-border pt-4 mt-4">
             <button
               onClick={() => setIsFiltersOpen(false)}
-              className="h-[44px] px-6 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 transition-all border border-primary/20"
+              className="h-[44px] px-6 rounded-2xl text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 transition-all border border-primary/20"
             >
               {t("Apply")}
             </button>
@@ -1341,7 +1352,7 @@ export function EventsPageContent() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="save-view-title"
-            className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
+            className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-massive p-6 space-y-4"
           >
             <div>
               <h3 id="save-view-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Save View")}</h3>
@@ -1355,7 +1366,7 @@ export function EventsPageContent() {
                 value={newViewName}
                 onChange={(e) => setNewViewName(e.target.value)}
                 required
-                className="px-3 py-2 rounded bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                className="px-3 py-2 rounded-2xl bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
               />
             </div>
 
@@ -1364,7 +1375,7 @@ export function EventsPageContent() {
               <select
                 value={newViewScope}
                 onChange={(e) => setNewViewScope(e.target.value as "personal" | "role" | "global")}
-                className="px-3 py-2 rounded bg-card-alt border border-border text-sm outline-none"
+                className="px-3 py-2 rounded-2xl bg-card-alt border border-border text-sm outline-none"
               >
                 <option value="personal">{t("Personal")}</option>
                 <option value="role">{t("Role-based")}</option>
@@ -1381,7 +1392,7 @@ export function EventsPageContent() {
                   onChange={(e) => setNewViewRoleName(e.target.value)}
                   required
                   placeholder={t("e.g. Administrator")}
-                  className="px-3 py-2 rounded bg-card-alt border border-border text-sm outline-none"
+                  className="px-3 py-2 rounded-2xl bg-card-alt border border-border text-sm outline-none"
                 />
               </div>
             )}
@@ -1392,24 +1403,22 @@ export function EventsPageContent() {
                 id="default-view-checkbox"
                 checked={newViewIsDefault}
                 onChange={(e) => setNewViewIsDefault(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30 cursor-pointer"
+                className="w-4 h-4 rounded-md border-border accent-primary"
               />
-              <label htmlFor="default-view-checkbox" className="text-xs font-bold text-muted uppercase tracking-wider cursor-pointer">
-                {t("Default")}
-              </label>
+              <label htmlFor="default-view-checkbox" className="text-xs font-bold text-muted uppercase tracking-wider">{t("Set as default view")}</label>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-border pt-4">
               <button
                 type="button"
                 onClick={() => setIsSaveViewOpen(false)}
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
+                className="h-[44px] px-5 rounded-2xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
               >
                 {t("Cancel")}
               </button>
               <button
                 type="submit"
-                className="h-[44px] px-5 rounded-lg text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
+                className="h-[44px] px-5 rounded-2xl text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 border border-primary/20"
               >
                 {t("Save")}
               </button>
@@ -1418,7 +1427,7 @@ export function EventsPageContent() {
         </div>
       )}
 
-      {/* Delete View dialog */}
+      {/* Delete View Modal dialog */}
       {isDeleteViewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsDeleteViewOpen(null)} />
@@ -1427,7 +1436,7 @@ export function EventsPageContent() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-view-title"
-            className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
+            className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-massive p-6 space-y-4"
           >
             <h3 id="delete-view-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Delete View")}</h3>
             <p className="text-sm text-muted font-semibold">{t("Are you sure you want to delete this saved view?")}</p>

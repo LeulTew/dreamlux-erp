@@ -30,9 +30,9 @@ export default function OfficeFilterChips({
       <div className="hidden md:flex flex-wrap gap-2 items-center">
         <button
           onClick={() => onChange("all")}
-          className={`h-10 px-4 rounded-xl text-xs uppercase font-semibold tracking-wider transition-all shadow-sm ${
+          className={`h-10 px-4 rounded-xl text-xs uppercase font-extrabold tracking-wider transition-all duration-300 ${
             selected === "all"
-              ? "bg-primary text-on-primary shadow-sm"
+              ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.97]"
               : "bg-card-alt text-muted hover:text-foreground hover:bg-border/50"
           }`}
         >
@@ -42,9 +42,9 @@ export default function OfficeFilterChips({
           <button
             key={office.id}
             onClick={() => onChange(office.id)}
-            className={`h-10 px-4 rounded-xl text-xs uppercase font-semibold tracking-wider transition-all shadow-sm ${
+            className={`h-10 px-4 rounded-xl text-xs uppercase font-extrabold tracking-wider transition-all duration-300 ${
               selected === office.id
-                ? "bg-primary text-on-primary shadow-sm"
+                ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.97]"
                 : "bg-card-alt text-muted hover:text-foreground hover:bg-border/50"
             }`}
           >

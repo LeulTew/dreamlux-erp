@@ -11,6 +11,7 @@ import { getItems, getStores, recoverItem, permanentlyDeleteItem } from "@/lib/a
 import { Item, ItemsResponse, Store } from "@/lib/types";
 import { HiArrowLeft, HiMiniArrowUturnLeft, HiTrash } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
+import DatePicker from "@/components/ui/DatePicker";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -191,27 +192,27 @@ export default function TrashPage() {
 
           <div className="lg:col-span-2">
             <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">{t("Deleted From")}</label>
-            <input
-              type="datetime-local"
+            <DatePicker
+              showTime
               value={fromDateTime}
-              onChange={(e) => {
-                setFromDateTime(e.target.value);
+              onChange={(val) => {
+                setFromDateTime(val);
                 setPage(1);
               }}
-              className="w-full px-3 py-2.5 rounded-2xl border border-border bg-card-alt text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+              placeholder={t("Deleted From")}
             />
           </div>
 
           <div className="lg:col-span-2">
             <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">{t("Deleted To")}</label>
-            <input
-              type="datetime-local"
+            <DatePicker
+              showTime
               value={toDateTime}
-              onChange={(e) => {
-                setToDateTime(e.target.value);
+              onChange={(val) => {
+                setToDateTime(val);
                 setPage(1);
               }}
-              className="w-full px-3 py-2.5 rounded-2xl border border-border bg-card-alt text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+              placeholder={t("Deleted To")}
             />
           </div>
 

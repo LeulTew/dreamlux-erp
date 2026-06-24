@@ -4,11 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { getEventProposals } from "@/lib/api";
 import { EventProposal } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
-import { 
-  HiInboxStack, 
-  HiPlus, 
-  HiMagnifyingGlass, 
-  HiEye 
+import {
+  HiInboxStack,
+  HiPlus,
+  HiMagnifyingGlass,
+  HiEye,
+  HiArrowPath,
+  HiCheckCircle,
+  HiCurrencyDollar
 } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import PaginationControls from "@/components/PaginationControls";
@@ -153,7 +156,7 @@ export default function ProposalsPage() {
 
           <Link
             href="/events/proposals/new"
-            className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 active:scale-[0.98] transition-all border border-primary/20"
+            className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
           >
             <HiPlus className="w-4 h-4" />
             {t("Add Proposal")}
@@ -162,34 +165,65 @@ export default function ProposalsPage() {
 
         {/* KPI Strip */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
-            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Total Proposals")}</span>
-            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+          {/* Card 1: Total Proposals */}
+          <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-indigo-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-indigo-500/10 to-transparent rounded-full blur-xl group-hover:scale-110 transition-transform duration-500 pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted uppercase tracking-wider font-extrabold">{t("Total Proposals")}</span>
+              <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-500 border border-indigo-500/20 group-hover:scale-105 transition-transform duration-300">
+                <HiInboxStack className="w-4 h-4" />
+              </div>
+            </div>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums mt-2">
               {stats.totalCount}
             </span>
           </div>
-          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
-            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Active Intake")}</span>
-            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+
+          {/* Card 2: Active Intake */}
+          <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-amber-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/10 to-transparent rounded-full blur-xl group-hover:scale-110 transition-transform duration-500 pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted uppercase tracking-wider font-extrabold">{t("Active Intake")}</span>
+              <div className="p-1.5 bg-amber-500/10 rounded-lg text-amber-500 border border-amber-500/20 group-hover:scale-105 transition-transform duration-300">
+                <HiArrowPath className="w-4 h-4" />
+              </div>
+            </div>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums mt-2">
               {stats.activeIntake}
             </span>
           </div>
-          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
-            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Conversion Rate")}</span>
-            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+
+          {/* Card 3: Conversion Rate */}
+          <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-500/10 to-transparent rounded-full blur-xl group-hover:scale-110 transition-transform duration-500 pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted uppercase tracking-wider font-extrabold">{t("Conversion Rate")}</span>
+              <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-500 border border-emerald-500/20 group-hover:scale-105 transition-transform duration-300">
+                <HiCheckCircle className="w-4 h-4" />
+              </div>
+            </div>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums mt-2">
               {stats.conversionRate}%
             </span>
           </div>
-          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-1.5">
-            <span className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Avg Margin")}</span>
-            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+
+          {/* Card 4: Avg Margin */}
+          <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-violet-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-violet-500/10 to-transparent rounded-full blur-xl group-hover:scale-110 transition-transform duration-500 pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted uppercase tracking-wider font-extrabold">{t("Avg Margin")}</span>
+              <div className="p-1.5 bg-violet-500/10 rounded-lg text-violet-500 border border-violet-500/20 group-hover:scale-105 transition-transform duration-300">
+                <HiCurrencyDollar className="w-4 h-4" />
+              </div>
+            </div>
+            <span className="text-2xl font-black text-foreground tracking-tight tabular-nums mt-2">
               {stats.avgMargin}%
             </span>
           </div>
         </div>
 
         {/* Filters Toolbar */}
-        <div className="bg-card border border-border rounded-lg p-3.5 mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 mb-6 flex flex-wrap items-center justify-between gap-3">
           <div className="relative flex-1 min-w-[200px] md:max-w-xs">
             <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
@@ -200,7 +234,7 @@ export default function ProposalsPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-10 pr-4 h-[44px] rounded-lg bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
+              className="w-full pl-10 pr-4 h-[44px] rounded-xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
             />
           </div>
 
@@ -219,7 +253,7 @@ export default function ProposalsPage() {
               setStatus(val);
               setPage(1);
             }}
-            className="min-w-[150px] rounded-lg border-border"
+            className="min-w-[150px] rounded-xl border-border"
           />
         </div>
 
@@ -227,11 +261,11 @@ export default function ProposalsPage() {
         {isLoading ? (
           <div className="space-y-4 animate-pulse">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 bg-card-alt rounded-lg border border-border" />
+              <div key={i} className="h-16 bg-card-alt rounded-2xl border border-border" />
             ))}
           </div>
         ) : proposals.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-lg border border-dashed border-border text-center px-4">
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-2xl border border-dashed border-border text-center px-4">
             <HiInboxStack className="w-16 h-16 text-muted mb-4 opacity-10" />
             <h3 className="text-lg font-bold text-foreground opacity-50">
               {t("No proposals found")}
@@ -240,7 +274,7 @@ export default function ProposalsPage() {
         ) : (
           <>
             {/* Desktop table */}
-            <div className="hidden md:block overflow-hidden bg-card border border-border rounded-lg">
+            <div className="hidden md:block overflow-hidden bg-card border border-border rounded-2xl 2xl:rounded-4xl">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
@@ -304,7 +338,7 @@ export default function ProposalsPage() {
                 <Link
                   key={proposal.id}
                   href={`/events/proposals/${proposal.id}`}
-                  className="block p-4 bg-card border border-border rounded-lg space-y-3 active:scale-[0.98] transition-all"
+                  className="block p-4 bg-card border border-border rounded-2xl space-y-3 active:scale-[0.98] transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div>

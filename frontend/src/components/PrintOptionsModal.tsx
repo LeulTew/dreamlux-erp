@@ -105,7 +105,7 @@ export default function PrintOptionsModal({
                     onPrint({ includeImages, includeEvents });
                     onClose();
                   }}
-                  className="h-11 px-6 rounded-xl font-semibold text-sm bg-primary text-on-primary shadow-sm hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 group"
+                  className="h-11 px-6 rounded-xl text-xs font-black uppercase tracking-widest bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 flex items-center gap-2 group cursor-pointer"
                 >
                   <HiPrinter className="w-5 h-5 opacity-90 group-hover:opacity-100" />
                   <span>Generate PDF</span>

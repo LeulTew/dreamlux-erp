@@ -26,6 +26,14 @@ export async function runStartupMigrations() {
       // Ignore if salary_levels table doesn't exist yet
     });
 
+    // Add inventory_id_prefix and event_id_prefix columns to app_settings
+    await client.query(`
+      ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS inventory_id_prefix TEXT NOT NULL DEFAULT 'INV';
+    `);
+    await client.query(`
+      ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS event_id_prefix TEXT NOT NULL DEFAULT 'EVT';
+    `);
+
     console.log("[StartupMigration] Success: Schema is up to date.");
   } catch (err: any) {
     console.warn("[StartupMigration] Note: Automatic migration skip/fail:", err.message);

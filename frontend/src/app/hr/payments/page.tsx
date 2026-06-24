@@ -1,17 +1,17 @@
 "use client";
-
 import Link from "next/link";
 import { format } from "date-fns";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRuns, updatePayrollRunStatus, exportPayrollPDF, permanentlyDeletePayrollRun } from "@/lib/api";
-import { HiPlusCircle, HiClock, HiOutlineChevronRight, HiPencilSquare, HiTrash, HiPrinter, HiArrowUturnLeft, HiArrowPath } from "react-icons/hi2";
+import { HiClock, HiOutlineChevronRight, HiPencilSquare, HiPrinter, HiArrowUturnLeft, HiArrowPath, HiTrash } from "react-icons/hi2";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/hooks/use-language";
+import { FancyButton } from "@/components/ui/FancyButton";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -89,6 +89,7 @@ function PaymentsPageContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const searchParams = useSearchParams();
+  const router = useRouter();
   const selectedMonth = format(new Date(), "yyyy-MM");
   const queryClient = useQueryClient();
   const [view, setView] = useState<"active" | "trash">("active");
@@ -102,9 +103,9 @@ function PaymentsPageContent() {
 
   const { data: runs, isLoading, isRefetching, refetch } = useQuery<PayrollRunRow[]>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder],
-    queryFn: () => getPayrollRuns({ 
-      view, 
-      year: yearFilter === "ALL" ? undefined : yearFilter, 
+    queryFn: () => getPayrollRuns({
+      view,
+      year: yearFilter === "ALL" ? undefined : yearFilter,
       status: statusFilter === "ALL" ? undefined : statusFilter,
       sortBy,
       sortOrder
@@ -199,7 +200,7 @@ function PaymentsPageContent() {
               {t("Payroll snaphosts & history")}
             </p>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-1 rounded-xl border border-border/50 bg-card-alt p-1">
               <button
@@ -232,7 +233,7 @@ function PaymentsPageContent() {
               onClick={handleSync}
               disabled={isRefetching}
               className={`
-                group inline-flex items-center justify-center w-10 h-10 rounded-xl border border-border/60 
+                group inline-flex items-center justify-center w-10 h-10 rounded-xl border border-border/60
                 bg-card/50 backdrop-blur-xl text-foreground hover:bg-muted transition-all active:scale-95
                 ${isRefetching ? 'opacity-50 cursor-not-allowed' : ''}
               `}
@@ -241,20 +242,18 @@ function PaymentsPageContent() {
               <HiArrowPath className={`w-4 h-4 transition-transform duration-700 ${isRefetching ? 'animate-spin' : 'group-hover:rotate-180'}`} />
             </button>
 
-            <Link
-              href={`/hr/payments/run?date=${selectedMonth}`}
-              className="inline-flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 active:scale-95 whitespace-nowrap"
+            <FancyButton
+              onClick={() => router.push(`/hr/payments/run?date=${selectedMonth}`)}
             >
-              <HiPlusCircle className="w-4 h-4" />
               {t("New Payout")}
-            </Link>
+            </FancyButton>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-card/40 backdrop-blur-md p-4 rounded-2xl border border-border/50 shadow-sm">
           <div className="space-y-1.5">
             <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">{t("Year")}</label>
-            <select 
+            <select
               value={yearFilter}
               onChange={(e) => { setYearFilter(e.target.value); setPage(1); }}
               className="w-full h-10 px-4 py-2 bg-card border border-border/80 rounded-xl text-xs font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
@@ -268,7 +267,7 @@ function PaymentsPageContent() {
 
           <div className="space-y-1.5">
             <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">{t("Status")}</label>
-            <select 
+            <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="w-full h-10 px-4 py-2 bg-card border border-border/80 rounded-xl text-xs font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
@@ -281,7 +280,7 @@ function PaymentsPageContent() {
 
           <div className="space-y-1.5">
             <label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">{t("Sort By")}</label>
-            <select 
+            <select
               value={sortBy}
               onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
               className="w-full h-10 px-4 py-2 bg-card border border-border/80 rounded-xl text-xs font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all"
@@ -357,7 +356,7 @@ function PaymentsPageContent() {
                   }`}
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-[4rem] -mr-4 -mt-4 transition-transform group-hover:scale-110 pointer-events-none" />
-                  
+
                   <div className="flex flex-col gap-6 md:flex-row md:items-center relative z-10">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
@@ -427,7 +426,7 @@ function PaymentsPageContent() {
                         )}
                         <Link
                           href={`/hr/payments/${run.id}`}
-                          className="flex items-center justify-center gap-2 flex-1 md:flex-initial px-6 py-3 bg-card-alt border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted transition-all active:scale-95 group/btn shadow-sm"
+                          className="flex items-center justify-center gap-2 flex-1 md:flex-initial px-6 py-3 bg-primary/5 hover:bg-primary/15 border border-primary/20 hover:border-primary/40 rounded-2xl text-[10px] font-black uppercase tracking-widest text-primary transition-all duration-200 active:scale-95 group/btn shadow-sm cursor-pointer"
                         >
                           {t("Details")}
                           <HiOutlineChevronRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
@@ -447,7 +446,7 @@ function PaymentsPageContent() {
           </div>
         )}
 
-        <DeleteConfirmModal 
+        <DeleteConfirmModal
           isOpen={!!confirmState}
           onClose={() => setConfirmState(null)}
           onConfirm={executeConfirmAction}

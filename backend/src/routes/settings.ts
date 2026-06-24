@@ -17,19 +17,25 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 // PATCH /settings
 router.patch("/", async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { employee_id_prefix } = req.body;
-    
+    const { employee_id_prefix, inventory_id_prefix, event_id_prefix } = req.body;
+
     // Only allow updating known fields
     const updates: any = {};
     if (typeof employee_id_prefix === "string") {
       updates.employee_id_prefix = employee_id_prefix.trim().toUpperCase();
     }
-    
+    if (typeof inventory_id_prefix === "string") {
+      updates.inventory_id_prefix = inventory_id_prefix.trim().toUpperCase();
+    }
+    if (typeof event_id_prefix === "string") {
+      updates.event_id_prefix = event_id_prefix.trim().toUpperCase();
+    }
+
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: "No valid fields provided" });
       return;
     }
-    
+
     const newSettings = await updateSettings(updates);
     res.json(newSettings);
   } catch {

@@ -378,8 +378,8 @@ function DesignPackagePanel({
         <Button
           type="button"
           onClick={() => saveDesignMutation.mutate()}
-          disabled={saveDesignMutation.isPending}
-          className="w-full"
+          loading={saveDesignMutation.isPending}
+          className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
         >
           {t("Save Design")}
         </Button>
@@ -481,7 +481,7 @@ function EventProfitPanel({
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-lg border border-border bg-card p-4">
           <h2 className="mb-4 text-base font-bold text-foreground">{t("Category Breakdown")}</h2>
-          
+
           {profit.totalExpenses === 0 ? (
             <div className="p-8 text-center text-sm text-muted">
               {t("No approved expenses yet. Profit is same as contract price.")}
@@ -524,7 +524,7 @@ function EventProfitPanel({
         <section className="rounded-lg border border-border bg-card p-4 flex flex-col justify-between">
           <div>
             <h2 className="mb-4 text-base font-bold text-foreground">{t("Category Breakdown")}</h2>
-            
+
             {profit.totalExpenses === 0 ? (
               <div className="flex h-48 items-center justify-center text-sm text-muted">
                 {t("No approved expenses yet. Profit is same as contract price.")}
@@ -544,7 +544,7 @@ function EventProfitPanel({
                       </span>
                     </div>
                   </div>
-                  
+
                   <svg width="100%" height="24" className="rounded-md overflow-hidden bg-muted">
                     {chartSegments.map((seg, idx: number) => (
                       <rect
@@ -979,7 +979,13 @@ export default function EventWorkspacePage() {
                       onChange={(eventChange) => setAllocationNotes(eventChange.target.value)}
                       placeholder={t("Notes")}
                     />
-                    <Button type="button" onClick={() => allocationMutation.mutate()} disabled={!canAllocate} className="w-full">
+                    <Button
+                      type="button"
+                      onClick={() => allocationMutation.mutate()}
+                      loading={allocationMutation.isPending}
+                      disabled={!canAllocate}
+                      className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                    >
                       <HiPlus className="h-4 w-4" />
                       {t("Allocate")}
                     </Button>
@@ -1008,7 +1014,7 @@ export default function EventWorkspacePage() {
                             variant="outline"
                             size="sm"
                             onClick={() => releaseMutation.mutate(allocation.id)}
-                            disabled={releaseMutation.isPending}
+                            loading={releaseMutation.isPending}
                           >
                             <HiMinusCircle className="h-4 w-4" />
                             {t("Release")}
@@ -1038,8 +1044,8 @@ export default function EventWorkspacePage() {
                         }
                         addTaskMutation.mutate();
                       }}
-                      disabled={addTaskMutation.isPending}
-                      className="w-full"
+                      loading={addTaskMutation.isPending}
+                      className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                     >
                       <HiPlus className="h-4 w-4" />
                       {t("Add Task")}
@@ -1149,8 +1155,8 @@ export default function EventWorkspacePage() {
                             commission_amount: Number(commissionAmt || 0),
                           });
                         }}
-                        disabled={assignEmployeeMutation.isPending}
-                        className="w-full"
+                        loading={assignEmployeeMutation.isPending}
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                       >
                         <HiPlus className="h-4 w-4" />
                         {t("Assign")}
@@ -1187,7 +1193,7 @@ export default function EventWorkspacePage() {
                               variant="outline"
                               size="sm"
                               onClick={() => removeEmployeeMutation.mutate(asg.employee_id)}
-                              disabled={removeEmployeeMutation.isPending}
+                              loading={removeEmployeeMutation.isPending}
                             >
                               <HiMinusCircle className="h-4 w-4" />
                               {t("Release")}
@@ -1264,8 +1270,8 @@ export default function EventWorkspacePage() {
                             is_night_shift: nightShift,
                           });
                         }}
-                        disabled={assignVehicleMutation.isPending}
-                        className="w-full"
+                        loading={assignVehicleMutation.isPending}
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                       >
                         <HiPlus className="h-4 w-4" />
                         {t("Assign")}
@@ -1296,7 +1302,7 @@ export default function EventWorkspacePage() {
                               variant="outline"
                               size="sm"
                               onClick={() => removeVehicleMutation.mutate(va.vehicle_id)}
-                              disabled={removeVehicleMutation.isPending}
+                              loading={removeVehicleMutation.isPending}
                             >
                               <HiMinusCircle className="h-4 w-4" />
                               {t("Release")}
@@ -1330,8 +1336,8 @@ export default function EventWorkspacePage() {
                       <Input value={receiptKey} onChange={(eventChange) => setReceiptKey(eventChange.target.value)} placeholder={t("Receipt Key")} />
                       <Button
                         type="button"
-                        className="w-full"
-                        disabled={createExpenseMutation.isPending}
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                        loading={createExpenseMutation.isPending}
                         onClick={() => {
                           if (!expenseDescription.trim() || Number(expenseAmount) <= 0) {
                             toast.error(t("Required"));
@@ -1343,7 +1349,13 @@ export default function EventWorkspacePage() {
                         <HiPlus className="h-4 w-4" />
                         {t("Submit Expense")}
                       </Button>
-                      <Button type="button" variant="outline" className="w-full" disabled={generateLaborMutation.isPending} onClick={() => generateLaborMutation.mutate()}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
+                        loading={generateLaborMutation.isPending}
+                        onClick={() => generateLaborMutation.mutate()}
+                      >
                         {t("Generate Labor Expense")}
                       </Button>
                     </div>
@@ -1372,8 +1384,8 @@ export default function EventWorkspacePage() {
                       </div>
                       <Button
                         type="button"
-                        className="w-full"
-                        disabled={createTripMutation.isPending}
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                        loading={createTripMutation.isPending}
                         onClick={() => {
                           if (!tripVehicleAssignmentId || !tripDestination.trim() || Number(tripDistance) <= 0 || Number(fuelPrice) <= 0) {
                             toast.error(t("Required"));

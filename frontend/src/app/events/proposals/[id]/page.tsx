@@ -1,25 +1,27 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  getEventProposal, 
-  submitEventProposal, 
-  approveEventProposal, 
-  rejectEventProposal, 
-  cancelEventProposal, 
+import {
+  getEventProposal,
+  submitEventProposal,
+  approveEventProposal,
+  rejectEventProposal,
+  cancelEventProposal,
   convertEventProposal,
   api
 } from "@/lib/api";
 import { EventProposal, EventProposalLog } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
-import { 
-  HiInboxStack, 
-  HiCheckCircle, 
-  HiPrinter, 
-  HiArrowLeft, 
+import {
+  HiInboxStack,
+  HiCheckCircle,
+  HiPrinter,
+  HiArrowLeft,
   HiExclamationTriangle,
-  HiCurrencyDollar
+  HiCurrencyDollar,
+  HiArrowTopRightOnSquare
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -58,7 +60,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Yes, Convert": "Yes, Convert",
     "Cancel Action": "Cancel",
     "Print Proposal": "Print / PDF",
-    "Back": "Back to Proposals"
+    "Back": "Back to Proposals",
+    "Linked Event": "Linked Event",
+    "Open Event Workspace": "Open Event Workspace"
   },
   am: {
     "Proposal Details": "የፕሮፖዛል ዝርዝሮች",
@@ -94,7 +98,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Yes, Convert": "አዎ፣ ቀይር",
     "Cancel Action": "ተመለስ",
     "Print Proposal": "ሪፖርት አትም",
-    "Back": "ወደ ፕሮፖዛሎች ተመለስ"
+    "Back": "ወደ ፕሮፖዛሎች ተመለስ",
+    "Linked Event": "የተያያዘ ዝግጅት",
+    "Open Event Workspace": "የዝግጅቱን ቦርድ ክፈት"
   }
 };
 
@@ -327,10 +333,10 @@ export default function ProposalDetailPage() {
 
         {/* Primary layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start print-grid">
-          
+
           {/* Main Info */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Basics Card */}
             <div className="bg-card border border-border rounded-lg p-5 space-y-4">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
@@ -460,7 +466,7 @@ export default function ProposalDetailPage() {
 
           {/* Sticky Actions Sidebar */}
           <div className="space-y-6 sticky top-6 w-full shrink-0">
-            
+
             {/* Live Financial Totals */}
             <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
@@ -497,7 +503,7 @@ export default function ProposalDetailPage() {
             </div>
 
             {/* Workflow Actions Panel */}
-            <div className="bg-card border border-border rounded-lg p-5 space-y-4 actions-panel no-print">
+            <div className="bg-card border border-border rounded-xl p-5 space-y-4 actions-panel no-print">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
                 {t("Actions")}
               </h3>
@@ -506,33 +512,33 @@ export default function ProposalDetailPage() {
                 {proposal.status === "Draft" && canWrite && (
                   <button
                     onClick={() => submitMutation.mutate()}
-                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-primary/20"
+                    className="w-full h-10 text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl border border-indigo-600/20 transition-all duration-300 shadow-md shadow-indigo-600/10"
                   >
                     {t("Submit")}
                   </button>
                 )}
 
                 {proposal.status === "Submitted" && canApprove && (
-                  <>
+                  <div className="flex flex-row gap-3">
                     <button
                       onClick={() => approveMutation.mutate()}
-                      className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-success text-on-success [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-success/20 animate-pulse"
+                      className="flex-1 h-10 text-xs font-black uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 rounded-xl transition-all duration-300"
                     >
                       {t("Approve")}
                     </button>
                     <button
                       onClick={() => setIsRejectOpen(true)}
-                      className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-danger text-on-danger [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-danger/25"
+                      className="flex-1 h-10 text-xs font-black uppercase tracking-wider bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/20 rounded-xl transition-all duration-300"
                     >
                       {t("Reject")}
                     </button>
-                  </>
+                  </div>
                 )}
 
                 {proposal.status === "Approved" && canApprove && (
                   <button
                     onClick={() => setIsConvertOpen(true)}
-                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 rounded-lg border border-primary/20 flex items-center justify-center gap-1.5"
+                    className="w-full h-10 text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-xl border border-indigo-600/20 flex items-center justify-center gap-1.5 transition-all duration-300 shadow-md shadow-indigo-600/10"
                   >
                     <HiCheckCircle className="w-4 h-4" />
                     {t("Convert to Event")}
@@ -542,13 +548,31 @@ export default function ProposalDetailPage() {
                 {(proposal.status === "Draft" || proposal.status === "Submitted" || proposal.status === "Approved") && canWrite && (
                   <button
                     onClick={() => cancelMutation.mutate()}
-                    className="w-full h-[44px] text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground rounded-lg"
+                    className="w-full h-10 text-xs font-bold uppercase tracking-wider bg-card-alt border border-border/50 text-muted hover:text-foreground hover:bg-border/30 rounded-xl transition-all duration-300 mt-1"
                   >
                     {t("Cancel")}
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Linked Event Panel */}
+            {proposal.converted_event_id && (
+              <div className="bg-card border border-border rounded-xl p-5 space-y-3 no-print">
+                <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                  {t('Linked Event')}
+                </h3>
+                <p className="text-[11px] text-muted font-medium">This proposal was converted into a live event. Open the event workspace to manage it.</p>
+                <Link
+                  href={`/events/${proposal.converted_event_id}`}
+                  className="flex items-center justify-center gap-1.5 w-full h-10 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-all border border-indigo-600/20 shadow-md shadow-indigo-600/10"
+                >
+                  <HiArrowTopRightOnSquare className="w-4 h-4" />
+                  {t('Open Event Workspace')}
+                </Link>
+              </div>
+            )}
 
             {/* Audit Logs History */}
             <div className="bg-card border border-border rounded-lg p-5 space-y-3 logs-panel no-print">
@@ -596,7 +620,7 @@ export default function ProposalDetailPage() {
             className="relative w-full max-w-md bg-card border border-border rounded-lg shadow-massive p-6 space-y-4"
           >
             <h3 id="reject-proposal-title" className="text-base font-black text-foreground uppercase tracking-wider">{t("Rejection Modal Title")}</h3>
-            
+
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Rejection Reason")} *</label>
               <textarea

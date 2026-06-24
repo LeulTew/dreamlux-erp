@@ -4,7 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { HiOutlineArrowUturnLeft, HiPrinter, HiExclamationTriangle, HiTrash, HiTableCells, HiDocumentArrowDown } from "react-icons/hi2";
+import { HiOutlineArrowUturnLeft, HiPrinter, HiExclamationTriangle, HiTableCells, HiDocumentArrowDown, HiTrash } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRun, exportPayrollExcel, exportPayrollCSV, updatePayrollRunStatus } from "@/lib/api";
 import { useState, useMemo } from "react";
@@ -212,15 +212,15 @@ export default function PaymentRunDetailPage() {
 
             <div className="h-8 w-px bg-border/50 mx-2 hidden sm:block" />
 
-            <button 
+            <button
               onClick={() => setIsPrintModalOpen(true)}
-              className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:opacity-90 transition-all active:scale-[0.98] shadow-sm"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white rounded-lg text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
             >
               <HiPrinter className="w-4 h-4" />
               {t("Print PDF")}
             </button>
 
-            <button 
+            <button
               onClick={() => exportPayrollExcel(id)}
               className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
@@ -228,7 +228,7 @@ export default function PaymentRunDetailPage() {
               {t("Excel")}
             </button>
 
-            <button 
+            <button
               onClick={() => exportPayrollCSV(id)}
               className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
@@ -238,16 +238,16 @@ export default function PaymentRunDetailPage() {
 
              {run.status === "FINALIZED" && (
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => setIsFlagModalOpen(true)}
                   className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg hover:bg-amber-500/20 transition-all active:scale-[0.98]"
                   title={t("Flag as Wrong")}
                 >
                   <HiExclamationTriangle className="w-5 h-5" />
                 </button>
-                <button 
+                <button
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="p-2.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-all active:scale-[0.98]"
+                  className="p-2.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all active:scale-[0.98] shadow-md shadow-rose-500/10"
                   title={t("Move to Trash")}
                 >
                   <HiTrash className="w-5 h-5" />
@@ -256,7 +256,7 @@ export default function PaymentRunDetailPage() {
             )}
 
             {run.status === "DRAFT" && (
-              <button 
+              <button
                 onClick={() => setIsFinalizeModalOpen(true)}
                 className="inline-flex items-center gap-2 h-10 px-4 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm"
               >
@@ -266,7 +266,7 @@ export default function PaymentRunDetailPage() {
           </div>
         </div>
 
-        <PrintOptionsModal 
+        <PrintOptionsModal
           isOpen={isPrintModalOpen}
           onClose={() => setIsPrintModalOpen(false)}
           onPrint={(options) => router.push(`/hr/payments/${id}/report?includeImages=${options.includeImages}`)}
@@ -274,7 +274,7 @@ export default function PaymentRunDetailPage() {
           description={t("Generate a detailed PDF summary of this payroll period.")}
         />
 
-        <DeleteConfirmModal 
+        <DeleteConfirmModal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
           onConfirm={() => statusMutation.mutate("TRASH")}
@@ -284,7 +284,7 @@ export default function PaymentRunDetailPage() {
           isDeleting={statusMutation.isPending}
         />
 
-         <DeleteConfirmModal 
+         <DeleteConfirmModal
           isOpen={isFlagModalOpen}
           onClose={() => setIsFlagModalOpen(false)}
           onConfirm={() => statusMutation.mutate("FLAGGED_WRONG")}
@@ -294,7 +294,7 @@ export default function PaymentRunDetailPage() {
           isDeleting={statusMutation.isPending}
         />
 
-        <DeleteConfirmModal 
+        <DeleteConfirmModal
           isOpen={isFinalizeModalOpen}
           onClose={() => setIsFinalizeModalOpen(false)}
           onConfirm={() => {

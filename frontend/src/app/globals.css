@@ -288,7 +288,7 @@ body {
 }
 
 .text-on-primary {
-  @apply text-white dark:text-background;
+  @apply text-primary-foreground;
 }
 
 /* Print Styles */
@@ -389,5 +389,14 @@ body {
   }
   html {
     @apply font-sans;
+  }
+}
+
+@keyframes shrink-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
   }
 }

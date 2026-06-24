@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/ui/PillButton";
+import DatePicker from "@/components/ui/DatePicker";
 import { Suspense, useState, useCallback, useMemo, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -348,7 +351,6 @@ function buildColumns(
   ];
 }
 
-const ITEMS_PER_PAGE = 10;
 type StockFilterMode = "all" | "low-stock";
 
 function AssetsContent() {
@@ -367,11 +369,7 @@ function AssetsContent() {
   const [fromDateTime, setFromDateTime] = useState(() => searchParams.get("from") || "");
   const [toDateTime, setToDateTime] = useState(() => searchParams.get("to") || "");
   const [advancedFilters, setAdvancedFilters] = useState<FilterRule[]>([]);
-  const [page, setPage] = useState(1);
-  const [editMode, setEditMode] = useState(false);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [limit, setLimit] = useState(10);
   const showTrash = false;
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [reconcileMode, setReconcileMode] = useState(() => searchParams.get("reconcile") === "true");
@@ -379,6 +377,45 @@ function AssetsContent() {
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
   const [itemToRecover, setItemToRecover] = useState<Item | null>(null);
   const [showReconcileReview, setShowReconcileReview] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [editMode, setEditMode] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+
+  useEffect(() => {
+    const urlStore = searchParams.get("store") || "all";
+    if (urlStore !== officeFilter) {
+      setTimeout(() => setOfficeFilter(urlStore), 0);
+    }
+
+    const urlFilter = searchParams.get("filter") === "low-stock" ? "low-stock" : "all";
+    if (urlFilter !== stockFilter) {
+      setTimeout(() => setStockFilter(urlFilter), 0);
+    }
+
+    const urlQ = searchParams.get("q") || "";
+    if (urlQ !== searchInput) {
+      setTimeout(() => setSearchInput(urlQ), 0);
+    }
+
+    const urlFrom = searchParams.get("from") || "";
+    if (urlFrom !== fromDateTime) {
+      setTimeout(() => setFromDateTime(urlFrom), 0);
+    }
+
+    const urlTo = searchParams.get("to") || "";
+    if (urlTo !== toDateTime) {
+      setTimeout(() => setToDateTime(urlTo), 0);
+    }
+
+    const urlReconcile = searchParams.get("reconcile") === "true";
+    if (urlReconcile !== reconcileMode) {
+      setTimeout(() => setReconcileMode(urlReconcile), 0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -409,11 +446,11 @@ function AssetsContent() {
   });
 
   const { data, isLoading } = useQuery<ItemsResponse>({
-    queryKey: ["assets", officeFilter, page, stockFilter, searchTerm, fromDateTime, toDateTime],
+    queryKey: ["assets", officeFilter, page, limit, stockFilter, searchTerm, fromDateTime, toDateTime],
     queryFn: () =>
       getItems(
         page,
-        ITEMS_PER_PAGE,
+        limit,
         searchTerm || undefined,
         officeFilter === "all" ? undefined : officeFilter,
         false,
@@ -426,7 +463,7 @@ function AssetsContent() {
 
   const items = useMemo(() => data?.items || [], [data?.items]);
   const total = data?.total || 0;
-  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(total / limit);
 
   const filteredItems = useMemo(() => {
     let result = items;
@@ -693,53 +730,44 @@ function AssetsContent() {
   return (
     <div className="page-container pb-12">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/40">
+        <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/40">
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground tracking-tight">{t("Assets")}</h1>
               <p className="text-sm text-muted font-medium">{total} {t("Total Records")}</p>
             </div>
           </div>
-          {!authLoading && canManageAssets && (
-            <>
-              <button
-                onClick={() => router.push("/assets/insert")}
-                className="flex items-center gap-1.5 h-11 px-5 rounded-xl text-sm font-semibold bg-primary text-background shadow-sm hover:opacity-90 active:scale-[0.98] transition-all"
-              >
-                <HiPlus className="w-4.5 h-4.5" />
-                {t("Add Asset")}
-              </button>
-              <div className="w-px h-6 bg-border hidden sm:block mx-1" />
-            </>
-          )}
-        <div className="flex flex-wrap items-center gap-2">
-            <button
+          <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+            <Button
                onClick={handleExportPDF}
-               className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
+               variant="secondary"
+               className="h-11 px-4 text-xs font-semibold"
              >
                <HiDocumentText className="w-4.5 h-4.5 text-danger" />
                {t("PDF")}
-             </button>
-             <button
+             </Button>
+             <Button
                onClick={handleExportExcel}
                disabled={exportingXlsx}
-               className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
+               variant="secondary"
+               className="h-11 px-4 text-xs font-semibold"
              >
                <HiTableCells className="w-4.5 h-4.5 text-success" />
                {t("XLSX")}
-             </button>
-             <button
+             </Button>
+             <Button
                onClick={handleExportCSV}
                disabled={exportingCSV}
-               className="flex items-center gap-1.5 h-11 px-4 rounded-xl text-xs font-semibold bg-card text-foreground hover:bg-card-alt transition-all disabled:opacity-50"
+               variant="secondary"
+               className="h-11 px-4 text-xs font-semibold"
              >
                <HiDocumentArrowDown className="w-4.5 h-4.5 text-accent" />
                {t("CSV")}
-             </button>
+             </Button>
 
              <div className="w-px h-6 bg-border hidden sm:block mx-1" />
 
-            <button
+            <Button
               onClick={() => {
                 if (reconcileMode) {
                   setReconcileMode(false);
@@ -750,13 +778,12 @@ function AssetsContent() {
                   setSelectMode(false);
                 }
               }}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                reconcileMode ? "bg-accent text-white shadow-premium" : "bg-card-alt text-foreground border border-border"
-              }`}
+              variant={reconcileMode ? "default" : "secondary"}
+              className="px-4 py-2 text-sm font-medium h-auto"
             >
               <HiCheckCircle className="w-4 h-4" />
               {reconcileMode ? t("Cancel Count") : t("Reconcile")}
-            </button>
+            </Button>
 
             <button
               onClick={() => {
@@ -770,53 +797,69 @@ function AssetsContent() {
               <HiTrash className="w-4 h-4" />
               {t("Trash")}
             </button>
-            <button
+            <Button
               onClick={() => {
                 setEditMode(!editMode);
                 setReconcileMode(false);
               }}
-              className={`hidden md:flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                editMode ? "bg-primary text-on-primary" : "bg-card-alt text-foreground border border-border"
-              }`}
+              variant={editMode ? "outline" : "secondary"}
+              className="hidden md:flex px-4 py-2 text-sm font-medium h-auto"
             >
               <HiPencilSquare className="w-4 h-4" />
               {editMode ? t("Done") : t("Quick Edit")}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setSelectMode(!selectMode);
                 setReconcileMode(false);
                 if (selectMode) setSelectedIds(new Set());
               }}
-              className={`hidden md:flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                selectMode ? "bg-primary text-on-primary" : "bg-card-alt text-foreground border border-border"
-              }`}
+              variant={selectMode ? "outline" : "secondary"}
+              className="hidden md:flex px-4 py-2 text-sm font-medium h-auto"
             >
-              <HiTableCells className="w-4 h-4" />
+              <HiTableCells className="w-4.5 h-4.5" />
               {selectMode ? t("Cancel Selection") : t("Select")}
-            </button>
-        </div>
-      </header>
+            </Button>
+
+            {!authLoading && canManageAssets && (
+              <>
+                <div className="w-px h-6 bg-border hidden sm:block mx-1" />
+                <PillButton
+                  onClick={() => router.push("/assets/insert")}
+                  variant="primary"
+                  className="h-11 px-6 text-sm font-bold shadow-md shadow-amber-500/10"
+                  icon={
+                    <HiPlus className="w-4.5 h-4.5" />
+                  }
+                >
+                  {t("Add Asset")}
+                </PillButton>
+              </>
+            )}
+          </div>
+        </header>
 
       {selectMode && !showTrash && (
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border rounded-2xl p-4">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4">
           <span className="text-sm font-bold text-foreground">
             {selectedIds.size} asset{selectedIds.size !== 1 ? "s" : ""} selected
           </span>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setSelectedIds(new Set())}
-              className="px-4 py-2 rounded-xl text-sm font-medium bg-card-alt border border-border hover:bg-border transition-all"
+              variant="secondary"
+              className="px-4 py-2 text-sm font-medium h-auto"
             >
               Clear
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowBulkDeleteModal(true)}
               disabled={selectedIds.size === 0}
-              className="px-4 py-2 rounded-xl text-sm font-medium bg-danger text-white disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all"
+              variant="destructive"
+              className="px-4 py-2 text-sm font-medium h-auto"
             >
               Delete Selected
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -858,7 +901,7 @@ function AssetsContent() {
         onChange={(s: string) => { setOfficeFilter(s); setPage(1); }}
       />
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl p-4 shadow-sm">
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4 shadow-sm">
         <div className="lg:col-span-3">
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Filter Method")}</label>
           <div className="flex flex-wrap gap-2">
@@ -867,9 +910,9 @@ function AssetsContent() {
                 setStockFilter("all");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${
                 stockFilter === "all"
-                  ? "bg-primary text-on-primary shadow-sm"
+                  ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.97]"
                   : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
@@ -914,27 +957,27 @@ function AssetsContent() {
 
         <div className="lg:col-span-2">
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("From")}</label>
-          <input
-            type="datetime-local"
+          <DatePicker
+            showTime
             value={fromDateTime}
-            onChange={(e) => {
-              setFromDateTime(e.target.value);
+            onChange={(val) => {
+              setFromDateTime(val);
               setPage(1);
             }}
-            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            placeholder={t("From")}
           />
         </div>
 
         <div className="lg:col-span-2">
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("To")}</label>
-          <input
-            type="datetime-local"
+          <DatePicker
+            showTime
             value={toDateTime}
-            onChange={(e) => {
-              setToDateTime(e.target.value);
+            onChange={(val) => {
+              setToDateTime(val);
               setPage(1);
             }}
-            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            placeholder={t("To")}
           />
         </div>
 
@@ -1049,6 +1092,13 @@ function AssetsContent() {
         page={page}
         totalPages={Math.max(1, totalPages)}
         onPageChange={setPage}
+        pageSize={limit}
+        onPageSizeChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
+        totalItems={total}
+        pageSizeOptions={[10, 20, 50, 100]}
       />
 
       {editingItem && (

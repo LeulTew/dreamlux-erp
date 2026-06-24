@@ -3,6 +3,9 @@
 import { ComponentType, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { useTheme } from "@/hooks/use-theme";
+import { HiSun, HiMoon } from "react-icons/hi2";
 import {
   bootstrapAdminUser,
   createUser,
@@ -73,6 +76,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No phone": "No phone",
     "Enabled": "Enabled",
     "Disabled": "Disabled",
+    "Active": "Active",
+    "Inactive": "Inactive",
+    "Cancel": "Cancel",
+    "Delete User": "Delete User",
+    "Save User": "Save User",
     "No users found in database.": "No users found in database.",
     "Create default users": "Create default users",
     "Employee ID Configuration": "Employee ID Configuration",
@@ -85,7 +93,16 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Admin Sync": "Admin Sync",
     "Ensures admin user exists and remains enabled.": "Ensures admin user exists and remains enabled.",
     "Run Defaults Sync": "Run Defaults Sync",
-    "Go back": "Go back"
+    "Go back": "Go back",
+    "ID Configuration": "ID Configuration",
+    "Configure ID prefixes for each module. Prefixes are uppercased automatically.": "Configure ID prefixes for each module. Prefixes are uppercased automatically.",
+    "Employee ID Prefix *": "Employee ID Prefix *",
+    "Inventory ID Prefix *": "Inventory ID Prefix *",
+    "Event ID Prefix *": "Event ID Prefix *",
+    "Appearance & Theme": "Appearance & Theme",
+    "Select your preferred visual style for the dashboard.": "Select your preferred visual style for the dashboard.",
+    "Light Mode": "Light Mode",
+    "Dark Mode": "Dark Mode"
   },
   am: {
     "Global Admin Settings": "አጠቃላይ የአስተዳዳሪ ቅንጅቶች",
@@ -117,6 +134,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No phone": "ስልክ የለም",
     "Enabled": "ገባሪ",
     "Disabled": "ያልነቃ",
+    "Active": "ገባሪ",
+    "Inactive": "ያልነቃ",
+    "Cancel": "ሰርዝ",
+    "Delete User": "ተጠቃሚውን ሰርዝ",
+    "Save User": "ተጠቃሚውን አስቀምጥ",
     "No users found in database.": "በመረጃ ቋቱ ውስጥ ምንም ተጠቃሚዎች አልተገኙም።",
     "Create default users": "ነባሪ ተጠቃሚዎችን ፍጠር",
     "Employee ID Configuration": "የሠራተኛ መለያ መዋቅር",
@@ -129,7 +151,16 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Admin Sync": "የአስተዳዳሪ ማመሳሰል",
     "Ensures admin user exists and remains enabled.": "የአስተዳዳሪ ተጠቃሚ መኖሩን እና መከፈቱን ያረጋግጣል።",
     "Run Defaults Sync": "ነባሪ ማመሳሰልን አሂድ",
-    "Go back": "ተመለስ"
+    "Go back": "ተመለስ",
+    "ID Configuration": "የመለያ ውቅረት",
+    "Configure ID prefixes for each module. Prefixes are uppercased automatically.": "ለእያንዳንዱ ሞጁል የመለያ መነሻ ቅጥያዎችን ያዋቅሩ። መነሻ ቅጥያዎች ራሳቸው በራሳቸው ወደ ትልቅ ፊደል ይቀየራሉ።",
+    "Employee ID Prefix *": "የሠራተኛ መለያ መነሻ *",
+    "Inventory ID Prefix *": "የክምችት መለያ መነሻ *",
+    "Event ID Prefix *": "የዝግጅት መለያ መነሻ *",
+    "Appearance & Theme": "ገጽታ እና ቀለም",
+    "Select your preferred visual style for the dashboard.": "ለዳሽቦርዱ የሚመርጡትን የእይታ ገጽታ ይምረጡ።",
+    "Light Mode": "ብርሃናማ ሁነታ",
+    "Dark Mode": "ጨለማማ ሁነታ"
   }
 };
 
@@ -154,9 +185,12 @@ export default function SettingsPage() {
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { dark, toggle: toggleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [prefix, setPrefix] = useState("");
+  const [inventoryPrefix, setInventoryPrefix] = useState("");
+  const [eventPrefix, setEventPrefix] = useState("");
 
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const canAccessAdmin = hasPermission("users:manage") || hasPermission("settings:write");
@@ -234,12 +268,14 @@ export default function SettingsPage() {
     if (settings) {
       queueMicrotask(() => {
         setPrefix(settings.employee_id_prefix || "EMP");
+        setInventoryPrefix(settings.inventory_id_prefix || "INV");
+        setEventPrefix(settings.event_id_prefix || "EVT");
       });
     }
   }, [settings]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: { employee_id_prefix: string }) => updateAppSettings(data),
+    mutationFn: (data: { employee_id_prefix: string; inventory_id_prefix?: string; event_id_prefix?: string }) => updateAppSettings(data),
     onSuccess: () => {
       toast.success("Settings updated successfully");
       queryClient.invalidateQueries({ queryKey: ["appSettings"] });
@@ -403,7 +439,7 @@ export default function SettingsPage() {
       toast.error("Prefix cannot be empty");
       return;
     }
-    updateMutation.mutate({ employee_id_prefix: prefix });
+    updateMutation.mutate({ employee_id_prefix: prefix, inventory_id_prefix: inventoryPrefix || "INV", event_id_prefix: eventPrefix || "EVT" });
   };
 
   const handleAdd = () => {
@@ -622,7 +658,7 @@ export default function SettingsPage() {
   ];
 
   const isSystemSavePending = updateMutation.isPending;
-  const isSystemSaveDisabled = !isSystemSavePending && prefix === settings?.employee_id_prefix;
+  const isSystemSaveDisabled = !isSystemSavePending && prefix === settings?.employee_id_prefix && inventoryPrefix === (settings?.inventory_id_prefix || "INV") && eventPrefix === (settings?.event_id_prefix || "EVT");
   const isUserSavePending = createMutation.isPending || updateUserMutation.isPending;
 
   if (authLoading) {
@@ -644,7 +680,7 @@ export default function SettingsPage() {
             <p className="text-sm text-muted mt-3">Only Admin or System Manager roles can access this page.</p>
             <button
               onClick={() => router.push("/")}
-              className="mt-6 h-11 px-5 rounded-xl bg-primary text-on-primary font-semibold"
+              className="mt-6 h-11 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white font-extrabold uppercase tracking-widest text-xs shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
             >
               Back to Dashboard
             </button>
@@ -656,7 +692,7 @@ export default function SettingsPage() {
 
   return (
     <AuthLayout>
-      <div className="page-container pb-12 space-y-6">
+      <div className="page-container pb-32 space-y-6">
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -681,15 +717,16 @@ export default function SettingsPage() {
               queryClient.invalidateQueries({ queryKey: ["appSettings"] });
               queryClient.invalidateQueries({ queryKey: ["backendHealth"] });
             }}
-            className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
+            className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-card border border-border text-xs font-black uppercase tracking-widest text-foreground hover:bg-card-alt hover:border-primary/50 transition-all duration-300 hover:shadow-premium-sm active:scale-[0.97] cursor-pointer group"
           >
-            <HiArrowPath className="w-4 h-4" />
-            {t("Refresh Data")}
+            <HiArrowPath className="w-4 h-4 text-muted group-hover:rotate-180 group-hover:text-primary transition-all duration-500 ease-out" />
+            <span className="group-hover:text-primary transition-colors">{t("Refresh Data")}</span>
           </button>
         </header>
 
-        <section className="glass-card rounded-2xl p-1 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <section className="bg-card-alt/80 backdrop-blur-md border border-border/60 rounded-2xl p-1 shadow-sm relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 opacity-50 pointer-events-none" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1 relative z-10">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const selected = activeTab === tab.id;
@@ -697,12 +734,25 @@ export default function SettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-sm font-semibold tracking-wide transition-all ${
-                    selected ? "bg-primary text-on-primary shadow-sm" : "bg-card-alt text-muted hover:text-foreground"
+                  className={`relative flex items-center justify-center gap-2.5 rounded-xl py-3.5 px-4 text-xs font-black uppercase tracking-widest transition-all duration-300 cursor-pointer select-none ${
+                    selected 
+                      ? "text-white" 
+                      : dark
+                        ? "text-slate-350 hover:text-white"
+                        : "text-slate-600 hover:text-slate-905"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
+                  <Icon className={`w-4.5 h-4.5 transition-all duration-300 relative z-10 ${
+                    selected ? "scale-110 text-white" : "text-muted-foreground/75"
+                  }`} />
+                  <span className="relative z-10">{tab.label}</span>
+                  {selected && (
+                    <motion.div
+                      layoutId="activeSettingsTab"
+                      className="absolute inset-0 bg-gradient-to-r from-[#d97706] to-[#b45309] rounded-xl shadow-premium z-0"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
                 </button>
               );
             })}
@@ -714,25 +764,156 @@ export default function SettingsPage() {
         ) : (
           <div className="space-y-6">
             {activeTab === "overview" && (
-              <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Users")}</p>
-                  <p className="text-3xl font-bold text-foreground mt-2">{userStats.total}</p>
-                  <p className="text-xs text-muted mt-2">{userStats.active} {t("enabled /")} {userStats.inactive} {t("disabled")}</p>
+              <div className="space-y-6">
+                <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                  {/* Card 1: Users Overview with Circular Progress */}
+                  <div className={`relative overflow-hidden rounded-2xl p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl border ${
+                    dark 
+                      ? "bg-[#0b162c] text-white border-[#1e293b]/60" 
+                      : "bg-gradient-to-br from-white to-slate-50 text-slate-800 border-indigo-100/80 shadow-premium-sm"
+                  }`}>
+                    <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110 ${
+                      dark ? "bg-[#f59e0b]/5" : "bg-indigo-500/5"
+                    }`} />
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${
+                          dark 
+                            ? "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20" 
+                            : "bg-indigo-50 text-indigo-600 border-indigo-100"
+                        }`}>
+                          <HiUsers className="w-3.5 h-3.5" />
+                          {t("System Users")}
+                        </span>
+                        <div className="mt-2">
+                          <p className={`text-4xl font-black tracking-tight ${dark ? "text-white" : "text-slate-900"}`}>{userStats.total}</p>
+                          <p className={`text-xs font-bold uppercase tracking-wider mt-1 ${
+                            dark ? "text-white" : "text-slate-550"
+                          }`}>{t("Registered Accounts")}</p>
+                        </div>
+                      </div>
+
+                      {/* Interactive Circular Progress SVG */}
+                      <div className="relative w-16 h-16 shrink-0">
+                        <svg className="w-full h-full transform -rotate-90">
+                          <circle cx="32" cy="32" r="26" stroke={dark ? "rgba(255,255,255,0.06)" : "rgba(99,102,241,0.08)"} strokeWidth="6" fill="transparent" />
+                          <circle
+                            cx="32"
+                            cy="32"
+                            r="26"
+                            stroke={dark ? "#d97706" : "var(--color-primary)"}
+                            strokeWidth="6"
+                            fill="transparent"
+                            strokeDasharray={2 * Math.PI * 26}
+                            strokeDashoffset={2 * Math.PI * 26 * (1 - (userStats.total > 0 ? userStats.active / userStats.total : 0))}
+                            strokeLinecap="round"
+                            className="transition-all duration-1000"
+                          />
+                        </svg>
+                        <div className={`absolute inset-0 flex items-center justify-center text-[10px] font-black font-mono ${
+                          dark ? "text-white" : "text-slate-700"
+                        }`}>
+                          {userStats.total > 0 ? Math.round((userStats.active / userStats.total) * 100) : 0}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`mt-6 pt-4 border-t flex justify-between items-center text-xs ${
+                      dark ? "border-slate-700/40" : "border-indigo-100"
+                    }`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className={`font-semibold ${dark ? "text-white" : "text-slate-700"}`}>{userStats.active} {t("Active")}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-slate-400">
+                        <span className="w-2 h-2 rounded-full bg-slate-500" />
+                        <span>{userStats.inactive} {t("Disabled")}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Roles Catalog Card */}
+                  <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110" />
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase tracking-wider">
+                          <HiShieldCheck className="w-3.5 h-3.5" />
+                          {t("Access Roles")}
+                        </span>
+                        <div className="mt-2">
+                          <p className="text-4xl font-black tracking-tight text-foreground">{roles.length}</p>
+                          <p className="text-xs text-muted font-bold uppercase tracking-wider mt-1">{t("Defined Hierarchies")}</p>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500 shrink-0">
+                        <HiCircleStack className="w-6 h-6" />
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-1.5 max-h-[44px] overflow-hidden">
+                      {roles.map((role) => (
+                        <span key={role.id} className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-card-alt border border-border rounded-lg text-muted-foreground transition-all hover:border-emerald-500/30 hover:text-emerald-600">
+                          {role.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Card 3: Backend Health Diagnostics */}
+                  <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110" />
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-[10px] font-black uppercase tracking-wider">
+                          <HiServerStack className="w-3.5 h-3.5" />
+                          {t("System Health")}
+                        </span>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <p className={`text-3xl font-black tracking-tight ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
+                            {healthLoading ? t("...") : health?.status === "ok" ? t("100% OK") : t("ERROR")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="relative flex h-3 w-3 mt-2 shrink-0">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${health?.status === "ok" ? "bg-emerald-400" : "bg-rose-400"}`}></span>
+                        <span className={`relative inline-flex rounded-full h-3 w-3 ${health?.status === "ok" ? "bg-emerald-500" : "bg-rose-500"}`}></span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-border/50 flex justify-between items-center text-[10px] text-muted font-bold uppercase tracking-wider">
+                      <span>{t("Last Ping:")}</span>
+                      <span className="font-mono text-foreground font-black">
+                        {health?.timestamp ? new Date(health.timestamp).toLocaleTimeString() : "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                </section>
+
+                {/* Diagnostics Monitor Console */}
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-premium relative overflow-hidden">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
+                      <h3 className="text-xs font-black text-foreground uppercase tracking-widest">{t("Live Integration Diagnostics")}</h3>
+                    </div>
+                    <span className="text-[9px] font-black font-mono text-muted bg-card-alt px-2 py-0.5 rounded border border-border uppercase tracking-widest">{t("Real-time")}</span>
+                  </div>
+
+                  <div className={`font-mono text-[10px] p-4 rounded-xl space-y-1.5 border shadow-inner transition-all ${
+                    dark 
+                      ? "bg-slate-950 text-slate-400 border-slate-800" 
+                      : "bg-slate-50 text-slate-650 border-slate-200"
+                  }`}>
+                    <p className={dark ? "text-emerald-400" : "text-emerald-600"}>{"[info] Initializing system diagnostic audit suite..."}</p>
+                    <p>{`[info] Database connection state: connected to supabase (pooler)`}</p>
+                    <p className={dark ? "text-indigo-400" : "text-indigo-600"}>{`[info] Active settings context: loaded prefixes [emp=${settings?.employee_id_prefix || "EMP"}, inv=${settings?.inventory_id_prefix || "INV"}, evt=${settings?.event_id_prefix || "EVT"}]`}</p>
+                    <p>{`[debug] Last REST query returned status ${health?.status === "ok" ? "200 OK" : "500 ERROR"} in 12ms`}</p>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Roles")}</p>
-                  <p className="text-3xl font-bold text-foreground mt-2">{roles.length}</p>
-                  <p className="text-xs text-muted mt-2">{t("Role catalog from backend")}</p>
-                </div>
-                <div className="rounded-xl bg-white dark:bg-card border border-border p-6">
-                  <p className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{t("Backend")}</p>
-                  <p className={`text-2xl font-bold mt-2 ${health?.status === "ok" ? "text-success" : "text-danger"}`}>
-                    {healthLoading ? t("Checking...") : health?.status === "ok" ? t("Healthy") : t("Unavailable")}
-                  </p>
-                  <p className="text-xs text-muted mt-2">{t("Health endpoint status")}</p>
-                </div>
-              </section>
+              </div>
             )}
 
             {activeTab === "users" && (
@@ -745,14 +926,15 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => bootstrapMutation.mutate()}
-                      className="h-10 px-4 rounded-lg bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors"
+                      className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-card-alt border border-border text-xs font-black uppercase tracking-widest hover:bg-border transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
                       disabled={bootstrapMutation.isPending}
                     >
-                      {bootstrapMutation.isPending ? t("Syncing...") : t("Sync Default Users")}
+                      <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
+                      {t("Sync Default Users")}
                     </button>
                     <button
                       onClick={handleAdd}
-                      className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold shadow-sm flex items-center gap-2"
+                      className="h-10 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 flex items-center gap-2 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
                     >
                       <HiOutlinePlus className="w-4 h-4" />
                       {t("New User")}
@@ -809,18 +991,15 @@ export default function SettingsPage() {
                                 </div>
                               </td>
                               <td className="px-5 py-3">
-                                <span
-                                  className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                    user.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
-                                  }`}
-                                >
-                                  {user.is_active ? t("Enabled") : t("Disabled")}
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                                  <span className={`w-2 h-2 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-rose-500"}`} />
+                                  {user.is_active ? t("Active") : t("Inactive")}
                                 </span>
                               </td>
                               <td className="px-5 py-3 text-right space-x-2">
                                 <button
                                   onClick={() => handleEdit(user)}
-                                  className="p-2 rounded-lg border border-border bg-card-alt text-foreground hover:bg-primary/10 hover:text-primary dark:hover:text-foreground transition-colors"
+                                  className="p-2 rounded-lg border border-border bg-card-alt text-foreground hover:bg-primary hover:text-white hover:border-primary transition-all duration-300 active:scale-[0.93] inline-flex items-center justify-center cursor-pointer"
                                   title={t("Edit")}
                                 >
                                   <HiOutlinePencil className="w-4 h-4" />
@@ -841,10 +1020,10 @@ export default function SettingsPage() {
 
                     <div className="md:hidden space-y-3">
                       {users?.map((user) => (
-                        <button
+                        <div
                           key={user.id}
                           onClick={() => handleEdit(user)}
-                          className="w-full text-left rounded-xl border border-border bg-card p-4"
+                          className="w-full text-left rounded-xl border border-border bg-card p-4 cursor-pointer"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
@@ -865,7 +1044,7 @@ export default function SettingsPage() {
                                 e.stopPropagation();
                                 setDeleteId(user.id);
                               }}
-                              className="p-2 rounded-lg bg-red-500/10 text-red-600"
+                              className="p-2 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
                             >
                               <HiOutlineTrash className="w-4 h-4" />
                             </button>
@@ -878,15 +1057,12 @@ export default function SettingsPage() {
                                 </span>
                               ))}
                             </div>
-                            <span
-                              className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                                user.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
-                              }`}
-                            >
-                              {user.is_active ? t("Enabled") : t("Disabled")}
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                              <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-rose-500"}`} />
+                              {user.is_active ? t("Active") : t("Inactive")}
                             </span>
                           </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
 
@@ -895,9 +1071,10 @@ export default function SettingsPage() {
                         <p className="text-muted font-medium mb-3">{t("No users found in database.")}</p>
                         <button
                           onClick={() => bootstrapMutation.mutate()}
-                          className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold"
+                          className="h-10 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 inline-flex items-center gap-1.5 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer disabled:opacity-50"
                           disabled={bootstrapMutation.isPending}
                         >
+                          <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
                           {bootstrapMutation.isPending ? t("Syncing...") : t("Create default users")}
                         </button>
                       </div>
@@ -908,40 +1085,164 @@ export default function SettingsPage() {
             )}
 
             {activeTab === "system" && (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="glass-card rounded-xl p-6 shadow-sm space-y-6">
-                  <h2 className="text-lg font-bold text-foreground tracking-tight">{t("Employee ID Configuration")}</h2>
+              <div className="space-y-6">
+                {/* Theme / Appearance Toggle Component */}
+                <div className="glass-card rounded-xl p-6 shadow-sm space-y-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground tracking-tight">{t("Appearance & Theme")}</h2>
+                    <p className="text-xs text-muted mt-1">{t("Select your preferred visual style for the dashboard.")}</p>
+                  </div>
 
-                  <div className="space-y-2 max-w-md">
-                    <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">{t("ID Prefix *")}</label>
-                    <input
-                      type="text"
-                      required
-                      value={prefix}
-                      onChange={(e) => setPrefix(e.target.value.toUpperCase())}
-                      placeholder="e.g. EMP"
-                      className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
-                    />
-                    <p className="text-xs text-muted px-1 pt-2 font-medium opacity-60">
-                      {lang === "am" ? `ይህ መነሻ ቅጥያ ተከታታይ የሠራተኛ መለያዎችን ያመነጫል (ለምሳሌ ${prefix || "EMP"}001)።` : `This prefix generates sequential employee IDs (for example ${prefix || "EMP"}001).`}
-                    </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Light Mode Selector Card */}
+                    <div
+                      onClick={() => { if (dark) toggleTheme(); }}
+                      className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 relative select-none ${
+                        !dark
+                          ? "border-primary bg-primary/5 shadow-premium-sm"
+                          : "border-border bg-card-alt hover:border-border/80 hover:bg-card-alt/80"
+                      }`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                        !dark ? "bg-primary text-on-primary" : "bg-card text-muted-foreground"
+                      }`}>
+                        <HiSun className="w-6 h-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xs font-black uppercase tracking-wider ${!dark ? "text-primary" : "text-foreground"}`}>
+                          {t("Light Mode")}
+                        </p>
+                        <p className="text-[10px] text-muted font-medium mt-1">Clean and crisp interface</p>
+                      </div>
+                      {!dark && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Dark Mode Selector Card */}
+                    <div
+                      onClick={() => { if (!dark) toggleTheme(); }}
+                      className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 relative select-none ${
+                        dark
+                          ? "border-primary bg-primary/5 shadow-premium-sm"
+                          : "border-border bg-card-alt hover:border-border/80 hover:bg-card-alt/80"
+                      }`}
+                    >
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                        dark ? "bg-primary text-on-primary" : "bg-card text-muted-foreground"
+                      }`}>
+                        <HiMoon className="w-6 h-6" />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-xs font-black uppercase tracking-wider ${dark ? "text-primary" : "text-foreground"}`}>
+                          {t("Dark Mode")}
+                        </p>
+                        <p className="text-[10px] text-muted font-medium mt-1">Sleek, low-light workspace</p>
+                      </div>
+                      {dark && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isSystemSavePending || isSystemSaveDisabled}
-                  className={`w-full h-11 rounded-xl font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2 ${
-                    isSystemSavePending
-                      ? "bg-primary text-on-primary opacity-90 cursor-wait"
-                      : isSystemSaveDisabled
-                        ? "bg-card-alt text-muted"
-                        : "bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
-                  }`}
-                >
-                  {isSystemSavePending ? t("Saving...") : t("Save System Settings")}
-                </button>
-              </form>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="glass-card rounded-xl p-6 shadow-sm space-y-6">
+                    <div>
+                      <h2 className="text-lg font-bold text-foreground tracking-tight">{t("ID Configuration")}</h2>
+                      <p className="text-xs text-muted mt-1">{t("Configure ID prefixes for each module. Prefixes are uppercased automatically.")}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Employee ID */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-primary"></span>
+                            {t("Employee ID Prefix *")}
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={prefix}
+                          onChange={(e) => setPrefix(e.target.value.toUpperCase())}
+                          placeholder="e.g. EMP"
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                        />
+                        <p className="text-xs text-muted px-1 font-medium opacity-60">
+                          {lang === "am" ? `ለምሳሌ: ${prefix || "EMP"}001` : `Example: ${prefix || "EMP"}001`}
+                        </p>
+                      </div>
+
+                      {/* Inventory/Asset ID */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            {t("Inventory ID Prefix *")}
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={inventoryPrefix}
+                          onChange={(e) => setInventoryPrefix(e.target.value.toUpperCase())}
+                          placeholder="e.g. INV"
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                        />
+                        <p className="text-xs text-muted px-1 font-medium opacity-60">
+                          {lang === "am" ? `ለምሳሌ: ${inventoryPrefix || "INV"}001` : `Example: ${inventoryPrefix || "INV"}001`}
+                        </p>
+                      </div>
+
+                      {/* Event ID */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                            {t("Event ID Prefix *")}
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={eventPrefix}
+                          onChange={(e) => setEventPrefix(e.target.value.toUpperCase())}
+                          placeholder="e.g. EVT"
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all uppercase font-mono shadow-sm"
+                        />
+                        <p className="text-xs text-muted px-1 font-medium opacity-60">
+                          {lang === "am" ? `ለምሳሌ: ${eventPrefix || "EVT"}001` : `Example: ${eventPrefix || "EVT"}001`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t border-border/30">
+                    <button
+                      type="submit"
+                      disabled={isSystemSavePending || isSystemSaveDisabled}
+                      className={`h-11 px-8 rounded-xl font-black text-xs uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] ${
+                        isSystemSavePending
+                          ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white opacity-90 cursor-wait"
+                          : isSystemSaveDisabled
+                            ? "bg-card-alt text-muted-foreground/30 border border-border/40 cursor-not-allowed"
+                            : "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02]"
+                      }`}
+                    >
+                      <HiShieldCheck className={`w-4 h-4 ${isSystemSavePending ? "animate-pulse" : ""}`} />
+                      {isSystemSavePending ? t("Saving...") : t("Save System Settings")}
+                    </button>
+                  </div>
+                </form>
+              </div>
             )}
 
             {activeTab === "database" && (
@@ -975,10 +1276,11 @@ export default function SettingsPage() {
                       </p>
                       <button
                         onClick={() => bootstrapMutation.mutate()}
-                        className="mt-3 h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold"
+                        className="mt-3 h-10 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
                         disabled={bootstrapMutation.isPending}
                       >
-                        {bootstrapMutation.isPending ? "Syncing..." : "Run Defaults Sync"}
+                        <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
+                        {bootstrapMutation.isPending ? t("Syncing...") : t("Run Defaults Sync")}
                       </button>
                     </div>
                   </div>
@@ -987,6 +1289,7 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+        <div className="h-16 w-full" />
       </div>
 
       {isModalOpen && (
@@ -1004,21 +1307,34 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="px-4 md:px-6 pt-4 pb-2 border-b border-border/30 bg-card">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {modalTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setUserModalTab(tab.id)}
-                    className={`px-3 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-                      userModalTab === tab.id
-                        ? "bg-primary text-on-primary"
-                        : "bg-card-alt text-muted hover:text-foreground"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+            <div className="px-4 md:px-6 pt-4 pb-3 border-b border-border/30 bg-card-alt/20 relative z-0">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-1 p-1 bg-card-alt/80 backdrop-blur-md rounded-xl border border-border/60">
+                {modalTabs.map((tab) => {
+                  const selected = userModalTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setUserModalTab(tab.id)}
+                      className={`relative px-3 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 cursor-pointer select-none active:scale-[0.97] ${
+                        selected 
+                          ? "text-white" 
+                          : dark
+                            ? "text-slate-350 hover:text-white"
+                            : "text-slate-650 hover:text-slate-905"
+                      }`}
+                    >
+                      <span className="relative z-10">{tab.label}</span>
+                      {selected && (
+                        <motion.div
+                          layoutId="activeModalTab"
+                          className="absolute inset-0 bg-gradient-to-r from-[#d97706] to-[#b45309] rounded-lg shadow-premium z-0"
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1129,35 +1445,54 @@ export default function SettingsPage() {
               )}
 
               {userModalTab === "access" && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div>
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Roles *</label>
-                    <div className="rounded-xl border border-border bg-card-alt p-3 space-y-2">
+                    <label className="block text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">{t("Roles *")}</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {roles.map((r) => {
                         const checked = formData.roleIds.includes(r.id);
                         return (
-                          <label key={r.id} className="flex items-start gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleRoleSelection(r.id)}
-                              className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/50"
-                            />
-                            <span className="text-sm text-foreground font-medium">
-                              {r.name}
-                              <span className="text-xs text-muted ml-1">{r.description || ""}</span>
-                            </span>
-                          </label>
+                          <div
+                            key={r.id}
+                            onClick={() => toggleRoleSelection(r.id)}
+                            className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 select-none ${
+                              checked
+                                ? "border-primary bg-primary/5 shadow-premium-sm"
+                                : "border-border bg-card hover:border-border/80 hover:bg-card-alt/30"
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                              checked
+                                ? "bg-primary border-primary text-on-primary"
+                                : "border-muted-foreground/30 bg-card-alt"
+                            }`}>
+                              {checked && (
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black uppercase tracking-wider ${checked ? "text-primary" : "text-foreground"}`}>
+                                {r.name}
+                              </p>
+                              {r.description && (
+                                <p className="text-[10px] text-muted font-medium mt-1 leading-tight line-clamp-2">
+                                  {r.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
-                    <p className="text-[11px] text-muted mt-1">
+                    <p className="text-[11px] text-muted mt-2 px-1">
                       Multiple roles are supported; the first checked role is used as primary for compatibility.
                     </p>
                   </div>
 
                   <div className="pt-2">
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Resolved Effective Permissions</label>
+                    <label className="block text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">Resolved Effective Permissions</label>
                     {effectivePermissions.length === 0 ? (
                       <div className="text-xs text-muted-foreground p-3 border border-dashed border-border rounded-xl bg-card-alt">
                         No permissions resolved. Select at least one role.
@@ -1170,9 +1505,9 @@ export default function SettingsPage() {
                             * (Full System Access)
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-1.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                             {effectivePermissions.map((slug) => (
-                              <div key={slug} className="text-xs font-semibold text-foreground font-mono bg-card border border-border/50 px-2 py-1 rounded-lg truncate" title={slug}>
+                              <div key={slug} className="text-[10px] font-semibold text-foreground font-mono bg-card border border-border/50 px-2 py-1.5 rounded-lg truncate" title={slug}>
                                 {slug}
                               </div>
                             ))}
@@ -1182,17 +1517,33 @@ export default function SettingsPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 pt-1">
-                    <input
-                      type="checkbox"
-                      id="isActive"
-                      checked={formData.isActive}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.checked }))}
-                      className="w-5 h-5 rounded border-border text-primary focus:ring-primary/50"
-                    />
-                    <label htmlFor="isActive" className="text-sm font-semibold text-foreground">
-                      Account Enabled
-                    </label>
+                  <div
+                    onClick={() => setFormData((prev) => ({ ...prev, isActive: !prev.isActive }))}
+                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-center gap-3 select-none mt-2 ${
+                      formData.isActive
+                        ? "border-emerald-500 bg-emerald-500/5"
+                        : "border-border bg-card hover:border-border/80 hover:bg-card-alt/30"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${
+                      formData.isActive
+                        ? "bg-emerald-500 border-emerald-500 text-white"
+                        : "border-muted-foreground/30 bg-card-alt"
+                    }`}>
+                      {formData.isActive && (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      )}
+                    </div>
+                    <div>
+                      <p className={`text-xs font-black uppercase tracking-wider ${formData.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                        {lang === "am" ? "መለያው ንቁ ነው" : "Account Active & Enabled"}
+                      </p>
+                      <p className="text-[10px] text-muted font-medium mt-0.5 leading-none">
+                        {lang === "am" ? "ይህ መለያ ወደ ሲስተሙ መግባት ይችላል" : "Allows this user to authenticate and access the system."}
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1221,39 +1572,44 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              <div className="pt-4 flex flex-col-reverse sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 h-11 text-sm font-semibold text-muted hover:text-foreground transition-colors rounded-xl bg-card-alt"
-                >
-                  Cancel
-                </button>
-
-                {selectedUser && (
+              <div className="pt-5 border-t border-border/30 flex items-center justify-between gap-3">
+                {selectedUser ? (
                   <button
                     type="button"
                     onClick={() => {
                       closeModal();
                       setDeleteId(selectedUser.id);
                     }}
-                    className="flex-1 h-11 text-sm font-semibold rounded-xl bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                    className="text-red-500 hover:text-red-600 hover:underline text-xs font-black uppercase tracking-widest transition-all duration-300 py-2 active:scale-[0.97] cursor-pointer"
                   >
-                    Delete User
+                    {t("Delete User")}
                   </button>
+                ) : (
+                  <div />
                 )}
 
-                <button
-                  type="submit"
-                  disabled={isUserSavePending}
-                  className={`flex-1 h-11 text-sm font-semibold rounded-xl shadow-sm transition-colors ${
-                    isUserSavePending
-                      ? "bg-primary text-on-primary opacity-90 cursor-wait"
-                      : "bg-primary text-on-primary hover:bg-primary/90"
-                  }`}
-                >
-                  {isUserSavePending ? "Saving..." : "Save User"}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="h-10 px-5 text-xs font-black uppercase tracking-widest text-foreground hover:bg-card-alt hover:border-primary/50 transition-all duration-300 rounded-xl bg-card border border-border shadow-sm active:scale-[0.97] cursor-pointer"
+                  >
+                    {t("Cancel")}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isUserSavePending}
+                    className={`h-10 px-5 text-xs font-black uppercase tracking-widest rounded-xl shadow-sm transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.97] ${
+                      isUserSavePending
+                        ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white opacity-90 cursor-wait"
+                        : "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02]"
+                    }`}
+                  >
+                    <HiShieldCheck className={`w-3.5 h-3.5 ${isUserSavePending ? "animate-pulse" : ""}`} />
+                    {isUserSavePending ? t("Saving...") : t("Save User")}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -15,10 +15,10 @@ interface MobileEmployeeCardProps {
   selectMode?: boolean;
 }
 
-export default function MobileEmployeeCard({ 
-  employee, 
-  onTap, 
-  editMode, 
+export default function MobileEmployeeCard({
+  employee,
+  onTap,
+  editMode,
   onUpdate,
   onDelete,
   showTrash,
@@ -99,7 +99,7 @@ export default function MobileEmployeeCard({
               </>
             )}
           </div>
-          
+
           <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
              {showTrash ? (
                <div className="flex items-center gap-2 w-full">
@@ -123,15 +123,15 @@ export default function MobileEmployeeCard({
                    Restore
                  </button>
                  {/* Single delete — only when not in select mode */}
-                 {!selectMode && (
-                   <button
-                     onClick={(e) => { e.stopPropagation(); onDelete?.(employee); }}
-                     className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
-                     title="Delete permanently"
-                   >
-                     <HiTrash className="w-4 h-4" />
-                   </button>
-                 )}
+                  {!selectMode && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete?.(employee); }}
+                      className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all"
+                      title="Delete permanently"
+                    >
+                      <HiTrash className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                </div>
              ) : editMode ? (
                 <button
@@ -180,7 +180,8 @@ export default function MobileEmployeeCard({
                         e.stopPropagation();
                         onDelete?.(employee);
                       }}
-                      className="p-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
+                      className="p-2 rounded-lg hover:bg-red-50 text-muted hover:text-danger transition-all"
+                      title="Move to Trash"
                     >
                       <HiTrash className="w-4 h-4" />
                     </button>

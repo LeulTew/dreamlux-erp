@@ -5,10 +5,38 @@ import jwt from "jsonwebtoken";
 
 // Mock the DB pool
 const mockQuery = mock((..._args: any[]) => Promise.resolve({ rows: [] as any[], rowCount: 1 }));
+const mockSettingsQuery = mock(() => Promise.resolve({ rows: [] as Record<string, unknown>[] }));
+const settingsChain = () => {
+  let isSingle = false;
+  const chain: any = {
+    select: mock(() => chain),
+    eq: mock(() => chain),
+    update: mock(() => chain),
+    single: mock(() => {
+      isSingle = true;
+      return chain;
+    }),
+    then: mock((resolve: (value: any) => void) => {
+      mockSettingsQuery()
+        .then((res: any) => {
+          const rows = res?.rows || [];
+          resolve({ data: isSingle ? (rows[0] || null) : rows, error: null, count: rows.length });
+        })
+        .catch((error: Error) => resolve({ data: null, error, count: 0 }));
+    }),
+  };
+  return chain;
+};
 
 mock.module("../db/pool", () => ({
   pool: {
     query: mockQuery,
+  },
+}));
+
+mock.module("../db/supabase", () => ({
+  supabase: {
+    from: () => settingsChain(),
   },
 }));
 
@@ -28,6 +56,8 @@ function getToken(role = "SUPER_ADMIN", extra: Record<string, unknown> = {}): st
 beforeEach(() => {
   mockQuery.mockReset();
   mockQuery.mockResolvedValue({ rows: [], rowCount: 1 });
+  mockSettingsQuery.mockReset();
+  mockSettingsQuery.mockResolvedValue({ rows: [] });
 });
 
 describe("Users API", () => {
@@ -101,6 +131,51 @@ describe("Users API", () => {
       .set("Authorization", `Bearer ${getToken("STORE_MANAGER")}`);
 
     expect(res.status).toBe(403);
+  });
+
+  test("PATCH /settings allows settings:write and normalizes prefixes", async () => {
+    mockSettingsQuery.mockResolvedValueOnce({
+      rows: [{
+        employee_id_prefix: "DLX-EMP",
+        inventory_id_prefix: "DLX-INV",
+        event_id_prefix: "DLX-EVT",
+      }],
+    });
+
+    const res = await request(app)
+      .patch("/settings")
+      .set("Authorization", `Bearer ${getToken("STORE_MANAGER", { permission_slugs: ["settings:write"] })}`)
+      .send({
+        employee_id_prefix: " dlx-emp ",
+        inventory_id_prefix: " dlx-inv ",
+        event_id_prefix: " dlx-evt ",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      employee_id_prefix: "DLX-EMP",
+      inventory_id_prefix: "DLX-INV",
+      event_id_prefix: "DLX-EVT",
+    });
+  });
+
+  test("PATCH /settings blocks missing permission slugs", async () => {
+    const res = await request(app)
+      .patch("/settings")
+      .set("Authorization", `Bearer ${getToken("STORE_MANAGER")}`)
+      .send({ employee_id_prefix: "DLX" });
+
+    expect(res.status).toBe(403);
+  });
+
+  test("PATCH /settings rejects requests without valid fields", async () => {
+    const res = await request(app)
+      .patch("/settings")
+      .set("Authorization", `Bearer ${getToken("STORE_MANAGER", { permission_slugs: ["settings:write"] })}`)
+      .send({ unknown: "DLX" });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "No valid fields provided" });
   });
 
   test("POST /users creates new user", async () => {

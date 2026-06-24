@@ -1,17 +1,49 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { createEvent, updateEvent, deleteEvent, getEventTypes } from "@/lib/api";
 import { Event, EventType } from "@/lib/types";
-import toast from "react-hot-toast";
-import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser } from "react-icons/hi2";
+import { notify } from "@/lib/toast";
+import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser, HiArrowPath, HiCheck, HiArrowTopRightOnSquare } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
+import { useLanguage } from "@/hooks/use-language";
+import { Button } from "./ui/button";
+
+const TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: {
+    "Edit Event": "Edit Event",
+    "Create Event": "Create Event",
+    "Save Changes": "Save Changes",
+    "Delete Event": "Delete Event",
+    "Managing event details": "Managing event details",
+    "Register a new event schedule": "Register a new event schedule",
+    "Required": "Required",
+    "Reset Changes": "Reset Changes",
+    "Changes reset": "Changes reset",
+    "Workspace": "Workspace",
+    "Open Event Workspace": "Open Event Workspace",
+  },
+  am: {
+    "Edit Event": "ዝግጅት ማስተካከያ",
+    "Create Event": "አዲስ ዝግጅት ፍጠር",
+    "Save Changes": "ለውጦችን አስቀምጥ",
+    "Delete Event": "ዝግጅቱን ሰርዝ",
+    "Managing event details": "የዝግጅት ዝርዝሮችን ማስተዳደር",
+    "Register a new event schedule": "አዲስ የዝግጅት መርሃግብር ይመዝግቡ",
+    "Required": "አስፈላጊ",
+    "Reset Changes": "ለውጦችን መልስ",
+    "Changes reset": "ለውጦች ተመልሰዋል",
+    "Workspace": "የስራ ቦታ",
+    "Open Event Workspace": "Open Event Workspace",
+  }
+};
 
 const eventValidationSchema = z.object({
   name: z.string().min(1, "Event name is required"),
@@ -39,6 +71,8 @@ interface EditEventSheetProps {
 }
 
 export default function EditEventSheet({ event, onClose, onSuccess }: EditEventSheetProps) {
+  const { lang } = useLanguage();
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -76,6 +110,25 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  const handleReset = () => {
+    if (!event) return;
+    setFormData({
+      name: event.name || "",
+      client_name: event.client_name || "",
+      client_phone: event.client_phone || "",
+      event_type_id: event.event_type_id || "",
+      start_date: formatDateForInput(event.start_date),
+      end_date: formatDateForInput(event.end_date),
+      start_time: formatTimeForInput(event.start_time),
+      end_time: formatTimeForInput(event.end_time),
+      venue_location: event.venue_location || "",
+      contract_price: event.contract_price || 0,
+      status: event.status || "Planned",
+    });
+    setFormErrors({});
+    notify.success(t("Changes reset"));
+  };
+
   const { data: eventTypes = [] } = useQuery<EventType[]>({
     queryKey: ["event-types"],
     queryFn: getEventTypes,
@@ -85,12 +138,12 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     mutationFn: (id: string) => deleteEvent(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      toast.success("Event deleted successfully");
+      notify.success("Success", "Event deleted successfully");
       if (onSuccess) onSuccess();
       onClose();
     },
     onError: (err: AxiosError<{ error?: string }>) => {
-      toast.error(err.response?.data?.error || "Failed to delete event");
+      notify.error("Error", err.response?.data?.error || "Failed to delete event");
     },
   });
 
@@ -105,12 +158,12 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event", event?.id] });
-      toast.success(event ? "Event updated successfully" : "Event created successfully");
+      notify.success("Success", event ? "Event updated successfully" : "Event created successfully");
       if (onSuccess) onSuccess();
       onClose();
     },
     onError: (err: AxiosError<{ error?: string }>) => {
-      toast.error(err.response?.data?.error || "Failed to save event");
+      notify.error("Error", err.response?.data?.error || "Failed to save event");
     },
   });
 
@@ -127,7 +180,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
         errors[field] = issue.message;
       });
       setFormErrors(errors);
-      toast.error(validation.error.issues[0].message);
+      notify.error("Validation Error", validation.error.issues[0].message);
       return;
     }
 
@@ -136,7 +189,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     // Status transition validation rules client side
     if (event && formData.status !== event.status) {
       if (event.status === "Ongoing" && formData.status === "Planned" && !isOverrideAllowed) {
-        toast.error("Cannot transition status from Ongoing back to Planned");
+        notify.error("Status Transition Warning", "Cannot transition status from Ongoing back to Planned");
         return;
       }
     }
@@ -158,8 +211,8 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       <ResponsiveDrawer
         isOpen={true}
         onClose={onClose}
-        title={event ? "Edit Event" : "Create Event"}
-        subtitle={event ? `Managing event details` : "Register a new event schedule"}
+        title={event ? t("Edit Event") : t("Create Event")}
+        subtitle={event ? t("Managing event details") : t("Register a new event schedule")}
       >
         {/* Warning Banner for Completed Event Locks */}
         {isCompleted && (
@@ -367,25 +420,51 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
           {/* Form Actions */}
           {!isReadOnly && (
-            <div className="flex gap-3 pt-4">
-              <button
-                type="submit"
-                disabled={saveMutation.isPending}
-                className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
-              >
-                {saveMutation.isPending ? "Saving..." : event ? "Save Changes" : "Create Event"}
-              </button>
+            <div className="flex justify-end items-center gap-3 mt-8 pt-4 border-t border-border/40">
               {event && (
-                <button
-                  type="button"
-                  disabled={deleteMutation.isPending}
-                  onClick={() => setShowDeleteModal(true)}
-                  className="w-11 h-11 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all group shrink-0"
-                  title="Delete Event"
+                <Link
+                  href={`/events/${event.id}`}
+                  className="h-10 px-4 rounded-xl bg-card-alt border border-border text-muted hover:text-foreground text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                  title={t('Open Event Workspace')}
                 >
-                  <HiTrash className="w-5 h-5 group-hover:scale-105 transition-transform" />
-                </button>
+                  <HiArrowTopRightOnSquare className="w-4 h-4" />
+                  {t('Workspace')}
+                </Link>
               )}
+
+              {event && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  loading={deleteMutation.isPending}
+                  onClick={() => setShowDeleteModal(true)}
+                  className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                  title={t("Delete Event")}
+                >
+                  <HiTrash className="w-4.5 h-4.5" />
+                  {t("Delete")}
+                </Button>
+              )}
+
+              {event && (
+                <Button
+                  type="button"
+                  onClick={handleReset}
+                  className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+                >
+                  <HiArrowPath className="w-4.5 h-4.5" />
+                  {t("Reset Changes")}
+                </Button>
+              )}
+
+              <Button
+                type="submit"
+                loading={saveMutation.isPending}
+                className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+              >
+                <HiCheck className="w-4.5 h-4.5" />
+                {event ? t("Save Changes") : t("Create Event")}
+              </Button>
             </div>
           )}
         </form>
