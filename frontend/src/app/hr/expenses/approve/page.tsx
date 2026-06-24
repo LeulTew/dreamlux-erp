@@ -144,10 +144,10 @@ export default function ExpenseApprovalPage() {
             <Skeleton className="h-20 w-full" />
           </div>
         ) : expenses.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted">{t("No pending expenses.")}</div>
+          <div className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-8 text-center text-sm text-muted">{t("No pending expenses.")}</div>
                  ) : (
           <div className="space-y-4">
-            <div className="divide-y divide-border rounded-2xl border border-border bg-card">
+            <div className="divide-y divide-border rounded-2xl 2xl:rounded-4xl border border-border bg-card">
               {paginatedExpenses.map((expense: EventExpense) => {
                 const comment = reviewComments[expense.id] || "";
                 return (

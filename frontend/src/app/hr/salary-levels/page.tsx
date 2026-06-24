@@ -165,7 +165,7 @@ function SalaryLevelsContent() {
           </Link>
         </header>
         
-        <div className="bg-card p-6 rounded-2xl shadow-premium border border-border mb-6 relative overflow-hidden group">
+        <div className="bg-card p-6 rounded-2xl 2xl:rounded-4xl shadow-premium border border-border mb-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
           
           <form onSubmit={handleSubmit} className="relative z-10 flex gap-6 items-end flex-wrap">
@@ -215,7 +215,7 @@ function SalaryLevelsContent() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-card rounded-2xl shadow-premium border border-border overflow-hidden p-2">
+          <div className="bg-card rounded-2xl 2xl:rounded-4xl shadow-premium border border-border overflow-hidden p-2">
             <table className="w-full text-left text-sm border-separate border-spacing-0">
               <thead>
                 <tr className="bg-muted/30">

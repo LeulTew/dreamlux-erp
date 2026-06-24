@@ -763,7 +763,7 @@ function EventsPageContent() {
         </header>
 
         {/* Compact Integrated Toolbar Container */}
-        <div className="toolbar-container bg-card border border-border rounded-2xl p-3.5 mb-6 space-y-3 no-print">
+        <div className="toolbar-container bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 mb-6 space-y-3 no-print">
           <div className="flex flex-wrap items-center justify-between gap-3">
             
             {/* Search and Saved Views dropdown */}

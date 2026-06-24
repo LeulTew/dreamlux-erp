@@ -805,7 +805,7 @@ function AssetsContent() {
       </header>
 
       {selectMode && !showTrash && (
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border rounded-2xl p-4">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4">
           <span className="text-sm font-bold text-foreground">
             {selectedIds.size} asset{selectedIds.size !== 1 ? "s" : ""} selected
           </span>
@@ -866,7 +866,7 @@ function AssetsContent() {
         onChange={(s: string) => { setOfficeFilter(s); setPage(1); }}
       />
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl p-4 shadow-sm">
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4 shadow-sm">
         <div className="lg:col-span-3">
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Filter Method")}</label>
           <div className="flex flex-wrap gap-2">

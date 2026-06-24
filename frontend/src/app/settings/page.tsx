@@ -73,6 +73,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No phone": "No phone",
     "Enabled": "Enabled",
     "Disabled": "Disabled",
+    "Active": "Active",
+    "Inactive": "Inactive",
+    "Cancel": "Cancel",
+    "Delete User": "Delete User",
+    "Save User": "Save User",
     "No users found in database.": "No users found in database.",
     "Create default users": "Create default users",
     "Employee ID Configuration": "Employee ID Configuration",
@@ -122,6 +127,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No phone": "ስልክ የለም",
     "Enabled": "ገባሪ",
     "Disabled": "ያልነቃ",
+    "Active": "ገባሪ",
+    "Inactive": "ያልነቃ",
+    "Cancel": "ሰርዝ",
+    "Delete User": "ተጠቃሚውን ሰርዝ",
+    "Save User": "ተጠቃሚውን አስቀምጥ",
     "No users found in database.": "በመረጃ ቋቱ ውስጥ ምንም ተጠቃሚዎች አልተገኙም።",
     "Create default users": "ነባሪ ተጠቃሚዎችን ፍጠር",
     "Employee ID Configuration": "የሠራተኛ መለያ መዋቅር",
@@ -670,7 +680,7 @@ export default function SettingsPage() {
 
   return (
     <AuthLayout>
-      <div className="page-container pb-12 space-y-6">
+      <div className="page-container pb-32 space-y-6">
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -824,12 +834,9 @@ export default function SettingsPage() {
                                 </div>
                               </td>
                               <td className="px-5 py-3">
-                                <span
-                                  className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                    user.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
-                                  }`}
-                                >
-                                  {user.is_active ? t("Enabled") : t("Disabled")}
+                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                                  <span className={`w-2 h-2 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-rose-500"}`} />
+                                  {user.is_active ? t("Active") : t("Inactive")}
                                 </span>
                               </td>
                               <td className="px-5 py-3 text-right space-x-2">
@@ -893,12 +900,9 @@ export default function SettingsPage() {
                                 </span>
                               ))}
                             </div>
-                            <span
-                              className={`px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                                user.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
-                              }`}
-                            >
-                              {user.is_active ? t("Enabled") : t("Disabled")}
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                              <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? "bg-emerald-500" : "bg-rose-500"}`} />
+                              {user.is_active ? t("Active") : t("Inactive")}
                             </span>
                           </div>
                         </button>
@@ -910,9 +914,10 @@ export default function SettingsPage() {
                         <p className="text-muted font-medium mb-3">{t("No users found in database.")}</p>
                         <button
                           onClick={() => bootstrapMutation.mutate()}
-                          className="h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold"
+                          className="h-10 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-1.5"
                           disabled={bootstrapMutation.isPending}
                         >
+                          <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
                           {bootstrapMutation.isPending ? t("Syncing...") : t("Create default users")}
                         </button>
                       </div>
@@ -1041,10 +1046,11 @@ export default function SettingsPage() {
                       </p>
                       <button
                         onClick={() => bootstrapMutation.mutate()}
-                        className="mt-3 h-10 px-4 rounded-lg bg-primary text-on-primary text-sm font-semibold"
+                        className="mt-3 h-10 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-1.5"
                         disabled={bootstrapMutation.isPending}
                       >
-                        {bootstrapMutation.isPending ? "Syncing..." : "Run Defaults Sync"}
+                        <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
+                        {bootstrapMutation.isPending ? t("Syncing...") : t("Run Defaults Sync")}
                       </button>
                     </div>
                   </div>
@@ -1053,6 +1059,7 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+        <div className="h-16 w-full" />
       </div>
 
       {isModalOpen && (
@@ -1287,39 +1294,43 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              <div className="pt-4 flex flex-col-reverse sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 h-11 text-sm font-semibold text-muted hover:text-foreground transition-colors rounded-xl bg-card-alt"
-                >
-                  Cancel
-                </button>
-
-                {selectedUser && (
+              <div className="pt-5 border-t border-border/30 flex items-center justify-between gap-3">
+                {selectedUser ? (
                   <button
                     type="button"
                     onClick={() => {
                       closeModal();
                       setDeleteId(selectedUser.id);
                     }}
-                    className="flex-1 h-11 text-sm font-semibold rounded-xl bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                    className="text-red-500 hover:text-red-600 text-xs font-black uppercase tracking-wider transition-colors py-2"
                   >
-                    Delete User
+                    {t("Delete User")}
                   </button>
+                ) : (
+                  <div />
                 )}
 
-                <button
-                  type="submit"
-                  disabled={isUserSavePending}
-                  className={`flex-1 h-11 text-sm font-semibold rounded-xl shadow-sm transition-colors ${
-                    isUserSavePending
-                      ? "bg-primary text-on-primary opacity-90 cursor-wait"
-                      : "bg-primary text-on-primary hover:bg-primary/90"
-                  }`}
-                >
-                  {isUserSavePending ? "Saving..." : "Save User"}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="h-10 px-5 text-xs font-black uppercase tracking-wider text-muted hover:text-foreground transition-colors rounded-xl bg-card-alt border border-border"
+                  >
+                    {t("Cancel")}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isUserSavePending}
+                    className={`h-10 px-5 text-xs font-black uppercase tracking-wider rounded-xl shadow-sm transition-colors ${
+                      isUserSavePending
+                        ? "bg-primary text-on-primary opacity-90 cursor-wait"
+                        : "bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
+                    }`}
+                  >
+                    {isUserSavePending ? t("Saving...") : t("Save User")}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

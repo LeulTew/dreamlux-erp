@@ -348,7 +348,7 @@ export default function FinancialDashboardPage() {
         </div>
 
         {/* Filters Toolbar Container */}
-        <div className="toolbar-container bg-card border border-border rounded-2xl p-3.5 space-y-3.5 no-print">
+        <div className="toolbar-container bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 space-y-3.5 no-print">
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
               <div className="relative flex-1 max-w-xs">
@@ -460,7 +460,7 @@ export default function FinancialDashboardPage() {
             <Skeleton className="h-64 w-full" />
           </div>
         ) : isError || !data ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-muted">
+          <div className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-8 text-center text-muted">
             {t("Workspace unavailable")}
           </div>
         ) : (
@@ -500,7 +500,7 @@ export default function FinancialDashboardPage() {
             {activeTab === "overview" && (
               <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 {/* Trend Chart */}
-                <section className="rounded-2xl border border-border bg-card p-5">
+                <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                   <div className="mb-4 flex items-center gap-2">
                     <HiArrowTrendingUp className="h-5 w-5 text-primary-dark" />
                     <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Profit Trend")}</h2>
@@ -573,7 +573,7 @@ export default function FinancialDashboardPage() {
                 </section>
 
                 {/* KPI highlights lists */}
-                <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
+                <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5 space-y-4">
                   <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
                     {t("Key Performance Indicators")}
                   </h3>
@@ -603,7 +603,7 @@ export default function FinancialDashboardPage() {
 
             {/* Monthly View */}
             {(activeTab === "monthly" || !activeTab) && (
-              <section className="rounded-2xl border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiCalendarDays className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Monthly View")}</h2>
@@ -655,7 +655,7 @@ export default function FinancialDashboardPage() {
 
             {/* Event Type Performance View */}
             {activeTab === "eventTypes" && (
-              <section className="rounded-2xl border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiChartBar className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Event Type Performance")}</h2>
@@ -707,7 +707,7 @@ export default function FinancialDashboardPage() {
 
             {/* Category Breakdown View */}
             {activeTab === "categories" && (
-              <section className="rounded-2xl border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiChartBar className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Category Breakdown")}</h2>
@@ -756,7 +756,7 @@ export default function FinancialDashboardPage() {
 
             {/* Proposal Variance View */}
             {activeTab === "variance" && (
-              <section className="rounded-2xl border border-border bg-card p-5">
+              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <HiArrowTrendingUp className="h-5 w-5 text-primary-dark" />
                   <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Proposal Variance")}</h2>

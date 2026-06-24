@@ -223,7 +223,7 @@ export default function ProposalsPage() {
         </div>
 
         {/* Filters Toolbar */}
-        <div className="bg-card border border-border rounded-2xl p-3.5 mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 mb-6 flex flex-wrap items-center justify-between gap-3">
           <div className="relative flex-1 min-w-[200px] md:max-w-xs">
             <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input

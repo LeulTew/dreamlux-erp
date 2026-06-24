@@ -165,7 +165,7 @@ export default function InsertAssetPage() {
 
   return (
     <AuthLayout>
-      <div className="max-w-xl mx-auto px-4 md:px-0 pb-12">
+      <div className="max-w-xl mx-auto px-4 md:px-0 pb-32">
         <header className="mb-10 flex items-center gap-4 pt-6 pb-2">
           <button
             onClick={() => router.back()}
@@ -373,6 +373,7 @@ export default function InsertAssetPage() {
             </button>
           </div>
         </form>
+        <div className="h-16 w-full" />
       </div>
     </AuthLayout>
   );
