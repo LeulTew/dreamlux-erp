@@ -926,7 +926,7 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => bootstrapMutation.mutate()}
-                      className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-card-alt border border-border text-xs font-black uppercase tracking-widest hover:bg-border transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                      className="inline-flex items-center gap-2 h-10 px-6 rounded-full bg-[#d9a84e] text-black text-xs font-black uppercase tracking-widest hover:bg-[#c2923c] transition-all active:scale-[0.96] cursor-pointer disabled:opacity-50"
                       disabled={bootstrapMutation.isPending}
                     >
                       <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
@@ -934,7 +934,7 @@ export default function SettingsPage() {
                     </button>
                     <button
                       onClick={handleAdd}
-                      className="h-10 px-4 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest shadow-premium flex items-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
+                      className="h-10 px-6 rounded-full bg-[#d9a84e] text-black text-xs font-black uppercase tracking-widest shadow-premium flex items-center gap-2 hover:bg-[#c2923c] active:scale-[0.96] transition-all cursor-pointer"
                     >
                       <HiOutlinePlus className="w-4 h-4" />
                       {t("New User")}
@@ -1229,12 +1229,12 @@ export default function SettingsPage() {
                     <button
                       type="submit"
                       disabled={isSystemSavePending || isSystemSaveDisabled}
-                      className={`h-11 px-8 rounded-xl font-black text-xs uppercase tracking-widest shadow-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] ${
+                      className={`h-11 px-8 rounded-full font-black text-xs uppercase tracking-widest shadow-premium transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.96] ${
                         isSystemSavePending
-                          ? "bg-primary text-on-primary opacity-90 cursor-wait"
+                          ? "bg-[#d9a84e]/70 text-black/70 cursor-wait"
                           : isSystemSaveDisabled
                             ? "bg-card-alt text-muted-foreground/30 border border-border/40 cursor-not-allowed"
-                            : "bg-primary text-on-primary hover:opacity-90 hover:shadow-premium"
+                            : "bg-[#d9a84e] text-black hover:bg-[#c2923c]"
                       }`}
                     >
                       <HiShieldCheck className={`w-4 h-4 ${isSystemSavePending ? "animate-pulse" : ""}`} />
@@ -1276,7 +1276,7 @@ export default function SettingsPage() {
                       </p>
                       <button
                         onClick={() => bootstrapMutation.mutate()}
-                        className="mt-3 h-10 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-1.5"
+                        className="mt-3 h-10 px-6 rounded-full bg-[#d9a84e] text-black text-xs font-black uppercase tracking-widest transition-all active:scale-[0.96] disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
                         disabled={bootstrapMutation.isPending}
                       >
                         <HiArrowPath className={`w-3.5 h-3.5 ${bootstrapMutation.isPending ? "animate-spin" : ""}`} />
@@ -1600,13 +1600,13 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={isUserSavePending}
-                    className={`h-10 px-5 text-xs font-black uppercase tracking-widest rounded-xl shadow-sm transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.97] ${
+                    className={`h-10 px-6 text-xs font-black uppercase tracking-widest rounded-full shadow-premium transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.96] ${
                       isUserSavePending
-                        ? "bg-primary text-on-primary opacity-90 cursor-wait"
-                        : "bg-primary text-on-primary hover:opacity-90 hover:shadow-premium"
+                        ? "bg-[#d9a84e]/70 text-black/70 cursor-wait"
+                        : "bg-[#d9a84e] text-black hover:bg-[#c2923c]"
                     }`}
                   >
-                    <HiShieldCheck className={`w-3.5 h-3.5 ${isUserSavePending ? "animate-pulse" : ""}`} />
+                    <HiShieldCheck className={`w-4 h-4 ${isUserSavePending ? "animate-pulse" : ""}`} />
                     {isUserSavePending ? t("Saving...") : t("Save User")}
                   </button>
                 </div>
