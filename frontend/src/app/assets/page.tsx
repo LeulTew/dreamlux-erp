@@ -1,6 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { PillButton } from "@/components/ui/PillButton";
+import DatePicker from "@/components/ui/DatePicker";
 import { Suspense, useState, useCallback, useMemo, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -922,27 +923,27 @@ function AssetsContent() {
 
         <div className="lg:col-span-2">
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("From")}</label>
-          <input
-            type="datetime-local"
+          <DatePicker
+            showTime
             value={fromDateTime}
-            onChange={(e) => {
-              setFromDateTime(e.target.value);
+            onChange={(val) => {
+              setFromDateTime(val);
               setPage(1);
             }}
-            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            placeholder={t("From")}
           />
         </div>
 
         <div className="lg:col-span-2">
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("To")}</label>
-          <input
-            type="datetime-local"
+          <DatePicker
+            showTime
             value={toDateTime}
-            onChange={(e) => {
-              setToDateTime(e.target.value);
+            onChange={(val) => {
+              setToDateTime(val);
               setPage(1);
             }}
-            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            placeholder={t("To")}
           />
         </div>
 

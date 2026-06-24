@@ -2,14 +2,15 @@
 
 import * as React from "react";
 import { useState, useRef, useEffect } from "react";
-import { HiCalendarDays, HiChevronLeft, HiChevronRight } from "react-icons/hi2";
+import { HiCalendarDays, HiChevronLeft, HiChevronRight, HiCheck } from "react-icons/hi2";
 import { cn } from "@/lib/utils";
 
 interface DatePickerProps {
-  value?: string; // YYYY-MM-DD format
+  value?: string; // YYYY-MM-DD or YYYY-MM-DDTHH:mm format
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  showTime?: boolean;
 }
 
 export default function DatePicker({
@@ -17,30 +18,76 @@ export default function DatePicker({
   onChange,
   placeholder = "Select date",
   className,
+  showTime = false,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hourScrollRef = useRef<HTMLDivElement>(null);
+  const minuteScrollRef = useRef<HTMLDivElement>(null);
 
   // Parse initial date or fallback to today
   const getParsedDate = (dateStr: string) => {
     if (!dateStr) return null;
-    const parts = dateStr.split("-");
+    const isDateTime = dateStr.includes("T");
+    const [datePart, timePart] = isDateTime ? dateStr.split("T") : [dateStr, ""];
+    const parts = datePart.split("-");
     if (parts.length !== 3) return null;
     const year = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
-    return new Date(year, month, day);
+    
+    let hours = 0;
+    let minutes = 0;
+    if (timePart) {
+      const timeParts = timePart.split(":");
+      if (timeParts.length >= 2) {
+        hours = parseInt(timeParts[0], 10);
+        minutes = parseInt(timeParts[1], 10);
+      }
+    }
+    return new Date(year, month, day, hours, minutes);
   };
 
   const parsedDate = getParsedDate(value);
   const [viewDate, setViewDate] = useState(() => parsedDate || new Date());
+  
+  // 12-hour format states
+  const getInitial12HourState = (): { hour12: number; minute: number; ampm: "AM" | "PM" } => {
+    if (!parsedDate) return { hour12: 12, minute: 0, ampm: "AM" };
+    const rawHour = parsedDate.getHours();
+    const ampm: "AM" | "PM" = rawHour >= 12 ? "PM" : "AM";
+    const hour12 = rawHour % 12 === 0 ? 12 : rawHour % 12;
+    return { hour12, minute: parsedDate.getMinutes(), ampm };
+  };
 
-  // Keep viewDate updated when value changes externally
+  const [timeState, setTimeState] = useState(getInitial12HourState);
+
+  // Keep viewDate and time selection updated when value changes externally
   useEffect(() => {
     if (parsedDate) {
       setViewDate(parsedDate);
+      const rawHour = parsedDate.getHours();
+      const ampm: "AM" | "PM" = rawHour >= 12 ? "PM" : "AM";
+      const hour12 = rawHour % 12 === 0 ? 12 : rawHour % 12;
+      setTimeState({ hour12, minute: parsedDate.getMinutes(), ampm });
     }
   }, [value]);
+
+  // Scroll active elements into view when calendar opens
+  useEffect(() => {
+    if (isOpen && showTime) {
+      setTimeout(() => {
+        if (hourScrollRef.current) {
+          const activeHour = hourScrollRef.current.querySelector("[data-active='true']");
+          if (activeHour) activeHour.scrollIntoView({ block: "center", behavior: "auto" });
+        }
+        if (minuteScrollRef.current) {
+          const activeMinute = minuteScrollRef.current.querySelector("[data-active='true']");
+          if (activeMinute) activeMinute.scrollIntoView({ block: "center", behavior: "auto" });
+        }
+      }, 50);
+    }
+  }, [isOpen, showTime]);
 
   // Click outside listener to close calendar
   useEffect(() => {
@@ -71,7 +118,7 @@ export default function DatePicker({
     currentMonthDays.push(i);
   }
 
-  // Total grid items = 42 (6 rows of 7 days) to prevent height jumps
+  // Total grid items = 42
   const totalDaysSoFar = prevMonthDays.length + currentMonthDays.length;
   const nextMonthDays = [];
   const remainingCells = 42 - totalDaysSoFar;
@@ -92,25 +139,74 @@ export default function DatePicker({
     setViewDate(new Date(year, month + 1, 1));
   };
 
+  // Convert 12h representation back to 24h hour
+  const get24Hour = (h12: number, ampm: "AM" | "PM") => {
+    if (ampm === "PM") {
+      return h12 === 12 ? 12 : h12 + 12;
+    }
+    return h12 === 12 ? 0 : h12;
+  };
+
+  // Helper to construct formatted value string
+  const getFormattedValue = (dateObj: Date, h12: number, m: number, ampm: "AM" | "PM") => {
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    
+    if (showTime) {
+      const h24 = get24Hour(h12, ampm);
+      const hh = String(h24).padStart(2, "0");
+      const min = String(m).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    }
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const selectDate = (day: number, monthOffset = 0) => {
     const targetMonth = month + monthOffset;
     const selectedDate = new Date(year, targetMonth, day);
+    setViewDate(selectedDate);
     
-    // Format as YYYY-MM-DD
-    const yyyy = selectedDate.getFullYear();
-    const mm = String(selectedDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(selectedDate.getDate()).padStart(2, "0");
-    const formatted = `${yyyy}-${mm}-${dd}`;
-    
+    const formatted = getFormattedValue(selectedDate, timeState.hour12, timeState.minute, timeState.ampm);
     onChange(formatted);
-    setIsOpen(false);
+
+    // If time is not shown, we close immediately on date select
+    if (!showTime) {
+      setIsOpen(false);
+    }
   };
 
-  // Format date for the input trigger: MM/DD/YYYY
+  const handleTimeSelect = (type: "hour" | "minute" | "ampm", val: any) => {
+    const nextState = { ...timeState };
+    if (type === "hour") nextState.hour12 = val;
+    if (type === "minute") nextState.minute = val;
+    if (type === "ampm") nextState.ampm = val;
+    
+    setTimeState(nextState);
+    
+    const baseDate = parsedDate || new Date();
+    const formatted = getFormattedValue(baseDate, nextState.hour12, nextState.minute, nextState.ampm);
+    onChange(formatted);
+  };
+
+  // Format display string
+  const formatTime = (date: Date) => {
+    let h = date.getHours();
+    const m = String(date.getMinutes()).padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12;
+    h = h ? h : 12; // '0' becomes '12'
+    return `${String(h).padStart(2, "0")}:${m} ${ampm}`;
+  };
+
   const displayValue = parsedDate
-    ? `${String(parsedDate.getMonth() + 1).padStart(2, "0")}/${String(
-        parsedDate.getDate()
-      ).padStart(2, "0")}/${parsedDate.getFullYear()}`
+    ? showTime
+      ? `${String(parsedDate.getMonth() + 1).padStart(2, "0")}/${String(
+          parsedDate.getDate()
+        ).padStart(2, "0")}/${parsedDate.getFullYear()} ${formatTime(parsedDate)}`
+      : `${String(parsedDate.getMonth() + 1).padStart(2, "0")}/${String(
+          parsedDate.getDate()
+        ).padStart(2, "0")}/${parsedDate.getFullYear()}`
     : "";
 
   const isToday = (day: number, monthOffset = 0) => {
@@ -135,8 +231,12 @@ export default function DatePicker({
     );
   };
 
+  // 12-hour lists
+  const hoursList = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const minutesList = Array.from({ length: 60 }, (_, i) => i);
+
   return (
-    <div ref={containerRef} className={cn("relative inline-block", className)}>
+    <div ref={containerRef} className={cn("relative inline-block w-full", className)}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -149,91 +249,190 @@ export default function DatePicker({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-2 p-4 w-[280px] bg-card border border-border rounded-xl shadow-massive z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
-            >
-              <HiChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="text-xs font-black uppercase tracking-wider text-foreground select-none">
-              {monthsList[month]} {year}
-            </div>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
-            >
-              <HiChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-muted-foreground/65 uppercase tracking-wider mb-2 select-none">
-            <span>Su</span>
-            <span>Mo</span>
-            <span>Tu</span>
-            <span>We</span>
-            <span>Th</span>
-            <span>Fr</span>
-            <span>Sa</span>
-          </div>
-
-          {/* Day Grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {/* Prev month days */}
-            {prevMonthDays.map((day) => (
+        <div
+          className={cn(
+            "absolute left-0 mt-2 bg-card border border-border rounded-xl shadow-massive z-50 animate-in fade-in slide-in-from-top-1 duration-150 flex flex-row divide-x divide-border/60 overflow-hidden",
+            showTime ? "w-[440px]" : "w-[280px]"
+          )}
+        >
+          {/* Calendar Panel */}
+          <div className="p-4 w-[280px] shrink-0">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
               <button
-                key={`prev-${day}`}
                 type="button"
-                onClick={() => selectDate(day, -1)}
-                className="w-8 h-8 rounded-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
               >
-                {day}
+                <HiChevronLeft className="w-4 h-4" />
               </button>
-            ))}
+              <div className="text-xs font-black uppercase tracking-wider text-foreground select-none">
+                {monthsList[month]} {year}
+              </div>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
+              >
+                <HiChevronRight className="w-4 h-4" />
+              </button>
+            </div>
 
-            {/* Current month days */}
-            {currentMonthDays.map((day) => {
-              const active = isSelected(day);
-              const today = isToday(day);
-              return (
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-muted-foreground/65 uppercase tracking-wider mb-2 select-none">
+              <span>Su</span>
+              <span>Mo</span>
+              <span>Tu</span>
+              <span>We</span>
+              <span>Th</span>
+              <span>Fr</span>
+              <span>Sa</span>
+            </div>
+
+            {/* Day Grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {/* Prev month days */}
+              {prevMonthDays.map((day) => (
                 <button
-                  key={`curr-${day}`}
+                  key={`prev-${day}`}
                   type="button"
-                  onClick={() => selectDate(day)}
-                  className={cn(
-                    "w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center relative",
-                    active
-                      ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 scale-105"
-                      : today
-                      ? "border border-primary text-primary hover:bg-primary/5"
-                      : "text-foreground hover:bg-card-alt"
-                  )}
+                  onClick={() => selectDate(day, -1)}
+                  className="w-8 h-8 rounded-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
                 >
                   {day}
-                  {today && !active && (
-                    <span className="absolute bottom-1 w-1 h-1 rounded-full bg-primary" />
-                  )}
                 </button>
-              );
-            })}
+              ))}
 
-            {/* Next month days */}
-            {nextMonthDays.map((day) => (
-              <button
-                key={`next-${day}`}
-                type="button"
-                onClick={() => selectDate(day, 1)}
-                className="w-8 h-8 rounded-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
-              >
-                {day}
-              </button>
-            ))}
+              {/* Current month days */}
+              {currentMonthDays.map((day) => {
+                const active = isSelected(day);
+                const today = isToday(day);
+                return (
+                  <button
+                    key={`curr-${day}`}
+                    type="button"
+                    onClick={() => selectDate(day)}
+                    className={cn(
+                      "w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center relative",
+                      active
+                        ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 scale-105"
+                        : today
+                        ? "border border-primary text-primary hover:bg-primary/5"
+                        : "text-foreground hover:bg-card-alt"
+                    )}
+                  >
+                    {day}
+                    {today && !active && (
+                      <span className="absolute bottom-1 w-1 h-1 rounded-full bg-primary" />
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* Next month days */}
+              {nextMonthDays.map((day) => (
+                <button
+                  key={`next-${day}`}
+                  type="button"
+                  onClick={() => selectDate(day, 1)}
+                  className="w-8 h-8 rounded-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Time Picker Panel (Side-by-Side) */}
+          {showTime && (
+            <div className="w-[160px] p-4 flex flex-col justify-between bg-card-alt/30 select-none">
+              <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 mb-3 text-center border-b border-border pb-1.5">
+                Time Picker
+              </div>
+              
+              <div className="flex gap-1 h-[145px] overflow-hidden justify-center items-center">
+                {/* Hours column */}
+                <div ref={hourScrollRef} className="h-full overflow-y-auto scrollbar-none flex flex-col gap-1 w-10 text-center">
+                  {hoursList.map((h) => {
+                    const isSel = timeState.hour12 === h;
+                    return (
+                      <button
+                        key={h}
+                        type="button"
+                        data-active={isSel}
+                        onClick={() => handleTimeSelect("hour", h)}
+                        className={cn(
+                          "py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer block w-full",
+                          isSel
+                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm"
+                            : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
+                        )}
+                      >
+                        {String(h).padStart(2, "0")}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <span className="text-foreground font-black pb-1 shrink-0">:</span>
+
+                {/* Minutes column */}
+                <div ref={minuteScrollRef} className="h-full overflow-y-auto scrollbar-none flex flex-col gap-1 w-10 text-center">
+                  {minutesList.map((m) => {
+                    const isSel = timeState.minute === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        data-active={isSel}
+                        onClick={() => handleTimeSelect("minute", m)}
+                        className={cn(
+                          "py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer block w-full",
+                          isSel
+                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm"
+                            : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
+                        )}
+                      >
+                        {String(m).padStart(2, "0")}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* AM/PM Column */}
+                <div className="flex flex-col gap-1 w-10 text-center justify-center shrink-0">
+                  {(["AM", "PM"] as const).map((ap) => {
+                    const isSel = timeState.ampm === ap;
+                    return (
+                      <button
+                        key={ap}
+                        type="button"
+                        onClick={() => handleTimeSelect("ampm", ap)}
+                        className={cn(
+                          "py-2 text-xs font-black rounded-lg transition-all cursor-pointer block w-full",
+                          isSel
+                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm"
+                            : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
+                        )}
+                      >
+                        {ap}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Done button */}
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="w-full h-8 mt-3 rounded-lg text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md hover:shadow-lg active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <HiCheck className="w-3.5 h-3.5" />
+                Done
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -426,7 +426,7 @@ function PaymentsPageContent() {
                         )}
                         <Link
                           href={`/hr/payments/${run.id}`}
-                          className="flex items-center justify-center gap-2 flex-1 md:flex-initial px-6 py-3 bg-card-alt border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted transition-all active:scale-95 group/btn shadow-sm"
+                          className="flex items-center justify-center gap-2 flex-1 md:flex-initial px-6 py-3 bg-primary/5 hover:bg-primary/15 border border-primary/20 hover:border-primary/40 rounded-2xl text-[10px] font-black uppercase tracking-widest text-primary transition-all duration-200 active:scale-95 group/btn shadow-sm cursor-pointer"
                         >
                           {t("Details")}
                           <HiOutlineChevronRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
