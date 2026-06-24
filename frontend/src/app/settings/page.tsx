@@ -717,15 +717,16 @@ export default function SettingsPage() {
               queryClient.invalidateQueries({ queryKey: ["appSettings"] });
               queryClient.invalidateQueries({ queryKey: ["backendHealth"] });
             }}
-            className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-card-alt border border-border text-xs font-black uppercase tracking-widest hover:bg-border transition-all active:scale-[0.98] shadow-sm cursor-pointer"
+            className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-card border border-border text-xs font-black uppercase tracking-widest text-foreground hover:bg-card-alt hover:border-primary/50 transition-all duration-300 hover:shadow-premium-sm active:scale-[0.97] cursor-pointer group"
           >
-            <HiArrowPath className="w-4 h-4" />
-            {t("Refresh Data")}
+            <HiArrowPath className="w-4 h-4 text-muted group-hover:rotate-180 group-hover:text-primary transition-all duration-500 ease-out" />
+            <span className="group-hover:text-primary transition-colors">{t("Refresh Data")}</span>
           </button>
         </header>
 
-        <section className="bg-card-alt border border-border/50 rounded-2xl p-1.5 shadow-sm relative z-0">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+        <section className="bg-card-alt/80 backdrop-blur-md border border-border/60 rounded-2xl p-1 shadow-sm relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 opacity-50 pointer-events-none" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1 relative z-10">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const selected = activeTab === tab.id;
@@ -733,17 +734,21 @@ export default function SettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-black uppercase tracking-widest transition-all active:scale-[0.97] cursor-pointer ${
-                    selected ? "text-on-primary" : "text-muted hover:text-foreground"
+                  className={`relative flex items-center justify-center gap-2.5 rounded-xl py-3.5 px-4 text-xs font-black uppercase tracking-widest transition-all duration-300 cursor-pointer select-none ${
+                    selected 
+                      ? "text-on-primary font-extrabold" 
+                      : "text-muted hover:text-foreground hover:bg-card-alt/50 active:scale-[0.98]"
                   }`}
                 >
-                  <Icon className="w-4 h-4 relative z-10" />
+                  <Icon className={`w-4.5 h-4.5 transition-all duration-300 ${
+                    selected ? "scale-110 text-on-primary" : "text-muted-foreground/75"
+                  }`} />
                   <span className="relative z-10">{tab.label}</span>
                   {selected && (
                     <motion.div
                       layoutId="activeSettingsTab"
-                      className="absolute inset-0 bg-primary rounded-xl shadow-premium z-0"
-                      transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                      className="absolute inset-0 bg-gradient-to-r from-primary via-primary/95 to-primary-light/90 rounded-xl shadow-premium z-0"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
                     />
                   )}
                 </button>
@@ -761,29 +766,41 @@ export default function SettingsPage() {
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
                   {/* Card 1: Users Overview with Circular Progress */}
-                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white border border-slate-700/50 p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110" />
+                  <div className={`relative overflow-hidden rounded-2xl p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl border ${
+                    dark 
+                      ? "bg-gradient-to-br from-slate-900 to-slate-800 text-white border-slate-700/50" 
+                      : "bg-gradient-to-br from-white to-slate-50 text-slate-800 border-indigo-100/80 shadow-premium-sm"
+                  }`}>
+                    <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110 ${
+                      dark ? "bg-primary/10" : "bg-indigo-500/5"
+                    }`} />
                     <div className="flex items-start justify-between">
                       <div className="space-y-2">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/20 text-primary-light border border-primary/30 text-[10px] font-black uppercase tracking-wider">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${
+                          dark 
+                            ? "bg-primary/20 text-primary-light border-primary/30" 
+                            : "bg-indigo-50 text-indigo-600 border-indigo-100"
+                        }`}>
                           <HiUsers className="w-3.5 h-3.5" />
                           {t("System Users")}
                         </span>
                         <div className="mt-2">
                           <p className="text-4xl font-black tracking-tight">{userStats.total}</p>
-                          <p className="text-xs text-slate-300 font-bold uppercase tracking-wider mt-1">{t("Registered Accounts")}</p>
+                          <p className={`text-xs font-bold uppercase tracking-wider mt-1 ${
+                            dark ? "text-slate-300" : "text-slate-550"
+                          }`}>{t("Registered Accounts")}</p>
                         </div>
                       </div>
 
                       {/* Interactive Circular Progress SVG */}
                       <div className="relative w-16 h-16 shrink-0">
                         <svg className="w-full h-full transform -rotate-90">
-                          <circle cx="32" cy="32" r="26" stroke="rgba(255,255,255,0.06)" strokeWidth="6" fill="transparent" />
+                          <circle cx="32" cy="32" r="26" stroke={dark ? "rgba(255,255,255,0.06)" : "rgba(99,102,241,0.08)"} strokeWidth="6" fill="transparent" />
                           <circle
                             cx="32"
                             cy="32"
                             r="26"
-                            stroke="var(--color-primary)"
+                            stroke={dark ? "#d97706" : "var(--color-primary)"}
                             strokeWidth="6"
                             fill="transparent"
                             strokeDasharray={2 * Math.PI * 26}
@@ -792,16 +809,20 @@ export default function SettingsPage() {
                             className="transition-all duration-1000"
                           />
                         </svg>
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black font-mono">
+                        <div className={`absolute inset-0 flex items-center justify-center text-[10px] font-black font-mono ${
+                          dark ? "text-white" : "text-slate-700"
+                        }`}>
                           {userStats.total > 0 ? Math.round((userStats.active / userStats.total) * 100) : 0}%
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-slate-700/50 flex justify-between items-center text-xs">
+                    <div className={`mt-6 pt-4 border-t flex justify-between items-center text-xs ${
+                      dark ? "border-slate-700/50" : "border-indigo-100"
+                    }`}>
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="font-semibold text-slate-200">{userStats.active} {t("Active")}</span>
+                        <span className={`font-semibold ${dark ? "text-slate-200" : "text-slate-700"}`}>{userStats.active} {t("Active")}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-slate-400">
                         <span className="w-2 h-2 rounded-full bg-slate-500" />
@@ -1198,19 +1219,22 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={isSystemSavePending || isSystemSaveDisabled}
-                    className={`w-full h-11 rounded-xl font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2 ${
-                      isSystemSavePending
-                        ? "bg-primary text-on-primary opacity-90 cursor-wait"
-                        : isSystemSaveDisabled
-                          ? "bg-card-alt text-muted"
-                          : "bg-primary text-on-primary hover:opacity-90 active:scale-[0.98]"
-                    }`}
-                  >
-                    {isSystemSavePending ? t("Saving...") : t("Save System Settings")}
-                  </button>
+                  <div className="flex justify-end pt-4 border-t border-border/30">
+                    <button
+                      type="submit"
+                      disabled={isSystemSavePending || isSystemSaveDisabled}
+                      className={`h-11 px-8 rounded-xl font-black text-xs uppercase tracking-widest shadow-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.97] ${
+                        isSystemSavePending
+                          ? "bg-primary text-on-primary opacity-90 cursor-wait"
+                          : isSystemSaveDisabled
+                            ? "bg-card-alt text-muted-foreground/30 border border-border/40 cursor-not-allowed"
+                            : "bg-primary text-on-primary hover:opacity-90 hover:shadow-premium"
+                      }`}
+                    >
+                      <HiShieldCheck className={`w-4 h-4 ${isSystemSavePending ? "animate-pulse" : ""}`} />
+                      {isSystemSavePending ? t("Saving...") : t("Save System Settings")}
+                    </button>
+                  </div>
                 </form>
               </div>
             )}
