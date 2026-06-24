@@ -1,6 +1,6 @@
 import { Router, Response } from "express";
 import { AuthRequest } from "../middleware/auth";
-import { getSettings, updateSettings } from "../lib/settings";
+import { AppSettings, getSettings, updateSettings } from "../lib/settings";
 
 const router = Router();
 
@@ -19,8 +19,8 @@ router.patch("/", async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { employee_id_prefix, inventory_id_prefix, event_id_prefix } = req.body;
 
-    // Only allow updating known fields
-    const updates: any = {};
+    // Only allow updating known fields.
+    const updates: Partial<AppSettings> = {};
     if (typeof employee_id_prefix === "string") {
       updates.employee_id_prefix = employee_id_prefix.trim().toUpperCase();
     }
