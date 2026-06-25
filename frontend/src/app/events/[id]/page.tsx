@@ -48,6 +48,7 @@ import {
 import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Employee, Vehicle, EventExpense, EventTripLog, EventProfitSummary, CategoryCost } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -1004,8 +1005,12 @@ export default function EventWorkspacePage() {
                         <div key={allocation.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
                             <div className="font-semibold text-foreground">{allocation.item_name}</div>
-                            <div className="mt-1 text-xs text-muted">
-                              {allocation.store_name || "-"} | {t("Allocated")}: {allocation.quantity_allocated} | {t(allocation.status)}
+                            <div className="mt-1 text-xs text-muted flex flex-wrap items-center gap-2">
+                              <span>{allocation.store_name || "-"}</span>
+                              <span className="opacity-40">|</span>
+                              <span>{t("Allocated")}: {allocation.quantity_allocated}</span>
+                              <span className="opacity-40">|</span>
+                              <StatusBadge status={allocation.status} />
                             </div>
                             {allocation.notes && <div className="mt-1 text-xs text-muted">{allocation.notes}</div>}
                           </div>

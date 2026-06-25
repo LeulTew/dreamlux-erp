@@ -16,6 +16,7 @@ import type { EventExpense } from "@/lib/types";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -199,6 +200,7 @@ export default function ExpenseApprovalPage() {
                           <span className={cn("rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider", categoryClass)}>
                             {t(expense.category)}
                           </span>
+                          <StatusBadge status="Pending" />
                         </div>
                         
                         <p className="mt-2 text-xs font-semibold text-muted-foreground leading-relaxed max-w-3xl">

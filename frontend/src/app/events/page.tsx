@@ -38,6 +38,7 @@ import EditEventSheet from "@/components/EditEventSheet";
 import PaginationControls from "@/components/PaginationControls";
 import Link from "next/link";
 import { useLanguage } from "@/hooks/use-language";
+import StatusBadge from "@/components/ui/StatusBadge";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
@@ -662,19 +663,7 @@ function EventsPageContent() {
     window.open(exportUrl, "_blank");
   };
 
-  // Badges color helper
-  const getStatusBadgeClass = (statusStr: string) => {
-    switch (statusStr) {
-      case "Planned":
-        return "bg-primary-light text-primary-dark border border-primary/20";
-      case "Ongoing":
-        return "bg-warning/10 text-warning border border-warning/20";
-      case "Completed":
-        return "bg-success/10 text-success border border-success/20";
-      default:
-        return "bg-card-alt text-muted border border-border";
-    }
-  };
+
 
   if (authLoading) {
     return (
@@ -1066,13 +1055,7 @@ function EventsPageContent() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-bold ${getStatusBadgeClass(
-                            event.status
-                          )}`}
-                        >
-                          {t(event.status)}
-                        </span>
+                        <StatusBadge status={event.status} />
                       </td>
                       <td className="px-6 py-4 text-right no-print">
                         <div className="flex items-center justify-end gap-2">
@@ -1116,13 +1099,7 @@ function EventsPageContent() {
                         {event.client_name}
                       </p>
                     </div>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadgeClass(
-                        event.status
-                      )}`}
-                    >
-                      {t(event.status)}
-                    </span>
+                    <StatusBadge status={event.status} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs border-t border-border/50 pt-2.5">

@@ -24,6 +24,7 @@ import {
   HiArrowTopRightOnSquare
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -245,22 +246,7 @@ export default function ProposalDetailPage() {
     );
   }
 
-  const getStatusBadgeClass = (statusStr: string) => {
-    switch (statusStr) {
-      case "Draft":
-        return "bg-card-alt text-muted border border-border";
-      case "Submitted":
-        return "bg-primary-light text-primary-dark border border-primary/20";
-      case "Approved":
-        return "bg-success/10 text-success border border-success/20";
-      case "Rejected":
-        return "bg-danger/10 text-danger border border-danger/20";
-      case "Converted":
-        return "bg-warning/10 text-warning border border-warning/20";
-      default:
-        return "bg-card-alt text-muted border border-border";
-    }
-  };
+
 
   return (
     <AuthLayout>
@@ -369,10 +355,7 @@ export default function ProposalDetailPage() {
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Status")}</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadgeClass(proposal.status)}`}>
-                    {t(proposal.status)}
-                  </span>
+                  <StatusBadge status={proposal.status} />
                 </div>
               </div>
 

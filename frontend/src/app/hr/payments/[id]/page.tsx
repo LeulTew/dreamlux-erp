@@ -7,13 +7,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { HiOutlineArrowUturnLeft, HiPrinter, HiExclamationTriangle, HiTableCells, HiDocumentArrowDown, HiTrash } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRun, exportPayrollExcel, exportPayrollCSV, updatePayrollRunStatus } from "@/lib/api";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -125,11 +126,7 @@ export default function PaymentRunDetailPage() {
   const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
   const [employeePage, setEmployeePage] = useState(1);
 
-  const statusColors: Record<string, string> = useMemo(() => ({
-    FINALIZED: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    DRAFT: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-    FLAGGED_WRONG: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
-  }), []);
+
 
   const { data: run, isLoading, error } = useQuery({
     queryKey: ["payroll-run", id],
@@ -206,9 +203,7 @@ export default function PaymentRunDetailPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider border ${statusColors[run.status ?? ""] ?? "bg-muted text-muted-foreground border-border"}`}>
-              {t(run.status ?? "unknown")}
-            </span>
+            <StatusBadge status={run.status ?? "unknown"} />
 
             <div className="h-8 w-px bg-border/50 mx-2 hidden sm:block" />
 

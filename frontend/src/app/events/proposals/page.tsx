@@ -20,6 +20,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
 import type { EventProposalFilter } from "@/lib/api";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -137,7 +138,7 @@ export default function ProposalsPage() {
     }),
   });
 
-  const proposals = data?.proposals || [];
+  const proposals = useMemo(() => data?.proposals || [], [data?.proposals]);
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
 
@@ -154,23 +155,6 @@ export default function ProposalsPage() {
     const avgMargin = margins.length > 0 ? Math.round(margins.reduce((a, b) => a + b, 0) / margins.length) : 0;
     return { totalCount, activeIntake, conversionRate, avgMargin };
   }, [proposals, total]);
-
-  const getStatusBadgeClass = (statusStr: string) => {
-    switch (statusStr) {
-      case "Draft":
-        return "bg-card-alt text-muted border border-border";
-      case "Submitted":
-        return "bg-primary-light text-primary-dark border border-primary/20";
-      case "Approved":
-        return "bg-success/10 text-success border border-success/20";
-      case "Rejected":
-        return "bg-danger/10 text-danger border border-danger/20";
-      case "Converted":
-        return "bg-warning/10 text-warning border border-warning/20";
-      default:
-        return "bg-card-alt text-muted border border-border";
-    }
-  };
 
   return (
     <AuthLayout>
@@ -469,9 +453,7 @@ export default function ProposalsPage() {
                         {proposal.estimated_margin_percentage}%
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${getStatusBadgeClass(proposal.status)}`}>
-                          {t(proposal.status)}
-                        </span>
+                        <StatusBadge status={proposal.status} />
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
@@ -494,16 +476,14 @@ export default function ProposalsPage() {
                 <Link
                   key={proposal.id}
                   href={`/events/proposals/${proposal.id}`}
-                  className="block p-4 bg-card border border-border rounded-2xl space-y-3 active:scale-[0.98] transition-all"
+                  className="block p-4 bg-card border border-border rounded-2xl space-y-3 active:scale-[0.98] [@media(hover:hover)]:hover:border-primary/45 [@media(hover:hover)]:hover:bg-primary-light/5 active:bg-primary-light/10 active:border-primary/30 transition-all duration-200"
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <h4 className="font-bold text-foreground text-base leading-snug">{proposal.name}</h4>
                       <p className="text-xs text-muted font-medium mt-0.5">{proposal.client_name}</p>
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadgeClass(proposal.status)}`}>
-                      {t(proposal.status)}
-                    </span>
+                    <StatusBadge status={proposal.status} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs border-t border-border/50 pt-2.5">

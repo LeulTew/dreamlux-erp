@@ -12,6 +12,7 @@ import PaginationControls from "@/components/PaginationControls";
 import toast from "react-hot-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { FancyButton } from "@/components/ui/FancyButton";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -338,12 +339,6 @@ function PaymentsPageContent() {
                 }
               }
 
-              const statusColors: Record<string, string> = {
-                FINALIZED: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-                DRAFT: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-                FLAGGED_WRONG: "bg-danger/10 text-danger border-danger/20",
-              };
-
               const currentStatus = (run.status ?? "draft").toUpperCase();
 
               return (
@@ -363,9 +358,7 @@ function PaymentsPageContent() {
                         <Link href={`/hr/payments/${run.id}`} className="hover:text-primary transition-all">
                           <div className="font-black tracking-tight text-xl uppercase text-foreground hover:text-primary transition-all">{periodText}</div>
                         </Link>
-                        <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${statusColors[currentStatus] || "bg-muted text-muted-foreground"}`}>
-                          {t(currentStatus)}
-                        </span>
+                        <StatusBadge status={currentStatus} />
                       </div>
                       <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold opacity-60">
                         {run.created_at ? format(new Date(run.created_at), "PPP") : ""}
