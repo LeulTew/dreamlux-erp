@@ -412,7 +412,7 @@ export default function ProposalsPage() {
                         }}
                       />
                     </th>
-                    <th className="px-6 py-4">
+                    <th className="px-6 py-4 text-center">
                       <SortableHeader
                         label={t("Status")}
                         sortKey="status"
@@ -423,6 +423,7 @@ export default function ProposalsPage() {
                           setSortOrder(order);
                           setPage(1);
                         }}
+                        align="center"
                       />
                     </th>
                     <th className="px-6 py-4 text-right">{t("Actions")}</th>
@@ -452,8 +453,10 @@ export default function ProposalsPage() {
                       <td className={`px-6 py-4 font-black text-right font-mono ${proposal.estimated_margin_percentage < 25 ? "text-warning" : "text-success"}`}>
                         {proposal.estimated_margin_percentage}%
                       </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={proposal.status} />
+                      <td className="px-6 py-4 text-center">
+                        <div className="inline-flex justify-center w-full">
+                          <StatusBadge status={proposal.status} />
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link

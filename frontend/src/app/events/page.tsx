@@ -991,13 +991,14 @@ function EventsPageContent() {
                         align="right"
                       />
                     </th>
-                    <th className="px-6 py-4">
+                    <th className="px-6 py-4 text-center">
                       <SortableHeader
                         label={t("Status")}
                         sortKey="status"
                         currentSortBy={sortBy}
                         currentSortOrder={sortOrder}
                         onSort={handleSort}
+                        align="center"
                       />
                     </th>
                     <th className="px-6 py-4 text-right no-print">{t("Actions")}</th>
@@ -1054,8 +1055,10 @@ function EventsPageContent() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={event.status} />
+                      <td className="px-6 py-4 text-center">
+                        <div className="inline-flex justify-center w-full">
+                          <StatusBadge status={event.status} />
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right no-print">
                         <div className="flex items-center justify-end gap-2">
