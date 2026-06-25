@@ -13,6 +13,7 @@ import {
   employeePaginationSchema,
 } from "../lib/validation";
 import { generateNextEmployeeId } from "../lib/id-generator";
+import { ZodError } from "zod";
 
 const router = Router();
 
@@ -416,6 +417,14 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
 
     res.json({ employees, total: finalCount || 0, page, limit });
   } catch (error: unknown) {
+    if (error instanceof ZodError) {
+      res.status(400).json({
+        error: "Invalid employee query parameters",
+        details: error.issues.map((issue) => issue.message),
+      });
+      return;
+    }
+
     console.error("Failed to fetch employees:", error);
     res.status(500).json({
       error: "Failed to fetch employees",

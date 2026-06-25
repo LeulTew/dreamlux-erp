@@ -8,6 +8,7 @@ import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/
 import { hasPermissionSlug } from "../lib/permissions";
 
 const router = express.Router();
+const PAYROLL_RUN_SORT_FIELDS = new Set(["period_start", "period_end", "created_at", "updated_at", "finalized_at", "status", "total"]);
 
 function canReadPayroll(req: AuthRequest): boolean {
   return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), "payroll:read");
@@ -90,7 +91,11 @@ router.get("/runs", async (req: AuthRequest, res) => {
     const statusFilter = req.query.status as string | undefined;
     const yearFilter = req.query.year as string | undefined;
     const sortBy = (req.query.sortBy as string) || "period_start";
-    const sortOrder = (req.query.sortOrder as string) || "desc";
+    const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
+
+    if (!PAYROLL_RUN_SORT_FIELDS.has(sortBy)) {
+      return res.status(400).json({ error: `Unsupported payroll run sort field: ${sortBy}` });
+    }
 
     let runsQuery = supabase
       .from("payroll_runs")

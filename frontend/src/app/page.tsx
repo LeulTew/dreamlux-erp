@@ -34,6 +34,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { useLanguage } from "@/hooks/use-language";
+import { SortableHeader } from "@/components/ui/SortableHeader";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -128,6 +129,10 @@ function buildColumns(
   singleDelete: (id: string) => void,
   selectMode: boolean,
   t: (key: string) => string,
+  sortBy: string,
+  sortOrder: string,
+  setSortBy: (val: string) => void,
+  setSortOrder: (val: string) => void,
 ) {
   const cols = [];
 
@@ -177,7 +182,18 @@ function buildColumns(
 
   cols.push(
     columnHelper.accessor("full_name", {
-      header: t("Employee Name"),
+      header: () => (
+        <SortableHeader
+          label={t("Employee Name")}
+          sortKey="name"
+          currentSortBy={sortBy}
+          currentSortOrder={sortOrder}
+          onSort={(key, order) => {
+            setSortBy(key);
+            setSortOrder(order);
+          }}
+        />
+      ),
       cell: ({ row, getValue }) =>
         editMode ? (
           <input
@@ -236,7 +252,18 @@ function buildColumns(
         ),
     }),
     columnHelper.accessor("salary_level", {
-      header: t("Base Salary"),
+      header: () => (
+        <SortableHeader
+          label={t("Base Salary")}
+          sortKey="salary"
+          currentSortBy={sortBy}
+          currentSortOrder={sortOrder}
+          onSort={(key, order) => {
+            setSortBy(key);
+            setSortOrder(order);
+          }}
+        />
+      ),
       cell: ({ row, getValue }) =>
         editMode ? (
           <Select
@@ -502,8 +529,29 @@ function EmployeesPageContent() {
   };
 
   const columns = useMemo(
-    () => buildColumns(editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length > 0 && selectedIds.size === employees.length, toggleAll, handleSinglePermanentDelete, selectMode, t),
-    [editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length, toggleAll, selectMode, t],
+    () => buildColumns(
+      editMode,
+      page,
+      limit,
+      debouncedUpdate,
+      setEditingEmployee,
+      deleteMutation,
+      showTrash,
+      recoverMutation,
+      setEmployeeToDelete,
+      selectedIds,
+      toggleSelection,
+      employees.length > 0 && selectedIds.size === employees.length,
+      toggleAll,
+      handleSinglePermanentDelete,
+      selectMode,
+      t,
+      sortBy,
+      sortOrder,
+      setSortBy,
+      setSortOrder,
+    ),
+    [editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length, toggleAll, selectMode, t, sortBy, sortOrder, setSortBy, setSortOrder],
   );
 
   const table = useReactTable({

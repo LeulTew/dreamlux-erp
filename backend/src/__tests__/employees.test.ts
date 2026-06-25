@@ -102,6 +102,16 @@ describe("Employees API", () => {
     expect(res.body.employees[0].full_name).toBe("John Doe");
   });
 
+  test("GET /employees rejects unsupported sort fields before querying", async () => {
+    const res = await request(app)
+      .get("/employees?sortBy=full_name%3B%20DROP%20TABLE%20employees")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Invalid employee query parameters/i);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   test("POST /employees creates new employee", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [{ 

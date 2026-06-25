@@ -217,6 +217,27 @@ describe("Assets", () => {
       expect(res.status).toBe(200);
     });
 
+    test("supports sorting parameters", async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const res = await request(app)
+        .get("/assets?sortBy=quantity&sortOrder=asc")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+    });
+
+    test("rejects unsupported sort parameters", async () => {
+      const res = await request(app)
+        .get("/assets?sortBy=invalid_column")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/Invalid asset query parameters/i);
+    });
+
     test("paginates correctly", async () => {
       mockQuery
         .mockResolvedValueOnce({
