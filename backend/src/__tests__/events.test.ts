@@ -654,6 +654,61 @@ describe("Events API", () => {
     expect(String(mockQuery.mock.calls[1][0])).toContain("p.created_at ASC");
   });
 
+  test("GET /events/proposals validates and applies custom sorting", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    const res = await request(app)
+      .get("/events/proposals?sortBy=requested_budget&sortOrder=desc")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(String(mockQuery.mock.calls[1][0])).toContain("ORDER BY p.requested_budget DESC NULLS LAST");
+  });
+
+  test("GET /events/proposals rejects invalid sortBy parameter", async () => {
+    const res = await request(app)
+      .get("/events/proposals?sortBy=invalid_column&sortOrder=desc")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(400);
+  });
+
+  test("GET /events/proposals applies allowlisted advanced filters with OR logic", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Premium Gala",
+        client_name: "Aster",
+        venue_location: "Hilton",
+        status: "Submitted",
+        requested_budget: "250000.00",
+        estimated_net_profit: "110000.00",
+        estimated_margin_percentage: "44.00",
+        requested_start_date: "2026-07-20",
+        requested_end_date: "2026-07-21",
+        created_at: "2026-06-25T10:00:00Z",
+        event_type_name: "Wedding",
+      }],
+      rowCount: 1,
+    });
+
+    const filters = encodeURIComponent(JSON.stringify([
+      { field: "client_name", operator: "contains", value: "Aster" },
+      { field: "requested_budget", operator: "greater_than", value: 200000 },
+    ]));
+
+    const res = await request(app)
+      .get(`/events/proposals?filters=${filters}&filterLogic=or&sortBy=created_at&sortOrder=desc`)
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposals).toHaveLength(1);
+    expect(String(mockQuery.mock.calls[1][0])).toContain(" OR ");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("et.name");
+  });
+
   test("POST /events/proposals/:id/submit moves Draft to Submitted with audit", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
     mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Draft" }], rowCount: 1 }); // lock

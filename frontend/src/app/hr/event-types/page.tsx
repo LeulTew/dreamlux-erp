@@ -177,14 +177,14 @@ export default function EventTypesPage() {
           <div className="flex gap-3 sm:gap-4 w-full sm:w-auto">
             <Link
               href="/hr/event-types/trash"
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-danger/10 text-danger rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-danger/20 transition-all shadow-sm border border-danger/20"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-danger/10 text-danger rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-danger/20 transition-all shadow-sm border border-danger/20"
             >
               <HiOutlineTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t("TRASH")}
             </Link>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
-                showAddForm ? 'bg-muted text-foreground' : 'bg-primary text-on-primary hover:bg-primary-dark shadow-primary/20'
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
+                showAddForm ? 'bg-muted text-foreground' : 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800'
               }`}
             >
               {showAddForm ? (

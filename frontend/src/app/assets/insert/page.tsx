@@ -292,15 +292,15 @@ export default function InsertAssetPage() {
                   <label className="block text-xs font-black uppercase tracking-wider text-muted px-1 mb-2">
                     {t("Select Office Location")} <span className="text-danger">*</span>
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {offices.map((office) => (
                       <button
                         key={office.id}
                         type="button"
                         onClick={() => setOfficeId(office.id)}
-                        className={`px-3 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 text-center truncate ${
+                        className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 text-center ${
                           officeId === office.id
-                            ? "bg-primary text-on-primary shadow-premium"
+                            ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10"
                             : "bg-card-alt border border-border text-muted hover:bg-border/40"
                         }`}
                       >

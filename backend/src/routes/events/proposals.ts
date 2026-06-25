@@ -25,6 +25,53 @@ function canImportEvents(req: AuthRequest): boolean {
   return hasPermission(req, "events:write");
 }
 
+type ProposalFilterField = "name" | "client_name" | "venue_location" | "status" | "requested_budget" | "estimated_net_profit" | "estimated_margin_percentage" | "requested_start_date" | "requested_end_date" | "created_at" | "event_type_name";
+type ProposalFilterOperator = "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "between";
+
+function buildProposalFilterClause(
+  filter: { field: ProposalFilterField; operator: ProposalFilterOperator; value?: unknown },
+  params: Array<string | number | null>,
+): string {
+  const columnMap: Record<ProposalFilterField, string> = {
+    name: "p.name",
+    client_name: "p.client_name",
+    venue_location: "p.venue_location",
+    status: "p.status",
+    requested_budget: "p.requested_budget",
+    estimated_net_profit: "p.estimated_net_profit",
+    estimated_margin_percentage: "p.estimated_margin_percentage",
+    requested_start_date: "p.requested_start_date",
+    requested_end_date: "p.requested_end_date",
+    created_at: "p.created_at",
+    event_type_name: "et.name",
+  };
+
+  const column = columnMap[filter.field];
+  if (filter.operator === "contains") {
+    params.push(`%${String(filter.value ?? "").trim()}%`);
+    return `${column} ILIKE $${params.length}`;
+  }
+
+  if (filter.operator === "between") {
+    const range = Array.isArray(filter.value) ? filter.value : [];
+    const start = range[0] ?? null;
+    const end = range[1] ?? null;
+    params.push(start as string | number | null, end as string | number | null);
+    return `${column} BETWEEN $${params.length - 1} AND $${params.length}`;
+  }
+
+  params.push(filter.value as string | number | null);
+  const comparator = filter.operator === "not_equals" ? "<>" : filter.operator === "greater_than" ? ">" : filter.operator === "less_than" ? "<" : "=";
+  return `${column} ${comparator} $${params.length}`;
+}
+
+function buildProposalFilterGroup(filters: Array<{ field: ProposalFilterField; operator: ProposalFilterOperator; value?: unknown }>, logic: "and" | "or", params: Array<string | number | null>): string {
+  if (filters.length === 0) return "TRUE";
+  const clauses = filters.map((filter) => buildProposalFilterClause(filter, params));
+  const joiner = logic === "or" ? " OR " : " AND ";
+  return clauses.length === 1 ? clauses[0] : `(${clauses.join(joiner)})`;
+}
+
 async function insertEventAuditLog(
   client: PoolClient | Pool,
   eventId: string | null,
@@ -138,7 +185,24 @@ export function createEventProposalsRouter(): Router {
         return;
       }
 
-      const { page, limit, status, created_by, event_type_id, search, start_date, end_date, min_margin, max_margin, min_profit, max_profit } = validationResult.data;
+      const {
+        page,
+        limit,
+        status,
+        created_by,
+        event_type_id,
+        search,
+        start_date,
+        end_date,
+        min_margin,
+        max_margin,
+        min_profit,
+        max_profit,
+        filterLogic,
+        filters,
+        sortBy,
+        sortOrder
+      } = validationResult.data;
       const params: any[] = [];
       const conditions = ["p.deleted_at IS NULL"];
 
@@ -182,6 +246,9 @@ export function createEventProposalsRouter(): Router {
         params.push(max_profit);
         conditions.push(`p.estimated_net_profit <= $${params.length}`);
       }
+      if (filters && filters.length > 0) {
+        conditions.push(buildProposalFilterGroup(filters as any, filterLogic || "and", params));
+      }
 
       const whereClause = conditions.join(" AND ");
       const countResult = await pool.query(`SELECT COUNT(*) FROM event_proposals p WHERE ${whereClause}`, params);
@@ -189,25 +256,34 @@ export function createEventProposalsRouter(): Router {
       const offset = (page - 1) * limit;
       const queryParams = [...params, limit, offset];
 
+      let orderByClause = `
+        ORDER BY
+          CASE WHEN p.status = 'Submitted' THEN 0 ELSE 1 END,
+          CASE
+            WHEN p.requested_start_date IS NOT NULL AND p.requested_start_date <= CURRENT_DATE + INTERVAL '14 days'
+            THEN p.estimated_net_profit
+            ELSE NULL
+          END DESC NULLS LAST,
+          CASE
+            WHEN p.requested_start_date IS NOT NULL AND p.requested_start_date <= CURRENT_DATE + INTERVAL '14 days'
+            THEN p.estimated_margin_percentage
+            ELSE NULL
+          END DESC NULLS LAST,
+          p.created_at ASC
+      `;
+
+      if (sortBy) {
+        const order = sortOrder === "asc" ? "ASC" : "DESC";
+        orderByClause = `ORDER BY p.${sortBy} ${order} NULLS LAST`;
+      }
+
       const result = await pool.query(
         `
           SELECT p.*, et.name AS event_type_name
           FROM event_proposals p
           LEFT JOIN event_types et ON p.event_type_id = et.id
           WHERE ${whereClause}
-          ORDER BY
-            CASE WHEN p.status = 'Submitted' THEN 0 ELSE 1 END,
-            CASE
-              WHEN p.requested_start_date IS NOT NULL AND p.requested_start_date <= CURRENT_DATE + INTERVAL '14 days'
-              THEN p.estimated_net_profit
-              ELSE NULL
-            END DESC NULLS LAST,
-            CASE
-              WHEN p.requested_start_date IS NOT NULL AND p.requested_start_date <= CURRENT_DATE + INTERVAL '14 days'
-              THEN p.estimated_margin_percentage
-              ELSE NULL
-            END DESC NULLS LAST,
-            p.created_at ASC
+          ${orderByClause}
           LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}
         `,
         queryParams,

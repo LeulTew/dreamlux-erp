@@ -355,6 +355,10 @@ function EventsPageContent() {
   const [isDeleteViewOpen, setIsDeleteViewOpen] = useState<string | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
+  // Local draft states for advanced filtering inside drawer
+  const [draftFilters, setDraftFilters] = useState<EventSavedView["filters"]>([]);
+  const [draftFilterLogic, setDraftFilterLogic] = useState<string>("and");
+
   // Saved view creation form state
   const [newViewName, setNewViewName] = useState("");
   const [newViewScope, setNewViewScope] = useState<"personal" | "role" | "global">("personal");
@@ -596,15 +600,15 @@ function EventsPageContent() {
     });
   };
 
-  const handleAddFilterRule = () => {
-    const nextRules = [...filters, { field: "name", operator: "contains", value: "" }];
-    updateUrl({ filters: btoa(JSON.stringify(nextRules)), page: "1", viewId: null });
+
+
+  const handleAddDraftFilterRule = () => {
+    setDraftFilters([...draftFilters, { field: "name", operator: "contains", value: "" }]);
   };
 
-  const handleUpdateFilterRule = (index: number, key: string, val: unknown) => {
-    const nextRules = filters.map((rule, i: number) => {
+  const handleUpdateDraftFilterRule = (index: number, key: string, val: unknown) => {
+    const nextRules = draftFilters.map((rule, i: number) => {
       if (i === index) {
-        // Reset operator to a compatible one when field changes
         if (key === "field") {
           const fieldMeta = FIELD_OPTIONS.find(f => f.key === val);
           const fieldType = fieldMeta?.type || "text";
@@ -619,16 +623,16 @@ function EventsPageContent() {
       }
       return rule;
     });
-    updateUrl({ filters: btoa(JSON.stringify(nextRules)), page: "1", viewId: null });
+    setDraftFilters(nextRules);
   };
 
-  const handleRemoveFilterRule = (index: number) => {
-    const nextRules = filters.filter((_, i: number) => i !== index);
-    updateUrl({
-      filters: nextRules.length > 0 ? btoa(JSON.stringify(nextRules)) : null,
-      page: "1",
-      viewId: null
-    });
+  const handleRemoveDraftFilterRule = (index: number) => {
+    setDraftFilters(draftFilters.filter((_, i: number) => i !== index));
+  };
+
+  const handleResetDraftFilters = () => {
+    setDraftFilters([]);
+    setDraftFilterLogic("and");
   };
 
   const handleClearFilters = () => {
@@ -847,7 +851,7 @@ function EventsPageContent() {
                   <button
                     key={opt.id}
                     onClick={() => updateUrl({ dateRange: opt.id, page: "1" })}
-                    className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider transition-all ${dateRange === opt.id ? "bg-primary text-on-primary" : "text-muted [@media(hover:hover)]:hover:bg-border"}`}
+                    className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider transition-all ${dateRange === opt.id ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10" : "text-muted [@media(hover:hover)]:hover:bg-border"}`}
                   >
                     {t(opt.label)}
                   </button>
@@ -856,13 +860,17 @@ function EventsPageContent() {
 
               {/* Advanced filter builder button */}
               <button
-                onClick={() => setIsFiltersOpen(true)}
-                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-primary bg-primary/5 text-primary" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"}`}
+                onClick={() => {
+                  setDraftFilters(filters.map(r => ({ ...r })));
+                  setDraftFilterLogic(filterLogic);
+                  setIsFiltersOpen(true);
+                }}
+                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-amber-500/40 bg-amber-500/5 text-amber-600" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"} active:scale-[0.98] transition-all`}
               >
                 <HiAdjustmentsHorizontal className="w-4 h-4" />
                 {t("Filters")}
                 {filters.length > 0 && (
-                  <span className="ml-1 w-5 h-5 rounded-full bg-primary text-on-primary text-[10px] flex items-center justify-center font-bold">
+                  <span className="ml-1 w-5 h-5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] flex items-center justify-center font-bold">
                     {filters.length}
                   </span>
                 )}
@@ -910,7 +918,7 @@ function EventsPageContent() {
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-3">
             <button
               onClick={() => updateUrl({ status: "all", page: "1" })}
-              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === "all" ? "bg-primary border-primary text-on-primary" : "bg-card-alt border-border text-muted [@media(hover:hover)]:hover:text-foreground"}`}
+              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === "all" ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 border-transparent text-white shadow-md shadow-amber-500/10" : "bg-card-alt border-border text-muted [@media(hover:hover)]:hover:text-foreground"}`}
             >
               {t("All Statuses")}
             </button>
@@ -918,7 +926,7 @@ function EventsPageContent() {
               <button
                 key={s}
                 onClick={() => updateUrl({ status: s, page: "1" })}
-                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === s ? "bg-primary border-primary text-on-primary" : "bg-card-alt border-border text-muted [@media(hover:hover)]:hover:text-foreground"}`}
+                className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full border transition-all ${status === s ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 border-transparent text-white shadow-md shadow-amber-500/10" : "bg-card-alt border-border text-muted [@media(hover:hover)]:hover:text-foreground"}`}
               >
                 {t(s)}
               </button>
@@ -1194,21 +1202,21 @@ function EventsPageContent() {
               <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Logic")}</label>
               <div className="flex rounded-2xl border border-border overflow-hidden">
                 <button
-                  onClick={() => updateUrl({ filterLogic: "and", page: "1" })}
-                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${filterLogic === "and" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
+                  onClick={() => setDraftFilterLogic("and")}
+                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${draftFilterLogic === "and" ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                 >
                   {t("Match All (AND)")}
                 </button>
                 <button
-                  onClick={() => updateUrl({ filterLogic: "or", page: "1" })}
-                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${filterLogic === "or" ? "bg-primary text-on-primary" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
+                  onClick={() => setDraftFilterLogic("or")}
+                  className={`px-3 py-1.5 text-[10px] font-bold transition-all ${draftFilterLogic === "or" ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-sm" : "bg-card-alt text-muted [@media(hover:hover)]:hover:bg-border"}`}
                 >
                   {t("Match Any (OR)")}
                 </button>
               </div>
             </div>
             <button
-              onClick={handleClearFilters}
+              onClick={handleResetDraftFilters}
               className="text-xs font-bold text-danger [@media(hover:hover)]:hover:underline uppercase tracking-wider"
             >
               {t("Reset")}
@@ -1216,12 +1224,12 @@ function EventsPageContent() {
           </div>
 
           <div className="flex flex-col gap-3">
-            {filters.map((rule, idx: number) => (
+            {draftFilters.map((rule, idx: number) => (
               <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 p-3 rounded-2xl border border-border bg-card-alt">
                 {/* Field Selector */}
                 <select
                   value={rule.field}
-                  onChange={(e) => handleUpdateFilterRule(idx, "field", e.target.value)}
+                  onChange={(e) => handleUpdateDraftFilterRule(idx, "field", e.target.value)}
                   className="flex-1 px-3 py-2 text-xs font-semibold rounded-2xl bg-card border border-border outline-none"
                 >
                   {FIELD_OPTIONS.map((f) => (
@@ -1238,7 +1246,7 @@ function EventsPageContent() {
                     return (
                       <select
                         value={rule.operator}
-                        onChange={(e) => handleUpdateFilterRule(idx, "operator", e.target.value)}
+                        onChange={(e) => handleUpdateDraftFilterRule(idx, "operator", e.target.value)}
                         className="w-full sm:w-44 px-3 py-2 text-xs font-semibold rounded-2xl bg-card border border-border outline-none"
                       >
                         {compatibleOps.map((op) => (
@@ -1264,7 +1272,7 @@ function EventsPageContent() {
                             type={fieldType === "date" ? "date" : "number"}
                             value={parts[0] || ""}
                             placeholder="From"
-                            onChange={(e) => handleUpdateFilterRule(idx, "value", `${e.target.value}|${parts[1] || ""}`)}
+                            onChange={(e) => handleUpdateDraftFilterRule(idx, "value", `${e.target.value}|${parts[1] || ""}`)}
                             className={inputCls}
                           />
                           <span className="text-xs text-muted font-bold">{t("and")}</span>
@@ -1272,7 +1280,7 @@ function EventsPageContent() {
                             type={fieldType === "date" ? "date" : "number"}
                             value={parts[1] || ""}
                             placeholder="To"
-                            onChange={(e) => handleUpdateFilterRule(idx, "value", `${parts[0] || ""}|${e.target.value}`)}
+                            onChange={(e) => handleUpdateDraftFilterRule(idx, "value", `${parts[0] || ""}|${e.target.value}`)}
                             className={inputCls}
                           />
                         </div>
@@ -1284,7 +1292,7 @@ function EventsPageContent() {
                         <input
                           type="date"
                           value={(rule.value as string) || ""}
-                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          onChange={(e) => handleUpdateDraftFilterRule(idx, "value", e.target.value)}
                           className={inputCls}
                         />
                       );
@@ -1296,7 +1304,7 @@ function EventsPageContent() {
                           type="number"
                           value={(rule.value as string) || ""}
                           placeholder={t("Value")}
-                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          onChange={(e) => handleUpdateDraftFilterRule(idx, "value", e.target.value)}
                           className={inputCls}
                         />
                       );
@@ -1306,7 +1314,7 @@ function EventsPageContent() {
                       return (
                         <select
                           value={(rule.value as string) || ""}
-                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          onChange={(e) => handleUpdateDraftFilterRule(idx, "value", e.target.value)}
                           className={inputCls}
                         >
                           <option value="">{t("Select Status")}</option>
@@ -1321,7 +1329,7 @@ function EventsPageContent() {
                       return (
                         <select
                           value={(rule.value as string) || ""}
-                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          onChange={(e) => handleUpdateDraftFilterRule(idx, "value", e.target.value)}
                           className={inputCls}
                         >
                           <option value="">{t("Select Status")}</option>
@@ -1339,7 +1347,7 @@ function EventsPageContent() {
                           type="text"
                           value={(rule.value as string) || ""}
                           placeholder={rule.operator === "in_list" || rule.operator === "not_in_list" ? t("comma-separated") : t("Value")}
-                          onChange={(e) => handleUpdateFilterRule(idx, "value", e.target.value)}
+                          onChange={(e) => handleUpdateDraftFilterRule(idx, "value", e.target.value)}
                           className={inputCls}
                         />
                         {(rule.operator === "in_list" || rule.operator === "not_in_list") && (
@@ -1352,8 +1360,8 @@ function EventsPageContent() {
 
                 {/* Remove button */}
                 <button
-                  onClick={() => handleRemoveFilterRule(idx)}
-                  className="w-8 h-8 rounded-2xl bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger flex items-center justify-center transition-all shrink-0 self-end sm:self-auto"
+                  onClick={() => handleRemoveDraftFilterRule(idx)}
+                  className="w-8 h-8 rounded-2xl bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger flex items-center justify-center transition-all shrink-0 self-end sm:self-auto cursor-pointer"
                 >
                   <HiXMark className="w-4 h-4" />
                 </button>
@@ -1361,8 +1369,8 @@ function EventsPageContent() {
             ))}
 
             <button
-              onClick={handleAddFilterRule}
-              className="mt-2 h-[44px] border border-dashed border-primary/35 [@media(hover:hover)]:hover:bg-primary/5 rounded-2xl text-primary text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-[0.99]"
+              onClick={handleAddDraftFilterRule}
+              className="mt-2 h-[44px] border border-dashed border-primary/35 [@media(hover:hover)]:hover:bg-primary/5 rounded-2xl text-primary text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer"
             >
               <HiPlus className="w-4 h-4" />
               {t("Add Rule")}
@@ -1372,7 +1380,21 @@ function EventsPageContent() {
           <div className="flex justify-end gap-2 border-t border-border pt-4 mt-4">
             <button
               onClick={() => setIsFiltersOpen(false)}
-              className="h-[44px] px-6 rounded-2xl text-xs font-black uppercase tracking-wider bg-primary text-on-primary [@media(hover:hover)]:hover:opacity-90 transition-all border border-primary/20"
+              className="h-[44px] px-6 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted hover:text-foreground transition-all cursor-pointer"
+            >
+              {t("Cancel")}
+            </button>
+            <button
+              onClick={() => {
+                updateUrl({
+                  filters: draftFilters.length > 0 ? btoa(JSON.stringify(draftFilters)) : null,
+                  filterLogic: draftFilterLogic,
+                  page: "1",
+                  viewId: null
+                });
+                setIsFiltersOpen(false);
+              }}
+              className="h-[44px] px-6 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 transition-all border border-transparent cursor-pointer"
             >
               {t("Apply")}
             </button>

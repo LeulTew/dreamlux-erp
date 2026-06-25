@@ -432,6 +432,39 @@ export const eventProposalListQuerySchema = z.object({
   max_margin: z.coerce.number().optional(),
   min_profit: z.coerce.number().optional(),
   max_profit: z.coerce.number().optional(),
+  filterLogic: z.enum(["and", "or"]).optional().default("and"),
+  filters: z.preprocess((value) => {
+    if (value === undefined || value === null || value === "") return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }, z.array(z.object({
+    field: z.enum([
+      "name",
+      "client_name",
+      "venue_location",
+      "status",
+      "requested_budget",
+      "estimated_net_profit",
+      "estimated_margin_percentage",
+      "requested_start_date",
+      "requested_end_date",
+      "created_at",
+      "event_type_name",
+    ]),
+    operator: z.enum(["contains", "equals", "not_equals", "greater_than", "less_than", "between"]),
+    value: z.union([
+      z.string().max(500),
+      z.number(),
+      z.array(z.union([z.string().max(500), z.number()])).max(2),
+    ]).optional(),
+  })).max(25)).optional().default([]),
+  sortBy: z.enum(["name", "client_name", "requested_start_date", "requested_budget", "estimated_margin_percentage", "status", "created_at"]).optional(),
+  sortOrder: z.enum(["asc", "desc"]).optional(),
 }).refine((data) => {
   if (!data.start_date || !data.end_date) return true;
   return new Date(data.start_date) <= new Date(data.end_date);

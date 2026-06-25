@@ -35,6 +35,7 @@ import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { useLanguage } from "@/hooks/use-language";
 import { SortableHeader } from "@/components/ui/SortableHeader";
+import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -360,6 +361,8 @@ function EmployeesPageContent() {
   const [departmentId, setDepartmentId] = useState("all");
   const [sortBy, setSortBy] = useState("salary");
   const [sortOrder, setSortOrder] = useState("desc");
+  const [advancedFilters, setAdvancedFilters] = useState<FilterRule[]>([]);
+  const [filterLogic, setFilterLogic] = useState<"and" | "or">("and");
   const [exportingCSV, setExportingCSV] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -399,7 +402,39 @@ function EmployeesPageContent() {
     queryFn: () => getDepartments(),
   });
 
-  const employees = useMemo(() => data?.employees || [], [data?.employees]);
+  const rawEmployees = useMemo(() => data?.employees || [], [data?.employees]);
+
+  const employees = useMemo(() => {
+    let result = rawEmployees;
+    if (advancedFilters.length > 0) {
+      result = result.filter(emp => {
+        const matchFn = filterLogic === "or" ? "some" : "every";
+        return advancedFilters[matchFn](rule => {
+          let fieldVal: string | number | null | undefined;
+          if (rule.field === "department") fieldVal = emp.department;
+          else if (rule.field === "salary_level") fieldVal = emp.salary_level;
+          else if (rule.field === "phone") fieldVal = emp.phone;
+          else if (rule.field === "email") fieldVal = emp.email;
+          else if (rule.field === "employee_id") fieldVal = emp.employee_id;
+          else if (rule.field === "full_name") fieldVal = emp.full_name;
+          else fieldVal = undefined;
+
+          if (fieldVal === undefined || fieldVal === null) return false;
+
+          const valStr = String(fieldVal).toLowerCase();
+          const targetStr = String(rule.value).toLowerCase();
+
+          if (rule.operator === "contains") return valStr.includes(targetStr);
+          if (rule.operator === "equals") return valStr === targetStr;
+          if (rule.operator === "not_equals") return valStr !== targetStr;
+
+          return false;
+        });
+      });
+    }
+    return result;
+  }, [rawEmployees, advancedFilters, filterLogic]);
+
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / limit);
 
@@ -578,174 +613,180 @@ function EmployeesPageContent() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 2xl:gap-2">
-          <div className="relative flex-1 min-w-36 md:max-w-xs 2xl:max-w-sm">
-             <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-             <input
-                type="text"
-                placeholder={t("Search")}
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="w-full pl-9 2xl:pl-10 pr-3 2xl:pr-4 h-9 2xl:h-11 rounded-2xl bg-card-alt border border-border/20 focus:ring-2 focus:ring-primary/20 transition-all text-xs 2xl:text-sm outline-none shadow-sm"
-             />
+        <div className="flex flex-col gap-2.5 items-stretch sm:items-end flex-1 md:flex-initial">
+          {/* Row 1: Search & Filtering Inputs */}
+          <div className="flex flex-wrap items-center gap-1.5 2xl:gap-2 justify-start sm:justify-end">
+            <div className="relative flex-1 min-w-36 md:max-w-xs 2xl:max-w-sm">
+               <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+               <input
+                  type="text"
+                  placeholder={t("Search")}
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  className="w-full pl-9 2xl:pl-10 pr-3 2xl:pr-4 h-9 2xl:h-11 rounded-2xl bg-card-alt border border-border/20 focus:ring-2 focus:ring-primary/20 transition-all text-xs 2xl:text-sm outline-none shadow-sm"
+               />
+            </div>
+
+            <Select
+              options={[
+                { id: "all", label: t("All Offices") },
+                ...(stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []),
+              ]}
+              value={officeId}
+              onChange={(val) => { setOfficeId(val); setPage(1); }}
+              className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
+            />
+
+            <Select
+              options={[
+                { id: "all", label: t("All Depts") },
+                ...(departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []),
+              ]}
+              value={departmentId}
+              onChange={(val) => { setDepartmentId(val); setPage(1); }}
+              className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
+            />
+
+            <AdvancedFilterBuilder
+              pageKey="employees"
+              fields={[
+                { key: "full_name", label: t("Employee Name"), type: "string" },
+                { key: "employee_id", label: t("ID"), type: "string" },
+                { key: "department", label: t("Department"), type: "string" },
+                { key: "salary_level", label: t("Base Salary"), type: "string" },
+                { key: "phone", label: t("Phone"), type: "string" },
+                { key: "email", label: t("Email"), type: "string" },
+                { key: "store.name", label: t("Office"), type: "string" },
+              ]}
+              rules={advancedFilters}
+              logic={filterLogic}
+              onChange={(rules, logic) => {
+                setAdvancedFilters(rules);
+                setFilterLogic(logic);
+              }}
+              data={employees}
+            />
           </div>
 
-          <Select
-            options={[
-              { id: "all", label: t("All Offices") },
-              ...(stores?.map((s: { id: string; name: string }) => ({ id: s.id, label: s.name })) || []),
-            ]}
-            value={officeId}
-            onChange={(val) => { setOfficeId(val); setPage(1); }}
-            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
-          />
+          {/* Row 2: Sort, Add Employee, Edit, Export, Trash */}
+          <div className="flex flex-wrap items-center gap-1.5 2xl:gap-2 justify-start sm:justify-end border-t border-border/25 pt-2">
+            <Select
+              options={[
+                { id: "salary", label: t("Sort: Salary") },
+                { id: "name", label: t("Sort: Name") },
+                { id: "date", label: t("Sort: Recent") },
+              ]}
+              value={sortBy}
+              onChange={(val) => { setSortBy(val); setPage(1); }}
+              className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
+            />
 
-          <Select
-            options={[
-              { id: "all", label: t("All Depts") },
-              ...(departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []),
-            ]}
-            value={departmentId}
-            onChange={(val) => { setDepartmentId(val); setPage(1); }}
-            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
-          />
-
-          <Select
-            options={[
-              { id: "salary", label: t("Sort: Salary") },
-              { id: "name", label: t("Sort: Name") },
-              { id: "date", label: t("Sort: Recent") },
-            ]}
-            value={sortBy}
-            onChange={(val) => { setSortBy(val); setPage(1); }}
-            className="min-w-30 2xl:min-w-35 [&>button]:h-9 [&>button]:px-3 [&>button]:py-0 [&>button]:rounded-2xl [&>button]:text-xs 2xl:[&>button]:h-11 2xl:[&>button]:px-4 2xl:[&>button]:rounded-2xl 2xl:[&>button]:text-sm"
-          />
-
-          <Button
-            onClick={() => { setSortOrder(sortOrder === "asc" ? "desc" : "asc"); setPage(1); }}
-            variant="secondary"
-            className="w-9 h-9 2xl:w-11 2xl:h-11 p-0"
-            title={sortOrder === "asc" ? "Sort Ascending" : "Sort Descending"}
-          >
-            {sortOrder === "asc" ? "↑" : "↓"}
-          </Button>
-
-          <button
-            onClick={() => { setShowTrash(!showTrash); setPage(1); }}
-            className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-2xl text-xs 2xl:text-sm font-semibold transition-all ${
-              showTrash
-                ? "bg-rose-500/90 text-white shadow-sm hover:bg-rose-600"
-                : "bg-card-alt text-muted border border-border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 dark:hover:border-rose-900"
-            }`}
-          >
-            <HiTrash className="w-4 h-4" />
-            {showTrash ? t("Exit Trash") : t("Trash")}
-          </button>
-
-          {!showTrash && (
-            <PillButton
-              onClick={() => router.push("/insert")}
-              className="h-9 2xl:h-11 px-4 2xl:px-6 text-xs 2xl:text-sm font-bold"
-              icon={
-                <HiPlus className="w-4 h-4" />
-              }
-            >
-              {t("Add Employee")}
-            </PillButton>
-          )}
-
-          {!showTrash && (
             <Button
-              onClick={() => setEditMode(!editMode)}
-              variant={editMode ? "outline" : "secondary"}
-              className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
+              onClick={() => { setSortOrder(sortOrder === "asc" ? "desc" : "asc"); setPage(1); }}
+              variant="secondary"
+              className="w-9 h-9 2xl:w-11 2xl:h-11 p-0"
+              title={sortOrder === "asc" ? "Sort Ascending" : "Sort Descending"}
             >
-              <HiPencilSquare className="w-4 h-4" />
-              {editMode ? t("Done") : t("Quick Edit")}
+              {sortOrder === "asc" ? "↑" : "↓"}
             </Button>
-          )}
 
-          {showTrash && (
-            <>
+            <button
+              onClick={() => { setShowTrash(!showTrash); setPage(1); }}
+              className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-2xl text-xs 2xl:text-sm font-semibold transition-all ${
+                showTrash
+                  ? "bg-rose-500/90 text-white shadow-sm hover:bg-rose-600"
+                  : "bg-card-alt text-muted border border-border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 dark:hover:border-rose-900"
+              }`}
+            >
+              <HiTrash className="w-4 h-4" />
+              {showTrash ? t("Exit Trash") : t("Trash")}
+            </button>
+
+            {!showTrash && (
+              <PillButton
+                onClick={() => router.push("/insert")}
+                className="h-9 2xl:h-11 px-4 2xl:px-6 text-xs 2xl:text-sm font-bold"
+                icon={
+                  <HiPlus className="w-4 h-4" />
+                }
+              >
+                {t("Add Employee")}
+              </PillButton>
+            )}
+
+            {!showTrash && (
               <Button
-                onClick={() => {
-                  setSelectMode(!selectMode);
-                  if (selectMode) setSelectedIds(new Set());
-                }}
-                variant={selectMode ? "outline" : "secondary"}
+                onClick={() => setEditMode(!editMode)}
+                variant={editMode ? "outline" : "secondary"}
                 className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-                {selectMode ? `${selectedIds.size} ${t("Selected")}` : t("Select")}
+                {editMode ? t("Done") : t("Quick Edit")}
               </Button>
-              {selectMode && selectedIds.size > 0 && (
+            )}
+
+            {!showTrash && (
+              <div className="relative">
                 <Button
-                  onClick={() => setShowDeleteModal(true)}
-                  variant="destructive"
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  variant={exportMenuOpen ? "default" : "secondary"}
                   className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
                 >
-                  <HiTrash className="w-4 h-4" />
-                  {t("Delete")} {selectedIds.size}
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  {t("Export")}
+                  <svg className={`w-3.5 h-3.5 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
                 </Button>
-              )}
-            </>
-          )}
-
-          {!showTrash && (
-            <div className="relative">
-	              <Button
-	                onClick={() => setExportMenuOpen(!exportMenuOpen)}
-	                variant={exportMenuOpen ? "default" : "secondary"}
-	                className="h-9 2xl:h-11 px-3 2xl:px-4 text-xs 2xl:text-sm"
-	              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                {t("Export")}
-                <svg className={`w-3.5 h-3.5 transition-transform ${exportMenuOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-              </Button>
-              <AnimatePresence>
-                {exportMenuOpen && (
-                  <>
-                     <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
-                     <motion.div
-                       initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                       exit={{ opacity: 0, y: 4, scale: 0.96 }}
-                       transition={{ duration: 0.15 }}
-                       className="absolute right-0 mt-2 w-40 bg-card border border-border rounded-xl shadow-premium overflow-hidden z-50 flex flex-col text-foreground"
-                     >
-                       <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">{t("Choose Format")}</div>
-                       <button
-                         onClick={() => { handleExportCSV(); setExportMenuOpen(false); }}
-                         disabled={exportingCSV}
-                         className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full disabled:opacity-50 font-semibold text-foreground"
-                       >
-                         <svg className="w-4 h-4 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0 1 18 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0 1 18 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 0 1 6 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-9.75 0h9.75" /></svg>
-                         {exportingCSV ? "Exporting…" : t("CSV Spreadsheet")}
-                       </button>
-                       <button
-                         onClick={() => { handleExportExcel(); setExportMenuOpen(false); }}
-                         disabled={exportingExcel}
-                         className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border disabled:opacity-50 font-semibold text-foreground"
-                       >
-                         <svg className="w-4 h-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                         {exportingExcel ? "Exporting…" : t("Excel Workbook")}
-                       </button>
-                       <button
-                         onClick={() => { setIsPrintModalOpen(true); setExportMenuOpen(false); }}
-                         className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border font-semibold text-foreground"
-                       >
-                         <svg className="w-4 h-4 text-rose-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                         {t("PDF Report")}
-                       </button>
-                     </motion.div>
-                   </>
-                 )}
-               </AnimatePresence>
-             </div>
-           )}
-
+                <AnimatePresence>
+                  {exportMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute right-0 mt-2 w-40 bg-card border border-border rounded-xl shadow-premium overflow-hidden z-50 flex flex-col text-foreground"
+                      >
+                        <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/80">{t("Choose Format")}</div>
+                        <button
+                          onClick={() => { handleExportCSV(); setExportMenuOpen(false); }}
+                          disabled={exportingCSV}
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full disabled:opacity-50 font-semibold text-foreground"
+                        >
+                          <svg className="w-4 h-4 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0 1 18 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0 1 18 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 0 1 6 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-9.75 0h9.75" />
+                          </svg>
+                          {exportingCSV ? "Exporting…" : t("CSV Spreadsheet")}
+                        </button>
+                        <button
+                          onClick={() => { handleExportExcel(); setExportMenuOpen(false); }}
+                          disabled={exportingExcel}
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border disabled:opacity-50 font-semibold text-foreground"
+                        >
+                          <svg className="w-4 h-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                          </svg>
+                          {exportingExcel ? "Exporting…" : t("Excel Workbook")}
+                        </button>
+                        <button
+                          onClick={() => { setIsPrintModalOpen(true); setExportMenuOpen(false); }}
+                          className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-card-alt transition-colors w-full border-t border-border font-semibold text-foreground"
+                        >
+                          <svg className="w-4 h-4 text-rose-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                          </svg>
+                          {t("PDF Report")}
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

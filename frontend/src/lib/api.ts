@@ -1323,6 +1323,23 @@ export const setDefaultEventSavedView = (id: string) =>
 export const getEventProposals = (params: Record<string, unknown> = {}) =>
   api.get("/events/proposals", { params }).then((r) => r.data);
 
+export type EventProposalFilter = {
+  field:
+    | "name"
+    | "client_name"
+    | "venue_location"
+    | "status"
+    | "requested_budget"
+    | "estimated_net_profit"
+    | "estimated_margin_percentage"
+    | "requested_start_date"
+    | "requested_end_date"
+    | "created_at"
+    | "event_type_name";
+  operator: "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "between";
+  value?: string | number | Array<string | number>;
+};
+
 export const createEventProposal = (data: Record<string, unknown>) =>
   api.post("/events/proposals", data).then((r) => r.data);
 

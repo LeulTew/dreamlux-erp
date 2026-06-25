@@ -396,6 +396,7 @@ function AssetsContent() {
   const [fromDateTime, setFromDateTime] = useState(() => searchParams.get("from") || "");
   const [toDateTime, setToDateTime] = useState(() => searchParams.get("to") || "");
   const [advancedFilters, setAdvancedFilters] = useState<FilterRule[]>([]);
+  const [filterLogic, setFilterLogic] = useState<"and" | "or">("and");
   const [limit, setLimit] = useState(10);
   const showTrash = false;
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -508,7 +509,8 @@ function AssetsContent() {
 
     if (advancedFilters.length > 0) {
       result = result.filter(item => {
-        return advancedFilters.every(rule => {
+        const matchFn = filterLogic === "or" ? "some" : "every";
+        return advancedFilters[matchFn](rule => {
           let fieldVal: string | number | undefined;
           if (rule.field === "store.name") fieldVal = item.store?.name;
           else if (rule.field === "description") fieldVal = item.description || undefined;
@@ -529,6 +531,12 @@ function AssetsContent() {
             case "not_equals": return sVal !== rVal;
             case "greater_than": return !isNaN(nVal) && !isNaN(nrVal) && nVal > nrVal;
             case "less_than": return !isNaN(nVal) && !isNaN(nrVal) && nVal < nrVal;
+            case "between": {
+              const parts = rule.value.split("|");
+              const start = parts[0] || "";
+              const end = parts[1] || "";
+              return sVal >= start.toLowerCase() && sVal <= end.toLowerCase();
+            }
             default: return true;
           }
         });
@@ -536,7 +544,7 @@ function AssetsContent() {
     }
 
     return result;
-  }, [items, searchTerm, advancedFilters]);
+  }, [items, searchTerm, advancedFilters, filterLogic]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -1016,7 +1024,24 @@ function AssetsContent() {
           />
         </div>
 
-        <div className="lg:col-span-2 flex items-end">
+        <div className="lg:col-span-2 flex items-end gap-2">
+          <AdvancedFilterBuilder
+            pageKey="assets"
+            fields={[
+              { key: "name", label: t("Asset Name"), type: "string" },
+              { key: "store.name", label: t("Office"), type: "string" },
+              { key: "quantity", label: t("Quantity"), type: "number" },
+              { key: "description", label: t("Description"), type: "string" },
+            ]}
+            rules={advancedFilters}
+            logic={filterLogic}
+            onChange={(rules, logic) => {
+              setAdvancedFilters(rules);
+              setFilterLogic(logic);
+              setPage(1);
+            }}
+            data={items}
+          />
           <button
             onClick={() => {
               setOfficeFilter("all");
@@ -1029,24 +1054,11 @@ function AssetsContent() {
               setAdvancedFilters([]);
               setPage(1);
             }}
-            className="w-full h-11 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider bg-card-alt text-foreground border border-border hover:bg-border transition-all"
+            className="flex-1 h-11 px-3 rounded-xl text-[10px] sm:text-xs font-semibold uppercase tracking-wider bg-card-alt text-foreground border border-border hover:bg-border transition-all"
           >
             {t("Clear Filters")}
           </button>
         </div>
-      </div>
-
-      <div className="mt-4 px-2">
-        <AdvancedFilterBuilder
-          fields={[
-            { key: "name", label: "Asset Name", type: "string" },
-            { key: "store.name", label: "Office", type: "string" },
-            { key: "quantity", label: "Quantity", type: "number" },
-            { key: "description", label: "Description", type: "string" },
-          ]}
-          rules={advancedFilters}
-          onChange={setAdvancedFilters}
-        />
       </div>
 
       <div className="mt-8 overflow-hidden glass-card rounded-4xl hidden md:block">

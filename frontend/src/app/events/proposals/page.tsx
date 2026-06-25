@@ -17,6 +17,9 @@ import Select from "@/components/ui/Select";
 import PaginationControls from "@/components/PaginationControls";
 import Link from "next/link";
 import { useLanguage } from "@/hooks/use-language";
+import { SortableHeader } from "@/components/ui/SortableHeader";
+import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
+import type { EventProposalFilter } from "@/lib/api";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -44,7 +47,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Active Intake": "Active Intake",
     "Conversion Rate": "Conversion Rate",
     "Avg Margin": "Avg Margin",
-    "Date": "Requested Date"
+    "Date": "Requested Date",
+    "Clear": "Clear"
   },
   am: {
     "Event Proposals": "የዝግጅት ፕሮፖዛሎች",
@@ -71,7 +75,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Active Intake": "በሂደት ላይ",
     "Conversion Rate": "የመለወጥ መጠን",
     "Avg Margin": "አማካይ ህዳግ",
-    "Date": "የተጠየቀ ቀን"
+    "Date": "የተጠየቀ ቀን",
+    "Clear": "አጽዳ"
   }
 };
 
@@ -82,7 +87,35 @@ export default function ProposalsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [sortBy, setSortBy] = useState<string>("created_at");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [advancedFilters, setAdvancedFilters] = useState<FilterRule[]>([]);
+  const [filterLogic, setFilterLogic] = useState<"and" | "or">("and");
   const limit = 10;
+
+  const serverFilters = useMemo<EventProposalFilter[]>(() => {
+    return advancedFilters.map((rule) => {
+      if (rule.operator === "between") {
+        const parts = rule.value.split("|").map((part) => part.trim()).filter(Boolean);
+        return {
+          field: rule.field as EventProposalFilter["field"],
+          operator: rule.operator,
+          value: parts.slice(0, 2),
+        };
+      }
+      const numericFields = new Set([
+        "requested_budget",
+        "estimated_net_profit",
+        "estimated_margin_percentage",
+      ]);
+      const isNumericField = numericFields.has(rule.field);
+      return {
+        field: rule.field as EventProposalFilter["field"],
+        operator: rule.operator,
+        value: isNumericField && rule.value.trim() !== "" ? Number(rule.value) : rule.value,
+      };
+    });
+  }, [advancedFilters]);
 
   const { data, isLoading } = useQuery<{
     proposals: EventProposal[];
@@ -91,16 +124,20 @@ export default function ProposalsPage() {
     limit: number;
     totalPages: number;
   }>({
-    queryKey: ["event-proposals", page, search, status],
+    queryKey: ["event-proposals", page, search, status, sortBy, sortOrder, filterLogic, serverFilters],
     queryFn: () => getEventProposals({
       page,
       limit,
       search: search || undefined,
-      status: status === "all" ? undefined : status
+      status: status === "all" ? undefined : status,
+      filterLogic,
+      sortBy,
+      sortOrder,
+      filters: serverFilters.length > 0 ? serverFilters : undefined,
     }),
   });
 
-  const proposals = useMemo(() => data?.proposals || [], [data?.proposals]);
+  const proposals = data?.proposals || [];
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
 
@@ -223,38 +260,83 @@ export default function ProposalsPage() {
         </div>
 
         {/* Filters Toolbar */}
-        <div className="bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="relative flex-1 min-w-[200px] md:max-w-xs">
-            <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-            <input
-              type="text"
-              placeholder={t("Search Proposals")}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full pl-10 pr-4 h-[44px] rounded-xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
-            />
-          </div>
+        <div className="bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 mb-6 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="relative flex-1 min-w-[200px] md:max-w-xs">
+              <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                type="text"
+                placeholder={t("Search Proposals")}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-10 pr-4 h-[44px] rounded-xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
+              />
+            </div>
 
-          <Select
-            options={[
-              { id: "all", label: t("All Statuses") },
-              { id: "Draft", label: t("Draft") },
-              { id: "Submitted", label: t("Submitted") },
-              { id: "Approved", label: t("Approved") },
-              { id: "Rejected", label: t("Rejected") },
-              { id: "Converted", label: t("Converted") },
-              { id: "Canceled", label: t("Canceled") }
-            ]}
-            value={status}
-            onChange={(val) => {
-              setStatus(val);
-              setPage(1);
-            }}
-            className="min-w-[150px] rounded-xl border-border"
-          />
+            <div className="flex items-center gap-2">
+              <Select
+                options={[
+                  { id: "all", label: t("All Statuses") },
+                  { id: "Draft", label: t("Draft") },
+                  { id: "Submitted", label: t("Submitted") },
+                  { id: "Approved", label: t("Approved") },
+                  { id: "Rejected", label: t("Rejected") },
+                  { id: "Converted", label: t("Converted") },
+                  { id: "Canceled", label: t("Canceled") }
+                ]}
+                value={status}
+                onChange={(val) => {
+                  setStatus(val);
+                  setPage(1);
+                }}
+                className="min-w-[150px] rounded-xl border-border"
+              />
+              <AdvancedFilterBuilder
+                pageKey="proposals"
+                fields={[
+                  { key: "name", label: t("Proposal Name"), type: "string" },
+                  { key: "client_name", label: t("Client"), type: "string" },
+                  { key: "requested_budget", label: t("Budget"), type: "number" },
+                  { key: "estimated_margin_percentage", label: t("Margin %"), type: "number" },
+                  { key: "venue_location", label: t("Venue"), type: "string" },
+                  {
+                    key: "status",
+                    label: t("Status"),
+                    type: "select",
+                    options: [
+                      { id: "Draft", label: "Draft" },
+                      { id: "Submitted", label: "Submitted" },
+                      { id: "Approved", label: "Approved" },
+                      { id: "Rejected", label: "Rejected" },
+                      { id: "Converted", label: "Converted" },
+                    ],
+                  },
+                ]}
+                rules={advancedFilters}
+                logic={filterLogic}
+                onChange={(rules, logic) => {
+                  setAdvancedFilters(rules);
+                  setFilterLogic(logic);
+                  setPage(1);
+                }}
+                data={data?.proposals || []}
+              />
+              {advancedFilters.length > 0 && (
+                <button
+                  onClick={() => {
+                    setAdvancedFilters([]);
+                    setPage(1);
+                  }}
+                  className="h-10 px-4 text-xs font-semibold uppercase tracking-wider bg-card-alt border border-border text-foreground hover:bg-border rounded-xl transition-all"
+                >
+                  {t("Clear")}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* List content */}
@@ -279,12 +361,86 @@ export default function ProposalsPage() {
                 <thead>
                   <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
                     <th className="px-6 py-4">#</th>
-                    <th className="px-6 py-4">{t("Proposal Name")}</th>
-                    <th className="px-6 py-4">{t("Client")}</th>
-                    <th className="px-6 py-4">{t("Date")}</th>
-                    <th className="px-6 py-4 text-right">{t("Budget")}</th>
-                    <th className="px-6 py-4 text-right">{t("Margin %")}</th>
-                    <th className="px-6 py-4">{t("Status")}</th>
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Proposal Name")}
+                        sortKey="name"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={(key, order) => {
+                          setSortBy(key);
+                          setSortOrder(order);
+                          setPage(1);
+                        }}
+                      />
+                    </th>
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Client")}
+                        sortKey="client_name"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={(key, order) => {
+                          setSortBy(key);
+                          setSortOrder(order);
+                          setPage(1);
+                        }}
+                      />
+                    </th>
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Date")}
+                        sortKey="requested_start_date"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={(key, order) => {
+                          setSortBy(key);
+                          setSortOrder(order);
+                          setPage(1);
+                        }}
+                      />
+                    </th>
+                    <th className="px-6 py-4 text-right">
+                      <SortableHeader
+                        label={t("Budget")}
+                        sortKey="requested_budget"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        align="right"
+                        onSort={(key, order) => {
+                          setSortBy(key);
+                          setSortOrder(order);
+                          setPage(1);
+                        }}
+                      />
+                    </th>
+                    <th className="px-6 py-4 text-right">
+                      <SortableHeader
+                        label={t("Margin %")}
+                        sortKey="estimated_margin_percentage"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        align="right"
+                        onSort={(key, order) => {
+                          setSortBy(key);
+                          setSortOrder(order);
+                          setPage(1);
+                        }}
+                      />
+                    </th>
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Status")}
+                        sortKey="status"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={(key, order) => {
+                          setSortBy(key);
+                          setSortOrder(order);
+                          setPage(1);
+                        }}
+                      />
+                    </th>
                     <th className="px-6 py-4 text-right">{t("Actions")}</th>
                   </tr>
                 </thead>
