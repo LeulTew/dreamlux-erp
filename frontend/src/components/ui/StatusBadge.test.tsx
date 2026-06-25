@@ -50,4 +50,27 @@ describe("StatusBadge component", () => {
     expect(container).not.toBeNull();
     expect(container!.className).toContain("bg-card-alt");
   });
+
+  it("maps blocked and overdue statuses to the correct semantic variants", () => {
+    const { rerender } = render(<StatusBadge status="Blocked" />);
+    expect(screen.getByText("Blocked").parentElement?.className).toContain("bg-danger/10");
+
+    rerender(<StatusBadge status="Overdue" />);
+    expect(screen.getByText("Overdue").parentElement?.className).toContain("bg-warning/10");
+  });
+
+  it("maps archived and restricted statuses to neutral and info variants", () => {
+    const { rerender } = render(<StatusBadge status="Archived" />);
+    expect(screen.getByText("Archived").parentElement?.className).toContain("bg-card-alt");
+
+    rerender(<StatusBadge status="Restricted" />);
+    expect(screen.getByText("Restricted").parentElement?.className).toContain("bg-primary-light");
+  });
+
+  it("renders Amharic translations for standardized statuses", () => {
+    localStorage.setItem("lang", "am");
+    render(<StatusBadge status="Blocked" />);
+    expect(screen.getByText("የተከለከለ")).toBeInTheDocument();
+    localStorage.removeItem("lang");
+  });
 });

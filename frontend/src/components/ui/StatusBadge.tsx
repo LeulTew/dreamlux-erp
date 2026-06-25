@@ -17,6 +17,8 @@ interface StatusBadgeProps {
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
+    ARCHIVED: "Archived",
+    BLOCKED: "Blocked",
     PLANNED: "Planned",
     ONGOING: "Ongoing",
     COMPLETED: "Completed",
@@ -30,12 +32,16 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     FINALIZED: "Finalized",
     FLAGGED_WRONG: "Flagged Incorrect",
     PENDING: "Pending",
+    OVERDUE: "Overdue",
     ALLOCATED: "Allocated",
     RETURNED: "Returned",
     RESERVED: "Reserved",
     PULLED: "Pulled",
+    RESTRICTED: "Restricted",
   },
   am: {
+    ARCHIVED: "በማህደር የተያዘ",
+    BLOCKED: "የተከለከለ",
     PLANNED: "ቀጠሮ የተያዘ",
     ONGOING: "በሂደት ላይ",
     COMPLETED: "የተጠናቀቀ",
@@ -49,10 +55,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     FINALIZED: "የተጠናቀቀ",
     FLAGGED_WRONG: "ስህተት የተገኘበት",
     PENDING: "በመጠባበቅ ላይ",
+    OVERDUE: "ያለፈ ጊዜ",
     ALLOCATED: "የተመደበ",
     RETURNED: "የተመለሰ",
     RESERVED: "የተያዘ",
     PULLED: "የወጣ",
+    RESTRICTED: "የተገደበ",
   }
 };
 
@@ -75,18 +83,22 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
     case "SUBMITTED":
     case "DRAFT":
     case "PENDING":
+    case "OVERDUE":
       variant = "warning";
       break;
     case "REJECTED":
     case "FLAGGED_WRONG":
+    case "BLOCKED":
       variant = "danger";
       break;
     case "RESERVED":
     case "PLANNED":
     case "CONVERTED":
     case "ALLOCATED":
+    case "RESTRICTED":
       variant = "info";
       break;
+    case "ARCHIVED":
     case "CANCELED":
     case "CANCELLED":
     default:
