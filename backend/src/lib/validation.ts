@@ -20,6 +20,13 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(5000).optional().default(50),
 });
 
+export const assetsPaginationSchema = paginationSchema.extend({
+  sortBy: z.enum(["name", "quantity", "created_at", "updated_at", "last_counted_at"]).optional().default("created_at"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+});
+
+export type AssetsPaginationInput = z.infer<typeof assetsPaginationSchema>;
+
 export const reconcileItemsSchema = z.object({
   store_id: z.string().uuid("Invalid store ID").optional().nullable(),
   notes: z.string().max(2000, "Notes too long").optional(),

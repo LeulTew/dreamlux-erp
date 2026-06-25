@@ -37,6 +37,7 @@ import { useAuth } from "@/hooks/useAuth";
 import toast from "react-hot-toast";
 import { fuzzySearch } from "@/lib/fuzzy-search";
 import { useLanguage } from "@/hooks/use-language";
+import { SortableHeader } from "@/components/ui/SortableHeader";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -173,6 +174,10 @@ function buildColumns(
   setReconcileCount: (id: string, qty: number) => void,
   setItemToRecover: (item: Item) => void,
   t: (key: string) => string,
+  sortBy: string,
+  sortOrder: string,
+  setSortBy: (val: string) => void,
+  setSortOrder: (val: string) => void,
 ) {
   return [
     ...(selectMode
@@ -208,7 +213,18 @@ function buildColumns(
       size: 80,
     }),
     columnHelper.accessor("name", {
-      header: t("Asset Name"),
+      header: () => (
+        <SortableHeader
+          label={t("Asset Name")}
+          sortKey="name"
+          currentSortBy={sortBy}
+          currentSortOrder={sortOrder}
+          onSort={(key, order) => {
+            setSortBy(key);
+            setSortOrder(order);
+          }}
+        />
+      ),
       cell: ({ row, getValue }) =>
         editMode ? (
           <div className="flex-1">
@@ -230,7 +246,18 @@ function buildColumns(
         ),
     }),
     columnHelper.accessor("quantity", {
-      header: t("Qty"),
+      header: () => (
+        <SortableHeader
+          label={t("Qty")}
+          sortKey="quantity"
+          currentSortBy={sortBy}
+          currentSortOrder={sortOrder}
+          onSort={(key, order) => {
+            setSortBy(key);
+            setSortOrder(order);
+          }}
+        />
+      ),
       cell: ({ row, getValue }) => {
         if (reconcileMode) {
           const currentCount = reconcileCounts.get(row.original.id) ?? getValue();
@@ -380,6 +407,8 @@ function AssetsContent() {
 
   const [page, setPage] = useState(1);
   const [editMode, setEditMode] = useState(false);
+  const [sortBy, setSortBy] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState("desc");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -446,7 +475,7 @@ function AssetsContent() {
   });
 
   const { data, isLoading } = useQuery<ItemsResponse>({
-    queryKey: ["assets", officeFilter, page, limit, stockFilter, searchTerm, fromDateTime, toDateTime],
+    queryKey: ["assets", officeFilter, page, limit, stockFilter, searchTerm, fromDateTime, toDateTime, sortBy, sortOrder],
     queryFn: () =>
       getItems(
         page,
@@ -458,6 +487,8 @@ function AssetsContent() {
         stockFilter === "low-stock" ? "low-stock" : undefined,
         fromDateTime || undefined,
         toDateTime || undefined,
+        sortBy,
+        sortOrder,
       ),
   });
 
@@ -719,6 +750,10 @@ function AssetsContent() {
     setReconcileCount,
     setItemToRecover,
     t,
+    sortBy,
+    sortOrder,
+    setSortBy,
+    setSortOrder,
   );
 
   const table = useAssetsTable(filteredItems, columns);

@@ -296,6 +296,16 @@ describe("Payroll API > GET /payroll/runs", () => {
     expect(res.body[0].year).toBe(2026);
   });
 
+  test("rejects unsupported sort fields before querying payroll runs", async () => {
+    const res = await request(app)
+      .get("/payroll/runs?sortBy=period_start%3B%20DROP%20TABLE%20payroll_runs")
+      .set("Authorization", AUTH());
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Unsupported payroll run sort field/i);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   test("requires authentication", async () => {
     const res = await request(app).get("/payroll/runs");
     expect(res.status).toBe(401);

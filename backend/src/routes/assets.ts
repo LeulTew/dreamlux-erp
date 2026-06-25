@@ -11,8 +11,10 @@ import {
   createItemSchema,
   updateItemSchema,
   paginationSchema,
+  assetsPaginationSchema,
   reconcileItemsSchema,
 } from "../lib/validation";
+import { ZodError } from "zod";
 import { pool } from "../db/pool";
 import {
   addLegacyRunsToDeletedFallback,
@@ -891,12 +893,12 @@ router.get(
 
 router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const pagination = paginationSchema.parse(req.query);
+    const pagination = assetsPaginationSchema.parse(req.query);
     const filter = req.query.filter as string | undefined;
     const search = req.query.search as string | undefined;
     const from = req.query.from as string | undefined;
     const to = req.query.to as string | undefined;
-    const { store, page, limit } = pagination;
+    const { store, page, limit, sortBy, sortOrder } = pagination;
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
     const trashFlag = req.query.trash;
@@ -952,7 +954,7 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
       }
 
       return filteredQuery
-        .order("created_at", { ascending: false })
+        .order(sortBy, { ascending: sortOrder === "asc" })
         .range(offset, offset + limit - 1);
     };
 
@@ -1041,6 +1043,13 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
 
     res.json({ items, total: count || 0, page, limit });
   } catch (error: unknown) {
+    if (error instanceof ZodError) {
+      res.status(400).json({
+        error: "Invalid asset query parameters",
+        details: error.issues.map((issue) => issue.message),
+      });
+      return;
+    }
     console.error("Failed to fetch items:", error);
     res.status(500).json({
       error: "Failed to fetch items",

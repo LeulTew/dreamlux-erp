@@ -38,6 +38,7 @@ import EditEventSheet from "@/components/EditEventSheet";
 import PaginationControls from "@/components/PaginationControls";
 import Link from "next/link";
 import { useLanguage } from "@/hooks/use-language";
+import { SortableHeader } from "@/components/ui/SortableHeader";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import ImportWizard from "@/components/ImportWizard";
@@ -635,9 +636,9 @@ function EventsPageContent() {
   };
 
   // Sorting columns triggers
-  const handleSort = (field: string) => {
-    const order = sortBy === field && sortOrder === "asc" ? "desc" : "asc";
-    updateUrl({ sortBy: field, sortOrder: order });
+  const handleSort = (field: string, order?: "asc" | "desc") => {
+    const nextOrder = order ?? (sortBy === field && sortOrder === "asc" ? "desc" : "asc");
+    updateUrl({ sortBy: field, sortOrder: nextOrder });
   };
 
   // Export downloads triggers
@@ -946,24 +947,61 @@ function EventsPageContent() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
-                    <th className="px-6 py-4">#</th>
-                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("name")}>
-                      {t("Event Title")} {sortBy === "name" && (sortOrder === "asc" ? "▲" : "▼")}
+                    <th className="px-6 py-4 text-xs font-black tracking-[0.2em] text-muted">#</th>
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Event Title")}
+                        sortKey="name"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
                     </th>
-                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("client_name")}>
-                      {t("Client Name")} {sortBy === "client_name" && (sortOrder === "asc" ? "▲" : "▼")}
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Client Name")}
+                        sortKey="client_name"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
                     </th>
-                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("start_date")}>
-                      {t("Date")} {sortBy === "start_date" && (sortOrder === "asc" ? "▲" : "▼")}
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Date")}
+                        sortKey="start_date"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
                     </th>
-                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("venue_location")}>
-                      {t("Venue")} {sortBy === "venue_location" && (sortOrder === "asc" ? "▲" : "▼")}
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Venue")}
+                        sortKey="venue_location"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
                     </th>
-                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50 text-right" onClick={() => handleSort("contract_price")}>
-                      {t("Price")} {sortBy === "contract_price" && (sortOrder === "asc" ? "▲" : "▼")}
+                    <th className="px-6 py-4 text-right">
+                      <SortableHeader
+                        label={t("Price")}
+                        sortKey="contract_price"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={handleSort}
+                        align="right"
+                      />
                     </th>
-                    <th className="px-6 py-4 cursor-pointer [@media(hover:hover)]:hover:bg-card-alt/50" onClick={() => handleSort("status")}>
-                      {t("Status")} {sortBy === "status" && (sortOrder === "asc" ? "▲" : "▼")}
+                    <th className="px-6 py-4">
+                      <SortableHeader
+                        label={t("Status")}
+                        sortKey="status"
+                        currentSortBy={sortBy}
+                        currentSortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
                     </th>
                     <th className="px-6 py-4 text-right no-print">{t("Actions")}</th>
                   </tr>

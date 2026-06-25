@@ -458,12 +458,14 @@ export const getItems = (
   filter?: string,
   from?: string,
   to?: string,
+  sortBy?: string,
+  sortOrder?: string,
 ) =>
 {
   const resolvedStatus = status ?? (showTrash ? "trash" : undefined);
 
   return getWithAliasFallback<ItemsResponse>("/assets", {
-    params: { page, limit, search, store, trash: showTrash, status: resolvedStatus, filter, from, to },
+    params: { page, limit, search, store, trash: showTrash, status: resolvedStatus, filter, from, to, sortBy, sortOrder },
   });
 };
 
