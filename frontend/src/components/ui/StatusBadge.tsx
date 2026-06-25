@@ -118,10 +118,10 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[10px] font-black uppercase tracking-wider border leading-none shrink-0 ${variantStyles[variant]}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[9px] font-medium tracking-wide border leading-none shrink-0 ${variantStyles[variant]}`}
     >
       <IconComponent className="w-3.5 h-3.5 shrink-0" />
-      <span>{translated}</span>
+      <span className="md:hidden lg:inline">{translated}</span>
     </span>
   );
 }
