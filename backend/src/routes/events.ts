@@ -996,7 +996,101 @@ router.use(createEventProposalsRouter());
 router.use(createEventSavedViewsRouter());
 router.use(createEventProfitReportsRouter());
 
-// GET /events/expenses/pending - accountant approval queue
+// Helper to build filters for expenses
+function buildExpensesQuery(req: AuthRequest, statusMode: "Pending" | "History") {
+  const page = parseInt(req.query.page as string, 10) || 1;
+  const limit = parseInt(req.query.limit as string, 10) || 15;
+  const offset = (page - 1) * limit;
+
+  const params: any[] = [];
+  const whereClauses: string[] = [];
+
+  if (statusMode === "Pending") {
+    whereClauses.push("exp.status = 'Pending'");
+  } else {
+    if (req.query.status && (req.query.status === "Approved" || req.query.status === "Rejected")) {
+      params.push(req.query.status);
+      whereClauses.push(`exp.status = $${params.length}`);
+    } else {
+      whereClauses.push("exp.status IN ('Approved', 'Rejected')");
+    }
+  }
+
+  whereClauses.push("e.deleted_at IS NULL");
+
+  if (req.query.search) {
+    params.push(`%${req.query.search}%`);
+    const pIdx = params.length;
+    whereClauses.push(`(
+      e.name ILIKE $${pIdx} OR 
+      exp.category ILIKE $${pIdx} OR 
+      submitter.full_name ILIKE $${pIdx}
+    )`);
+  }
+
+  if (req.query.category) {
+    params.push(req.query.category);
+    whereClauses.push(`exp.category = $${params.length}`);
+  }
+
+  if (req.query.date_from) {
+    params.push(req.query.date_from);
+    whereClauses.push(`exp.created_at >= $${params.length}::timestamp`);
+  }
+  if (req.query.date_to) {
+    params.push(`${req.query.date_to} 23:59:59.999`);
+    whereClauses.push(`exp.created_at <= $${params.length}::timestamp`);
+  }
+
+  if (req.query.amount_min) {
+    params.push(parseFloat(req.query.amount_min as string));
+    whereClauses.push(`exp.amount >= $${params.length}`);
+  }
+  if (req.query.amount_max) {
+    params.push(parseFloat(req.query.amount_max as string));
+    whereClauses.push(`exp.amount <= $${params.length}`);
+  }
+
+  if (statusMode === "History" && req.query.reviewer) {
+    params.push(`%${req.query.reviewer}%`);
+    whereClauses.push(`reviewer.full_name ILIKE $${params.length}`);
+  }
+
+  let sortSql = "exp.created_at";
+  let sortDir = "DESC";
+  if (statusMode === "History" && req.query.sort_by) {
+    const allowedSortFields = ["amount", "created_at", "approved_at", "category", "event_name"];
+    const sortBy = req.query.sort_by as string;
+    if (allowedSortFields.includes(sortBy)) {
+      if (sortBy === "event_name") {
+        sortSql = "e.name";
+      } else {
+        sortSql = `exp.${sortBy}`;
+      }
+    }
+    const order = req.query.sort_order as string;
+    if (order === "asc" || order === "desc") {
+      sortDir = order.toUpperCase();
+    }
+  } else if (statusMode === "Pending") {
+    sortSql = "exp.created_at";
+    sortDir = "ASC";
+  }
+
+  const whereClause = whereClauses.length > 0 ? whereClauses.join(" AND ") : "1=1";
+
+  return {
+    params,
+    whereClause,
+    sortSql,
+    sortDir,
+    limit,
+    offset,
+    page
+  };
+}
+
+// GET /events/expenses/pending - accountant approval queue (paginated & filtered)
 router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     if (!canApproveExpenses(req)) {
@@ -1004,22 +1098,108 @@ router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Respo
       return;
     }
 
-    const result = await pool.query(`
+    const { params, whereClause, sortSql, sortDir, limit, offset, page } = buildExpensesQuery(req, "Pending");
+
+    const countQuery = `
+      SELECT COUNT(*)::integer AS count
+      FROM expenses exp
+      JOIN events e ON exp.event_id = e.id
+      LEFT JOIN users submitter ON exp.created_by = submitter.id
+      LEFT JOIN users reviewer ON exp.approved_by = reviewer.id
+      WHERE ${whereClause}
+    `;
+    const countRes = await pool.query(countQuery, params);
+    const total = countRes.rows[0].count;
+
+    const dataParams = [...params];
+    dataParams.push(limit);
+    const limitPlaceholder = `$${dataParams.length}`;
+    dataParams.push(offset);
+    const offsetPlaceholder = `$${dataParams.length}`;
+
+    const dataQuery = `
       SELECT
         exp.*,
         e.name AS event_name,
         e.client_name,
         e.venue_location,
-        submitter.full_name AS submitted_by_name
+        submitter.full_name AS submitted_by_name,
+        reviewer.full_name AS approved_by_name
       FROM expenses exp
       JOIN events e ON exp.event_id = e.id
       LEFT JOIN users submitter ON exp.created_by = submitter.id
-      WHERE exp.status = 'Pending' AND e.deleted_at IS NULL
-      ORDER BY exp.created_at ASC
-    `);
-    res.json(result.rows);
+      LEFT JOIN users reviewer ON exp.approved_by = reviewer.id
+      WHERE ${whereClause}
+      ORDER BY ${sortSql} ${sortDir}
+      LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}
+    `;
+    const dataRes = await pool.query(dataQuery, dataParams);
+
+    res.json({
+      data: dataRes.rows,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error: any) {
     console.error("[get-pending-expenses] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/expenses/history - accountant expense history queue (paginated & filtered)
+router.get("/expenses/history", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canApproveExpenses(req)) {
+      res.status(403).json({ error: "Forbidden: Missing expense approval permission" });
+      return;
+    }
+
+    const { params, whereClause, sortSql, sortDir, limit, offset, page } = buildExpensesQuery(req, "History");
+
+    const countQuery = `
+      SELECT COUNT(*)::integer AS count
+      FROM expenses exp
+      JOIN events e ON exp.event_id = e.id
+      LEFT JOIN users submitter ON exp.created_by = submitter.id
+      LEFT JOIN users reviewer ON exp.approved_by = reviewer.id
+      WHERE ${whereClause}
+    `;
+    const countRes = await pool.query(countQuery, params);
+    const total = countRes.rows[0].count;
+
+    const dataParams = [...params];
+    dataParams.push(limit);
+    const limitPlaceholder = `$${dataParams.length}`;
+    dataParams.push(offset);
+    const offsetPlaceholder = `$${dataParams.length}`;
+
+    const dataQuery = `
+      SELECT
+        exp.*,
+        e.name AS event_name,
+        e.client_name,
+        e.venue_location,
+        submitter.full_name AS submitted_by_name,
+        reviewer.full_name AS approved_by_name
+      FROM expenses exp
+      JOIN events e ON exp.event_id = e.id
+      LEFT JOIN users submitter ON exp.created_by = submitter.id
+      LEFT JOIN users reviewer ON exp.approved_by = reviewer.id
+      WHERE ${whereClause}
+      ORDER BY ${sortSql} ${sortDir}
+      LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}
+    `;
+    const dataRes = await pool.query(dataQuery, dataParams);
+
+    res.json({
+      data: dataRes.rows,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error: any) {
+    console.error("[get-expense-history] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });

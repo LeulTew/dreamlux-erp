@@ -378,6 +378,13 @@ export interface EventExpense {
   approved_by_name?: string | null;
 }
 
+export interface PaginatedExpenseResponse {
+  data: EventExpense[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export interface EventTripLog {
   id: string;
   vehicle_assignment_id: string;
