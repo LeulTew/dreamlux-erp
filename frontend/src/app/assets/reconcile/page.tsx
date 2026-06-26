@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import { getReconcilePreview, saveLocalReconcileFallbackRun, submitReconcile, getStores } from "@/lib/api";
 import { Item, ReconcileSummary, Store } from "@/lib/types";
 import { 
@@ -79,6 +81,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export default function ReconcilePage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsReconcile = hasPermission("assets:reconcile");
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
@@ -97,6 +101,7 @@ export default function ReconcilePage() {
   const { data: storeData } = useQuery<Store[]>({
     queryKey: ["stores"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsReconcile,
   });
 
   const { data: previewData, isLoading } = useQuery<{ items: Item[]; total: number }>({
@@ -112,6 +117,7 @@ export default function ReconcilePage() {
     refetchInterval: 2000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
+    enabled: isAuthenticated && hasAssetsReconcile,
   });
 
   const reconcileMutation = useMutation({
@@ -266,6 +272,23 @@ export default function ReconcilePage() {
     if (!Number.isFinite(parsed.getTime())) return "Never";
     return parsed.toLocaleString();
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsReconcile) {
+    return (
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can reconcile inventory."
+      />
+    );
+  }
 
   return (
     <AuthLayout>

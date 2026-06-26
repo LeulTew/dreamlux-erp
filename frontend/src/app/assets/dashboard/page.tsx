@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import DashboardCards from "@/components/DashboardCards";
 import { getInventoryStats } from "@/lib/api";
 import { InventoryStats } from "@/lib/types";
@@ -105,6 +107,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export default function InventoryDashboardPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsRead = hasPermission("assets:read");
   const router = useRouter();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
@@ -122,6 +126,7 @@ export default function InventoryDashboardPage() {
     queryKey: ["inventoryStats"],
     queryFn: getInventoryStats,
     refetchInterval: 30000,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const locationData = useMemo(() => {
@@ -174,6 +179,23 @@ export default function InventoryDashboardPage() {
     finance: t("Value"),
     forecasting: t("Forecast"),
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsRead) {
+    return (
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can view inventory dashboard."
+      />
+    );
+  }
 
   return (
     <AuthLayout>

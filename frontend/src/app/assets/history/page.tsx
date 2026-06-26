@@ -4,6 +4,8 @@ import { Suspense, useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useRouter } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import Select from "@/components/ui/Select";
 import {
   clearReconcileHistory,
@@ -329,6 +331,8 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
 }
 
 function HistoryContent() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsRead = hasPermission("assets:read");
   const router = useRouter();
   const searchParams = useSearchParams();
   const { lang } = useLanguage();
@@ -362,6 +366,7 @@ function HistoryContent() {
   const { data: storeData } = useQuery<Store[]>({
     queryKey: ["stores"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const { data: historyData, isLoading, isError } = useQuery<{ runs: ReconcileRun[]; total: number }>({
@@ -377,6 +382,7 @@ function HistoryContent() {
     refetchInterval: 1000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const filteredRuns = useMemo(() => {
@@ -595,7 +601,7 @@ function HistoryContent() {
   const { data: runDetail, isLoading: isLoadingDetail } = useQuery<ReconcileRunDetail>({
     queryKey: ["reconcileRunDetail", selectedRunId],
     queryFn: () => getReconcileRunDetail(selectedRunId!),
-    enabled: !!selectedRunId && selectedRunId !== "null",
+    enabled: isAuthenticated && hasAssetsRead && !!selectedRunId && selectedRunId !== "null",
   });
 
   const handleCloseDetail = () => {
@@ -605,6 +611,24 @@ function HistoryContent() {
     const queryString = params.toString();
     router.replace(queryString ? `/assets/history?${queryString}` : "/assets/history");
   };
+
+  if (authLoading) {
+    return (
+      <div className="max-w-5xl mx-auto py-20 flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-muted animate-pulse">Loading history...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsRead) {
+    return (
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can view inventory audit logs."
+      />
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">

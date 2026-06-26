@@ -38,6 +38,7 @@ import toast from "react-hot-toast";
 import { fuzzySearch } from "@/lib/fuzzy-search";
 import { useLanguage } from "@/hooks/use-language";
 import { SortableHeader } from "@/components/ui/SortableHeader";
+import ForbiddenState from "@/components/ForbiddenState";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -381,9 +382,12 @@ function buildColumns(
 type StockFilterMode = "all" | "low-stock";
 
 function AssetsContent() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
+
+  const hasAssetsRead = hasPermission("assets:read");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -473,6 +477,7 @@ function AssetsContent() {
   const { data: offices = [] } = useQuery<Store[]>({
     queryKey: ["offices"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const { data, isLoading } = useQuery<ItemsResponse>({
@@ -491,6 +496,7 @@ function AssetsContent() {
         sortBy,
         sortOrder,
       ),
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const items = useMemo(() => data?.items || [], [data?.items]);
@@ -674,7 +680,6 @@ function AssetsContent() {
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
 
-  const { hasPermission, isLoading: authLoading } = useAuth();
   const canManageAssets =
     hasPermission("assets:write") ||
     hasPermission("assets:delete") ||
@@ -769,6 +774,23 @@ function AssetsContent() {
   const handleBulkDelete = () => {
     bulkDeleteMutation.mutate(Array.from(selectedIds));
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsRead) {
+    return (
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can access inventory management."
+      />
+    );
+  }
 
   return (
     <div className="page-container pb-12">

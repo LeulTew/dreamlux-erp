@@ -150,6 +150,10 @@ const mockReviewEventExpense = vi.fn().mockResolvedValue({ id: "expense-pending-
 vi.mock("@/lib/api", () => ({
   getPendingEventExpenses: vi.fn(),
   getExpenseHistory: vi.fn(),
+  getEffectivePermissions: vi.fn().mockResolvedValue({
+    permission_slugs: ["expenses:approve", "approvals:history:read"],
+    is_superuser: false,
+  }),
   reviewEventExpense: (id: string, data: any) => mockReviewEventExpense(id, data),
 }));
 

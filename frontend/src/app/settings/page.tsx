@@ -21,6 +21,7 @@ import {
 } from "@/lib/api";
 import { Role, User } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
+import ForbiddenState from "@/components/ForbiddenState";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import UserAvatar from "@/components/UserAvatar";
 import {
@@ -674,18 +675,10 @@ export default function SettingsPage() {
   if (!isAuthenticated || !canAccessAdmin) {
     return (
       <AuthLayout>
-        <div className="max-w-3xl mx-auto py-20">
-          <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">{t("Restricted Settings")}</h1>
-            <p className="text-sm text-muted mt-3">Only Admin or System Manager roles can access this page.</p>
-            <button
-              onClick={() => router.push("/")}
-              className="mt-6 h-11 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white font-extrabold uppercase tracking-widest text-xs shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
-            >
-              Back to Dashboard
-            </button>
-          </div>
-        </div>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Admin or System Manager roles can access this page."
+        />
       </AuthLayout>
     );
   }

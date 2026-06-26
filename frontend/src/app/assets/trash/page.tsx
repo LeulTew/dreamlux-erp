@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import PaginationControls from "@/components/PaginationControls";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import QuantityModal from "@/components/QuantityModal";
@@ -75,6 +77,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export default function TrashPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsRead = hasPermission("assets:read");
   const router = useRouter();
   const queryClient = useQueryClient();
   const { lang } = useLanguage();
@@ -91,6 +95,7 @@ export default function TrashPage() {
   const { data: stores = [] } = useQuery<Store[]>({
     queryKey: ["offices"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const { data, isLoading } = useQuery<ItemsResponse>({
@@ -107,6 +112,7 @@ export default function TrashPage() {
         fromDateTime || undefined,
         toDateTime || undefined,
       ),
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const items = useMemo(() => data?.items || [], [data?.items]);
@@ -136,6 +142,23 @@ export default function TrashPage() {
     },
     onError: () => toast.error(t("Permanent delete failed")),
   });
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsRead) {
+    return (
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can view trashed inventory items."
+      />
+    );
+  }
 
   return (
     <AuthLayout>

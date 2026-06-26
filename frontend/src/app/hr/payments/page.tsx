@@ -13,6 +13,8 @@ import toast from "react-hot-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { FancyButton } from "@/components/ui/FancyButton";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -87,10 +89,12 @@ type PayrollRunRow = {
 };
 
 function PaymentsPageContent() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const searchParams = useSearchParams();
   const router = useRouter();
+
   const selectedMonth = format(new Date(), "yyyy-MM");
   const queryClient = useQueryClient();
   const [view, setView] = useState<"active" | "trash">("active");
@@ -102,6 +106,8 @@ function PaymentsPageContent() {
   const [confirmState, setConfirmState] = useState<{ id: string; action: "trash" | "restore" | "delete" } | null>(null);
   const highlightedId = searchParams.get("highlight");
 
+  const hasPayrollAccess = hasPermission("payroll:read") || hasPermission("payroll:write");
+
   const { data: runs, isLoading, isRefetching, refetch } = useQuery<PayrollRunRow[]>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder],
     queryFn: () => getPayrollRuns({
@@ -111,6 +117,7 @@ function PaymentsPageContent() {
       sortBy,
       sortOrder
     }),
+    enabled: isAuthenticated && hasPayrollAccess,
   });
 
   const trashMutation = useMutation({
@@ -189,6 +196,27 @@ function PaymentsPageContent() {
     await refetch();
     toast.success("Payroll history updated");
   };
+
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!isAuthenticated || !hasPayrollAccess) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Accountants, and Administrators can view payroll snapshots."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

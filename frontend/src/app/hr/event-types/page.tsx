@@ -13,6 +13,8 @@ import EventCard from "./EventCard";
 import { packMasonry } from "@/lib/masonry-engine";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -54,6 +56,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export default function EventTypesPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
@@ -67,9 +70,12 @@ export default function EventTypesPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const hasEventWriteAccess = hasPermission("events:write");
+
   const { data: events, isLoading } = useQuery<EventType[]>({
     queryKey: ["event-types"],
-    queryFn: getEventTypes
+    queryFn: getEventTypes,
+    enabled: isAuthenticated && hasEventWriteAccess
   });
 
   const [form, setForm] = useState({
@@ -165,6 +171,27 @@ export default function EventTypesPage() {
   }, []);
 
   const activeDeleteEvent = events?.find(e => e.id === deleteId);
+
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!isAuthenticated || !hasEventWriteAccess) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Administrators, and Operations Managers can manage event types."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

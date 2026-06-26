@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createItem, getStores } from "@/lib/api";
 import { Store } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import toast from "react-hot-toast";
 import { HiCamera, HiXMark, HiPhoto, HiChevronLeft } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
@@ -65,6 +67,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export default function InsertAssetPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsWrite = hasPermission("assets:write");
   const router = useRouter();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,6 +86,7 @@ export default function InsertAssetPage() {
   const { data: offices = [] } = useQuery<Store[]>({
     queryKey: ["offices"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsWrite,
   });
 
   const createMutation = useMutation({
@@ -162,6 +167,23 @@ export default function InsertAssetPage() {
 
     createMutation.mutate(formData);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsWrite) {
+    return (
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can add inventory items."
+      />
+    );
+  }
 
   return (
     <AuthLayout>

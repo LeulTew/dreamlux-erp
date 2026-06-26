@@ -10,8 +10,12 @@ import AuthLayout from "@/components/AuthLayout";
 import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
+
 
 export default function SalaryLevelsTrashPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
@@ -19,9 +23,12 @@ export default function SalaryLevelsTrashPage() {
   const [isPermanentDeleting, setIsPermanentDeleting] = useState(false);
   const [singleDeleteId, setSingleDeleteId] = useState<string | null>(null);
 
+  const hasSalaryLevelAccess = hasPermission("salary-levels:manage");
+
   const { data: items, isLoading, error } = useQuery<SalaryLevel[]>({
     queryKey: ["trash-salary-levels"],
     queryFn: getSalaryLevelsTrash,
+    enabled: isAuthenticated && hasSalaryLevelAccess,
   });
 
   const restoreMutation = useMutation({
@@ -88,6 +95,27 @@ export default function SalaryLevelsTrashPage() {
   };
 
   const isAllSelected = !!(items && items.length > 0 && selectedIds.size === items.length);
+
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!isAuthenticated || !hasSalaryLevelAccess) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Administrators, and HR Managers can manage salary levels."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

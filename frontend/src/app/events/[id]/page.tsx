@@ -17,6 +17,7 @@ import {
   HiPaintBrush,
   HiPhone,
   HiPlus,
+  HiShieldExclamation,
   HiArrowTrendingUp,
   HiUser,
 } from "react-icons/hi2";
@@ -323,7 +324,16 @@ function FieldRow({ label, value, icon: Icon }: { label: string; value: string; 
         <Icon className="h-4 w-4" />
         <span>{label}</span>
       </div>
-      <div className="mt-1 text-sm font-semibold text-foreground break-words">{value || "-"}</div>
+      <div className="mt-1 text-sm font-semibold text-foreground break-words tabular-nums">{value || "-"}</div>
+    </div>
+  );
+}
+
+function ReadOnlyBanner({ message }: { message: string }) {
+  return (
+    <div className="mb-4 p-3 bg-neutral-900 border border-gold/20 rounded-lg text-xs text-gold flex items-center gap-2">
+      <HiShieldExclamation className="w-4 h-4 shrink-0" />
+      <span>{message}</span>
     </div>
   );
 }
@@ -459,21 +469,21 @@ function EventProfitPanel({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Contract Price")}</div>
-          <div className="mt-2 text-xl font-black text-foreground">{formatCurrency(profit.contractPrice)}</div>
+          <div className="mt-2 text-xl font-black text-foreground tabular-nums">{formatCurrency(profit.contractPrice)}</div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Total Approved Expenses")}</div>
-          <div className="mt-2 text-xl font-black text-foreground">{formatCurrency(profit.totalExpenses)}</div>
+          <div className="mt-2 text-xl font-black text-foreground tabular-nums">{formatCurrency(profit.totalExpenses)}</div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Net Profit")}</div>
-          <div className={`mt-2 text-xl font-black ${profit.netProfit >= 0 ? "text-emerald-500" : "text-danger"}`}>
+          <div className={`mt-2 text-xl font-black tabular-nums ${profit.netProfit >= 0 ? "text-emerald-500" : "text-danger"}`}>
             {formatCurrency(profit.netProfit)}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="text-[11px] font-semibold text-muted uppercase tracking-wider">{t("Profit Margin")}</div>
-          <div className={`mt-2 text-xl font-black ${profit.profitMargin >= 0 ? "text-emerald-500" : "text-danger"}`}>
+          <div className={`mt-2 text-xl font-black tabular-nums ${profit.profitMargin >= 0 ? "text-emerald-500" : "text-danger"}`}>
             {profit.profitMargin.toFixed(1)}%
           </div>
         </div>
@@ -507,10 +517,10 @@ function EventProfitPanel({
                           <span className={`h-2.5 w-2.5 rounded-full ${colorClass}`} />
                           {t(row.category)}
                         </td>
-                        <td className="py-3 text-right font-mono font-bold">
+                        <td className="py-3 text-right font-mono font-bold tabular-nums">
                           {formatCurrency(row.amount)}
                         </td>
-                        <td className="py-3 text-right font-mono text-muted">
+                        <td className="py-3 text-right font-mono text-muted tabular-nums">
                           {percentage.toFixed(1)}%
                         </td>
                       </tr>
@@ -602,8 +612,14 @@ export default function EventWorkspacePage() {
   const [taskOwner, setTaskOwner] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
 
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasAnyPermission, user } = useAuth();
   const hasProfitAccess = hasPermission("reports:profit:read");
+  const canViewOperations = hasAnyPermission(["events:write", "event_assignments:write", "vehicle_assignments:write", "events:delete", "expenses:approve"]);
+  const canWriteAllocations = hasPermission("event_allocations:write") || hasPermission("assets:write");
+  const canWriteChecklist = hasPermission("event_checklist:write");
+  const canWriteAssignments = hasPermission("event_assignments:write");
+  const canWriteVehicles = hasPermission("vehicle_assignments:write");
+  const canWriteExpenses = hasPermission("expenses:write");
 
   const profitQuery = useQuery({
     queryKey: ["event-profit", eventId],
@@ -704,6 +720,16 @@ export default function EventWorkspacePage() {
   const vehicleAssignments = workspaceQuery.data?.vehicleAssignments || [];
   const expenses = workspaceQuery.data?.expenses || [];
   const trips = workspaceQuery.data?.trips || [];
+
+  const isDriverRole =
+    user?.role_name?.toUpperCase() === "DRIVER" ||
+    user?.role_names?.some((r) => r.toUpperCase() === "DRIVER") ||
+    (user as { role?: string })?.role?.toUpperCase() === "DRIVER";
+  const filteredVehicleAssignments = vehicleAssignments.filter((va: VehicleAssignment) => {
+    if (!isDriverRole) return true;
+    return va.driver_name === user?.full_name;
+  });
+
   const selectedTripVehicle = vehicleAssignments.find((vehicleAssignment) => vehicleAssignment.id === tripVehicleAssignmentId);
   const fuelCostPreview =
     selectedTripVehicle && Number(tripDistance) > 0 && Number(fuelPrice) > 0
@@ -924,79 +950,88 @@ export default function EventWorkspacePage() {
                     <FieldRow label={t("Event Type")} value={event.event_type_name || "-"} icon={HiClipboardDocumentCheck} />
                     <FieldRow label={t("Venue")} value={event.venue_location} icon={HiMapPin} />
                     <FieldRow label={t("Schedule")} value={schedule} icon={HiCalendarDays} />
-                    <FieldRow label={t("Contract Price")} value={formatCurrency(event.contract_price)} icon={HiCheckCircle} />
+                    {hasProfitAccess && event.contract_price !== undefined && (
+                      <FieldRow label={t("Contract Price")} value={formatCurrency(event.contract_price)} icon={HiCheckCircle} />
+                    )}
                   </div>
                 </section>
 
-                <DesignPackagePanel
-                  key={`${event.id}:${event.updated_at}`}
-                  eventId={eventId}
-                  initialNotes={event.package_design_notes || ""}
-                  initialCost={Number(event.estimated_design_cost || 0)}
-                  t={t}
-                />
+                {canViewOperations && (
+                  <DesignPackagePanel
+                    key={`${event.id}:${event.updated_at}`}
+                    eventId={eventId}
+                    initialNotes={event.package_design_notes || ""}
+                    initialCost={Number(event.estimated_design_cost || 0)}
+                    t={t}
+                  />
+                )}
               </div>
             )}
 
             {activeTab === "inventory" && (
-              <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-                <section className="rounded-lg border border-border bg-card p-4">
-                  <h2 className="mb-4 text-base font-bold text-foreground">{t("Central Store Allocation")}</h2>
-                  <div className="space-y-3">
-                    <Input
-                      value={itemSearch}
-                      onChange={(eventChange) => setItemSearch(eventChange.target.value)}
-                      placeholder={t("Search inventory")}
-                    />
-                    <select
-                      value={selectedItemId}
-                      onChange={(eventChange) => setSelectedItemId(eventChange.target.value)}
-                      className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                    >
-                      <option value="">{t("Select item")}</option>
-                      {items.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name} - {t("Available")} {item.available_quantity ?? item.quantity}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedItem && (
-                      <div className="rounded-lg border border-border bg-card-alt/50 p-3 text-xs text-muted">
-                        <div className="font-semibold text-foreground">{selectedItem.name}</div>
-                        <div className="mt-1">
-                          {t("Available")}: {selectedAvailable} | {t("Allocated")}: {alreadyAllocated}
+              <div className={canWriteAllocations ? "grid gap-4 xl:grid-cols-[0.85fr_1.15fr]" : "block w-full"}>
+                {canWriteAllocations && (
+                  <section className="rounded-lg border border-border bg-card p-4">
+                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Central Store Allocation")}</h2>
+                    <div className="space-y-3">
+                      <Input
+                        value={itemSearch}
+                        onChange={(eventChange) => setItemSearch(eventChange.target.value)}
+                        placeholder={t("Search inventory")}
+                      />
+                      <select
+                        value={selectedItemId}
+                        onChange={(eventChange) => setSelectedItemId(eventChange.target.value)}
+                        className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                      >
+                        <option value="">{t("Select item")}</option>
+                        {items.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name} - {t("Available")} {item.available_quantity ?? item.quantity}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedItem && (
+                        <div className="rounded-lg border border-border bg-card-alt/50 p-3 text-xs text-muted">
+                          <div className="font-semibold text-foreground">{selectedItem.name}</div>
+                          <div className="mt-1">
+                            {t("Available")}: {selectedAvailable} | {t("Allocated")}: {alreadyAllocated}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    <Input
-                      type="number"
-                      min="1"
-                      value={allocationQty}
-                      onChange={(eventChange) => setAllocationQty(eventChange.target.value)}
-                      placeholder={t("Quantity")}
-                    />
-                    <Input
-                      value={allocationNotes}
-                      onChange={(eventChange) => setAllocationNotes(eventChange.target.value)}
-                      placeholder={t("Notes")}
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => allocationMutation.mutate()}
-                      loading={allocationMutation.isPending}
-                      disabled={!canAllocate}
-                      className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
-                    >
-                      <HiPlus className="h-4 w-4" />
-                      {t("Allocate")}
-                    </Button>
-                    {selectedItem && Number(allocationQty) > selectedAvailable && (
-                      <p className="text-xs font-semibold text-danger">{t("Allocation exceeds available stock.")}</p>
-                    )}
-                  </div>
-                </section>
+                      )}
+                      <Input
+                        type="number"
+                        min="1"
+                        value={allocationQty}
+                        onChange={(eventChange) => setAllocationQty(eventChange.target.value)}
+                        placeholder={t("Quantity")}
+                      />
+                      <Input
+                        value={allocationNotes}
+                        onChange={(eventChange) => setAllocationNotes(eventChange.target.value)}
+                        placeholder={t("Notes")}
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => allocationMutation.mutate()}
+                        loading={allocationMutation.isPending}
+                        disabled={!canAllocate}
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                      >
+                        <HiPlus className="h-4 w-4" />
+                        {t("Allocate")}
+                      </Button>
+                      {selectedItem && Number(allocationQty) > selectedAvailable && (
+                        <p className="text-xs font-semibold text-danger">{t("Allocation exceeds available stock.")}</p>
+                      )}
+                    </div>
+                  </section>
+                )}
 
-                <section className="rounded-lg border border-border bg-card">
+                <section className="rounded-lg border border-border bg-card p-4">
+                  {!canWriteAllocations && (
+                    <ReadOnlyBanner message={t("Read-only view. You do not have permission to allocate inventory items.")} />
+                  )}
                   {allocations.length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted">{t("No allocations yet. Reserve inventory before event setup begins.")}</div>
                   ) : (
@@ -1014,16 +1049,18 @@ export default function EventWorkspacePage() {
                             </div>
                             {allocation.notes && <div className="mt-1 text-xs text-muted">{allocation.notes}</div>}
                           </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => releaseMutation.mutate(allocation.id)}
-                            loading={releaseMutation.isPending}
-                          >
-                            <HiMinusCircle className="h-4 w-4" />
-                            {t("Release")}
-                          </Button>
+                          {canWriteAllocations && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => releaseMutation.mutate(allocation.id)}
+                              loading={releaseMutation.isPending}
+                            >
+                              <HiMinusCircle className="h-4 w-4" />
+                              {t("Release")}
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1033,62 +1070,82 @@ export default function EventWorkspacePage() {
             )}
 
             {activeTab === "checklist" && (
-              <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-                <section className="rounded-lg border border-border bg-card p-4">
-                  <h2 className="mb-4 text-base font-bold text-foreground">{t("Event Checklist")}</h2>
-                  <div className="space-y-3">
-                    <Input value={taskTitle} onChange={(eventChange) => setTaskTitle(eventChange.target.value)} placeholder={t("Task title")} />
-                    <Input value={taskOwner} onChange={(eventChange) => setTaskOwner(eventChange.target.value)} placeholder={t("Owner")} />
-                    <Input type="date" value={taskDueDate} onChange={(eventChange) => setTaskDueDate(eventChange.target.value)} />
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (!taskTitle.trim()) {
-                          toast.error(t("Required"));
-                          return;
-                        }
-                        addTaskMutation.mutate();
-                      }}
-                      loading={addTaskMutation.isPending}
-                      className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
-                    >
-                      <HiPlus className="h-4 w-4" />
-                      {t("Add Task")}
-                    </Button>
-                  </div>
-                </section>
+              <div className={canWriteChecklist ? "grid gap-4 xl:grid-cols-[0.85fr_1.15fr]" : "block w-full"}>
+                {canWriteChecklist && (
+                  <section className="rounded-lg border border-border bg-card p-4">
+                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Event Checklist")}</h2>
+                    <div className="space-y-3">
+                      <Input value={taskTitle} onChange={(eventChange) => setTaskTitle(eventChange.target.value)} placeholder={t("Task title")} />
+                      <Input value={taskOwner} onChange={(eventChange) => setTaskOwner(eventChange.target.value)} placeholder={t("Owner")} />
+                      <Input type="date" value={taskDueDate} onChange={(eventChange) => setTaskDueDate(eventChange.target.value)} />
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (!taskTitle.trim()) {
+                            toast.error(t("Required"));
+                            return;
+                          }
+                          addTaskMutation.mutate();
+                        }}
+                        loading={addTaskMutation.isPending}
+                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                      >
+                        <HiPlus className="h-4 w-4" />
+                        {t("Add Task")}
+                      </Button>
+                    </div>
+                  </section>
+                )}
 
-                <section className="rounded-lg border border-border bg-card">
+                <section className="rounded-lg border border-border bg-card p-4">
+                  {!canWriteChecklist && (
+                    <ReadOnlyBanner message={t("Read-only view. You do not have permission to modify event checklist tasks.")} />
+                  )}
                   {checklist.length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted">{t("No checklist tasks yet. Add the first preparation task.")}</div>
                   ) : (
                     <div className="divide-y divide-border">
-                      {checklist.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => toggleTaskMutation.mutate(item)}
-                          className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-card-alt/50"
-                        >
-                          <span
-                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
-                              item.status === "Done"
-                                ? "border-success bg-success text-white"
-                                : "border-border bg-card-alt text-transparent"
-                            }`}
+                      {checklist.map((item) => {
+                        const Content = (
+                          <>
+                            <span
+                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                                item.status === "Done"
+                                  ? "border-success bg-success text-white"
+                                  : "border-border bg-card-alt text-transparent"
+                              }`}
+                            >
+                              <HiCheckCircle className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className={`block text-sm font-semibold ${item.status === "Done" ? "text-muted line-through" : "text-foreground"}`}>
+                                {item.title}
+                              </span>
+                              <span className="mt-1 block text-xs text-muted">
+                                {item.owner_name || t("Owner")} | {item.due_date ? formatDate(item.due_date) : t("Due date")} | {t(item.status)}
+                              </span>
+                            </span>
+                          </>
+                        );
+
+                        return canWriteChecklist ? (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => toggleTaskMutation.mutate(item)}
+                            className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-card-alt/50"
                           >
-                            <HiCheckCircle className="h-4 w-4" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className={`block text-sm font-semibold ${item.status === "Done" ? "text-muted line-through" : "text-foreground"}`}>
-                              {item.title}
-                            </span>
-                            <span className="mt-1 block text-xs text-muted">
-                              {item.owner_name || t("Owner")} | {item.due_date ? formatDate(item.due_date) : t("Due date")} | {t(item.status)}
-                            </span>
-                          </span>
-                        </button>
-                      ))}
+                            {Content}
+                          </button>
+                        ) : (
+                          <div
+                            key={item.id}
+                            className="flex w-full items-start gap-3 p-4 text-left border-b border-border last:border-b-0"
+                          >
+                            {Content}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </section>
@@ -1099,77 +1156,82 @@ export default function EventWorkspacePage() {
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Team Assignment Panel */}
                 <div className="space-y-4">
+                  {canWriteAssignments && (
+                    <section className="rounded-lg border border-border bg-card p-4">
+                      <h2 className="mb-4 text-base font-bold text-foreground">{t("Assign Staff")}</h2>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-muted mb-1">{t("Staff Member")}</label>
+                          <select
+                            value={selectedEmpId}
+                            onChange={(e) => setSelectedEmpId(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                          >
+                            <option value="">{t("Choose staff")}</option>
+                            {(availableEmployeesQuery.data || []).map((emp: Employee) => (
+                              <option key={emp.id} value={emp.id}>
+                                {emp.full_name} ({emp.position || "Staff"})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-muted mb-1">{t("Role")}</label>
+                          <select
+                            value={assignRole}
+                            onChange={(e) => setAssignRole(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                          >
+                            <option value="">{t("Role")}</option>
+                            <option value="Event Manager">{t("Event Manager")}</option>
+                            <option value="Supervisor">{t("Supervisor")}</option>
+                            <option value="Team Leader">{t("Team Leader")}</option>
+                            <option value="Décor Professional">{t("Décor Professional")}</option>
+                            <option value="Assistant">{t("Assistant")}</option>
+                            <option value="Driver">{t("Driver")}</option>
+                            <option value="Store Keeper">{t("Store Keeper")}</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-muted mb-1">{t("Commission Amount")}</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={commissionAmt}
+                            onChange={(e) => setCommissionAmt(e.target.value)}
+                            placeholder="ETB 0.00"
+                          />
+                        </div>
+
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedEmpId || !assignRole) {
+                              toast.error(t("Required"));
+                              return;
+                            }
+                            assignEmployeeMutation.mutate({
+                              employee_id: selectedEmpId,
+                              role: assignRole,
+                              commission_amount: Number(commissionAmt || 0),
+                            });
+                          }}
+                          loading={assignEmployeeMutation.isPending}
+                          className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                        >
+                          <HiPlus className="h-4 w-4" />
+                          {t("Assign")}
+                        </Button>
+                      </div>
+                    </section>
+                  )}
+
                   <section className="rounded-lg border border-border bg-card p-4">
-                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Assign Staff")}</h2>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-muted mb-1">{t("Staff Member")}</label>
-                        <select
-                          value={selectedEmpId}
-                          onChange={(e) => setSelectedEmpId(e.target.value)}
-                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                        >
-                          <option value="">{t("Choose staff")}</option>
-                          {(availableEmployeesQuery.data || []).map((emp: Employee) => (
-                            <option key={emp.id} value={emp.id}>
-                              {emp.full_name} ({emp.position || "Staff"})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-muted mb-1">{t("Role")}</label>
-                        <select
-                          value={assignRole}
-                          onChange={(e) => setAssignRole(e.target.value)}
-                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                        >
-                          <option value="">{t("Role")}</option>
-                          <option value="Event Manager">{t("Event Manager")}</option>
-                          <option value="Supervisor">{t("Supervisor")}</option>
-                          <option value="Team Leader">{t("Team Leader")}</option>
-                          <option value="Décor Professional">{t("Décor Professional")}</option>
-                          <option value="Assistant">{t("Assistant")}</option>
-                          <option value="Driver">{t("Driver")}</option>
-                          <option value="Store Keeper">{t("Store Keeper")}</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-muted mb-1">{t("Commission Amount")}</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={commissionAmt}
-                          onChange={(e) => setCommissionAmt(e.target.value)}
-                          placeholder="ETB 0.00"
-                        />
-                      </div>
-
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (!selectedEmpId || !assignRole) {
-                            toast.error(t("Required"));
-                            return;
-                          }
-                          assignEmployeeMutation.mutate({
-                            employee_id: selectedEmpId,
-                            role: assignRole,
-                            commission_amount: Number(commissionAmt || 0),
-                          });
-                        }}
-                        loading={assignEmployeeMutation.isPending}
-                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
-                      >
-                        <HiPlus className="h-4 w-4" />
-                        {t("Assign")}
-                      </Button>
-                    </div>
-                  </section>
-
-                  <section className="rounded-lg border border-border bg-card">
+                    {!canWriteAssignments && (
+                      <ReadOnlyBanner message={t("Read-only view. You do not have permission to assign staff.")} />
+                    )}
                     {assignments.length === 0 ? (
                       <div className="p-8 text-center text-sm text-muted">{t("No staff assigned yet.")}</div>
                     ) : (
@@ -1178,31 +1240,34 @@ export default function EventWorkspacePage() {
                           <div key={asg.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
                               <div className="font-semibold text-foreground">{asg.employee_name}</div>
-                              <div className="mt-1 text-xs text-muted">
-                                {t(asg.role)} | {formatCurrency(asg.commission_amount)}
+                              <div className="mt-1 text-xs text-muted tabular-nums">
+                                {t(asg.role)}{canViewOperations && asg.commission_amount !== undefined && ` | ${formatCurrency(asg.commission_amount)}`}
                               </div>
                               <div className="mt-2 flex items-center gap-3">
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-muted cursor-pointer">
                                   <input
                                     type="checkbox"
                                     checked={asg.attended}
+                                    disabled={!canWriteAssignments}
                                     onChange={(e) => toggleAttendanceMutation.mutate({ employeeId: asg.employee_id, attended: e.target.checked })}
-                                    className="rounded border-border focus:ring-0 cursor-pointer"
+                                    className="rounded border-border focus:ring-0 cursor-pointer disabled:opacity-50"
                                   />
                                   <span>{t("Attended")}</span>
                                 </label>
                               </div>
                             </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeEmployeeMutation.mutate(asg.employee_id)}
-                              loading={removeEmployeeMutation.isPending}
-                            >
-                              <HiMinusCircle className="h-4 w-4" />
-                              {t("Release")}
-                            </Button>
+                            {canWriteAssignments && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeEmployeeMutation.mutate(asg.employee_id)}
+                                loading={removeEmployeeMutation.isPending}
+                              >
+                                <HiMinusCircle className="h-4 w-4" />
+                                {t("Release")}
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1212,79 +1277,84 @@ export default function EventWorkspacePage() {
 
                 {/* Vehicle Assignment Panel */}
                 <div className="space-y-4">
-                  <section className="rounded-lg border border-border bg-card p-4">
-                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Assign Vehicle")}</h2>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-muted mb-1">{t("Vehicle")}</label>
-                        <select
-                          value={selectedVehId}
-                          onChange={(e) => setSelectedVehId(e.target.value)}
-                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                        >
-                          <option value="">{t("Choose vehicle")}</option>
-                          {(availableVehiclesQuery.data || []).map((veh: Vehicle) => (
-                            <option key={veh.id} value={veh.id}>
-                              {veh.plate_number} - {veh.vehicle_type}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-muted mb-1">{t("Driver")}</label>
-                        <select
-                          value={selectedDrvId}
-                          onChange={(e) => setSelectedDrvId(e.target.value)}
-                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                        >
-                          <option value="">{t("Choose driver")}</option>
-                          {(availableEmployeesQuery.data || [])
-                            .filter((emp: Employee) => (emp.position || "").toLowerCase() === "driver" || (emp.department || "").toLowerCase() === "logistics")
-                            .map((emp: Employee) => (
-                              <option key={emp.id} value={emp.id}>
-                                {emp.full_name}
+                  {canWriteVehicles && (
+                    <section className="rounded-lg border border-border bg-card p-4">
+                      <h2 className="mb-4 text-base font-bold text-foreground">{t("Assign Vehicle")}</h2>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-muted mb-1">{t("Vehicle")}</label>
+                          <select
+                            value={selectedVehId}
+                            onChange={(e) => setSelectedVehId(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                          >
+                            <option value="">{t("Choose vehicle")}</option>
+                            {(availableVehiclesQuery.data || []).map((veh: Vehicle) => (
+                              <option key={veh.id} value={veh.id}>
+                                {veh.plate_number} - {veh.vehicle_type}
                               </option>
                             ))}
-                        </select>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-muted mb-1">{t("Driver")}</label>
+                          <select
+                            value={selectedDrvId}
+                            onChange={(e) => setSelectedDrvId(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                          >
+                            <option value="">{t("Choose driver")}</option>
+                            {(availableEmployeesQuery.data || [])
+                              .filter((emp: Employee) => (emp.position || "").toLowerCase() === "driver" || (emp.department || "").toLowerCase() === "logistics")
+                              .map((emp: Employee) => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.full_name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-2 py-1">
+                          <input
+                            type="checkbox"
+                            id="nightShiftCheck"
+                            checked={nightShift}
+                            onChange={(e) => setNightShift(e.target.checked)}
+                            className="rounded border-border focus:ring-0 cursor-pointer"
+                          />
+                          <label htmlFor="nightShiftCheck" className="text-xs font-semibold text-muted cursor-pointer">
+                            {t("Night Shift")}
+                          </label>
+                        </div>
+
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (!selectedVehId) {
+                              toast.error(t("Required"));
+                              return;
+                            }
+                            assignVehicleMutation.mutate({
+                              vehicle_id: selectedVehId,
+                              driver_id: selectedDrvId || null,
+                              is_night_shift: nightShift,
+                            });
+                          }}
+                          loading={assignVehicleMutation.isPending}
+                          className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                        >
+                          <HiPlus className="h-4 w-4" />
+                          {t("Assign")}
+                        </Button>
                       </div>
+                    </section>
+                  )}
 
-                      <div className="flex items-center gap-2 py-1">
-                        <input
-                          type="checkbox"
-                          id="nightShiftCheck"
-                          checked={nightShift}
-                          onChange={(e) => setNightShift(e.target.checked)}
-                          className="rounded border-border focus:ring-0 cursor-pointer"
-                        />
-                        <label htmlFor="nightShiftCheck" className="text-xs font-semibold text-muted cursor-pointer">
-                          {t("Night Shift")}
-                        </label>
-                      </div>
-
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (!selectedVehId) {
-                            toast.error(t("Required"));
-                            return;
-                          }
-                          assignVehicleMutation.mutate({
-                            vehicle_id: selectedVehId,
-                            driver_id: selectedDrvId || null,
-                            is_night_shift: nightShift,
-                          });
-                        }}
-                        loading={assignVehicleMutation.isPending}
-                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
-                      >
-                        <HiPlus className="h-4 w-4" />
-                        {t("Assign")}
-                      </Button>
-                    </div>
-                  </section>
-
-                  <section className="rounded-lg border border-border bg-card">
+                  <section className="rounded-lg border border-border bg-card p-4">
+                    {!canWriteVehicles && (
+                      <ReadOnlyBanner message={t("Read-only view. You do not have permission to assign vehicles.")} />
+                    )}
                     {vehicleAssignments.length === 0 ? (
                       <div className="p-8 text-center text-sm text-muted">{t("No vehicles assigned yet.")}</div>
                     ) : (
@@ -1302,16 +1372,18 @@ export default function EventWorkspacePage() {
                                 </span>
                               )}
                             </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeVehicleMutation.mutate(va.vehicle_id)}
-                              loading={removeVehicleMutation.isPending}
-                            >
-                              <HiMinusCircle className="h-4 w-4" />
-                              {t("Release")}
-                            </Button>
+                            {canWriteVehicles && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeVehicleMutation.mutate(va.vehicle_id)}
+                                loading={removeVehicleMutation.isPending}
+                              >
+                                <HiMinusCircle className="h-4 w-4" />
+                                {t("Release")}
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1324,47 +1396,51 @@ export default function EventWorkspacePage() {
             {activeTab === "expenses" && (
               <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
                 <div className="space-y-4">
-                  <section className="rounded-lg border border-border bg-card p-4">
-                    <h2 className="mb-4 text-base font-bold text-foreground">{t("Log Expense")}</h2>
-                    <div className="space-y-3">
-                      <select
-                        value={expenseCategory}
-                        onChange={(eventChange) => setExpenseCategory(eventChange.target.value as EventExpense["category"])}
-                        className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                      >
-                        {(["Transportation", "Equipment Rental", "Consumables", "Other", "Labor", "Fuel"] as EventExpense["category"][]).map((category) => (
-                          <option key={category} value={category}>{t(category)}</option>
-                        ))}
-                      </select>
-                      <Input type="number" min="0" value={expenseAmount} onChange={(eventChange) => setExpenseAmount(eventChange.target.value)} placeholder={t("Amount")} />
-                      <Input value={expenseDescription} onChange={(eventChange) => setExpenseDescription(eventChange.target.value)} placeholder={t("Description")} />
-                      <Input value={receiptKey} onChange={(eventChange) => setReceiptKey(eventChange.target.value)} placeholder={t("Receipt Key")} />
-                      <Button
-                        type="button"
-                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
-                        loading={createExpenseMutation.isPending}
-                        onClick={() => {
-                          if (!expenseDescription.trim() || Number(expenseAmount) <= 0) {
-                            toast.error(t("Required"));
-                            return;
-                          }
-                          createExpenseMutation.mutate();
-                        }}
-                      >
-                        <HiPlus className="h-4 w-4" />
-                        {t("Submit Expense")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
-                        loading={generateLaborMutation.isPending}
-                        onClick={() => generateLaborMutation.mutate()}
-                      >
-                        {t("Generate Labor Expense")}
-                      </Button>
-                    </div>
-                  </section>
+                  {canWriteExpenses ? (
+                    <section className="rounded-lg border border-border bg-card p-4">
+                      <h2 className="mb-4 text-base font-bold text-foreground">{t("Log Expense")}</h2>
+                      <div className="space-y-3">
+                        <select
+                          value={expenseCategory}
+                          onChange={(eventChange) => setExpenseCategory(eventChange.target.value as EventExpense["category"])}
+                          className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
+                        >
+                          {(["Transportation", "Equipment Rental", "Consumables", "Other", "Labor", "Fuel"] as EventExpense["category"][]).map((category) => (
+                            <option key={category} value={category}>{t(category)}</option>
+                          ))}
+                        </select>
+                        <Input type="number" min="0" value={expenseAmount} onChange={(eventChange) => setExpenseAmount(eventChange.target.value)} placeholder={t("Amount")} />
+                        <Input value={expenseDescription} onChange={(eventChange) => setExpenseDescription(eventChange.target.value)} placeholder={t("Description")} />
+                        <Input value={receiptKey} onChange={(eventChange) => setReceiptKey(eventChange.target.value)} placeholder={t("Receipt Key")} />
+                        <Button
+                          type="button"
+                          className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                          loading={createExpenseMutation.isPending}
+                          onClick={() => {
+                            if (!expenseDescription.trim() || Number(expenseAmount) <= 0) {
+                              toast.error(t("Required"));
+                              return;
+                            }
+                            createExpenseMutation.mutate();
+                          }}
+                        >
+                          <HiPlus className="h-4 w-4" />
+                          {t("Submit Expense")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
+                          loading={generateLaborMutation.isPending}
+                          onClick={() => generateLaborMutation.mutate()}
+                        >
+                          {t("Generate Labor Expense")}
+                        </Button>
+                      </div>
+                    </section>
+                  ) : (
+                    <ReadOnlyBanner message={t("Read-only view. You do not have permission to log manual expenses.")} />
+                  )}
 
                   <section className="rounded-lg border border-border bg-card p-4">
                     <h2 className="mb-4 text-base font-bold text-foreground">{t("Trip Log")}</h2>
@@ -1375,7 +1451,7 @@ export default function EventWorkspacePage() {
                         className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
                       >
                         <option value="">{t("Choose vehicle assignment")}</option>
-                        {vehicleAssignments.map((vehicleAssignment: VehicleAssignment) => (
+                        {filteredVehicleAssignments.map((vehicleAssignment: VehicleAssignment) => (
                           <option key={vehicleAssignment.id} value={vehicleAssignment.id}>
                             {vehicleAssignment.plate_number} - {vehicleAssignment.driver_name || t("Driver")}
                           </option>
@@ -1385,7 +1461,7 @@ export default function EventWorkspacePage() {
                       <Input type="number" min="0" value={tripDistance} onChange={(eventChange) => setTripDistance(eventChange.target.value)} placeholder={t("Distance (km)")} />
                       <Input type="number" min="0" value={fuelPrice} onChange={(eventChange) => setFuelPrice(eventChange.target.value)} placeholder={t("Fuel Price")} />
                       <div className="rounded-lg border border-border bg-card-alt/50 p-3 text-xs font-semibold text-muted">
-                        {t("Fuel cost preview")}: <span className="text-foreground">{formatCurrency(fuelCostPreview)}</span>
+                        {t("Fuel cost preview")}: <span className="text-foreground tabular-nums">{formatCurrency(fuelCostPreview)}</span>
                       </div>
                       <Button
                         type="button"
@@ -1420,7 +1496,7 @@ export default function EventWorkspacePage() {
                                 <div className="mt-1 text-xs text-muted">{expense.description}</div>
                               </div>
                               <div className="text-left sm:text-right">
-                                <div className="text-sm font-bold text-foreground">{formatCurrency(expense.amount)}</div>
+                                <div className="text-sm font-bold text-foreground tabular-nums">{formatCurrency(expense.amount)}</div>
                                 <div className="mt-1 text-xs font-semibold text-muted">{t(expense.status)}</div>
                               </div>
                             </div>
@@ -1439,7 +1515,7 @@ export default function EventWorkspacePage() {
                         {trips.map((trip: EventTripLog) => (
                           <div key={trip.id} className="p-4">
                             <div className="font-semibold text-foreground">{trip.destination}</div>
-                            <div className="mt-1 text-xs text-muted">
+                            <div className="mt-1 text-xs text-muted tabular-nums">
                               {trip.plate_number || "-"} | {trip.distance_km} km | {trip.fuel_liters_used} L | {formatCurrency(trip.fuel_cost_etb)}
                             </div>
                           </div>

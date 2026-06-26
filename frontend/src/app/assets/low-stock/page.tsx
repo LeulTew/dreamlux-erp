@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import { getItems, getStores } from "@/lib/api";
 import { Item, Store } from "@/lib/types";
 import { 
@@ -20,6 +22,8 @@ import PaginationControls from "@/components/PaginationControls";
 import { motion } from "framer-motion";
 
 export default function LowStockPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsRead = hasPermission("assets:read");
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [store, setStore] = useState<string>("all");
@@ -27,12 +31,31 @@ export default function LowStockPage() {
   const { data: storeData } = useQuery<Store[]>({
     queryKey: ["stores"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const { data: itemData, isLoading } = useQuery<{ items: Item[]; total: number }>({
     queryKey: ["lowStock", store, page],
     queryFn: () => getItems(page, 10, undefined, store === "all" ? undefined : store, false, undefined, "low-stock"),
+    enabled: isAuthenticated && hasAssetsRead,
   });
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsRead) {
+    return (
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can view low stock alerts."
+      />
+    );
+  }
 
   return (
     <AuthLayout>

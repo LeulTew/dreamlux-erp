@@ -121,9 +121,21 @@ This document tracks our progress, active branch, next steps, and pull requests 
 - [x] Tick §6 and §14 checkboxes on Issue #25 after PR is merged
 
 ### Phase 5 Plan: Mobile, i18n & Accessibility Pass
-- Re-audit access-aware navigation, breadcrumbs, direct URL blocked states, route shells, event workspace controls, field redaction, KPI hierarchy, forms, reports, print styles, localization, keyboard/focus, and mobile layout.
-- Audit 320px, 390px, 768px, 1366px, 1920px, and 2560px across key personas and routes.
-- Verify all modified visible strings use the translation helper and have English/Amharic coverage.
-- Check focus order, keyboard operation, reduced motion, tap targets, text wrapping, and WCAG AA contrast.
-- Record screenshot/manual QA evidence in the phase PR.
-- Issue #25 coverage: closes any remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after Phases 2-4 land.
+- [ ] Re-audit access-aware navigation, breadcrumbs, direct URL blocked states, route shells, event workspace controls, field redaction, KPI hierarchy, forms, reports, print styles, localization, keyboard/focus, and mobile layout.
+- [ ] Audit 320px, 390px, 768px, 1024px, 1366px, 1920px, and 2560px across key personas and routes.
+- [ ] Verify all modified visible strings use the translation helper and have English/Amharic coverage.
+- [ ] Check focus order, keyboard operation, reduced motion, tap targets, text wrapping, and WCAG AA contrast.
+- [ ] Record screenshot/manual QA evidence in the phase PR.
+- [ ] Add backend regression tests for permission-aware navigation, route guards, and direct URL blocked states.
+- [x] Add frontend regression tests for access-aware sidebar filtering and empty group suppression.
+- [ ] Add frontend regression tests for shell-state redaction.
+- [ ] Add UI tests for event workspace control visibility by role and field permission.
+- [ ] Add UI tests for report/print redaction states and hidden KPI shells.
+- [ ] Add responsive snapshot coverage for 320px and 390px mobile layouts.
+- [ ] Add Amharic overflow checks for long labels in sidebars, tabs, tables, and action buttons.
+- [ ] Issue #25 coverage: closes the remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after Phases 2-4 land.
+
+### Phase 6+ Backlog
+- [ ] Reconcile any newly discovered status labels that still bypass `StatusBadge`.
+- [ ] Close any remaining issue #25 checklist item that still needs explicit GitHub checkbox reconciliation after PR merges.
+- [ ] Track follow-up fixes discovered during Phase 5 QA as separate scoped branches if they do not fit the access/i18n pass.

@@ -247,9 +247,16 @@ function SidebarLink({
   }
 
   return (
-    <SidebarMenuButton asChild isActive={active} tooltip={label} className="rounded-xl h-10">
+    <SidebarMenuButton
+      asChild
+      isActive={active}
+      tooltip={label}
+      className={`rounded-xl h-10 border border-transparent ${
+        active ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent" : ""
+      }`}
+    >
       <Link href={href}>
-        <Icon className="w-[18px] h-[18px] shrink-0" />
+        <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? "text-primary" : ""}`} />
         <span>{label}</span>
       </Link>
     </SidebarMenuButton>
@@ -437,19 +444,21 @@ export function AppSidebar() {
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setEmployeesOpen(!employeesOpen)}
-                          className={`w-full justify-between rounded-xl h-10 ${
-                            isActive("/") || isActive("/insert") ? "text-primary font-semibold" : ""
+                          className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                            isActive("/") || isActive("/insert")
+                              ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
+                              : ""
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiUsers className="w-[18px] h-[18px] shrink-0" />
+                            <HiUsers className={`w-[18px] h-[18px] shrink-0 ${isActive("/") || isActive("/insert") ? "text-primary" : ""}`} />
                             <span>{t("Employees")}</span>
                           </span>
                           <span className="shrink-0">
                             {employeesOpen ? (
-                              <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
@@ -458,16 +467,40 @@ export function AppSidebar() {
                             <SidebarMenuSubItem className="relative">
                               <SubItemBranchLine isLast={false} />
                               <SidebarMenuSubButton asChild isActive={pathname === "/"} className="rounded-xl">
-                                <Link href="/" className={pathname === "/" ? "text-foreground font-medium" : "text-muted"}>
-                                  {t("List Employees")}
+                                <Link
+                                  href="/"
+                                  className={
+                                    pathname === "/"
+                                      ? "text-primary font-bold flex items-center gap-1.5"
+                                      : "text-muted flex items-center gap-1.5"
+                                  }
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                      pathname === "/" ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                    }`}
+                                  />
+                                  <span>{t("List Employees")}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                             <SidebarMenuSubItem className="relative">
                               <SubItemBranchLine isLast={true} />
                               <SidebarMenuSubButton asChild isActive={pathname === "/insert"} className="rounded-xl">
-                                <Link href="/insert" className={pathname === "/insert" ? "text-foreground font-medium" : "text-muted"}>
-                                  {t("Add Employee")}
+                                <Link
+                                  href="/insert"
+                                  className={
+                                    pathname === "/insert"
+                                      ? "text-primary font-bold flex items-center gap-1.5"
+                                      : "text-muted flex items-center gap-1.5"
+                                  }
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                      pathname === "/insert" ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                    }`}
+                                  />
+                                  <span>{t("Add Employee")}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -492,19 +525,21 @@ export function AppSidebar() {
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setEventsOpen(!eventsOpen)}
-                          className={`w-full justify-between rounded-xl h-10 ${
-                            isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary font-semibold" : ""
+                          className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                            isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")
+                              ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
+                              : ""
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineCalendar className="w-[18px] h-[18px] shrink-0" />
+                            <HiOutlineCalendar className={`w-[18px] h-[18px] shrink-0 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : ""}`} />
                             <span>{t("Events")}</span>
                           </span>
                           <span className="shrink-0">
                             {eventsOpen ? (
-                              <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
@@ -514,8 +549,20 @@ export function AppSidebar() {
                               <SidebarMenuSubItem key={link.href} className="relative">
                                 <SubItemBranchLine isLast={idx === eventLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
-                                  <Link href={link.href} className={link.active ? "text-foreground font-medium" : "text-muted"}>
-                                    {link.label}
+                                  <Link
+                                    href={link.href}
+                                    className={
+                                      link.active
+                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        : "text-muted flex items-center gap-1.5"
+                                    }
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                        link.active ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                      }`}
+                                    />
+                                    <span>{link.label}</span>
                                   </Link>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
@@ -541,19 +588,21 @@ export function AppSidebar() {
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setFinanceOpen(!financeOpen)}
-                          className={`w-full justify-between rounded-xl h-10 ${
-                            isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary font-semibold" : ""
+                          className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                            isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses")
+                              ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
+                              : ""
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineBanknotes className="w-[18px] h-[18px] shrink-0" />
+                            <HiOutlineBanknotes className={`w-[18px] h-[18px] shrink-0 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary" : ""}`} />
                             <span>{t("Finance")}</span>
                           </span>
                           <span className="shrink-0">
                             {financeOpen ? (
-                              <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
@@ -563,8 +612,20 @@ export function AppSidebar() {
                               <SidebarMenuSubItem key={link.href} className="relative">
                                 <SubItemBranchLine isLast={idx === financeLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
-                                  <Link href={link.href} className={link.active ? "text-foreground font-medium" : "text-muted"}>
-                                    {link.label}
+                                  <Link
+                                    href={link.href}
+                                    className={
+                                      link.active
+                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        : "text-muted flex items-center gap-1.5"
+                                    }
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                        link.active ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                      }`}
+                                    />
+                                    <span>{link.label}</span>
                                   </Link>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
@@ -615,19 +676,21 @@ export function AppSidebar() {
                     <div className="w-full">
                       <SidebarMenuButton
                         onClick={() => setItemsOpen(!itemsOpen)}
-                        className={`w-full justify-between rounded-xl ${
-                          isActive("/assets") || isActive("/assets/insert") ? "text-primary font-semibold" : ""
+                        className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                          isActive("/assets") || isActive("/assets/insert")
+                            ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
+                            : ""
                         }`}
                       >
                         <span className="flex items-center gap-3">
-                          <HiTableCells className="w-[18px] h-[18px] shrink-0" />
+                          <HiTableCells className={`w-[18px] h-[18px] shrink-0 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : ""}`} />
                           <span>{t("Inventory")}</span>
                         </span>
                         <span className="shrink-0">
                           {itemsOpen ? (
-                            <HiChevronUp className="w-3.5 h-3.5 text-muted/60" />
+                            <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
                           ) : (
-                            <HiChevronDown className="w-3.5 h-3.5 text-muted/60" />
+                            <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
                           )}
                         </span>
                       </SidebarMenuButton>
@@ -636,16 +699,40 @@ export function AppSidebar() {
                           <SidebarMenuSubItem className="relative">
                             <SubItemBranchLine isLast={false} />
                             <SidebarMenuSubButton asChild isActive={pathname === "/assets"} className="rounded-xl">
-                              <Link href="/assets" className={pathname === "/assets" ? "text-foreground font-medium" : "text-muted"}>
-                                {t("List Items")}
+                              <Link
+                                href="/assets"
+                                className={
+                                  pathname === "/assets"
+                                    ? "text-primary font-bold flex items-center gap-1.5"
+                                    : "text-muted flex items-center gap-1.5"
+                                }
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                    pathname === "/assets" ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                  }`}
+                                />
+                                <span>{t("List Items")}</span>
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem className="relative">
                             <SubItemBranchLine isLast={true} />
                             <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"} className="rounded-xl">
-                              <Link href="/assets/insert" className={pathname === "/assets/insert" ? "text-foreground font-medium" : "text-muted"}>
-                                {t("Add Item")}
+                              <Link
+                                href="/assets/insert"
+                                className={
+                                  pathname === "/assets/insert"
+                                    ? "text-primary font-bold flex items-center gap-1.5"
+                                    : "text-muted flex items-center gap-1.5"
+                                }
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                    pathname === "/assets/insert" ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                  }`}
+                                />
+                                <span>{t("Add Item")}</span>
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
