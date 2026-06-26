@@ -4,8 +4,8 @@ This document tracks our progress, active branch, next steps, and pull requests 
 
 ## Overall Status
 - **Current Step**: Phase 5 Mobile, i18n & Accessibility Pass
-- **Active Branch**: `feature/25-expense-approval-history` (branching from `main` @ `2dddea6`)
-- **Active Pull Request**: [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65)
+- **Active Branch**: `main`
+- **Active Pull Request**: [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) (Merged)
 - **Completion Progress**: 4/5 Phases Completed
 
 > [!NOTE]
@@ -21,7 +21,7 @@ This document tracks our progress, active branch, next steps, and pull requests 
 | **Cleanup** | Post-merge review cleanup | `feature/25-post-merge-review-cleanup` | **Completed & Merged** | [PR #62](https://github.com/LeulTew/dreamlux-erp/pull/62) |
 | **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | **Completed & Merged** | [PR #63](https://github.com/LeulTew/dreamlux-erp/pull/63) |
 | **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | **Completed & Merged** | [PR #64](https://github.com/LeulTew/dreamlux-erp/pull/64) — badge system, compact mode, center-align fix |
-| **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **PR Created (Draft)** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
+| **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **Completed & Merged** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
 | **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | *Planned* | Final cross-surface QA pass |
 
 ---
@@ -118,7 +118,7 @@ This document tracks our progress, active branch, next steps, and pull requests 
 - [x] Manual: non-accountant redirect tested
 - [x] Manual: 320px mobile layout readable
 - [x] Create PR using template and reference Issue #25
-- [ ] Tick §6 and §14 checkboxes on Issue #25 after PR is merged
+- [x] Tick §6 and §14 checkboxes on Issue #25 after PR is merged
 
 ### Phase 5 Plan: Mobile, i18n & Accessibility Pass
 - Re-audit access-aware navigation, breadcrumbs, direct URL blocked states, route shells, event workspace controls, field redaction, KPI hierarchy, forms, reports, print styles, localization, keyboard/focus, and mobile layout.
