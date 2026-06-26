@@ -79,10 +79,12 @@ export default function LocationDrilldownPage() {
 
   if (!isAuthenticated || !hasAssetsRead) {
     return (
-      <ForbiddenState
-        title="Forbidden: Insufficient privileges"
-        description="Only authorized personnel can view items in this location."
-      />
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can view items in this location."
+        />
+      </AuthLayout>
     );
   }
 

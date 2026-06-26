@@ -187,10 +187,12 @@ export default function ReportsPage() {
 
   if (!isAuthenticated || !hasAssetsRead) {
     return (
-      <ForbiddenState
-        title="Forbidden: Insufficient privileges"
-        description="Only authorized personnel can view inventory reports."
-      />
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can view inventory reports."
+        />
+      </AuthLayout>
     );
   }
 

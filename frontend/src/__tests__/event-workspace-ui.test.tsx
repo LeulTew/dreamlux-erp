@@ -20,6 +20,12 @@ vi.mock("@/hooks/use-language", () => ({
 }));
 
 // Mock api
+const apiMocks = vi.hoisted(() => ({
+  getItems: vi.fn().mockResolvedValue({ items: [] }),
+  getAvailableEmployees: vi.fn().mockResolvedValue([]),
+  getAvailableVehicles: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock("@/lib/api", () => ({
   getEventWorkspace: vi.fn().mockResolvedValue({
     event: {
@@ -45,15 +51,18 @@ vi.mock("@/lib/api", () => ({
     expenses: [],
     trips: [],
   }),
-  getItems: vi.fn().mockResolvedValue({ items: [] }),
-  getAvailableEmployees: vi.fn().mockResolvedValue([]),
-  getAvailableVehicles: vi.fn().mockResolvedValue([]),
+  getItems: apiMocks.getItems,
+  getAvailableEmployees: apiMocks.getAvailableEmployees,
+  getAvailableVehicles: apiMocks.getAvailableVehicles,
   getEventProfit: vi.fn().mockResolvedValue({}),
 }));
 
 // Mock react-query
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: { queryKey: string[] }) => {
+  useQuery: (options: { queryKey: string[]; queryFn?: () => unknown; enabled?: boolean }) => {
+    if (options.enabled !== false && options.queryFn) {
+      options.queryFn();
+    }
     // If it's workspace query, return mock data
     if (options.queryKey[0] === "event-workspace") {
       return {
@@ -145,6 +154,9 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     mockUser = { full_name: "Admin User", role: "ADMIN", role_name: "ADMIN" };
     mockPermissions = ["events:read"];
     mockIsSuperuser = false;
+    apiMocks.getItems.mockClear();
+    apiMocks.getAvailableEmployees.mockClear();
+    apiMocks.getAvailableVehicles.mockClear();
     vi.clearAllMocks();
   });
 
@@ -162,5 +174,14 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     
     expect(screen.getByText("Contract Price")).toBeInTheDocument();
     expect(screen.getByText("ETB 150,000")).toBeInTheDocument();
+  });
+
+  it("does not fetch mutation-only option lists for read-only event users", () => {
+    mockPermissions = ["events:read"];
+    render(<EventWorkspacePage />);
+
+    expect(apiMocks.getItems).not.toHaveBeenCalled();
+    expect(apiMocks.getAvailableEmployees).not.toHaveBeenCalled();
+    expect(apiMocks.getAvailableVehicles).not.toHaveBeenCalled();
   });
 });

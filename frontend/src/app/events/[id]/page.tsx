@@ -641,6 +641,7 @@ export default function EventWorkspacePage() {
   const itemsQuery = useQuery({
     queryKey: ["event-allocation-items", itemSearch],
     queryFn: () => getItems(1, 30, itemSearch || undefined, "all", false),
+    enabled: canWriteAllocations,
   });
 
   const items = (itemsQuery.data?.items || []) as Item[];
@@ -739,13 +740,13 @@ export default function EventWorkspacePage() {
   const availableEmployeesQuery = useQuery({
     queryKey: ["available-employees", eventId],
     queryFn: () => getAvailableEmployees(eventId),
-    enabled: activeTab === "scheduling",
+    enabled: activeTab === "scheduling" && (canWriteAssignments || canWriteVehicles),
   });
 
   const availableVehiclesQuery = useQuery({
     queryKey: ["available-vehicles", eventId],
     queryFn: () => getAvailableVehicles(eventId),
-    enabled: activeTab === "scheduling",
+    enabled: activeTab === "scheduling" && canWriteVehicles,
   });
 
   const assignEmployeeMutation = useMutation({

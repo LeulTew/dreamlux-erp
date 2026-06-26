@@ -623,10 +623,12 @@ function HistoryContent() {
 
   if (!isAuthenticated || !hasAssetsRead) {
     return (
-      <ForbiddenState
-        title="Forbidden: Insufficient privileges"
-        description="Only authorized personnel can view inventory audit logs."
-      />
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can view inventory audit logs."
+        />
+      </AuthLayout>
     );
   }
 

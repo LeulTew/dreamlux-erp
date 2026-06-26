@@ -283,10 +283,12 @@ export default function ReconcilePage() {
 
   if (!isAuthenticated || !hasAssetsReconcile) {
     return (
-      <ForbiddenState
-        title="Forbidden: Insufficient privileges"
-        description="Only authorized personnel can reconcile inventory."
-      />
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can reconcile inventory."
+        />
+      </AuthLayout>
     );
   }
 

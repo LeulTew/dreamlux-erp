@@ -153,10 +153,12 @@ export default function TrashPage() {
 
   if (!isAuthenticated || !hasAssetsRead) {
     return (
-      <ForbiddenState
-        title="Forbidden: Insufficient privileges"
-        description="Only authorized personnel can view trashed inventory items."
-      />
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can view trashed inventory items."
+        />
+      </AuthLayout>
     );
   }
 

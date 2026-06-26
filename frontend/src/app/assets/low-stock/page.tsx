@@ -50,10 +50,12 @@ export default function LowStockPage() {
 
   if (!isAuthenticated || !hasAssetsRead) {
     return (
-      <ForbiddenState
-        title="Forbidden: Insufficient privileges"
-        description="Only authorized personnel can view low stock alerts."
-      />
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can view low stock alerts."
+        />
+      </AuthLayout>
     );
   }
 
