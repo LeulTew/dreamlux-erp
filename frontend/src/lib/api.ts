@@ -14,6 +14,7 @@ import {
   EventExpense,
   EventProfitSummary,
   ProfitReportSummary,
+  PaginatedExpenseResponse,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1278,8 +1279,11 @@ export const createEventTripLog = (
 export const generateEventLaborExpense = (eventId: string) =>
   api.post(`/events/${eventId}/expenses/generate-labor`).then((r) => r.data);
 
-export const getPendingEventExpenses = (): Promise<EventExpense[]> =>
-  api.get("/events/expenses/pending").then((r) => r.data);
+export const getPendingEventExpenses = (params?: Record<string, unknown>): Promise<PaginatedExpenseResponse> =>
+  api.get("/events/expenses/pending", { params }).then((r) => r.data);
+
+export const getExpenseHistory = (params?: Record<string, unknown>): Promise<PaginatedExpenseResponse> =>
+  api.get("/events/expenses/history", { params }).then((r) => r.data);
 
 export const reviewEventExpense = (
   expenseId: string,

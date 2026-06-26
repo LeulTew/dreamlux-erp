@@ -1544,7 +1544,13 @@ describe("Events API", () => {
     expect(res.body.expense.status).toBe("Pending");
   });
 
-  test("GET /events/expenses/pending returns accountant approval queue", async () => {
+  test("GET /events/expenses/pending returns accountant approval queue (paginated)", async () => {
+    // 1. COUNT query mock
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: 1 }],
+      rowCount: 1,
+    });
+    // 2. DATA query mock
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "expense-1", event_name: "Wedding", status: "Pending" }],
       rowCount: 1,
@@ -1555,7 +1561,57 @@ describe("Events API", () => {
       .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.total).toBe(1);
+    expect(res.body.page).toBe(1);
+    expect(res.body.totalPages).toBe(1);
+  });
+
+  test("GET /events/expenses/pending blocks non-accountant with 403", async () => {
+    const res = await request(app)
+      .get("/events/expenses/pending")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toContain("Forbidden: Missing expense approval permission");
+  });
+
+  test("GET /events/expenses/history returns accountant approval history (paginated)", async () => {
+    // 1. COUNT query mock
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: 2 }],
+      rowCount: 1,
+    });
+    // 2. DATA query mock
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { id: "expense-2", event_name: "Birthday", status: "Approved", approved_by_name: "Accountant User" },
+        { id: "expense-3", event_name: "Conference", status: "Rejected", approved_by_name: "Accountant User", rejected_reason: "Too high" }
+      ],
+      rowCount: 2,
+    });
+
+    const res = await request(app)
+      .get("/events/expenses/history")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.total).toBe(2);
+    expect(res.body.page).toBe(1);
+    expect(res.body.totalPages).toBe(1);
+    expect(res.body.data[0].status).toBe("Approved");
+    expect(res.body.data[1].status).toBe("Rejected");
+    expect(res.body.data[1].rejected_reason).toBe("Too high");
+  });
+
+  test("GET /events/expenses/history blocks non-accountant with 403", async () => {
+    const res = await request(app)
+      .get("/events/expenses/history")
+      .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toContain("Forbidden: Missing expense approval permission");
   });
 
   test("PATCH /events/expenses/:expenseId/review approves pending expense", async () => {
