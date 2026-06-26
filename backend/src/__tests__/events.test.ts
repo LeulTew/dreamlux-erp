@@ -1614,6 +1614,60 @@ describe("Events API", () => {
     expect(res.body.error).toContain("Forbidden: Missing expense approval permission");
   });
 
+  test("GET /events/expenses/history accepts advanced filter parameters and maps them to SQL", async () => {
+    mockQuery.mockClear();
+    
+    // 1. COUNT query mock
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ count: 1 }],
+      rowCount: 1,
+    });
+    // 2. DATA query mock
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "expense-2", status: "Approved" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/expenses/history")
+      .query({
+        search: "Acme",
+        category: "Fuel",
+        status: "Approved",
+        reviewer: "Alice",
+        amount_min: "100",
+        amount_max: "5000",
+        date_from: "2026-06-01",
+        date_to: "2026-06-30",
+        sort_by: "amount",
+        sort_order: "asc",
+        page: "2",
+        limit: "10"
+      })
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+    expect(res.status).toBe(200);
+    
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    
+    const countSql = String(mockQuery.mock.calls[0][0]);
+    const dataSql = String(mockQuery.mock.calls[1][0]);
+    
+    expect(countSql).toContain("exp.status = $1");
+    expect(countSql).toContain("e.name ILIKE $2");
+    expect(countSql).toContain("exp.category ILIKE $2");
+    expect(countSql).toContain("submitter.full_name ILIKE $2");
+    expect(countSql).toContain("exp.category = $3");
+    expect(countSql).toContain("exp.created_at >= $4::timestamp");
+    expect(countSql).toContain("exp.created_at <= $5::timestamp");
+    expect(countSql).toContain("exp.amount >= $6");
+    expect(countSql).toContain("exp.amount <= $7");
+    expect(countSql).toContain("reviewer.full_name ILIKE $8");
+    
+    expect(dataSql).toContain("ORDER BY exp.amount ASC");
+    expect(dataSql).toContain("LIMIT $9 OFFSET $10");
+  });
+
   test("PATCH /events/expenses/:expenseId/review approves pending expense", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
     mockQuery.mockResolvedValueOnce({

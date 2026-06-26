@@ -129,10 +129,14 @@ vi.mock("@tanstack/react-query", () => {
           // Mock successful mutation execution
           mutationFn(variables)
             .then((data: any) => {
-              if (onSuccess) onSuccess(data, variables);
+              React.act(() => {
+                if (onSuccess) onSuccess(data, variables);
+              });
             })
             .catch((err: any) => {
-              if (onError) onError(err);
+              React.act(() => {
+                if (onError) onError(err);
+              });
             });
         },
         isPending: false,
@@ -248,5 +252,20 @@ describe("Expense Approval Page UI and Logic Test Suite", () => {
     
     // Header label in Amharic
     expect(screen.getByText("የወጪ ማጽደቂያ ዝርዝር")).toBeInTheDocument();
+  });
+
+  it("should sync search input filter with URL parameters on change", () => {
+    vi.useFakeTimers();
+    render(<ExpenseApprovalPage />);
+    
+    const searchInput = screen.getByPlaceholderText("Search event, category or submitter...");
+    
+    React.act(() => {
+      fireEvent.change(searchInput, { target: { value: "Wedding" } });
+      vi.runAllTimers();
+    });
+    
+    expect(mockReplace).toHaveBeenLastCalledWith(expect.stringContaining("q=Wedding"), expect.anything());
+    vi.useRealTimers();
   });
 });
