@@ -3,10 +3,10 @@
 This document tracks our progress, active branch, next steps, and pull requests for the UI/UX polish.
 
 ## Overall Status
-- **Current Step**: Phase 4 Expense Approval Queue & History — branch being created
+- **Current Step**: Phase 5 Mobile, i18n & Accessibility Pass
 - **Active Branch**: `feature/25-expense-approval-history` (branching from `main` @ `2dddea6`)
-- **Active Pull Request**: None
-- **Completion Progress**: 3/5 Phases Completed
+- **Active Pull Request**: [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65)
+- **Completion Progress**: 4/5 Phases Completed
 
 > [!NOTE]
 > **Temp/scratch cleanup**: Confirmed no temp JS/TS files exist in the repository. All scratch artifacts are outside the repo. Worktree is clean on `main`.
@@ -21,7 +21,7 @@ This document tracks our progress, active branch, next steps, and pull requests 
 | **Cleanup** | Post-merge review cleanup | `feature/25-post-merge-review-cleanup` | **Completed & Merged** | [PR #62](https://github.com/LeulTew/dreamlux-erp/pull/62) |
 | **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | **Completed & Merged** | [PR #63](https://github.com/LeulTew/dreamlux-erp/pull/63) |
 | **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | **Completed & Merged** | [PR #64](https://github.com/LeulTew/dreamlux-erp/pull/64) — badge system, compact mode, center-align fix |
-| **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **In Progress** | Implementation starting |
+| **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **PR Created (Draft)** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
 | **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | *Planned* | Final cross-surface QA pass |
 
 ---
@@ -80,54 +80,44 @@ This document tracks our progress, active branch, next steps, and pull requests 
 - [x] Status column centered in Events and Proposals tables (fix: commit `c61a175`).
 - [x] Issue #25 coverage: satisfies checklist section 12 and contributes to sections 3, 7, 8, and 13 where status colors, KPI hierarchy, reports, label fit, and semantic clarity overlap.
 
-### Phase 4: Expense Approval Queue & History
-
-#### Backend — `events.ts`
-- [ ] Upgrade `GET /events/expenses/pending` to server-side paginated (`page`, `limit`, `search`, `category`, `date_from`, `date_to`, `amount_min`, `amount_max`)
-- [ ] Return `{ data, total, page, totalPages }` from pending endpoint (not raw array)
-- [ ] Add new `GET /events/expenses/history` endpoint (Approved + Rejected, same auth guard)
-- [ ] History supports server-side: `page`, `limit`, `search`, `category`, `status`, `reviewer` search, `date_from`, `date_to`, `amount_min`, `amount_max`
-- [ ] History sort allowlist: `amount`, `created_at`, `approved_at`, `category`, `event_name`
-- [ ] Join `approved_by_name` from users table on history endpoint
-- [ ] Backend tests: 403 for non-accountant on both endpoints
-- [ ] Backend tests: pagination, category filter, status filter for history
-- [ ] Backend tests: `Pending` rows never appear in history response
-
-#### Frontend — API & Types
-- [ ] Update `getPendingEventExpenses(params)` to accept filter/page params
-- [ ] Add `getExpenseHistory(params)` calling new history endpoint
-- [ ] Add `PaginatedExpenseResponse` type to `types.ts`
-
-#### Frontend — Expense Approval Page (`hr/expenses/approve/page.tsx`)
-- [ ] Add two-tab layout: "Pending Queue" and "History"
-- [ ] Tab state driven by `?tab=history` URL query param
-- [ ] Pending tab: search bar + category dropdown + date-range + amount-range filters, all URL-param driven
-- [ ] History tab: same filters + status dropdown (`Approved` / `Rejected`) + reviewer search
-- [ ] Filters preserved when switching between tabs
-- [ ] Server-side pagination with `PaginationControls` on both tabs
-- [ ] History tab uses sortable table layout (`SortableHeader`) with columns: Event, Category, Amount, Submitter, Reviewer, Decision (StatusBadge), Date Reviewed, Reason
-- [ ] Pending tab: card layout retained and improved (show date submitted, receipt indicator)
-- [ ] Empty, loading, error states for both tabs (no protected data flash on error)
-- [ ] Full bilingual translations (English + Amharic) for all new strings
-
-#### Tests
-- [ ] Frontend tests: tab renders by default (Pending), switches on URL param
-- [ ] Frontend tests: filters update API query params
-- [ ] Frontend tests: approve/reject actions call correct mutations
-- [ ] Frontend tests: reject without reason shows toast error, blocks mutation
-- [ ] Frontend tests: empty state, loading skeleton render correctly
-- [ ] Frontend tests: bilingual rendering with `lang=am`
-
-#### Verification
-- [ ] `bun run lint` — 0 errors
-- [ ] `bun run build` — builds clean
-- [ ] `bun run test` — all tests pass
-- [ ] Manual: approve expense → moves from Pending to History as `Approved`
-- [ ] Manual: reject with reason → moves to History as `Rejected` with reason shown
-- [ ] Manual: reject without reason → toast fires, no mutation
-- [ ] Manual: non-accountant redirect tested
-- [ ] Manual: 320px mobile layout readable
-- [ ] Create PR using template and reference Issue #25
+### Phase 4: Expense Approval Queue & History — ✅ PR #65 Created (Draft)
+- [x] Upgrade `GET /events/expenses/pending` to server-side paginated (`page`, `limit`, `search`, `category`, `date_from`, `date_to`, `amount_min`, `amount_max`)
+- [x] Return `{ data, total, page, totalPages }` from pending endpoint (not raw array)
+- [x] Add new `GET /events/expenses/history` endpoint (Approved + Rejected, same auth guard)
+- [x] History supports server-side: `page`, `limit`, `search`, `category`, `status`, `reviewer` search, `date_from`, `date_to`, `amount_min`, `amount_max`
+- [x] History sort allowlist: `amount`, `created_at`, `approved_at`, `category`, `event_name`
+- [x] Join `approved_by_name` from users table on history endpoint
+- [x] Backend tests: 403 for non-accountant on both endpoints
+- [x] Backend tests: pagination, category filter, status filter for history
+- [x] Backend tests: `Pending` rows never appear in history response
+- [x] Update `getPendingEventExpenses(params)` to accept filter/page params
+- [x] Add `getExpenseHistory(params)` calling new history endpoint
+- [x] Add `PaginatedExpenseResponse` type to `types.ts`
+- [x] Add two-tab layout: "Pending Queue" and "History"
+- [x] Tab state driven by `?tab=history` URL query param
+- [x] Pending tab: search bar + category dropdown + date-range + amount-range filters, all URL-param driven
+- [x] History tab: same filters + status dropdown (`Approved` / `Rejected`) + reviewer search
+- [x] Filters preserved when switching between tabs
+- [x] Server-side pagination with `PaginationControls` on both tabs
+- [x] History tab uses sortable table layout (`SortableHeader`) with columns: Event, Category, Amount, Submitter, Reviewer, Decision (StatusBadge), Date Reviewed, Reason
+- [x] Pending tab: card layout retained and improved (show date submitted, receipt indicator)
+- [x] Empty, loading, error states for both tabs (no protected data flash on error)
+- [x] Full bilingual translations (English + Amharic) for all new strings
+- [x] Frontend tests: tab renders by default (Pending), switches on URL param
+- [x] Frontend tests: filters update API query params
+- [x] Frontend tests: approve/reject actions call correct mutations
+- [x] Frontend tests: reject without reason shows toast error, blocks mutation
+- [x] Frontend tests: empty state, loading skeleton render correctly
+- [x] Frontend tests: bilingual rendering with `lang=am`
+- [x] `bun run lint` — 0 errors
+- [x] `bun run build` — builds clean
+- [x] `bun run test` — all tests pass
+- [x] Manual: approve expense → moves from Pending to History as `Approved`
+- [x] Manual: reject with reason → moves to History as `Rejected` with reason shown
+- [x] Manual: reject without reason → toast fires, no mutation
+- [x] Manual: non-accountant redirect tested
+- [x] Manual: 320px mobile layout readable
+- [x] Create PR using template and reference Issue #25
 - [ ] Tick §6 and §14 checkboxes on Issue #25 after PR is merged
 
 ### Phase 5 Plan: Mobile, i18n & Accessibility Pass
