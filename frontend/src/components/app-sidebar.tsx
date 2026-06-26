@@ -262,7 +262,6 @@ function SidebarLink({
     </SidebarMenuButton>
   );
 }
-
 function SubItemBranchLine({ isLast }: { isLast: boolean }) {
   return (
     <div className="absolute left-[-14px] top-0 bottom-0 w-3.5 pointer-events-none flex items-center">
@@ -444,10 +443,10 @@ export function AppSidebar() {
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setEmployeesOpen(!employeesOpen)}
-                          className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                          className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isActive("/") || isActive("/insert")
-                              ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
-                              : ""
+                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
@@ -525,10 +524,10 @@ export function AppSidebar() {
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setEventsOpen(!eventsOpen)}
-                          className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                          className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")
-                              ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
-                              : ""
+                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
@@ -588,10 +587,10 @@ export function AppSidebar() {
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setFinanceOpen(!financeOpen)}
-                          className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                          className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses")
-                              ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
-                              : ""
+                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
@@ -676,10 +675,10 @@ export function AppSidebar() {
                     <div className="w-full">
                       <SidebarMenuButton
                         onClick={() => setItemsOpen(!itemsOpen)}
-                        className={`w-full justify-between rounded-xl h-10 border border-transparent transition-all ${
+                        className={`w-full justify-between h-10 border border-transparent transition-all ${
                           isActive("/assets") || isActive("/assets/insert")
-                            ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent"
-                            : ""
+                            ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                            : "rounded-xl"
                         }`}
                       >
                         <span className="flex items-center gap-3">
