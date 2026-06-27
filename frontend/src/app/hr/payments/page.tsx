@@ -107,6 +107,7 @@ function PaymentsPageContent() {
   const highlightedId = searchParams.get("highlight");
 
   const hasPayrollAccess = hasPermission("payroll:read") || hasPermission("payroll:write");
+  const hasPayrollWrite = hasPermission("payroll:write");
 
   const { data: runs, isLoading, isRefetching, refetch } = useQuery<PayrollRunRow[]>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder],
@@ -271,11 +272,13 @@ function PaymentsPageContent() {
               <HiArrowPath className={`w-4 h-4 transition-transform duration-700 ${isRefetching ? 'animate-spin' : 'group-hover:rotate-180'}`} />
             </button>
 
-            <FancyButton
-              onClick={() => router.push(`/hr/payments/run?date=${selectedMonth}`)}
-            >
-              {t("New Payout")}
-            </FancyButton>
+            {hasPayrollWrite && (
+              <FancyButton
+                onClick={() => router.push(`/hr/payments/run?date=${selectedMonth}`)}
+              >
+                {t("New Payout")}
+              </FancyButton>
+            )}
           </div>
         </div>
 
@@ -410,7 +413,7 @@ function PaymentsPageContent() {
                         >
                           <HiPrinter className="w-5 h-5" />
                         </button>
-                        {currentStatus === "DRAFT" && (
+                        {hasPayrollWrite && currentStatus === "DRAFT" && (
                           <Link
                             href={`/hr/payments/run?date=${run.period_start ? run.period_start.slice(0, 7) : ""}&period_type=${run.period_start?.endsWith("-16") ? "h2" : run.period_start?.endsWith("-01") && run.period_end?.endsWith("-15") ? "h1" : "full"}`}
                             className="flex items-center justify-center gap-2 p-3 bg-amber-500 text-white rounded-2xl hover:bg-amber-600 transition-all active:scale-95 shadow-lg shadow-amber-500/10"
@@ -419,16 +422,17 @@ function PaymentsPageContent() {
                             <HiPencilSquare className="w-5 h-5" />
                           </Link>
                         )}
-                        {view === "active" ? (
-                          <button
-                            onClick={() => setConfirmState({ id: run.id, action: "trash" })}
-                            className="flex items-center justify-center gap-2 p-3 bg-rose-600 text-white rounded-2xl hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
-                            title="Move to Trash"
-                          >
-                            <HiTrash className="w-5 h-5" />
-                          </button>
-                        ) : (
-                          <>
+                        {hasPayrollWrite && (
+                          view === "active" ? (
+                            <button
+                              onClick={() => setConfirmState({ id: run.id, action: "trash" })}
+                              className="flex items-center justify-center gap-2 p-3 bg-rose-600 text-white rounded-2xl hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
+                              title="Move to Trash"
+                            >
+                              <HiTrash className="w-5 h-5" />
+                            </button>
+                          ) : (
+                            <>
                             <button
                               onClick={() => setConfirmState({ id: run.id, action: "restore" })}
                               className="flex items-center justify-center gap-2 p-3 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/10"
@@ -443,7 +447,8 @@ function PaymentsPageContent() {
                             >
                               <HiTrash className="w-5 h-5" />
                             </button>
-                          </>
+                            </>
+                          )
                         )}
                         <Link
                           href={`/hr/payments/${run.id}`}

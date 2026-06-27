@@ -19,12 +19,13 @@ export default function EventTypesTrashPage() {
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const hasEventWriteAccess = hasPermission("events:write");
+  const hasEventReadAccess = hasPermission("events:read");
+  const hasEventDeleteAccess = hasPermission("events:delete");
 
   const { data: events, isLoading } = useQuery<EventType[]>({
     queryKey: ["event-types-trash"],
     queryFn: getEventTypesTrash,
-    enabled: isAuthenticated && hasEventWriteAccess,
+    enabled: isAuthenticated && hasEventReadAccess,
   });
 
   const restoreMut = useMutation({
@@ -55,12 +56,12 @@ export default function EventTypesTrashPage() {
     );
   }
 
-  if (!isAuthenticated || !hasEventWriteAccess) {
+  if (!isAuthenticated || !hasEventReadAccess) {
     return (
       <AuthLayout>
         <ForbiddenState
           title="Forbidden: Insufficient privileges"
-          description="Only Owners, Administrators, and Operations Managers can manage event types."
+          description="You need event read permissions to view deleted event types."
         />
       </AuthLayout>
     );
@@ -86,14 +87,16 @@ export default function EventTypesTrashPage() {
                 <th className="px-3 sm:px-6 py-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest">Event Name</th>
                 <th className="px-3 sm:px-6 py-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest">Description</th>
                 <th className="px-3 sm:px-6 py-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest hidden sm:table-cell">Deleted At</th>
-                <th className="px-3 sm:px-6 py-4 text-right text-[10px] font-black uppercase text-muted-foreground tracking-widest">Actions</th>
+                {hasEventDeleteAccess && (
+                  <th className="px-3 sm:px-6 py-4 text-right text-[10px] font-black uppercase text-muted-foreground tracking-widest">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {isLoading ? (
-                <tr><td colSpan={4} className="p-8 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Loading...</td></tr>
+                <tr><td colSpan={hasEventDeleteAccess ? 4 : 3} className="p-8 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Loading...</td></tr>
               ) : events?.length === 0 ? (
-                <tr><td colSpan={4} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Empty.</td></tr>
+                <tr><td colSpan={hasEventDeleteAccess ? 4 : 3} className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Empty.</td></tr>
               ) : (
                 events?.map(ev => (
                   <tr key={ev.id} className="transition-colors group opacity-75 hover:opacity-100">
@@ -106,16 +109,18 @@ export default function EventTypesTrashPage() {
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden sm:table-cell">{new Date(ev.deleted_at!).toLocaleDateString()}</td>
-                    <td className="px-3 sm:px-6 py-4 text-right">
-                      <div className="flex justify-end gap-1 sm:gap-2">
-                        <button onClick={() => restoreMut.mutate(ev.id)} className="text-[8px] sm:text-[10px] font-black tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-emerald-700 outline-none uppercase transition-colors">
-                          Restore
-                        </button>
-                        <button onClick={() => setDeleteId(ev.id)} className="text-[8px] sm:text-[10px] font-black tracking-widest text-white bg-danger hover:bg-danger/90 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-danger/80 outline-none uppercase transition-colors">
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+                    {hasEventDeleteAccess && (
+                      <td className="px-3 sm:px-6 py-4 text-right">
+                        <div className="flex justify-end gap-1 sm:gap-2">
+                          <button onClick={() => restoreMut.mutate(ev.id)} className="text-[8px] sm:text-[10px] font-black tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-emerald-700 outline-none uppercase transition-colors">
+                            Restore
+                          </button>
+                          <button onClick={() => setDeleteId(ev.id)} className="text-[8px] sm:text-[10px] font-black tracking-widest text-white bg-danger hover:bg-danger/90 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-danger/80 outline-none uppercase transition-colors">
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
