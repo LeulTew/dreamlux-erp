@@ -3,10 +3,10 @@
 This document tracks our progress, active branch, next steps, and pull requests for the UI/UX polish.
 
 ## Overall Status
-- **Current Step**: Phase 5 Mobile, i18n & Accessibility Pass
+- **Current Step**: Phase 6 E2E Regression, Report Redaction & Snapshots
 - **Active Branch**: `main`
-- **Active Pull Request**: [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) (Merged)
-- **Completion Progress**: 4/5 Phases Completed
+- **Active Pull Request**: None
+- **Completion Progress**: 5/6 Phases Completed
 
 > [!NOTE]
 > **Temp/scratch cleanup**: Confirmed no temp JS/TS files exist in the repository. All scratch artifacts are outside the repo. Worktree is clean on `main`.
@@ -22,7 +22,8 @@ This document tracks our progress, active branch, next steps, and pull requests 
 | **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | **Completed & Merged** | [PR #63](https://github.com/LeulTew/dreamlux-erp/pull/63) |
 | **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | **Completed & Merged** | [PR #64](https://github.com/LeulTew/dreamlux-erp/pull/64) — badge system, compact mode, center-align fix |
 | **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **Completed & Merged** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
-| **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | **Completed** | Final cross-surface QA pass |
+| **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | **Completed & Merged** | [PR #66](https://github.com/LeulTew/dreamlux-erp/pull/66) |
+| **Phase 6** | E2E Regression, Report Redaction & Snapshots | `feature/25-e2e-regression-snapshots` | **Planned** | Backend regression, snapshots & final issue signoff |
 
 ---
 
@@ -120,22 +121,19 @@ This document tracks our progress, active branch, next steps, and pull requests 
 - [x] Create PR using template and reference Issue #25
 - [x] Tick §6 and §14 checkboxes on Issue #25 after PR is merged
 
-### Phase 5 Plan: Mobile, i18n & Accessibility Pass
+### Phase 5: Mobile, i18n & Accessibility Pass — ✅ Completed & Merged (PR #66)
 - [x] Re-audit access-aware navigation, breadcrumbs, direct URL blocked states, route shells, event workspace controls, field redaction, KPI hierarchy, forms, reports, print styles, localization, keyboard/focus, and mobile layout.
 - [x] Audit 320px, 390px, 768px, 1024px, 1366px, 1920px, and 2560px across key personas and routes.
 - [x] Verify all modified visible strings use the translation helper and have English/Amharic coverage.
 - [x] Check focus order, keyboard operation, reduced motion, tap targets, text wrapping, and WCAG AA contrast.
-- [x] Record screenshot/manual QA evidence in the phase PR.
-- [x] Add backend regression tests for permission-aware navigation, route guards, and direct URL blocked states.
 - [x] Add frontend regression tests for access-aware sidebar filtering and empty group suppression.
 - [x] Add frontend regression tests for shell-state redaction.
 - [x] Add UI tests for event workspace control visibility by role and field permission.
-- [x] Add UI tests for report/print redaction states and hidden KPI shells.
-- [x] Add responsive snapshot coverage for 320px and 390px mobile layouts.
 - [x] Add Amharic overflow checks for long labels in sidebars, tabs, tables, and action buttons.
-- [x] Issue #25 coverage: closes the remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after Phases 2-4 land.
 
-### Phase 6+ Backlog
-- [ ] Reconcile any newly discovered status labels that still bypass `StatusBadge`.
-- [ ] Close any remaining issue #25 checklist item that still needs explicit GitHub checkbox reconciliation after PR merges.
-- [ ] Track follow-up fixes discovered during Phase 5 QA as separate scoped branches if they do not fit the access/i18n pass.
+### Phase 6 Plan: E2E Regression, Report Redaction & Snapshots
+- [ ] Add backend regression tests for permission-aware navigation, route guards, and direct URL blocked states.
+- [ ] Add UI tests for report/print redaction states and hidden KPI shells.
+- [ ] Add responsive snapshot coverage for 320px and 390px mobile layouts.
+- [ ] Record screenshot/manual QA evidence in the phase PR.
+- [ ] Issue #25 coverage: closes the remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after final regression suites land.
