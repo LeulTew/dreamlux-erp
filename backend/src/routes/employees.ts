@@ -308,10 +308,14 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
     // Default sorting and provided sort
     if (sortBy === "salary") {
       query = query.order("amount_etb", { ascending: sortOrder === "asc", referencedTable: "salary_levels", nullsFirst: false });
-    } else if (sortBy === "name") {
+    } else if (sortBy === "name" || sortBy === "full_name") {
       query = query.order("full_name", { ascending: sortOrder === "asc" });
     } else if (sortBy === "date") {
       query = query.order("created_at", { ascending: sortOrder === "asc" });
+    } else if (sortBy === "employee_id") {
+      query = query.order("employee_id", { ascending: sortOrder === "asc" });
+    } else if (sortBy === "commission") {
+      query = query.order("commission", { ascending: sortOrder === "asc" });
     } else {
       // Default: Salary High to Low per request
       query = query.order("amount_etb", { ascending: false, referencedTable: "salary_levels", nullsFirst: false });
@@ -358,8 +362,12 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
       // Apply safe sorts (Legacy column is base_salary)
       if (sortBy === "salary") {
         fallbackQuery = fallbackQuery.order("base_salary", { ascending: sortOrder === "asc" });
-      } else if (sortBy === "name") {
+      } else if (sortBy === "name" || sortBy === "full_name") {
         fallbackQuery = fallbackQuery.order("full_name", { ascending: sortOrder === "asc" });
+      } else if (sortBy === "employee_id") {
+        fallbackQuery = fallbackQuery.order("employee_id", { ascending: sortOrder === "asc" });
+      } else if (sortBy === "commission") {
+        fallbackQuery = fallbackQuery.order("commission", { ascending: sortOrder === "asc" });
       } else if (sortBy === "date" || !sortBy) {
         fallbackQuery = fallbackQuery.order("created_at", { ascending: sortOrder === "asc" });
       } else {
@@ -381,8 +389,12 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
 
         if (sortBy === "salary") {
           ultraFallback = ultraFallback.order("base_salary", { ascending: sortOrder === "asc" });
-        } else if (sortBy === "name") {
+        } else if (sortBy === "name" || sortBy === "full_name") {
           ultraFallback = ultraFallback.order("full_name", { ascending: sortOrder === "asc" });
+        } else if (sortBy === "employee_id") {
+          ultraFallback = ultraFallback.order("employee_id", { ascending: sortOrder === "asc" });
+        } else if (sortBy === "commission") {
+          ultraFallback = ultraFallback.order("commission", { ascending: sortOrder === "asc" });
         } else if (sortBy === "date" || !sortBy) {
           ultraFallback = ultraFallback.order("created_at", { ascending: sortOrder === "asc" });
         } else {
