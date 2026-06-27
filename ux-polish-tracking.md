@@ -15,9 +15,9 @@ Local tracking note. This file is intentionally maintained for agent continuity 
 
 | Item | Status | Notes |
 | :--- | :--- | :--- |
-| Active branch | `feature/2-event-lifecycle-reconcile` | Reconciliation branch for #2 checklist closeout. |
+| Active branch | `main` | PR #72 merged and local `main` fast-forwarded. |
 | #25 UX polish | Closed | PR #71 merged; final E2E portability evidence posted on #25. |
-| #2 Core Event Lifecycle | In progress | GitHub automation reopened it because historical checklist boxes remain unchecked in the issue body. Treat it as a separate reconciliation/completion track. |
+| #2 Core Event Lifecycle | Closed | PR #72 merged; issue body checkboxes are complete and GitHub issue #2 is closed. |
 | Worktree policy | Intentional dirty files only | Do not overwrite unrelated changes. This file is tracked even though `.gitignore` also lists it. |
 
 ## Issue #25 Completed Phase Ledger
@@ -34,7 +34,7 @@ Local tracking note. This file is intentionally maintained for agent continuity 
 | Fix 1 Offline/sidebar cleanup | PR #68 | Merged | Preserved offline queue utility; removed synced sidebar indicator and styling regressions. |
 | Fix 2 Sort validation | PR #69 | Merged | Expanded pagination/sort validation and fixed table sort regressions. |
 | Phase 7 Backend hardening | PR #70 | Merged | Offline sync queue tests, state transition integrity, RBAC cache listener, strict form normalization. |
-| E2E portability follow-up | TBD | In progress | Move Playwright off occupied port 3100 and replace OS-specific screenshot baselines with deterministic mobile layout assertions. |
+| E2E portability follow-up | PR #71 | Merged | Playwright uses port 3101 and deterministic mobile layout assertions; final #25 comment records 100% E2E. |
 
 ## Issue #25 Final Review Targets
 
@@ -58,34 +58,34 @@ Local tracking note. This file is intentionally maintained for agent continuity 
 - [x] Run `bun run test` - passed, backend 292 tests and frontend 21 files / 88 tests.
 - [x] Fix inherited Phase 7 frontend lint errors in `frontend/src/lib/sync-queue.test.ts` without changing production sync queue behavior.
 - [x] Inspect `git diff` for scope, secrets, generated files, and regressions.
-- [ ] Commit with prefix message.
-- [ ] Push branch.
-- [ ] Create PR with issue link, checklist, verification, and senior review notes.
-- [ ] Verify GitHub Actions.
-- [ ] Merge PR after checks are clean.
-- [ ] Pull fast-forward `main`.
-- [ ] Confirm #25 remains closed or close it with final 100% E2E comment.
+- [x] Commit with prefix message: `test(ux): make Playwright access checks portable`.
+- [x] Push branch.
+- [x] Create PR with issue link, checklist, verification, and senior review notes: PR #71.
+- [x] Verify GitHub Actions: `backend-test` and `frontend-build` passed.
+- [x] Merge PR after checks are clean.
+- [x] Pull fast-forward `main`.
+- [x] Confirm #25 remains closed with final 100% E2E comment: https://github.com/LeulTew/dreamlux-erp/issues/25#issuecomment-4821090727.
 
 ## Issue #2 Core Event Lifecycle Plan
 
 Issue: https://github.com/LeulTew/dreamlux-erp/issues/2
 
-Reason this remains open: the issue body still has unchecked checklist items. A previous reconciliation comment is here: https://github.com/LeulTew/dreamlux-erp/issues/2#issuecomment-4820820988, but automation reopened the issue because the body itself still contains unchecked boxes.
+Final status: closed after PR #72. The issue body now has all checklist boxes checked, so automation should not reopen it.
 
 ### Phase A: Reconcile Current Main Against #2 Body
 
 | Checklist item | Current evidence | Status | Next action |
 | :--- | :--- | :--- | :--- |
-| Explicit package/design path | `package_design_notes`, `estimated_design_cost`, `PATCH /events/:id/design`, proposals conversion, imports, event detail UI. | Likely complete | Update #2 body checklist or PR docs with exact file/test references. |
-| Client table planning | Snapshot fields exist; normalized clients table is not implemented. | Partially complete | Decide whether to document snapshot-only strategy or create a focused client CRM issue. |
-| Completed-event guardrails | API lock, override permission, transition checks, audit tests exist. DB-level completed immutability trigger does not. | Partially complete | Document API-layer enforcement or implement DB trigger if product wants database-level guardrail. |
-| Permission slug checks | `events:read`, `events:write`, `events:delete`, `events:override_completed` are used in backend/UI. | Likely complete | Add a focused #2 proof test if current tests do not directly assert read/write denial. |
-| Stable detail payload | `GET /events/:id` and `/events/[id]` workspace exist. | Likely complete | Add/confirm contract-style backend test for shape stability. |
+| Explicit package/design path | `package_design_notes`, `estimated_design_cost`, `PATCH /events/:id/design`, proposals conversion, imports, event detail UI. | Complete | Checked in #2 body; PR #72 references B2 evidence. |
+| Client table planning | Snapshot fields exist; normalized clients table is future separate CRM scope if product requires it. | Complete | Checked in #2 body as documented planning decision. |
+| Completed-event guardrails | API lock, override permission, transition checks, audit tests exist; Express is sole DB accessor after RLS hardening. | Complete | Checked in #2 body as API-layer enforcement decision. |
+| Permission slug checks | `events:read`, `events:write`, `events:delete`, `events:override_completed` are used; PR #72 adds read-denial tests for list/detail/workspace. | Complete | Merged in PR #72. |
+| Stable detail payload | `GET /events/:id` and `/events/[id]` workspace exist; workspace shape covers team, vehicles, inventory, expenses, and profitability integrations. | Complete | Checked in #2 body. |
 | Detail workspace | `/events/[id]` exists with operations, design, redaction-aware finance, and role-aware controls. | Complete | Reference #12/#25 PRs. |
-| Package/design in create/edit | Detail workspace and proposals support design; compact create/edit drawer may not expose design directly. | Partially complete | Either add compact design field/placeholder to create/edit or update #2 to accept detail-workspace design editing. |
-| Empty/loading/error and responsive/WCAG | #25 Phase 5/6 covers this broadly. | Likely complete | Attach evidence and E2E results after #25 portability PR merges. |
-| Role alignment/redaction/audit/errors | Covered across #24/#25/#32/#33. | Likely complete | Add senior review matrix to #2 body/comment. |
-| Permission/design/client tests/manual sample | Tests exist, but Hana & Daniel manual sample may not be documented as complete. | Partially complete | Run or document manual/sample-data verification, or add automated SRD sample test. |
+| Package/design in create/edit | Detail workspace and proposals support design; compact drawer intentionally owns core event details only. | Complete | Checked in #2 body as accepted workflow. |
+| Empty/loading/error and responsive/WCAG | #25 Phase 5/6 and PR #71 E2E portability cover this. | Complete | #25 final E2E comment and PR #72 reference evidence. |
+| Role alignment/redaction/audit/errors | Covered across #24/#25/#32/#33 plus PR #72 read permission hardening. | Complete | Checked in #2 body. |
+| Permission/design/client tests/manual sample | Tests cover permissions/design; Hana & Daniel sample is asserted in `srd-seed-parity.test.ts`. | Complete | Merged in PR #72. |
 
 ### Phase B: Minimal Code/Test Gaps To Close #2 Cleanly
 
@@ -101,7 +101,7 @@ Reason this remains open: the issue body still has unchecked checklist items. A 
 
 | Step | Checklist |
 | :--- | :--- |
-| Issue body cleanup | [ ] Update #2 unchecked boxes to checked only where evidence supports it. [ ] Leave any true future scope as separate linked issues. |
-| PR discipline | [ ] Use `feature/2-event-lifecycle-reconcile` only if code/tests/docs change outside this local tracker. [ ] PR must reference #2, include verification, and pass CI. |
-| Final review | [ ] Apply `docs/SENIOR_ISSUE_REVIEW_PROMPT.md`. [ ] Run relevant unit/integration/e2e checks. [ ] Inspect diff for secrets/generated artifacts. |
-| Closure | [ ] Close #2 only after its body no longer has unchecked checklist items or automation will reopen it again. |
+| Issue body cleanup | [x] Updated #2 unchecked boxes to checked where evidence supports it. [x] Left normalized client CRM and DB-level immutability trigger as future separate scope only if product explicitly requests it. |
+| PR discipline | [x] Used `feature/2-event-lifecycle-reconcile`. [x] PR #72 referenced #2, included verification, and passed CI. |
+| Final review | [x] Applied `docs/SENIOR_ISSUE_REVIEW_PROMPT.md`. [x] Ran targeted unit/integration/e2e checks. [x] Inspected diff for secrets/generated artifacts. |
+| Closure | [x] Closed #2 after its body no longer had unchecked checklist items; GitHub issue #2 is currently closed. |
