@@ -218,7 +218,9 @@ describe("Expense Approval Page UI and Logic Test Suite", () => {
     
     // Click approve button
     const approveBtn = screen.getByRole("button", { name: /Approve/i });
-    fireEvent.click(approveBtn);
+    await React.act(async () => {
+      fireEvent.click(approveBtn);
+    });
     
     expect(mockReviewEventExpense).toHaveBeenCalledWith("expense-pending-1", {
       status: "Approved",
