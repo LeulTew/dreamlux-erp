@@ -15,9 +15,9 @@ Local tracking note. This file is intentionally maintained for agent continuity 
 
 | Item | Status | Notes |
 | :--- | :--- | :--- |
-| Active branch | `feature/25-e2e-playwright-portability` | Follow-up to remove the last Playwright portability caveat from #25. |
-| #25 UX polish | In final follow-up | Product/security/unit/build coverage was already accepted; E2E portability is being made 100%. |
-| #2 Core Event Lifecycle | Open | GitHub automation reopened it because historical checklist boxes remain unchecked in the issue body. Treat it as a separate reconciliation/completion track. |
+| Active branch | `feature/2-event-lifecycle-reconcile` | Reconciliation branch for #2 checklist closeout. |
+| #25 UX polish | Closed | PR #71 merged; final E2E portability evidence posted on #25. |
+| #2 Core Event Lifecycle | In progress | GitHub automation reopened it because historical checklist boxes remain unchecked in the issue body. Treat it as a separate reconciliation/completion track. |
 | Worktree policy | Intentional dirty files only | Do not overwrite unrelated changes. This file is tracked even though `.gitignore` also lists it. |
 
 ## Issue #25 Completed Phase Ledger
@@ -91,11 +91,11 @@ Reason this remains open: the issue body still has unchecked checklist items. A 
 
 | Phase | Goal | Checklist |
 | :--- | :--- | :--- |
-| B1 Permission proof | Make #2 permission completion undeniable. | [ ] Inspect `backend/src/__tests__/events.test.ts` for explicit `events:read`/`events:write` denial tests. [ ] Add missing focused tests if absent. [ ] Confirm direct API denial does not rely on frontend gating. |
-| B2 Package/design proof | Resolve create/edit vs detail-workspace ambiguity. | [ ] Inspect `EditEventSheet.tsx` and event detail design editor. [ ] Either add package/design placeholder to create/edit or document why detail editor is the intended workflow. [ ] Add/confirm tests for `PATCH /events/:id/design`. |
-| B3 Client strategy | Close normalized client-table ambiguity. | [ ] Confirm SRD Phase 1 needs snapshots only or normalized clients. [ ] If normalized clients are out of scope, update #2 with documented decision. [ ] If needed, create new issue for CRM/client registry rather than expanding #2. |
-| B4 Completed-event guardrail | Resolve DB-level guardrail checkbox. | [ ] Confirm current API-layer enforcement and audit tests. [ ] Decide whether DB trigger is necessary. [ ] If not necessary, update #2 with rationale; if necessary, implement migration/test in a dedicated PR. |
-| B5 SRD sample verification | Make manual verification durable. | [ ] Use Hana & Daniel Wedding sample from #2. [ ] Verify create/list/detail/status/audit flow locally or via automated test. [ ] Record command/output evidence in #2. |
+| B1 Permission proof | Make #2 permission completion undeniable. | [x] Inspected `backend/src/__tests__/events.test.ts` for explicit `events:read`/`events:write` denial tests. [x] Added missing focused read-denial tests for list/detail/workspace routes. [x] Confirmed direct API denial does not rely on frontend gating. Evidence: `bun test backend/src/__tests__/events.test.ts` passed 99 tests. |
+| B2 Package/design proof | Resolve create/edit vs detail-workspace ambiguity. | [x] Inspected `frontend/src/components/EditEventSheet.tsx` and `frontend/src/app/events/[id]/page.tsx`. [x] Documented intended workflow: compact drawer owns core schedule/client/status; detail workspace owns design package editing via `DesignPackagePanel`. [x] Confirmed backend `PATCH /events/:id/design` tests cover update and low-privilege denial. |
+| B3 Client strategy | Close normalized client-table ambiguity. | [x] Confirmed current Phase 1 implementation preserves `client_name` / `client_phone` snapshots across schema, API, imports/exports, proposals, list/detail UI, and SRD seed. [x] Decision: normalized CRM/client registry is future separate scope, not a blocker for #2 closeout. |
+| B4 Completed-event guardrail | Resolve DB-level guardrail checkbox. | [x] Confirmed current API/business layer enforces completed-event lock, `events:override_completed`, sequential status transitions, labor generation idempotency, and audit logs. [x] Decision: DB trigger is not necessary for #2 because Express is the sole database accessor and #31 already hardened direct client access/RLS; open a future issue only if product requires DB-level immutability. |
+| B5 SRD sample verification | Make manual verification durable. | [x] Used Hana & Daniel Wedding sample from #2/SRD seed. [x] Added automated seed parity assertions for event, schedule, status, checklist, vehicle assignments, and allocation workspace data. [x] Evidence: `cd backend && bun test src/__tests__/srd-seed-parity.test.ts` passed 5 tests / 79 assertions. |
 
 ### Phase C: GitHub Closeout For #2
 

@@ -2327,6 +2327,36 @@ describe("Events API", () => {
       expect(res.status).toBe(403);
     });
 
+    test("GET /events blocks authenticated users without events:read before DB access", async () => {
+      const res = await request(app)
+        .get("/events")
+        .set("Authorization", `Bearer ${getToken("CUSTOM", { permission_slugs: [] })}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("view events");
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test("GET /events/:id blocks authenticated users without events:read before DB access", async () => {
+      const res = await request(app)
+        .get("/events/event-1")
+        .set("Authorization", `Bearer ${getToken("CUSTOM", { permission_slugs: [] })}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("view events");
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test("GET /events/:id/workspace blocks authenticated users without events:read before DB access", async () => {
+      const res = await request(app)
+        .get("/events/event-1/workspace")
+        .set("Authorization", `Bearer ${getToken("CUSTOM", { permission_slugs: [] })}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("view events");
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
     test("GET /events/:id/workspace redacts commission_amount and employee_phone for DRIVER", async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],

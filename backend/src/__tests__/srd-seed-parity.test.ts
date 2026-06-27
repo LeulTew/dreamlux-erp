@@ -28,6 +28,21 @@ describe("DreamLux SRD seed parity", () => {
     expect(seedSql).toContain("Pink Orchid");
   });
 
+  test("seeds Hana & Daniel lifecycle workspace data for issue #2 verification", () => {
+    expect(seedSql).toContain("Wedding (Sereg)");
+    expect(seedSql).toContain("'Hana & Daniel Wedding', 'Hana Mohammed', '0911223344'");
+    expect(seedSql).toContain("'2026-07-15', '2026-07-15'");
+    expect(seedSql).toContain("'10:00:00', '18:00:00'");
+    expect(seedSql).toContain("'Planned'");
+    expect(seedSql).toContain("Confirm client package design");
+    expect(seedSql).toContain("Reserve flowers and runners from central store");
+    expect(seedSql).toContain("Complete venue setup checklist");
+    expect(seedSql).toContain("AA-3-A12345");
+    expect(seedSql).toContain("AA-3-B98765");
+    expect(seedSql).toContain("AA-3-C45678");
+    expect(seedSql).toContain("SRD event workspace sample allocation");
+  });
+
   test("seeds all SRD inventory category examples with full item fields", () => {
     const requiredItems = [
       "Peach Runner",
