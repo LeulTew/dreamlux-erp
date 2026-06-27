@@ -2,37 +2,45 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   enqueueMutation,
   flushSyncQueue,
-  getSyncQueueSnapshot,
   listQueuedMutations,
-  refreshSyncQueueSnapshot,
+  type QueuedMutation,
   registerSyncQueueOnlineListeners,
   subscribeSyncQueue,
 } from "./sync-queue";
 
-const mockStoreMap = new Map<string, any>();
+type MockRequest<T> = Pick<IDBRequest<T>, "onsuccess" | "onerror" | "result">;
+
+type MockStore = {
+  add: ReturnType<typeof vi.fn<(item: QueuedMutation) => MockRequest<string>>>;
+  getAll: ReturnType<typeof vi.fn<() => MockRequest<QueuedMutation[]>>>;
+  put: ReturnType<typeof vi.fn<(item: QueuedMutation) => MockRequest<string>>>;
+  delete: ReturnType<typeof vi.fn<(id: string) => MockRequest<string>>>;
+};
+
+const mockStoreMap = new Map<string, QueuedMutation>();
 
 // Helper to create a request that triggers onsuccess asynchronously
-function createMockRequest(result?: any) {
-  const req = {
-    onsuccess: null as any,
-    onerror: null as any,
+function createMockRequest<T>(result: T): MockRequest<T> {
+  const req: MockRequest<T> = {
+    onsuccess: null,
+    onerror: null,
     result,
   };
   setTimeout(() => {
-    if (req.onsuccess) req.onsuccess();
+    req.onsuccess?.call(req as IDBRequest<T>, new Event("success"));
   }, 0);
-  return req as any;
+  return req;
 }
 
-const mockStore = {
-  add: vi.fn((item: any) => {
+const mockStore: MockStore = {
+  add: vi.fn((item: QueuedMutation) => {
     mockStoreMap.set(item.id, item);
     return createMockRequest(item.id);
   }),
   getAll: vi.fn(() => {
     return createMockRequest(Array.from(mockStoreMap.values()));
   }),
-  put: vi.fn((item: any) => {
+  put: vi.fn((item: QueuedMutation) => {
     mockStoreMap.set(item.id, item);
     return createMockRequest(item.id);
   }),
@@ -44,7 +52,7 @@ const mockStore = {
 
 const mockTransaction = {
   objectStore: () => mockStore,
-  onerror: null as any,
+  onerror: null as IDBTransaction["onerror"],
 };
 
 const mockDb = {
@@ -58,14 +66,14 @@ describe("sync-queue library", () => {
   beforeEach(() => {
     vi.stubGlobal("indexedDB", {
       open: () => {
-        const req = {
-          onsuccess: null as any,
-          onerror: null as any,
-          onupgradeneeded: null as any,
+        const req: MockRequest<typeof mockDb> & Pick<IDBOpenDBRequest, "onupgradeneeded"> = {
+          onsuccess: null,
+          onerror: null,
+          onupgradeneeded: null,
           result: mockDb,
         };
         setTimeout(() => {
-          if (req.onsuccess) req.onsuccess();
+          req.onsuccess?.call(req as IDBRequest<typeof mockDb>, new Event("success"));
         }, 0);
         return req;
       },
@@ -108,7 +116,7 @@ describe("sync-queue library", () => {
       status: 200,
     });
 
-    const snapshot = await flushSyncQueue(mockFetch as any);
+    const snapshot = await flushSyncQueue(mockFetch as typeof fetch);
 
     expect(mockFetch).toHaveBeenCalledWith("/api/success", expect.objectContaining({
       method: "POST",
@@ -129,7 +137,7 @@ describe("sync-queue library", () => {
       status: 500,
     });
 
-    const snapshot = await flushSyncQueue(mockFetch as any);
+    const snapshot = await flushSyncQueue(mockFetch as typeof fetch);
 
     expect(snapshot.pendingCount).toBe(1);
     expect(snapshot.status).toBe("warning");

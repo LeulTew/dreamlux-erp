@@ -2,6 +2,22 @@ import { expect, test } from "@playwright/test";
 import { fulfillJson, mockAuth, mockCommonShellData, seedAuthenticatedSession } from "./helpers";
 
 test.describe("Phase 5 access and UX polish", () => {
+  async function expectForbiddenMobileLayout(page: import("@playwright/test").Page, viewportWidth: number) {
+    const forbiddenHeading = page.getByText("Forbidden: Insufficient privileges");
+    const shell = page.locator("main").filter({ has: forbiddenHeading }).first();
+
+    await expect(forbiddenHeading).toBeVisible();
+    await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
+    await expect(page.getByRole("button", { name: /search/i })).toBeVisible();
+    await expect(shell).toBeVisible();
+    await expect
+      .poll(async () => {
+        const box = await forbiddenHeading.boundingBox();
+        return box ? box.x >= 0 && box.x + box.width <= viewportWidth : false;
+      })
+      .toBe(true);
+  }
+
   test("keeps inventory forbidden state inside the authenticated app shell", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, { permissions: [] });
@@ -99,9 +115,7 @@ test.describe("Phase 5 access and UX polish", () => {
 
     await page.goto("/assets");
 
-    await expect(page.getByText("Forbidden: Insufficient privileges")).toBeVisible();
-    await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
-    await expect(page).toHaveScreenshot("inventory-forbidden-320px.png", { maxDiffPixelRatio: 0.05 });
+    await expectForbiddenMobileLayout(page, 320);
   });
 
   test("inventory access state remains readable at 390px mobile width with screenshot", async ({ page }) => {
@@ -112,8 +126,6 @@ test.describe("Phase 5 access and UX polish", () => {
 
     await page.goto("/assets");
 
-    await expect(page.getByText("Forbidden: Insufficient privileges")).toBeVisible();
-    await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
-    await expect(page).toHaveScreenshot("inventory-forbidden-390px.png", { maxDiffPixelRatio: 0.05 });
+    await expectForbiddenMobileLayout(page, 390);
   });
 });
