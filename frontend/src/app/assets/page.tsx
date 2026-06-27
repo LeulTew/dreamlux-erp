@@ -785,12 +785,10 @@ function AssetsContent() {
 
   if (!isAuthenticated || !hasAssetsRead) {
     return (
-      <AuthLayout>
-        <ForbiddenState
-          title="Forbidden: Insufficient privileges"
-          description="Only authorized personnel can access inventory management."
-        />
-      </AuthLayout>
+      <ForbiddenState
+        title="Forbidden: Insufficient privileges"
+        description="Only authorized personnel can access inventory management."
+      />
     );
   }
 
