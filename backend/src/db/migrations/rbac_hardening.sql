@@ -151,3 +151,46 @@ FROM roles r
 JOIN permissions p ON p.slug IN ('events:read', 'trips:create')
 WHERE LOWER(r.name) IN ('driver')
 ON CONFLICT DO NOTHING;
+
+-- 6. Permission cache invalidation notifications
+-- Backend instances LISTEN on this channel and clear in-memory permission caches
+-- when role assignments or role permission mappings change.
+CREATE OR REPLACE FUNCTION notify_permissions_changed()
+RETURNS TRIGGER AS $$
+DECLARE
+    changed_user_id TEXT;
+BEGIN
+    IF TG_TABLE_NAME = 'users' THEN
+        changed_user_id := COALESCE(NEW.id::TEXT, OLD.id::TEXT);
+        PERFORM pg_notify(
+            'dreamlux_permissions_changed',
+            json_build_object('scope', 'user', 'userId', changed_user_id, 'reason', TG_TABLE_NAME || ':' || TG_OP)::TEXT
+        );
+    ELSE
+        PERFORM pg_notify(
+            'dreamlux_permissions_changed',
+            json_build_object('scope', 'all', 'reason', TG_TABLE_NAME || ':' || TG_OP)::TEXT
+        );
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_notify_user_permissions_changed ON users;
+CREATE TRIGGER trg_notify_user_permissions_changed
+AFTER INSERT OR UPDATE OF role_id, role_ids, is_active OR DELETE ON users
+FOR EACH ROW
+EXECUTE FUNCTION notify_permissions_changed();
+
+DROP TRIGGER IF EXISTS trg_notify_roles_permissions_changed ON roles;
+CREATE TRIGGER trg_notify_roles_permissions_changed
+AFTER INSERT OR UPDATE OF name, permissions OR DELETE ON roles
+FOR EACH ROW
+EXECUTE FUNCTION notify_permissions_changed();
+
+DROP TRIGGER IF EXISTS trg_notify_role_permissions_changed ON role_permissions;
+CREATE TRIGGER trg_notify_role_permissions_changed
+AFTER INSERT OR UPDATE OR DELETE ON role_permissions
+FOR EACH ROW
+EXECUTE FUNCTION notify_permissions_changed();

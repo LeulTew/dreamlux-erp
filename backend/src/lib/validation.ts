@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+const blankToUndefined = (value: unknown) => (typeof value === "string" && value.trim() === "" ? undefined : value);
+const blankToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
+
+const optionalUuid = (message: string) => z.preprocess(blankToUndefined, z.string().uuid(message).optional());
+const nullableUuid = (message: string) => z.preprocess(blankToNull, z.string().uuid(message).nullable().optional());
+const optionalText = (max: number, message: string) =>
+  z.preprocess(blankToUndefined, z.string().trim().max(max, message).optional());
+const nullableText = (max: number, message: string) =>
+  z.preprocess(blankToNull, z.string().trim().max(max, message).nullable().optional());
+const optionalDate = (message: string) =>
+  z.preprocess(
+    blankToNull,
+    z.string().nullable().optional().refine((val) => !val || !isNaN(Date.parse(val)), message),
+  );
+
 export const createItemSchema = z.object({
   name: z.string().min(1, "Name is required").max(500, "Name too long"),
   quantity: z.coerce.number().int("Must be integer").min(0, "Cannot be negative"),
@@ -45,7 +60,7 @@ export type PaginationInput = z.infer<typeof paginationSchema>;
 export const createEmployeeSchema = z.object({
   full_name: z.string().min(1, "Full name is required").max(500, "Name too long"),
   employee_id: z.string().min(1, "Employee ID is required").max(100, "ID too long"),
-  department_id: z.string().uuid("Invalid department ID").optional().or(z.literal("")),
+  department_id: optionalUuid("Invalid department ID"),
   phone: z
     .string()
     .max(50, "Phone too long")
@@ -58,11 +73,11 @@ export const createEmployeeSchema = z.object({
       const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
       return ethioRegex.test(val.replace(/\s+/g, ""));
     }, "Invalid Ethiopian phone number. Use +251... or 09.../07..."),
-  email: z.string().email("Invalid email").max(200, "Email too long").optional().or(z.literal("")),
-  commission: z.string().optional().or(z.literal("")),
+  email: z.preprocess(blankToUndefined, z.string().email("Invalid email").max(200, "Email too long").optional()),
+  commission: optionalText(100, "Commission too long"),
   commission_type: z.enum(["percent", "etb"]).optional().default("percent"),
-  salary_level: z.string().optional().or(z.literal("")),
-  office_id: z.string().uuid("Invalid office ID").optional().or(z.literal("")),
+  salary_level: optionalText(100, "Salary level code too long"),
+  office_id: optionalUuid("Invalid office ID"),
   event_prices: z
     .record(z.string(), z.coerce.number().min(0, "Event price cannot be negative"))
     .optional()
@@ -141,11 +156,7 @@ const eventBaseSchema = z.object({
   name: z.string().min(1, "Event name is required").max(500, "Event name too long"),
   client_name: z.string().min(1, "Client name is required").max(500, "Client name too long"),
   client_phone: z
-    .string()
-    .max(50, "Phone too long")
-    .optional()
-    .nullable()
-    .or(z.literal(""))
+    .preprocess(blankToNull, z.string().max(50, "Phone too long").nullable().optional())
     .refine((val) => {
       if (!val) return true;
       const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
@@ -154,8 +165,8 @@ const eventBaseSchema = z.object({
   event_type_id: z.string().uuid("Invalid event type ID").optional().nullable(),
   start_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid start date"),
   end_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid end date"),
-  start_time: z.string().optional().nullable().or(z.literal("")),
-  end_time: z.string().optional().nullable().or(z.literal("")),
+  start_time: nullableText(20, "Start time too long"),
+  end_time: nullableText(20, "End time too long"),
   venue_location: z.string().min(1, "Venue location is required").max(1000, "Venue location too long"),
   contract_price: z.coerce.number().min(0, "Contract price cannot be negative"),
 });
@@ -343,17 +354,17 @@ const eventImportRowSchema = z.object({
   id: z.string().uuid("Invalid event ID").optional().nullable(),
   name: z.string().min(1, "Event name is required").max(500, "Event name too long"),
   client_name: z.string().min(1, "Client name is required").max(500, "Client name too long"),
-  client_phone: z.string().max(50, "Phone too long").optional().nullable().or(z.literal("")),
-  event_type_id: z.string().uuid("Invalid event type ID").optional().nullable().or(z.literal("")),
-  event_type_name: z.string().max(500, "Event type name too long").optional().nullable().or(z.literal("")),
+  client_phone: nullableText(50, "Phone too long"),
+  event_type_id: nullableUuid("Invalid event type ID"),
+  event_type_name: nullableText(500, "Event type name too long"),
   start_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid start date"),
   end_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid end date"),
-  start_time: z.string().optional().nullable().or(z.literal("")),
-  end_time: z.string().optional().nullable().or(z.literal("")),
+  start_time: nullableText(20, "Start time too long"),
+  end_time: nullableText(20, "End time too long"),
   venue_location: z.string().min(1, "Venue location is required").max(1000, "Venue location too long"),
   contract_price: z.coerce.number().min(0, "Contract price cannot be negative"),
   status: z.enum(["Planned", "Ongoing", "Completed"]).optional().default("Planned"),
-  package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable().or(z.literal("")),
+  package_design_notes: nullableText(4000, "Design notes too long"),
   estimated_design_cost: z.coerce.number().min(0, "Estimated design cost cannot be negative").optional().nullable(),
 }).refine((data) => new Date(data.start_date) <= new Date(data.end_date), {
   message: "End date must be on or after start date",
@@ -378,27 +389,21 @@ export const eventProposalPayloadSchema = z.object({
   name: z.string().min(1, "Proposal name is required").max(500, "Proposal name too long"),
   client_name: z.string().min(1, "Client name is required").max(500, "Client name too long"),
   client_phone: z
-    .string()
-    .max(50, "Phone too long")
-    .optional()
-    .nullable()
-    .or(z.literal(""))
+    .preprocess(blankToNull, z.string().max(50, "Phone too long").nullable().optional())
     .refine((val) => {
       if (!val) return true;
       const ethioRegex = /^(?:\+251|0)[79]\d{8}$/;
       return ethioRegex.test(val.replace(/\s+/g, ""));
     }, "Invalid Ethiopian phone number. Use +251... or 09.../07..."),
-  event_type_id: z.string().uuid("Invalid event type ID").optional().nullable().or(z.literal("")),
+  event_type_id: nullableUuid("Invalid event type ID"),
   requested_budget: z.coerce.number().min(0, "Requested budget cannot be negative"),
-  requested_start_date: z.string().optional().nullable().or(z.literal(""))
-    .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid requested start date"),
-  requested_end_date: z.string().optional().nullable().or(z.literal(""))
-    .refine((val) => !val || !isNaN(Date.parse(val)), "Invalid requested end date"),
-  requested_start_time: z.string().optional().nullable().or(z.literal("")),
-  requested_end_time: z.string().optional().nullable().or(z.literal("")),
-  venue_location: z.string().max(1000, "Venue location too long").optional().nullable().or(z.literal("")),
-  notes: z.string().max(4000, "Notes too long").optional().nullable().or(z.literal("")),
-  package_design_notes: z.string().max(4000, "Design notes too long").optional().nullable().or(z.literal("")),
+  requested_start_date: optionalDate("Invalid requested start date"),
+  requested_end_date: optionalDate("Invalid requested end date"),
+  requested_start_time: nullableText(20, "Requested start time too long"),
+  requested_end_time: nullableText(20, "Requested end time too long"),
+  venue_location: nullableText(1000, "Venue location too long"),
+  notes: nullableText(4000, "Notes too long"),
+  package_design_notes: nullableText(4000, "Design notes too long"),
   cost_breakdown: z.object({
     design: z.array(proposalEstimateLineSchema).max(50).optional().default([]),
     team: z.array(proposalEstimateLineSchema.extend({
