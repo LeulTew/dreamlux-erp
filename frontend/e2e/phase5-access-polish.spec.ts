@@ -91,7 +91,7 @@ test.describe("Phase 5 access and UX polish", () => {
       .toBe("reviewed");
   });
 
-  test("inventory access state remains readable at narrow mobile width", async ({ page }) => {
+  test("inventory access state remains readable at 320px mobile width with screenshot", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await seedAuthenticatedSession(page);
     await mockAuth(page, { permissions: [] });
@@ -101,5 +101,19 @@ test.describe("Phase 5 access and UX polish", () => {
 
     await expect(page.getByText("Forbidden: Insufficient privileges")).toBeVisible();
     await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
+    await expect(page).toHaveScreenshot("inventory-forbidden-320px.png", { maxDiffPixelRatio: 0.05 });
+  });
+
+  test("inventory access state remains readable at 390px mobile width with screenshot", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, { permissions: [] });
+    await mockCommonShellData(page);
+
+    await page.goto("/assets");
+
+    await expect(page.getByText("Forbidden: Insufficient privileges")).toBeVisible();
+    await expect(page.locator("body")).not.toHaveCSS("overflow-x", "scroll");
+    await expect(page).toHaveScreenshot("inventory-forbidden-390px.png", { maxDiffPixelRatio: 0.05 });
   });
 });

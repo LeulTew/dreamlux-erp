@@ -23,7 +23,7 @@ This document tracks our progress, active branch, next steps, and pull requests 
 | **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | **Completed & Merged** | [PR #64](https://github.com/LeulTew/dreamlux-erp/pull/64) — badge system, compact mode, center-align fix |
 | **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **Completed & Merged** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
 | **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | **Completed & Merged** | [PR #66](https://github.com/LeulTew/dreamlux-erp/pull/66) |
-| **Phase 6** | E2E Regression, Report Redaction & Snapshots | `feature/25-e2e-regression-snapshots` | **Planned** | Backend regression, snapshots & final issue signoff |
+| **Phase 6** | E2E Regression, Report Redaction & Snapshots | `feature/25-e2e-regression-snapshots` | **Completed** | Backend regression, snapshots & final issue signoff |
 
 ---
 
@@ -131,9 +131,9 @@ This document tracks our progress, active branch, next steps, and pull requests 
 - [x] Add UI tests for event workspace control visibility by role and field permission.
 - [x] Add Amharic overflow checks for long labels in sidebars, tabs, tables, and action buttons.
 
-### Phase 6 Plan: E2E Regression, Report Redaction & Snapshots
-- [ ] Add backend regression tests for permission-aware navigation, route guards, and direct URL blocked states.
-- [ ] Add UI tests for report/print redaction states and hidden KPI shells.
-- [ ] Add responsive snapshot coverage for 320px and 390px mobile layouts.
-- [ ] Record screenshot/manual QA evidence in the phase PR.
-- [ ] Issue #25 coverage: closes the remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after final regression suites land.
+### Phase 6: E2E Regression, Report Redaction & Snapshots — ✅ Completed
+- [x] Add backend regression tests for permission-aware navigation, route guards, and direct URL blocked states.
+- [x] Add UI tests for report/print redaction states and hidden KPI shells.
+- [x] Add responsive snapshot coverage for 320px and 390px mobile layouts.
+- [x] Record screenshot/manual QA evidence in the phase PR.
+- [x] Issue #25 coverage: closes the remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after final regression suites land.
