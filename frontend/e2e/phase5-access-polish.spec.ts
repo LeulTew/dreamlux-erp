@@ -128,4 +128,64 @@ test.describe("Phase 5 access and UX polish", () => {
 
     await expectForbiddenMobileLayout(page, 390);
   });
+
+  test("event proposal queue denies users without proposal permissions before fetching data", async ({ page }) => {
+    const proposalRequests: string[] = [];
+
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, { permissions: ["events:read"] });
+    await mockCommonShellData(page);
+    await page.route("http://localhost:4000/events/proposals?**", (route) => {
+      proposalRequests.push(route.request().url());
+      return fulfillJson(route, { proposals: [], total: 0, page: 1, limit: 10, totalPages: 1 });
+    });
+
+    await page.goto("/events/proposals");
+
+    await expect(page.getByText("Forbidden: Insufficient privileges")).toBeVisible();
+    await expect(page.getByText("You need event proposal access permissions to view this content.")).toBeVisible();
+    expect(proposalRequests).toEqual([]);
+  });
+
+  test("event proposal approvers can read the queue without seeing create actions", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, { permissions: ["events:proposals:approve"] });
+    await mockCommonShellData(page);
+    await page.route("http://localhost:4000/events/proposals?**", (route) =>
+      fulfillJson(route, {
+        proposals: [
+          {
+            id: "proposal-e2e",
+            name: "Approval Review Gala",
+            client_name: "Dream Lux Client",
+            client_phone: "+251911111111",
+            requested_start_date: "2026-08-01",
+            requested_budget: 100000,
+            estimated_margin_percentage: 35,
+            status: "Submitted",
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      }),
+    );
+
+    await page.goto("/events/proposals");
+
+    await expect(page.getByRole("link", { name: "Approval Review Gala" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /new proposal/i })).toHaveCount(0);
+  });
+
+  test("event module wildcard users can open proposal creation", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, { permissions: ["events:*"] });
+    await mockCommonShellData(page);
+
+    await page.goto("/events/proposals/new");
+
+    await expect(page.getByText("New Proposal Intake")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
+  });
 });
