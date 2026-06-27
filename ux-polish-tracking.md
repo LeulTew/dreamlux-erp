@@ -22,7 +22,10 @@ This document tracks our progress, active branch, next steps, and pull requests 
 | **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | **Completed & Merged** | [PR #63](https://github.com/LeulTew/dreamlux-erp/pull/63) |
 | **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | **Completed & Merged** | [PR #64](https://github.com/LeulTew/dreamlux-erp/pull/64) — badge system, compact mode, center-align fix |
 | **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **Completed & Merged** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
+| **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | **Completed & Merged** | [PR #66](https://github.com/LeulTew/dreamlux-erp/pull/66) |
 | **Phase 6** | E2E Regression, Report Redaction & Snapshots | `feature/25-e2e-regression-snapshots` | **Completed & Merged** | [PR #67](https://github.com/LeulTew/dreamlux-erp/pull/67) |
+| **Fix 1** | Remove synced sidebar indicator & trash button styling | `feature/25-offline-sync-state-machine` | **Completed & Merged** | [PR #68](https://github.com/LeulTew/dreamlux-erp/pull/68) |
+| **Fix 2** | Expand pagination sorting validation & fix table sorts | `feature/25-sort-validation-fixes` | **Completed & Merged** | [PR #69](https://github.com/LeulTew/dreamlux-erp/pull/69) |
 
 ---
 
