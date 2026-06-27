@@ -18,11 +18,7 @@ import {
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  getSyncQueueSnapshot,
-  registerSyncQueueOnlineListeners,
-  subscribeSyncQueue,
-} from "@/lib/sync-queue";
+
 import {
   Sidebar,
   SidebarContent,
@@ -303,47 +299,7 @@ function SubItemBranchLine({ isLast }: { isLast: boolean }) {
   );
 }
 
-function SyncQueueIndicator({ t }: { t: (key: string) => string }) {
-  const snapshot = useSyncExternalStore(
-    subscribeSyncQueue,
-    getSyncQueueSnapshot,
-    getSyncQueueSnapshot
-  );
 
-  useEffect(() => registerSyncQueueOnlineListeners(), []);
-
-  const statusLabel =
-    snapshot.status === "offline"
-      ? t("Offline")
-      : snapshot.status === "syncing"
-        ? t("Syncing")
-        : snapshot.status === "warning"
-          ? t("Sync warning")
-          : t("Synced");
-
-  const indicatorClass =
-    snapshot.status === "idle"
-      ? "border-emerald-700/50 bg-emerald-950/20 text-emerald-200"
-      : snapshot.status === "offline"
-        ? "border-amber-700/60 bg-amber-950/30 text-amber-100"
-        : snapshot.status === "syncing"
-          ? "border-[color:var(--gold)]/50 bg-[color:var(--gold)]/10 text-[color:var(--gold)]"
-          : "border-red-700/60 bg-red-950/30 text-red-100";
-
-  return (
-    <div
-      className={`flex min-h-9 items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-[11px] font-semibold leading-tight tabular-nums group-data-[collapsible=icon]:hidden ${indicatorClass}`}
-      aria-label={`${statusLabel}${snapshot.pendingCount > 0 ? `, ${snapshot.pendingCount} ${t("queued")}` : ""}`}
-    >
-      <span className="truncate">{statusLabel}</span>
-      {snapshot.pendingCount > 0 && (
-        <span className="shrink-0 rounded-sm border border-current/25 px-1.5 py-0.5 text-[10px]">
-          {snapshot.pendingCount} {t("queued")}
-        </span>
-      )}
-    </div>
-  );
-}
 
 export function AppSidebar() {
   const pathname = usePathname();

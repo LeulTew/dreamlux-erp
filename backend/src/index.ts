@@ -16,9 +16,13 @@ import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
 import { runStartupMigrations } from "./db/startup-migration";
 import { pool } from "./db/pool";
+import { startPermissionCacheInvalidationListener } from "./lib/permissions-cache-listener";
 
 // Run DB migrations on startup (non-blocking)
 runStartupMigrations().catch((e) => console.warn("[startup-migration] failed:", e));
+if (process.env.NODE_ENV !== "test") {
+  startPermissionCacheInvalidationListener().catch((e) => console.warn("[permissions-cache-listener] failed:", e));
+}
 
 
 const app = express();

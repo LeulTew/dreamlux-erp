@@ -1037,7 +1037,8 @@ describe("Events API", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain("Cannot transition event status from Ongoing back to Planned");
+    expect(res.body.error).toContain("Cannot transition event status from Ongoing to Planned");
+    expect(res.body.error).toContain("Planned -> Ongoing -> Completed");
   });
 
   // Test soft delete
@@ -2278,6 +2279,42 @@ describe("Events API", () => {
           name: "Updated Name",
         });
       expect(res.status).toBe(403);
+    });
+
+    test("PUT /events/:id rejects invalid status jumps for non-override users", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", status: "Planned" }],
+        rowCount: 1,
+      });
+
+      const res = await request(app)
+        .put("/events/event-1")
+        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+        .send({
+          status: "Completed",
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain("Planned -> Ongoing -> Completed");
+    });
+
+    test("PUT /events/:id allows sequential status transitions", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", status: "Planned", name: "Wedding" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Ongoing" }], rowCount: 1 });
+
+      const res = await request(app)
+        .put("/events/event-1")
+        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+        .send({
+          status: "Ongoing",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.event.status).toBe("Ongoing");
     });
 
     test("PATCH /events/:id/design blocks low-privilege roles", async () => {
