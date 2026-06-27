@@ -47,6 +47,22 @@ function canOverrideCompleted(req: AuthRequest): boolean {
   return hasPermission(req, "events:override_completed");
 }
 
+function validateEventStatusTransition(current: string, target: string, canOverride: boolean): string | null {
+  if (current === target || canOverride) return null;
+
+  const allowedTransitions: Record<string, string[]> = {
+    Planned: ["Ongoing"],
+    Ongoing: ["Completed"],
+    Completed: [],
+  };
+
+  if (!allowedTransitions[current]?.includes(target)) {
+    return `Cannot transition event status from ${current} to ${target}. Follow Planned -> Ongoing -> Completed.`;
+  }
+
+  return null;
+}
+
 function canViewEventFinancials(req: AuthRequest): boolean {
   return canAccessProfitReports(req);
 }
@@ -1057,8 +1073,9 @@ function buildExpensesQuery(req: AuthRequest, statusMode: "Pending" | "History")
   }
 
   let sortSql = "exp.created_at";
-  let sortDir = "DESC";
-  if (statusMode === "History" && req.query.sort_by) {
+  let sortDir = statusMode === "Pending" ? "ASC" : "DESC";
+
+  if (req.query.sort_by) {
     const allowedSortFields = ["amount", "created_at", "approved_at", "category", "event_name"];
     const sortBy = req.query.sort_by as string;
     if (allowedSortFields.includes(sortBy)) {
@@ -1072,9 +1089,6 @@ function buildExpensesQuery(req: AuthRequest, statusMode: "Pending" | "History")
     if (order === "asc" || order === "desc") {
       sortDir = order.toUpperCase();
     }
-  } else if (statusMode === "Pending") {
-    sortSql = "exp.created_at";
-    sortDir = "ASC";
   }
 
   const whereClause = whereClauses.length > 0 ? whereClauses.join(" AND ") : "1=1";
@@ -1493,27 +1507,11 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     const updateData = validationResult.data;
     const shouldGenerateLaborOnCompletion = updateData.status === "Completed" && currentEvent.status !== "Completed";
 
-    // Status transition validation
     if (updateData.status && updateData.status !== currentEvent.status) {
-      const current = currentEvent.status;
-      const target = updateData.status;
-
-      // Planned -> Ongoing -> Completed
-      if (current === "Planned" && target === "Completed" && !isOverrideAuthorized) {
-        // Allowing Planned -> Completed directly for admins/accountants but optionally warn or restrict for Event Managers?
-        // Actually, Planned -> Completed is generally fine, let's allow it but warn.
-      }
-
-      if (current === "Ongoing" && target === "Planned" && !isOverrideAuthorized) {
+      const transitionError = validateEventStatusTransition(currentEvent.status, updateData.status, isOverrideAuthorized);
+      if (transitionError) {
         res.status(400).json({
-          error: "Cannot transition event status from Ongoing back to Planned",
-        });
-        return;
-      }
-
-      if (current === "Completed" && target !== "Completed" && !isOverrideAuthorized) {
-        res.status(403).json({
-          error: "Completed status cannot be changed except by administrators or accountants",
+          error: transitionError,
         });
         return;
       }

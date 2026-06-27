@@ -201,7 +201,7 @@ function ExpenseApprovalContent() {
     if (amountMin) params.set("amount_min", amountMin);
     if (amountMax) params.set("amount_max", amountMax);
     if (page > 1) params.set("page", String(page));
-    if (activeTab === "history" && sortBy !== "created_at") {
+    if (sortBy) {
       params.set("sort_by", sortBy);
       params.set("sort_order", sortOrder);
     }
@@ -241,8 +241,6 @@ function ExpenseApprovalContent() {
       params.delete("tab");
       params.delete("status");
       params.delete("reviewer");
-      params.delete("sort_by");
-      params.delete("sort_order");
     }
     params.delete("page");
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -258,11 +256,11 @@ function ExpenseApprovalContent() {
     date_to: dateTo || undefined,
     amount_min: amountMin || undefined,
     amount_max: amountMax || undefined,
+    sort_by: sortBy,
+    sort_order: sortOrder,
     ...(activeTab === "history" ? {
       status: statusFilter || undefined,
       reviewer: reviewerTerm || undefined,
-      sort_by: sortBy,
-      sort_order: sortOrder
     } : {})
   };
 

@@ -78,7 +78,7 @@ export const employeePaginationSchema = z.object({
   status: z.enum(["active", "trash"]).optional().default("active"),
   office_id: z.string().uuid("Invalid office ID").optional().or(z.literal("all")),
   department_id: z.string().uuid("Invalid department ID").optional().or(z.literal("all")),
-  sortBy: z.enum(["name", "salary", "date"]).optional().default("salary"),
+  sortBy: z.enum(["name", "full_name", "salary", "date", "employee_id", "commission"]).optional().default("salary"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
