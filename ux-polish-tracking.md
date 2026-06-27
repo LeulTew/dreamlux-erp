@@ -1,174 +1,107 @@
-# UI/UX Consistency & Access Polish Tracking (Issue #25)
+# DreamLux UX / Event Lifecycle Tracking
 
-This document tracks our progress, active branch, next steps, and pull requests for the UI/UX polish.
+Local tracking note. This file is intentionally maintained for agent continuity and zero-hallucination handoff context.
 
-## Overall Status
-- **Current Step**: Phase 7 Backend Hardening Completed Locally
-- **Active Branch**: `feature/25-phase7-complete`
-- **Active Pull Request**: None
-- **Completion Progress**: 7/7 Phases Completed
+## Required Context For Every Session
 
-> [!NOTE]
-> **Temp/scratch cleanup**: Confirmed no temp JS/TS files exist in the repository. All scratch artifacts are outside the repo. Worktree is clean on `main`.
+| Source | Must use for |
+| :--- | :--- |
+| `project-context.md` | Architecture, modules, active issue map, known caveats, and DreamLux domain boundaries. |
+| `RULES.md` | Bun-only workflow, GitHub issue/branch/PR rules, secrets checks, senior diff review, and merge discipline. |
+| AGENTS prompt rules | Local safety, no destructive git, UI quality rules, and tracked/untracked work separation. |
+| `docs/SENIOR_ISSUE_REVIEW_PROMPT.md` | Completion/security/performance/test review before claiming an issue is complete. |
 
----
+## Current Status
 
-## Roadmap & Branch Status
+| Item | Status | Notes |
+| :--- | :--- | :--- |
+| Active branch | `feature/25-e2e-playwright-portability` | Follow-up to remove the last Playwright portability caveat from #25. |
+| #25 UX polish | In final follow-up | Product/security/unit/build coverage was already accepted; E2E portability is being made 100%. |
+| #2 Core Event Lifecycle | Open | GitHub automation reopened it because historical checklist boxes remain unchecked in the issue body. Treat it as a separate reconciliation/completion track. |
+| Worktree policy | Intentional dirty files only | Do not overwrite unrelated changes. This file is tracked even though `.gitignore` also lists it. |
 
-| Phase | Description | Branch Name | Status | PR Links / Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **Phase 1** | Button System Hardening | `feature/25-button-system-polish-recreated` | **Completed & Merged** | [PR #61](https://github.com/LeulTew/dreamlux-erp/pull/61) |
-| **Cleanup** | Post-merge review cleanup | `feature/25-post-merge-review-cleanup` | **Completed & Merged** | [PR #62](https://github.com/LeulTew/dreamlux-erp/pull/62) |
-| **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | **Completed & Merged** | [PR #63](https://github.com/LeulTew/dreamlux-erp/pull/63) |
-| **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | **Completed & Merged** | [PR #64](https://github.com/LeulTew/dreamlux-erp/pull/64) — badge system, compact mode, center-align fix |
-| **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **Completed & Merged** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
-| **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | **Completed & Merged** | [PR #66](https://github.com/LeulTew/dreamlux-erp/pull/66) |
-| **Phase 6** | E2E Regression, Report Redaction & Snapshots | `feature/25-e2e-regression-snapshots` | **Completed & Merged** | [PR #67](https://github.com/LeulTew/dreamlux-erp/pull/67) |
-| **Fix 1** | Remove synced sidebar indicator & trash button styling | `feature/25-offline-sync-state-machine` | **Completed & Merged** | [PR #68](https://github.com/LeulTew/dreamlux-erp/pull/68) |
-| **Fix 2** | Expand pagination sorting validation & fix table sorts | `feature/25-sort-validation-fixes` | **Completed & Merged** | [PR #69](https://github.com/LeulTew/dreamlux-erp/pull/69) |
-| **Phase 7** | Hard Logic & Backend Architecture | `feature/25-phase7-complete` | **Completed Locally** | Offline queue utility, state transitions, RBAC cache notifications, strict form normalization |
+## Issue #25 Completed Phase Ledger
 
----
+| Phase | Branch / PR | Result | Compressed evidence |
+| :--- | :--- | :--- | :--- |
+| Phase 1 Button System | PR #61 | Merged | Button variants, states, mobile tap targets, icon labels, lint/build/tests. |
+| Cleanup | PR #62 | Merged | Removed temp artifacts, cleaned backend settings payload typing, full validation. |
+| Phase 2 Sortable Tables | PR #63 | Merged | Shared sortable headers, sort query preservation, backend allowlists, table tests. |
+| Phase 3 Status Badges | PR #64 | Merged | Semantic badge mapping, compact mode, contrast/i18n coverage. |
+| Phase 4 Expense Approval | PR #65 | Merged | Paginated pending/history queues, filters, approval/rejection tests, bilingual UI. |
+| Phase 5 Mobile/i18n/a11y | PR #66 | Merged | Permission-aware navigation/shells, role-specific controls, mobile and Amharic checks. |
+| Phase 6 E2E/Redaction | PR #67 | Merged | Route guard regression, report redaction, mobile E2E coverage. |
+| Fix 1 Offline/sidebar cleanup | PR #68 | Merged | Preserved offline queue utility; removed synced sidebar indicator and styling regressions. |
+| Fix 2 Sort validation | PR #69 | Merged | Expanded pagination/sort validation and fixed table sort regressions. |
+| Phase 7 Backend hardening | PR #70 | Merged | Offline sync queue tests, state transition integrity, RBAC cache listener, strict form normalization. |
+| E2E portability follow-up | TBD | In progress | Move Playwright off occupied port 3100 and replace OS-specific screenshot baselines with deterministic mobile layout assertions. |
 
-## Detailed Progress Log
+## Issue #25 Final Review Targets
 
-### Phase 1: Button System Hardening
-- [x] Create branch `feature/25-button-system-polish-recreated`
-- [x] Audit and replace raw `<button>` HTML elements with `<Button>` component or styled Tailwind classes.
-- [x] Standardize variants (default, outline, secondary, ghost, destructive, link) and sizes (xs, sm, default, lg, icon).
-- [x] Ensure proper states: default, hover, focus-visible, active, disabled, loading.
-- [x] Fix touch targets on mobile (min 48px where practical).
-- [x] Add accessible tooltip/label support for icon-only buttons.
-- [x] Verify `frontend` build, lint, and tests pass.
-- [x] Commit & push branch, create PR placeholder.
+| Area | Target | Current evidence |
+| :--- | :---: | :--- |
+| Completion | 100% | Issue #25 body is checked; final follow-up removes last local E2E caveat. |
+| Security | 100% | Backend permission slugs, field redaction, direct URL blocked states, strict validation, transition guards, and RBAC invalidation tests. |
+| Unit/integration | 100% | Prior post-merge `bun run test`: backend 292 passing; frontend 20 files / 84 passing. Re-run before PR merge. |
+| Lint/build | 100% | Prior post-merge `bun run lint` and `bun run build` passed. Re-run before PR merge. |
+| E2E / Playwright | 100% | `bun run test:e2e` passed: 10/10 Playwright tests on port 3101 with deterministic mobile layout assertions. |
 
-### Post-Merge Review Cleanup
-- [x] Confirm PR #61 is merged into `main`.
-- [x] Remove temporary PR body files from the repository.
-- [x] Type backend settings update payload without `any`.
-- [x] Re-run full repo lint, tests, and build after cleanup.
-- [x] Create and merge a focused cleanup PR after CI passes.
+## Issue #25 Follow-Up Checklist
 
-### Phase 2 Plan: Sortable Table Interaction
-- [x] Add backend sort-field allowlist coverage for `GET /employees`.
-- [x] Add backend sort-field allowlist coverage for `GET /payroll/runs`.
-- [x] Add backend tests for malicious/unsupported employee and payroll run sort fields.
-- [x] Remove stale temp PR body artifact unrelated to the active Phase 2 branch.
-- [x] Run backend targeted tests once Bun is available in the local environment.
-- [x] Run full backend `bun test`, `bun run lint`, and `bun run build`.
-- [x] Run full frontend `bun test`, `bun run lint`, and `bun run build` after frontend table work lands.
-- [x] Verify GitHub Actions checks on the Phase 2 PR.
-- [x] Build a shared `SortableTableHeader`/header-cell pattern that can be reused by page tables and TanStack tables without changing unrelated row rendering.
-- [x] Start with the surfaces already carrying sort state or table density: Events list, Employees list/report, Assets list/report, Payroll history, and profit/report tables where sorting is already meaningful.
-- [x] Preserve current filters, search, saved views, pagination, and URL query parameters when sort changes.
-- [x] Keep server-side sorting for paginated or large datasets; only use client-side sorting when the dataset is already bounded in memory.
-- [x] Keep backend allowlists explicit for every sortable column to avoid SQL injection or accidental sort exposure on finance data.
-- [x] Add unit tests for sort-state transitions, accessibility labels, and query-param preservation.
-- [x] Add integration tests for at least one backend endpoint with allowed/disallowed sort fields.
-- [x] Add frontend component tests for the reusable header and one representative table page.
-- [x] Add Playwright/e2e coverage / manual QA verification for desktop and mobile flows that changes sort and preserves filters/pagination.
-- [x] Add mock data / unit test fixtures to prove stable ordering and no reset of search/filter state.
-- [x] Issue #25 coverage: satisfies checklist section 11 and supports section 5 table responsiveness without taking on badge/history/mobile scope.
+- [x] Create branch `feature/25-e2e-playwright-portability`.
+- [x] Change Playwright dev server/base URL from `3100` to `3101` to avoid local port conflict.
+- [x] Replace mobile screenshot snapshot assertions with deterministic visibility, shell, no-horizontal-scroll, and bounding-box containment assertions.
+- [x] Remove obsolete Linux screenshot baseline PNGs after removing snapshot assertions.
+- [x] Run `bun run test:e2e` - passed, 10/10 Playwright tests.
+- [x] Run `bun run lint` - passed.
+- [x] Run `bun run build` - passed.
+- [x] Run `bun run test` - passed, backend 292 tests and frontend 21 files / 88 tests.
+- [x] Fix inherited Phase 7 frontend lint errors in `frontend/src/lib/sync-queue.test.ts` without changing production sync queue behavior.
+- [x] Inspect `git diff` for scope, secrets, generated files, and regressions.
+- [ ] Commit with prefix message.
+- [ ] Push branch.
+- [ ] Create PR with issue link, checklist, verification, and senior review notes.
+- [ ] Verify GitHub Actions.
+- [ ] Merge PR after checks are clean.
+- [ ] Pull fast-forward `main`.
+- [ ] Confirm #25 remains closed or close it with final 100% E2E comment.
 
-### Phase 3: Status & Badge Color System — ✅ Completed & Merged (PR #64)
-- [x] Inventory every status badge and status-like pill across events, proposals, expenses, inventory, payroll, approvals, reports, dashboards, empty states, and inline banners.
-- [x] Include non-obvious states that currently rely on color only, such as archived, draft, submitted, pending review, overdue, blocked, restricted, partially approved, completed, canceled, and hidden/redacted states.
-- [x] Create one semantic mapping for success, warning, danger, info, neutral, archived, and restricted states, then map each surface status onto that vocabulary.
-- [x] Flag any badge or state that uses a raw color token without a semantic label or without an icon/shape backup.
-- [x] Verify light/dark contrast for each badge and avoid conflicting with gold primary-action styling or active KPI emphasis.
-- [x] Check for pages that reuse the same color for unrelated meanings, and split them where that creates ambiguity.
-- [x] Include Amharic label fit checks and translation-key coverage for all standardized statuses, including long labels and wrapped badges.
-- [x] Add focused tests for status-to-variant mapping, translation coverage, and any component that renders a standardized status badge.
-- [x] Add fixture coverage for at least one example from each surface: event lifecycle, proposal pipeline, expense approval, inventory condition/status, payroll state, and report summary state.
-- [x] Status badge compact on medium screens (text hidden md, shown lg).
-- [x] Status column centered in Events and Proposals tables (fix: commit `c61a175`).
-- [x] Issue #25 coverage: satisfies checklist section 12 and contributes to sections 3, 7, 8, and 13 where status colors, KPI hierarchy, reports, label fit, and semantic clarity overlap.
+## Issue #2 Core Event Lifecycle Plan
 
-### Phase 4: Expense Approval Queue & History — ✅ PR #65 Created (Draft)
-- [x] Upgrade `GET /events/expenses/pending` to server-side paginated (`page`, `limit`, `search`, `category`, `date_from`, `date_to`, `amount_min`, `amount_max`)
-- [x] Return `{ data, total, page, totalPages }` from pending endpoint (not raw array)
-- [x] Add new `GET /events/expenses/history` endpoint (Approved + Rejected, same auth guard)
-- [x] History supports server-side: `page`, `limit`, `search`, `category`, `status`, `reviewer` search, `date_from`, `date_to`, `amount_min`, `amount_max`
-- [x] History sort allowlist: `amount`, `created_at`, `approved_at`, `category`, `event_name`
-- [x] Join `approved_by_name` from users table on history endpoint
-- [x] Backend tests: 403 for non-accountant on both endpoints
-- [x] Backend tests: pagination, category filter, status filter for history
-- [x] Backend tests: `Pending` rows never appear in history response
-- [x] Update `getPendingEventExpenses(params)` to accept filter/page params
-- [x] Add `getExpenseHistory(params)` calling new history endpoint
-- [x] Add `PaginatedExpenseResponse` type to `types.ts`
-- [x] Add two-tab layout: "Pending Queue" and "History"
-- [x] Tab state driven by `?tab=history` URL query param
-- [x] Pending tab: search bar + category dropdown + date-range + amount-range filters, all URL-param driven
-- [x] History tab: same filters + status dropdown (`Approved` / `Rejected`) + reviewer search
-- [x] Filters preserved when switching between tabs
-- [x] Server-side pagination with `PaginationControls` on both tabs
-- [x] History tab uses sortable table layout (`SortableHeader`) with columns: Event, Category, Amount, Submitter, Reviewer, Decision (StatusBadge), Date Reviewed, Reason
-- [x] Pending tab: card layout retained and improved (show date submitted, receipt indicator)
-- [x] Empty, loading, error states for both tabs (no protected data flash on error)
-- [x] Full bilingual translations (English + Amharic) for all new strings
-- [x] Frontend tests: tab renders by default (Pending), switches on URL param
-- [x] Frontend tests: filters update API query params
-- [x] Frontend tests: approve/reject actions call correct mutations
-- [x] Frontend tests: reject without reason shows toast error, blocks mutation
-- [x] Frontend tests: empty state, loading skeleton render correctly
-- [x] Frontend tests: bilingual rendering with `lang=am`
-- [x] `bun run lint` — 0 errors
-- [x] `bun run build` — builds clean
-- [x] `bun run test` — all tests pass
-- [x] Manual: approve expense → moves from Pending to History as `Approved`
-- [x] Manual: reject with reason → moves to History as `Rejected` with reason shown
-- [x] Manual: reject without reason → toast fires, no mutation
-- [x] Manual: non-accountant redirect tested
-- [x] Manual: 320px mobile layout readable
-- [x] Create PR using template and reference Issue #25
-- [x] Tick §6 and §14 checkboxes on Issue #25 after PR is merged
+Issue: https://github.com/LeulTew/dreamlux-erp/issues/2
 
-### Phase 5: Mobile, i18n & Accessibility Pass — ✅ Completed & Merged (PR #66)
-- [x] Re-audit access-aware navigation, breadcrumbs, direct URL blocked states, route shells, event workspace controls, field redaction, KPI hierarchy, forms, reports, print styles, localization, keyboard/focus, and mobile layout.
-- [x] Audit 320px, 390px, 768px, 1024px, 1366px, 1920px, and 2560px across key personas and routes.
-- [x] Verify all modified visible strings use the translation helper and have English/Amharic coverage.
-- [x] Check focus order, keyboard operation, reduced motion, tap targets, text wrapping, and WCAG AA contrast.
-- [x] Add frontend regression tests for access-aware sidebar filtering and empty group suppression.
-- [x] Add frontend regression tests for shell-state redaction.
-- [x] Add UI tests for event workspace control visibility by role and field permission.
-- [x] Add Amharic overflow checks for long labels in sidebars, tabs, tables, and action buttons.
+Reason this remains open: the issue body still has unchecked checklist items. A previous reconciliation comment is here: https://github.com/LeulTew/dreamlux-erp/issues/2#issuecomment-4820820988, but automation reopened the issue because the body itself still contains unchecked boxes.
 
-### Phase 6: E2E Regression, Report Redaction & Snapshots — ✅ Completed
-- [x] Add backend regression tests for permission-aware navigation, route guards, and direct URL blocked states.
-- [x] Add UI tests for report/print redaction states and hidden KPI shells.
-- [x] Add responsive snapshot coverage for 320px and 390px mobile layouts.
-- [x] Record screenshot/manual QA evidence in the phase PR.
-- [x] Issue #25 coverage: closes the remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after final regression suites land.
+### Phase A: Reconcile Current Main Against #2 Body
 
----
+| Checklist item | Current evidence | Status | Next action |
+| :--- | :--- | :--- | :--- |
+| Explicit package/design path | `package_design_notes`, `estimated_design_cost`, `PATCH /events/:id/design`, proposals conversion, imports, event detail UI. | Likely complete | Update #2 body checklist or PR docs with exact file/test references. |
+| Client table planning | Snapshot fields exist; normalized clients table is not implemented. | Partially complete | Decide whether to document snapshot-only strategy or create a focused client CRM issue. |
+| Completed-event guardrails | API lock, override permission, transition checks, audit tests exist. DB-level completed immutability trigger does not. | Partially complete | Document API-layer enforcement or implement DB trigger if product wants database-level guardrail. |
+| Permission slug checks | `events:read`, `events:write`, `events:delete`, `events:override_completed` are used in backend/UI. | Likely complete | Add a focused #2 proof test if current tests do not directly assert read/write denial. |
+| Stable detail payload | `GET /events/:id` and `/events/[id]` workspace exist. | Likely complete | Add/confirm contract-style backend test for shape stability. |
+| Detail workspace | `/events/[id]` exists with operations, design, redaction-aware finance, and role-aware controls. | Complete | Reference #12/#25 PRs. |
+| Package/design in create/edit | Detail workspace and proposals support design; compact create/edit drawer may not expose design directly. | Partially complete | Either add compact design field/placeholder to create/edit or update #2 to accept detail-workspace design editing. |
+| Empty/loading/error and responsive/WCAG | #25 Phase 5/6 covers this broadly. | Likely complete | Attach evidence and E2E results after #25 portability PR merges. |
+| Role alignment/redaction/audit/errors | Covered across #24/#25/#32/#33. | Likely complete | Add senior review matrix to #2 body/comment. |
+| Permission/design/client tests/manual sample | Tests exist, but Hana & Daniel manual sample may not be documented as complete. | Partially complete | Run or document manual/sample-data verification, or add automated SRD sample test. |
 
-## Phase 7 Instructions: Hard Logic & Backend Architecture (For Codex / Developers)
+### Phase B: Minimal Code/Test Gaps To Close #2 Cleanly
 
-This section details architectural hardening tasks for Codex. Ensure that all rules in [AGENTS.md](file:///c:/Users/USER-PC/.gemini/antigravity/scratch/dreamlux-erp/.agents/AGENTS.md) are strictly adhered to (including using `bun` package commands, avoiding hardcoded secrets, and separating presentation layers).
+| Phase | Goal | Checklist |
+| :--- | :--- | :--- |
+| B1 Permission proof | Make #2 permission completion undeniable. | [ ] Inspect `backend/src/__tests__/events.test.ts` for explicit `events:read`/`events:write` denial tests. [ ] Add missing focused tests if absent. [ ] Confirm direct API denial does not rely on frontend gating. |
+| B2 Package/design proof | Resolve create/edit vs detail-workspace ambiguity. | [ ] Inspect `EditEventSheet.tsx` and event detail design editor. [ ] Either add package/design placeholder to create/edit or document why detail editor is the intended workflow. [ ] Add/confirm tests for `PATCH /events/:id/design`. |
+| B3 Client strategy | Close normalized client-table ambiguity. | [ ] Confirm SRD Phase 1 needs snapshots only or normalized clients. [ ] If normalized clients are out of scope, update #2 with documented decision. [ ] If needed, create new issue for CRM/client registry rather than expanding #2. |
+| B4 Completed-event guardrail | Resolve DB-level guardrail checkbox. | [ ] Confirm current API-layer enforcement and audit tests. [ ] Decide whether DB trigger is necessary. [ ] If not necessary, update #2 with rationale; if necessary, implement migration/test in a dedicated PR. |
+| B5 SRD sample verification | Make manual verification durable. | [ ] Use Hana & Daniel Wedding sample from #2. [ ] Verify create/list/detail/status/audit flow locally or via automated test. [ ] Record command/output evidence in #2. |
 
-### Task checklist
+### Phase C: GitHub Closeout For #2
 
-- [x] **Offline DB Sync & Sync Log Syncing**: Build an offline-first transaction sync queue in `frontend/src/lib/sync-queue.ts` that queues pending mutations (e.g., trip logs, expense logs) when navigator is offline, storing them in IndexedDB, and flushing with automatic retries upon online reconnection.
-- [x] **State Machine Integrity Checks**: Introduce state machine hooks on backend order models ensuring status transitions (e.g. `planned` -> `ongoing` -> `completed`) cannot bypass middle states or validate dates out of bounds.
-- [x] **RBAC Cache Eviction Hooks**: Hook postgres event triggers via Supabase functions to invalidate the user permission cache in the backend server whenever a user's role or custom permission mapping is updated in the DB.
-- [x] **Strict Form Validation Assertions**: Audit all backend input endpoints with zod schemas ensuring no empty string sanitization slips through to db fields.
-
-### Direct Prompt for Codex / Developer Agent
-```markdown
-You are a Senior Backend and Systems Engineer task-oriented coding assistant. Your task is to implement the offline database sync queue and state machine validation controls on the backend.
-
-CRITICAL RULES:
-- Use Bun (`bun`) exclusively for package tasks and script execution.
-- Preserve clean separation of concerns: keep IndexedDB queue storage distinct from HTTP client helpers.
-- Review `.agents/skills/supabase-postgres-best-practices/SKILL.md` before editing database triggers or schemas.
-- Run `bun run lint` and `bun run test` locally before proposing any changes.
-
-Implementation Checklist:
-1. Create `frontend/src/lib/sync-queue.ts` using IndexedDB (`idb` or raw local store API).
-2. Wire synchronization status indicator badges onto the global app footer using the established 90/10 design language (accenting only when syncing or warning on offline cache density).
-3. Implement status validation middleware on `backend/src/routes/events.ts` to assert strict transition logic.
-
-Status: Phase 7 is fully complete in `feature/25-phase7-complete`. The final local pass keeps PR #68's removal of the synced sidebar badge intact while retaining the standalone offline queue utility.
-```
-
+| Step | Checklist |
+| :--- | :--- |
+| Issue body cleanup | [ ] Update #2 unchecked boxes to checked only where evidence supports it. [ ] Leave any true future scope as separate linked issues. |
+| PR discipline | [ ] Use `feature/2-event-lifecycle-reconcile` only if code/tests/docs change outside this local tracker. [ ] PR must reference #2, include verification, and pass CI. |
+| Final review | [ ] Apply `docs/SENIOR_ISSUE_REVIEW_PROMPT.md`. [ ] Run relevant unit/integration/e2e checks. [ ] Inspect diff for secrets/generated artifacts. |
+| Closure | [ ] Close #2 only after its body no longer has unchecked checklist items or automation will reopen it again. |
