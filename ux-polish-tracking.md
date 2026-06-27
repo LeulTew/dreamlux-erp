@@ -3,10 +3,10 @@
 This document tracks our progress, active branch, next steps, and pull requests for the UI/UX polish.
 
 ## Overall Status
-- **Current Step**: Phase 6 E2E Regression, Report Redaction & Snapshots
+- **Current Step**: Full Audit Completed
 - **Active Branch**: `main`
 - **Active Pull Request**: None
-- **Completion Progress**: 5/6 Phases Completed
+- **Completion Progress**: 6/6 Phases Completed
 
 > [!NOTE]
 > **Temp/scratch cleanup**: Confirmed no temp JS/TS files exist in the repository. All scratch artifacts are outside the repo. Worktree is clean on `main`.
@@ -22,8 +22,7 @@ This document tracks our progress, active branch, next steps, and pull requests 
 | **Phase 2** | Sortable Table Interaction | `feature/25-sortable-table-system` | **Completed & Merged** | [PR #63](https://github.com/LeulTew/dreamlux-erp/pull/63) |
 | **Phase 3** | Status & Badge Color System | `feature/25-status-badge-system` | **Completed & Merged** | [PR #64](https://github.com/LeulTew/dreamlux-erp/pull/64) — badge system, compact mode, center-align fix |
 | **Phase 4** | Expense Approval Queue & History | `feature/25-expense-approval-history` | **Completed & Merged** | [PR #65](https://github.com/LeulTew/dreamlux-erp/pull/65) |
-| **Phase 5** | Mobile, i18n & Accessibility Pass | `feature/25-mobile-i18n-a11y-polish` | **Completed & Merged** | [PR #66](https://github.com/LeulTew/dreamlux-erp/pull/66) |
-| **Phase 6** | E2E Regression, Report Redaction & Snapshots | `feature/25-e2e-regression-snapshots` | **Completed** | Backend regression, snapshots & final issue signoff |
+| **Phase 6** | E2E Regression, Report Redaction & Snapshots | `feature/25-e2e-regression-snapshots` | **Completed & Merged** | [PR #67](https://github.com/LeulTew/dreamlux-erp/pull/67) |
 
 ---
 
@@ -137,3 +136,33 @@ This document tracks our progress, active branch, next steps, and pull requests 
 - [x] Add responsive snapshot coverage for 320px and 390px mobile layouts.
 - [x] Record screenshot/manual QA evidence in the phase PR.
 - [x] Issue #25 coverage: closes the remaining checklist sections 1, 2, 3, 5, 7, 8, 9, 13, and 15 after final regression suites land.
+
+---
+
+## Phase 7 Instructions: Hard Logic & Backend Architecture (For Codex / Developers)
+
+This section details architectural hardening tasks for Codex. Ensure that all rules in [AGENTS.md](file:///c:/Users/USER-PC/.gemini/antigravity/scratch/dreamlux-erp/.agents/AGENTS.md) are strictly adhered to (including using `bun` package commands, avoiding hardcoded secrets, and separating presentation layers).
+
+### Task checklist
+
+- [ ] **Offline DB Sync & Sync Log Syncing**: Build an offline-first transaction sync queue in `frontend/src/lib/sync-queue.ts` that queues pending mutations (e.g., trip logs, expense logs) when navigator is offline, storing them in IndexedDB, and flushing with automatic retries upon online reconnection.
+- [ ] **State Machine Integrity Checks**: Introduce state machine hooks on backend order models ensuring status transitions (e.g. `planned` -> `ongoing` -> `completed`) cannot bypass middle states or validate dates out of bounds.
+- [ ] **RBAC Cache Eviction Hooks**: Hook postgres event triggers via Supabase functions to invalidate the user permission cache in the backend server whenever a user's role or custom permission mapping is updated in the DB.
+- [ ] **Strict Form Validation Assertions**: Audit all backend input endpoints with zod schemas ensuring no empty string sanitization slips through to db fields.
+
+### Direct Prompt for Codex / Developer Agent
+```markdown
+You are a Senior Backend and Systems Engineer task-oriented coding assistant. Your task is to implement the offline database sync queue and state machine validation controls on the backend.
+
+CRITICAL RULES:
+- Use Bun (`bun`) exclusively for package tasks and script execution.
+- Preserve clean separation of concerns: keep IndexedDB queue storage distinct from HTTP client helpers.
+- Review `.agents/skills/supabase-postgres-best-practices/SKILL.md` before editing database triggers or schemas.
+- Run `bun run lint` and `bun run test` locally before proposing any changes.
+
+Implementation Checklist:
+1. Create `frontend/src/lib/sync-queue.ts` using IndexedDB (`idb` or raw local store API).
+2. Wire synchronization status indicator badges onto the global app footer using the established 90/10 design language (accenting only when syncing or warning on offline cache density).
+3. Implement status validation middleware on `backend/src/routes/events.ts` to assert strict transition logic.
+```
+
