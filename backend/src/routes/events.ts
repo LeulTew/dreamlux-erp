@@ -87,6 +87,10 @@ function canImportEvents(req: AuthRequest): boolean {
   return hasPermission(req, "events:write");
 }
 
+function canReadEvents(req: AuthRequest): boolean {
+  return hasPermission(req, "events:read");
+}
+
 async function getHiddenEventFields(req: AuthRequest): Promise<string[]> {
   const roleNames = [req.user?.role, ...(req.user?.roles || [])].filter((role): role is string => Boolean(role));
   const key = roleNames.map((role) => role.toLowerCase()).sort().join("|");
@@ -602,6 +606,11 @@ async function resolveImportEventTypeId(
 // GET /events - List events (filtered, paginated)
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    if (!canReadEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
+      return;
+    }
+
     const validationResult = eventListQuerySchema.safeParse(req.query);
     if (!validationResult.success) {
       res.status(400).json({ error: validationResult.error.errors[0].message });
@@ -1370,6 +1379,10 @@ router.get("/:id/profit", requireAuth, async (req: AuthRequest, res: Response) =
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    if (!canReadEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
+      return;
+    }
 
     const eventQuery = `
       SELECT e.*, et.name as event_type_name, u.full_name as created_by_name
@@ -1649,6 +1662,10 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    if (!canReadEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
+      return;
+    }
 
     const eventQuery = `
       SELECT e.*, et.name as event_type_name, u.full_name as created_by_name
