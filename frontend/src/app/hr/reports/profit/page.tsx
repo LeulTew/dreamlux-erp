@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { HiLockClosed, HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass, HiArrowPath } from "react-icons/hi2";
+import { HiPrinter, HiArrowTrendingUp, HiCalendarDays, HiChartBar, HiArrowDownTray, HiMagnifyingGlass, HiArrowPath } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
+import ForbiddenState from "@/components/ForbiddenState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport, getEventTypes, getProfitReportExportUrl, api } from "@/lib/api";
@@ -237,13 +238,10 @@ export default function FinancialDashboardPage() {
   if (!authData || !hasProfitAccess) {
     return (
       <AuthLayout>
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-danger/10 flex items-center justify-center text-danger mb-4 border border-danger/20">
-            <HiLockClosed className="h-8 w-8" />
-          </div>
-          <h2 className="text-xl font-bold text-foreground">{t("Forbidden: Insufficient privileges")}</h2>
-          <p className="mt-2 text-sm text-muted max-w-md">{t("Only Owners, Accountants, and Administrators can access financial reports.")}</p>
-        </div>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Accountants, and Administrators can access financial reports."
+        />
       </AuthLayout>
     );
   }

@@ -47,6 +47,7 @@ import { fuzzySearch } from "@/lib/fuzzy-search";
 import toast from "react-hot-toast";
 import { findRunForPeriod } from "@/utils/payroll-period";
 import { useLanguage } from "@/hooks/use-language";
+import ForbiddenState from "@/components/ForbiddenState";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -270,8 +271,7 @@ function PaymentRunProcessPageContent() {
   const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [draftPeriodKey, setDraftPeriodKey] = useState<string | null>(null);
-  const { user, isLoading: authLoading } = useAuth();
-
+  const { user, isLoading: authLoading, hasPermission, isAuthenticated } = useAuth();
   const [isFloating, setIsFloating] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -295,24 +295,30 @@ function PaymentRunProcessPageContent() {
     };
   }, []);
 
+  const hasPayrollWrite = isAuthenticated && hasPermission("payroll:write");
+
   const { data: employeesPayload, isLoading: employeesLoading } = useQuery({
     queryKey: ["payroll-run-employees", officeId],
     queryFn: () => getEmployees(1, 5000, undefined, "active", officeId === "all" ? undefined : officeId),
+    enabled: hasPayrollWrite,
   });
 
   const { data: salaryLevels } = useQuery<SalaryLevel[]>({
     queryKey: ["salary-levels"],
     queryFn: getSalaryLevels,
+    enabled: hasPayrollWrite,
   });
 
   const { data: eventTypes } = useQuery<EventType[]>({
     queryKey: ["event-types"],
     queryFn: getEventTypes,
+    enabled: hasPayrollWrite,
   });
 
   const { data: runsHistory, isLoading: runsHistoryLoading } = useQuery<PayrollRun[]>({
     queryKey: ["payroll-runs", "active"],
     queryFn: () => getPayrollRuns({ view: "active" }),
+    enabled: hasPayrollWrite,
   });
 
   const existingDraft = useMemo(() => {
@@ -703,6 +709,28 @@ function PaymentRunProcessPageContent() {
       : lastSavedAt
         ? `${t("Saved")} ${format(new Date(lastSavedAt), "HH:mm")}`
         : t("Not saved yet");
+
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="max-w-5xl mx-auto py-20 flex flex-col items-center justify-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-bold text-muted animate-pulse">{t("Loading payroll run...")}</p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!isAuthenticated || !hasPermission("payroll:write")) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Accountants, and Administrators can run payroll."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

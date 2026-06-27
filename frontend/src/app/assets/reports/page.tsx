@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import { exportCSV, getInventoryStats, getItems, getStores } from "@/lib/api";
 import { InventoryStats, ItemsResponse, Store } from "@/lib/types";
 import {
@@ -100,6 +102,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export default function ReportsPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsRead = hasPermission("assets:read");
   const router = useRouter();
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [storeFilter, setStoreFilter] = useState<string>("all");
@@ -116,16 +120,19 @@ export default function ReportsPage() {
   const { data: stats } = useQuery<InventoryStats>({
     queryKey: ["inventoryStats"],
     queryFn: getInventoryStats,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const { data: stores } = useQuery<Store[]>({
     queryKey: ["stores"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const { data: itemsResponse } = useQuery<ItemsResponse>({
     queryKey: ["assets-report", storeFilter],
     queryFn: () => getItems(1, 1000, undefined, storeFilter === "all" ? undefined : storeFilter),
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const items = itemsResponse?.items || [];
@@ -169,6 +176,25 @@ export default function ReportsPage() {
     }
     setDownloading(false);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsRead) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can view inventory reports."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

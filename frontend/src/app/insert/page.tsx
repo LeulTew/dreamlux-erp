@@ -11,6 +11,8 @@ import { z } from "zod";
 import { SalaryLevel, EventType } from "@/lib/types";
 import Select from "@/components/ui/Select";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -108,10 +110,10 @@ const employeeValidationSchema = z.object({
 });
 
 export default function InsertEmployeePage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const { lang } = useLanguage();
   const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
-
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
@@ -338,8 +340,28 @@ export default function InsertEmployeePage() {
       }
     });
 
-    createMutation.mutate(fd);
   };
+
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!isAuthenticated || !hasPermission("hr:write")) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only HR Managers and Administrators can add employees."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

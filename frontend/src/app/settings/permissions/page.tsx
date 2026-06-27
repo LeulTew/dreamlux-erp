@@ -9,12 +9,12 @@ import {
   HiShieldCheck,
   HiArrowLeft,
   HiArrowPath,
-  HiLockClosed,
   HiCheck,
   HiXMark,
 } from "react-icons/hi2";
 
 import AuthLayout from "@/components/AuthLayout";
+import ForbiddenState from "@/components/ForbiddenState";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import { getRoles, getPermissionsCatalog, updateRolePermissions, createRole, updateRole, deleteRole } from "@/lib/api";
@@ -432,13 +432,10 @@ export default function RolePermissionsPage() {
   if (!isAuthenticated || !canAccessPermissions) {
     return (
       <AuthLayout>
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-xl bg-danger/10 flex items-center justify-center text-danger mb-4">
-            <HiLockClosed className="h-8 w-8" />
-          </div>
-          <h2 className="text-xl font-bold text-foreground">{t("Forbidden: Insufficient privileges")}</h2>
-          <p className="mt-2 text-sm text-muted">{t("Only System Managers and Administrators can access permission settings.")}</p>
-        </div>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only System Managers and Administrators can access permission settings."
+        />
       </AuthLayout>
     );
   }

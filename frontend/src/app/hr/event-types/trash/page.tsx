@@ -10,14 +10,21 @@ import Link from "next/link";
 import { HiArrowLeft } from "react-icons/hi2";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
+
 
 export default function EventTypesTrashPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const hasEventWriteAccess = hasPermission("events:write");
+
   const { data: events, isLoading } = useQuery<EventType[]>({
     queryKey: ["event-types-trash"],
-    queryFn: getEventTypesTrash
+    queryFn: getEventTypesTrash,
+    enabled: isAuthenticated && hasEventWriteAccess,
   });
 
   const restoreMut = useMutation({
@@ -37,6 +44,27 @@ export default function EventTypesTrashPage() {
       toast.success("Permanently deleted");
     }
   });
+
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!isAuthenticated || !hasEventWriteAccess) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Administrators, and Operations Managers can manage event types."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

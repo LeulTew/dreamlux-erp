@@ -150,6 +150,10 @@ const mockReviewEventExpense = vi.fn().mockResolvedValue({ id: "expense-pending-
 vi.mock("@/lib/api", () => ({
   getPendingEventExpenses: vi.fn(),
   getExpenseHistory: vi.fn(),
+  getEffectivePermissions: vi.fn().mockResolvedValue({
+    permission_slugs: ["expenses:approve", "approvals:history:read"],
+    is_superuser: false,
+  }),
   reviewEventExpense: (id: string, data: any) => mockReviewEventExpense(id, data),
 }));
 
@@ -214,7 +218,9 @@ describe("Expense Approval Page UI and Logic Test Suite", () => {
     
     // Click approve button
     const approveBtn = screen.getByRole("button", { name: /Approve/i });
-    fireEvent.click(approveBtn);
+    await React.act(async () => {
+      fireEvent.click(approveBtn);
+    });
     
     expect(mockReviewEventExpense).toHaveBeenCalledWith("expense-pending-1", {
       status: "Approved",

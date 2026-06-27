@@ -6,6 +6,9 @@ import { getEmployees, getEventTypes, getSalaryLevels } from "@/lib/api";
 import { Employee } from "@/lib/types";
 import { HiPhone, HiEnvelope, HiIdentification, HiUsers } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
+import AuthLayout from "@/components/AuthLayout";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -167,6 +170,7 @@ function EmployeeReportCard({
 }
 
 function ReportContent() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
@@ -182,7 +186,10 @@ function ReportContent() {
   const [salaryByLevelName, setSalaryByLevelName] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
+  const hasHRRead = hasPermission("hr:read") || hasPermission("hr:write");
+
   useEffect(() => {
+    if (authLoading || !isAuthenticated || !hasHRRead) return;
     async function fetchData() {
       try {
         const [employeesRes, eventTypesRes, salaryLevelsRes] = await Promise.all([
@@ -216,24 +223,36 @@ function ReportContent() {
       }
     }
     fetchData();
-  }, [search, officeId, sortBy, sortOrder]);
+  }, [search, officeId, sortBy, sortOrder, authLoading, isAuthenticated, hasHRRead]);
 
   const officeName = officeId !== "all" && employees.length > 0 ? employees[0].office : null;
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated || !hasHRRead) return;
     if (!loading && employees.length > 0) {
       const timer = setTimeout(() => {
         window.print();
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [loading, employees.length]);
+  }, [loading, employees.length, authLoading, isAuthenticated, hasHRRead]);
 
-  if (loading) {
+  if (authLoading || (loading && isAuthenticated && hasHRRead)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white text-black font-mono uppercase tracking-widest text-[10px]">
         {t("Loading Personnel Directory...")}
       </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasHRRead) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Administrators, and HR Managers can view employee reports."
+        />
+      </AuthLayout>
     );
   }
 

@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 import { exportCSV, getItems, getInventoryStats, getStores } from "@/lib/api";
 import { InventoryStats, ItemsResponse, Store } from "@/lib/types";
 import { 
@@ -22,6 +24,8 @@ import ImageCell from "@/components/ImageCell";
 import toast from "react-hot-toast";
 
 export default function LocationDrilldownPage() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const hasAssetsRead = hasPermission("assets:read");
   const params = useParams();
   const router = useRouter();
   const storeId = params.storeId as string;
@@ -31,6 +35,7 @@ export default function LocationDrilldownPage() {
   const { data: stores } = useQuery<Store[]>({
     queryKey: ["stores"],
     queryFn: getStores,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const activeStore = useMemo(() => 
@@ -40,12 +45,13 @@ export default function LocationDrilldownPage() {
   const { data: stats } = useQuery<InventoryStats>({
     queryKey: ["inventoryStats"],
     queryFn: getInventoryStats,
+    enabled: isAuthenticated && hasAssetsRead,
   });
 
   const { data: itemsResponse, isLoading: itemsLoading } = useQuery<ItemsResponse>({
     queryKey: ["location-items", storeId, page],
     queryFn: () => getItems(page, limit, undefined, storeId),
-    enabled: !!storeId,
+    enabled: isAuthenticated && hasAssetsRead && !!storeId,
   });
 
   const locationStats = useMemo(() => {
@@ -62,6 +68,25 @@ export default function LocationDrilldownPage() {
   };
 
   if (!storeId) return null;
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !hasAssetsRead) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only authorized personnel can view items in this location."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

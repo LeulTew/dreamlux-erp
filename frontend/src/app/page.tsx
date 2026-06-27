@@ -692,10 +692,10 @@ function EmployeesPageContent() {
 
             <button
               onClick={() => { setShowTrash(!showTrash); setPage(1); }}
-              className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-2xl text-xs 2xl:text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 h-9 2xl:h-11 px-3 2xl:px-4 rounded-md text-xs 2xl:text-sm font-semibold transition-all ${
                 showTrash
                   ? "bg-rose-500/90 text-white shadow-sm hover:bg-rose-600"
-                  : "bg-card-alt text-muted border border-border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 dark:hover:border-rose-900"
+                  : "bg-card-alt text-muted border border-border hover:border-rose-300 hover:text-rose-600 dark:hover:text-rose-400 dark:hover:border-rose-900"
               }`}
             >
               <HiTrash className="w-4 h-4" />

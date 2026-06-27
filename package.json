@@ -25,6 +25,7 @@
     "lint": "bun run lint:backend && bun run lint:frontend",
     "test:backend": "bun run --cwd backend test",
     "test:frontend": "bun run --cwd frontend test",
+    "test:e2e": "bun run --cwd frontend test:e2e",
     "test": "bun run test:backend && bun run test:frontend",
     "backup:storage": "bun run --cwd backend src/db/backup-storage.ts",
     "backup:db": "bun run --cwd backend src/db/backup-db.ts",

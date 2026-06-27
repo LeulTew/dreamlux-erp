@@ -12,6 +12,8 @@ import toast from "react-hot-toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
+import ForbiddenState from "@/components/ForbiddenState";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -55,13 +57,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 function SalaryLevelsContent() {
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+
+  const hasSalaryLevelAccess = hasPermission("salary-levels:manage");
+
   const { data: levels, isLoading } = useQuery<SalaryLevel[]>({
     queryKey: ["salary-levels"],
-    queryFn: getSalaryLevels
+    queryFn: getSalaryLevels,
+    enabled: isAuthenticated && hasSalaryLevelAccess
   });
 
   const [form, setForm] = useState<{ id?: string, level_name: string, base_salary: string }>({ level_name: "", base_salary: "" });
@@ -78,7 +85,7 @@ function SalaryLevelsContent() {
   const { data: deleteImpact, isLoading: isDeleteImpactLoading } = useQuery<{ salary_level_id: string; level_name: string; active_employee_count: number }>({
     queryKey: ["salary-level-delete-impact", deleteId],
     queryFn: () => getSalaryLevelDeleteImpact(deleteId as string),
-    enabled: !!deleteId,
+    enabled: !!deleteId && isAuthenticated && hasSalaryLevelAccess,
     retry: false,
   });
 
@@ -148,6 +155,27 @@ function SalaryLevelsContent() {
       : lang === "am"
         ? "ይህንን የደሞዝ ደረጃ መሰረዝ እርግጠኛ ነዎት? በአሁኑ ጊዜ ምንም ንቁ ሠራተኞች እየተጠቀሙበት አይደለም።"
         : "Are you sure you want to remove this salary level? No active employees are currently using it.";
+
+  if (authLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!isAuthenticated || !hasSalaryLevelAccess) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          title="Forbidden: Insufficient privileges"
+          description="Only Owners, Administrators, and HR Managers can manage salary levels."
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>
