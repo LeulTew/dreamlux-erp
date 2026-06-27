@@ -27,7 +27,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 interface EventCardProps {
   event: EventType;
   onUpdate: (id: string, data: Partial<EventType>) => Promise<void>;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
   isUpdating: boolean;
   isEditing: boolean;
   onEditStateChange: (config: { isEditing: boolean }) => void;
@@ -113,13 +113,15 @@ export default function EventCard({
                   >
                     <HiPencilSquare className="w-5 h-5" />
                   </button>
-                  <button 
-                    onClick={() => onDelete(event.id)} 
-                    aria-label="Delete"
-                    className="p-3 bg-danger/10 rounded-xl text-danger hover:bg-danger hover:text-white transition-all active:scale-90"
-                  >
-                    <HiOutlineTrash className="w-5 h-5" />
-                  </button>
+                  {onDelete && (
+                    <button
+                      onClick={() => onDelete(event.id)}
+                      aria-label="Delete"
+                      className="p-3 bg-danger/10 rounded-xl text-danger [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-white transition-all active:scale-90"
+                    >
+                      <HiOutlineTrash className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>

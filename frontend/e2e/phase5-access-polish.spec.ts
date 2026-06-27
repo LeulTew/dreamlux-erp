@@ -188,4 +188,52 @@ test.describe("Phase 5 access and UX polish", () => {
     await expect(page.getByText("New Proposal Intake")).toBeVisible();
     await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
   });
+
+  test("payroll read users can view runs without write-only actions", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, { permissions: ["payroll:read"] });
+    await mockCommonShellData(page);
+    await page.route("http://localhost:4000/payroll/runs**", (route) =>
+      fulfillJson(route, [
+        {
+          id: "payroll-read-only",
+          period_start: "2026-06-01",
+          period_end: "2026-06-15",
+          status: "DRAFT",
+          total_payroll_value: 12500,
+          created_at: "2026-06-16T10:00:00.000Z",
+        },
+      ]),
+    );
+
+    await page.goto("/hr/payments");
+
+    await expect(page.getByText("Jun 2026 (1st-15th)")).toBeVisible();
+    await expect(page.getByRole("button", { name: /new payout/i })).toHaveCount(0);
+    await expect(page.getByTitle("Edit Draft")).toHaveCount(0);
+    await expect(page.getByTitle("Move to Trash")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /details/i })).toBeVisible();
+  });
+
+  test("event type trash is read-only unless the user has event delete permission", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, { permissions: ["events:read"] });
+    await mockCommonShellData(page);
+    await page.route("http://localhost:4000/event-types/trash/list", (route) =>
+      fulfillJson(route, [
+        {
+          id: "event-type-trash-e2e",
+          event_name: "Archived Gala",
+          description: "Deleted event type",
+          deleted_at: "2026-06-01T00:00:00.000Z",
+        },
+      ]),
+    );
+
+    await page.goto("/hr/event-types/trash");
+
+    await expect(page.getByText("Archived Gala")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Restore" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+  });
 });

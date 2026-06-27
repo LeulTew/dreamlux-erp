@@ -71,6 +71,7 @@ export default function EventTypesPage() {
   }, []);
 
   const hasEventWriteAccess = hasPermission("events:write");
+  const hasEventDeleteAccess = hasPermission("events:delete");
 
   const { data: events, isLoading } = useQuery<EventType[]>({
     queryKey: ["event-types"],
@@ -202,12 +203,14 @@ export default function EventTypesPage() {
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mt-1 pl-1">{t("Professional Rate Engine")}</p>
           </div>
           <div className="flex gap-3 sm:gap-4 w-full sm:w-auto">
-            <Link
-              href="/hr/event-types/trash"
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-danger/10 text-danger rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-danger/20 transition-all shadow-sm border border-danger/20"
-            >
-              <HiOutlineTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t("TRASH")}
-            </Link>
+            {hasEventDeleteAccess && (
+              <Link
+                href="/hr/event-types/trash"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-danger/10 text-danger rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-danger/20 transition-all shadow-sm border border-danger/20"
+              >
+                <HiOutlineTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t("TRASH")}
+              </Link>
+            )}
             <button
               onClick={() => setShowAddForm(!showAddForm)}
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
@@ -298,7 +301,7 @@ export default function EventTypesPage() {
                     <EventCard
                       event={event}
                       onUpdate={(id, data) => updateMut.mutateAsync({ id, data })}
-                      onDelete={(id) => setDeleteId(id)}
+                      onDelete={hasEventDeleteAccess ? (id) => setDeleteId(id) : undefined}
                       isUpdating={updateMut.isPending}
                       isEditing={editingConfigs[event.id]?.isEditing || false}
                       onEditStateChange={(config) => handleEditStateChange(event.id, config)}

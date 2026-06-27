@@ -145,16 +145,18 @@ Initial audit classification:
 | `/events/proposals` | Proposal writers, approvers, event writers | Backend allows queue read for proposal writers, event writers, or proposal approvers; create CTA should only show for writers. | Page previously fetched proposals and showed create CTA without frontend permission gating. | ✅ Fixed in PR 1 | #73 | E2E verifies unauthorized users do not fetch queue data, approvers can read without create CTA, and wildcard users can open creation per backend module wildcard semantics. |
 | `/events/proposals/new` | Proposal writers, event writers, module wildcard users | Users without write permission should see a clear forbidden state before filling the form; backend remains source of truth. | Page previously relied on backend rejection after form work. | ✅ Fixed in PR 1 | #73 | Event types fetch is disabled until write access is confirmed. E2E covers `events:*` access because backend wildcard grants nested event permissions. |
 | `ForbiddenState` default copy | Unauthorized users across modules | Default copy should be capability-based and localized; role-specific descriptions may remain only when explicitly passed by page copy. | Default description implied Admin/System Manager-only access. | ✅ Fixed in PR 1 | #73 | Default now uses permission-based copy with English/Amharic tests; new proposal descriptions localized. |
+| `/hr/payments` payroll archive | Payroll readers, writers, wildcard users | Backend allows `payroll:read` to view runs and export details, but status mutations, draft editing, and permanent delete require `payroll:write`. | Continued audit found read users could see write-only New Payout, Edit Draft, trash, restore, and permanent-delete controls. | ✅ Fixed in PR 2 | #73 | Actions now render only for `payroll:write`; E2E covers `payroll:read` visibility without write controls. |
+| `/hr/event-types` and `/hr/event-types/trash` | Event readers, writers, deleters, wildcard users | Backend allows event type create/update with `events:write`, trash list read with `events:read`, and soft-delete/restore/permanent-delete with `events:delete`. | Continued audit found write-only users could see delete/trash controls, and trash page was blocked from read-only users even though backend permits trash list read. | ✅ Fixed in PR 2 | #73 | EventCard delete is optional; trash page is read-gated and mutation buttons render only for `events:delete`. E2E covers read-only trash behavior. |
 
 Planned phases for new issue:
 
 | Phase | Status | Checklist |
 | :--- | :--- | :--- |
-| Phase 1: Current RBAC inventory | Mostly complete for PR 1 | [x] Inventory shared nav/breadcrumb gates. [x] Inventory `useAuth`, `/events`, `/events/proposals`, `/events/proposals/new`, `/events/proposals/[id]`, `/hr/reports/profit`, and `ForbiddenState`. [ ] Continue page-by-page inventory for remaining HR/payroll/salary/assets/settings pages in next pass. |
-| Phase 2: Backend alignment | In progress | [x] Confirm backend matcher grants `*`, exact slug, and module wildcard through `backend/src/lib/permissions.ts`. [x] Align local frontend matchers with backend semantics. [x] Confirm event proposal backend read/write policy from `backend/src/routes/events/proposals.ts`. [ ] Continue mapping remaining pages to backend route middleware. |
-| Phase 3: Multi-role scenarios | In progress | [x] Validate explicit permission, global wildcard, module wildcard, and superuser in unit tests. [x] Validate proposal approver read-only and event wildcard creation paths in E2E. [ ] Add remaining multi-role scenarios only where the continued audit finds gaps. |
-| Phase 4: UX/access states | In progress | [x] Replace default role-only forbidden copy with capability-based copy. [x] Add localized proposal forbidden descriptions. [x] Avoid data fetches before proposal permissions resolve. [ ] Continue auditing page-specific role-only descriptions. |
-| Phase 5: Targeted enhancements only | PR 1 ready | [x] Implement only source-backed fixes from first audit pass. [x] Add focused unit and E2E tests. [x] Run frontend lint, build, unit, and Playwright E2E. [x] Run root workspace validation. [x] Prepare PR 1. |
+| Phase 1: Current RBAC inventory | In progress for PR 2 | [x] Inventory shared nav/breadcrumb gates. [x] Inventory `useAuth`, `/events`, proposals, `/hr/reports/profit`, and `ForbiddenState`. [x] Continue HR event-types and payroll archive route inventory. [ ] Continue assets/settings/admin detail inventory in next pass. |
+| Phase 2: Backend alignment | In progress for PR 2 | [x] Confirm backend matcher grants `*`, exact slug, and module wildcard through `backend/src/lib/permissions.ts`. [x] Align local frontend matchers with backend semantics. [x] Confirm event proposal backend read/write policy. [x] Map payroll archive read/write split to `backend/src/routes/payroll.ts`. [x] Map event-type write/delete/read split to `backend/src/routes/event-types.ts`. [ ] Continue mapping remaining pages to backend route middleware. |
+| Phase 3: Multi-role scenarios | In progress for PR 2 | [x] Validate explicit permission, global wildcard, module wildcard, and superuser in unit tests. [x] Validate proposal approver read-only and event wildcard creation paths in E2E. [x] Add payroll read-only and event-type read-only trash E2E scenarios. [ ] Add more scenarios only where continued audit finds proven gaps. |
+| Phase 4: UX/access states | In progress for PR 2 | [x] Replace default role-only forbidden copy with capability-based copy. [x] Add localized proposal forbidden descriptions. [x] Avoid data fetches before proposal permissions resolve. [x] Hide backend-denied write/delete controls for read-only users. [ ] Continue auditing page-specific role-only descriptions. |
+| Phase 5: Targeted enhancements only | PR 2 ready | [x] Implement only source-backed fixes from first audit pass. [x] Add focused unit and E2E tests for PR 1. [x] Run frontend lint, build, unit, and Playwright E2E for PR 1. [x] Merge PR 1 and revalidate main. [x] Implement PR 2 source-backed payroll/event-type fixes. [x] Run PR 2 verification. [x] Prepare PR 2. |
 
 PR 1 verification evidence:
 
@@ -165,6 +167,20 @@ PR 1 verification evidence:
 | `cd frontend; bun run lint` | ✅ Pass | ESLint clean. |
 | `cd frontend; bun run build` | ✅ Pass | Next production build and TypeScript passed. |
 | `cd frontend; bun run test:e2e` | ✅ Pass | 16 Playwright tests across desktop and mobile Chromium. |
+| `bun run test` | ✅ Pass | Backend: 296 tests; Frontend: 22 files, 92 tests. Backend output includes intentional mocked error logs while exiting 0. |
+| `bun run lint` | ✅ Pass | Backend ESLint/TypeScript and frontend ESLint passed. |
+| `bun run build` | ✅ Pass | Backend bundle and frontend production build passed. |
+| `git diff --check` | ✅ Pass | No whitespace errors. |
+
+PR 2 verification evidence:
+
+| Command | Result | Notes |
+| :--- | :--- | :--- |
+| `cd frontend; bun run test src/app/hr/event-types/__tests__/EventTypes.vitest.tsx` | ✅ Pass | EventCard optional delete prop remained compatible with existing tests; 1 file, 4 tests. |
+| `cd frontend; bun run test` | ✅ Pass | 22 files, 92 tests. |
+| `cd frontend; bun run lint` | ✅ Pass | ESLint clean after adding generated Playwright artifact ignores. |
+| `cd frontend; bun run build` | ✅ Pass | Next production build and TypeScript passed. |
+| `cd frontend; bun run test:e2e -- phase5-access-polish.spec.ts` | ✅ Pass | 20 Playwright tests across desktop and mobile Chromium. Added payroll read-only and event-type read-only trash scenarios. |
 | `bun run test` | ✅ Pass | Backend: 296 tests; Frontend: 22 files, 92 tests. Backend output includes intentional mocked error logs while exiting 0. |
 | `bun run lint` | ✅ Pass | Backend ESLint/TypeScript and frontend ESLint passed. |
 | `bun run build` | ✅ Pass | Backend bundle and frontend production build passed. |
