@@ -30,7 +30,7 @@ describe("ForbiddenState Component", () => {
   it("renders with default English titles when props are empty", () => {
     render(<ForbiddenState />);
     expect(screen.getByText("Forbidden: Insufficient privileges")).toBeInTheDocument();
-    expect(screen.getByText("Only Admin or System Manager roles can access this page.")).toBeInTheDocument();
+    expect(screen.getByText("You do not have the required permissions to view this content.")).toBeInTheDocument();
     expect(screen.getByText("Back to Dashboard")).toBeInTheDocument(); // button is uppercase text-[10px] uppercase tracking-wider
   });
 
@@ -51,7 +51,7 @@ describe("ForbiddenState Component", () => {
     mockLang = "am";
     render(<ForbiddenState />);
     expect(screen.getByText("ክልክል ነው: በቂ ፈቃድ የለዎትም")).toBeInTheDocument();
-    expect(screen.getByText("ይህንን ገጽ መድረስ የሚችሉት አስተዳዳሪዎች ወይም የስርዓት አስተዳዳሪዎች ብቻ ናቸው።")).toBeInTheDocument();
+    expect(screen.getByText("ይህንን ይዘት ለማየት የሚያስፈልግዎት ፈቃድ የለዎትም።")).toBeInTheDocument();
     expect(screen.getByText("ወደ ዳሽቦርድ ተመለስ")).toBeInTheDocument();
   });
 

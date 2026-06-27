@@ -1,4 +1,6 @@
-export type PermissionChecker = (slug: string) => boolean;
+export { createPermissionMatcher } from "@/lib/permission-matcher";
+import type { PermissionChecker } from "@/lib/permission-matcher";
+import { hasAnyPermission } from "@/lib/permission-matcher";
 
 export type SidebarNavLink = {
   href: string;
@@ -38,23 +40,6 @@ const EVENT_PROPOSAL_PERMISSIONS = [
 
 const PAYROLL_PERMISSIONS = ["payroll:read", "payroll:write"];
 const ADMIN_PERMISSIONS = ["users:manage", "settings:write"];
-
-export function createPermissionMatcher(permissionSlugs: string[] = [], isSuperuser = false): PermissionChecker {
-  const normalized = new Set(permissionSlugs);
-
-  return (slug: string) => {
-    if (isSuperuser || normalized.has("*") || normalized.has(slug)) {
-      return true;
-    }
-
-    const moduleName = slug.split(":")[0];
-    return Boolean(moduleName && normalized.has(`${moduleName}:*`));
-  };
-}
-
-function hasAnyPermission(hasPermission: PermissionChecker, slugs: string[]) {
-  return slugs.some((slug) => hasPermission(slug));
-}
 
 export function buildSidebarNavState(params: {
   pathname: string;

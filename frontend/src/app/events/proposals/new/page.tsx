@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createEventProposal, submitEventProposal, getEventTypes, createEventType } from "@/lib/api";
 import { EventType } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
+import ForbiddenState from "@/components/ForbiddenState";
 import Select from "@/components/ui/Select";
 import {
   HiArrowRight,
@@ -23,6 +24,7 @@ import {
   HiInboxStack
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -167,6 +169,7 @@ export default function NewProposalPage() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
+  const { hasAnyPermission, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
@@ -236,7 +239,8 @@ export default function NewProposalPage() {
   // Fetch event types for dropdown
   const { data: eventTypesData } = useQuery<EventType[]>({
     queryKey: ["event-types"],
-    queryFn: getEventTypes
+    queryFn: getEventTypes,
+    enabled: isAuthenticated && hasAnyPermission(["events:proposals:write", "events:write"]),
   });
 
   const eventTypes = eventTypesData || [];
@@ -388,9 +392,21 @@ export default function NewProposalPage() {
     if (category === "other") setOtherLines(filterLine(otherLines));
   };
 
+  const canCreateProposals = hasAnyPermission(["events:proposals:write", "events:write"]);
+
   return (
     <AuthLayout>
-      <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
+      {authLoading ? (
+        <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
+          <div className="h-48 animate-pulse rounded-lg border border-border bg-card" />
+        </div>
+      ) : !isAuthenticated || !canCreateProposals ? (
+        <ForbiddenState
+          description="You need event proposal write permissions to create proposals."
+        />
+      ) : (
+        <>
+        <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
         <header className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 border-b border-border/50 pb-5">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/20 shrink-0">
@@ -1127,6 +1143,8 @@ export default function NewProposalPage() {
               </div>
             </div>
           </div>
+        </>
+      )}
         </>
       )}
     </AuthLayout>

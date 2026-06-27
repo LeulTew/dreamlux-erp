@@ -12,6 +12,7 @@ import {
   getEventsExportUrl,
   api
 } from "@/lib/api";
+import { createPermissionMatcher } from "@/lib/permission-matcher";
 import { Event, EventsResponse, EventSavedView } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import {
@@ -450,9 +451,7 @@ function EventsPageContent() {
     }
   });
 
-  const hasPermission = (slug: string) => {
-    return authData?.is_superuser || authData?.permission_slugs?.includes(slug) || authData?.permission_slugs?.includes("*");
-  };
+  const hasPermission = createPermissionMatcher(authData?.permission_slugs || [], !!authData?.is_superuser);
 
   const hasProfitAccess = hasPermission("reports:profit:read");
   const canWrite = hasPermission("events:write");

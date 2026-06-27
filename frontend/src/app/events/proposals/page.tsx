@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getEventProposals } from "@/lib/api";
 import { EventProposal } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
+import ForbiddenState from "@/components/ForbiddenState";
 import {
   HiInboxStack,
   HiPlus,
@@ -21,6 +22,7 @@ import { SortableHeader } from "@/components/ui/SortableHeader";
 import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
 import type { EventProposalFilter } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { useAuth } from "@/hooks/useAuth";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -84,6 +86,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 export default function ProposalsPage() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const { hasAnyPermission, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -93,6 +96,8 @@ export default function ProposalsPage() {
   const [advancedFilters, setAdvancedFilters] = useState<FilterRule[]>([]);
   const [filterLogic, setFilterLogic] = useState<"and" | "or">("and");
   const limit = 10;
+  const canReadProposals = hasAnyPermission(["events:proposals:write", "events:write", "events:proposals:approve"]);
+  const canCreateProposals = hasAnyPermission(["events:proposals:write", "events:write"]);
 
   const serverFilters = useMemo<EventProposalFilter[]>(() => {
     return advancedFilters.map((rule) => {
@@ -136,6 +141,7 @@ export default function ProposalsPage() {
       sortOrder,
       filters: serverFilters.length > 0 ? serverFilters : undefined,
     }),
+    enabled: isAuthenticated && canReadProposals,
   });
 
   const proposals = useMemo(() => data?.proposals || [], [data?.proposals]);
@@ -158,7 +164,16 @@ export default function ProposalsPage() {
 
   return (
     <AuthLayout>
-      <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+      {authLoading ? (
+        <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
+          <div className="h-48 animate-pulse rounded-lg border border-border bg-card" />
+        </div>
+      ) : !isAuthenticated || !canReadProposals ? (
+        <ForbiddenState
+          description="You need event proposal access permissions to view this content."
+        />
+      ) : (
+        <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
@@ -175,13 +190,15 @@ export default function ProposalsPage() {
             </div>
           </div>
 
-          <Link
-            href="/events/proposals/new"
-            className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
-          >
-            <HiPlus className="w-4 h-4" />
-            {t("Add Proposal")}
-          </Link>
+          {canCreateProposals && (
+            <Link
+              href="/events/proposals/new"
+              className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
+            >
+              <HiPlus className="w-4 h-4" />
+              {t("Add Proposal")}
+            </Link>
+          )}
         </header>
 
         {/* KPI Strip */}
@@ -514,7 +531,8 @@ export default function ProposalsPage() {
             />
           </>
         )}
-      </div>
+        </div>
+      )}
     </AuthLayout>
   );
 }

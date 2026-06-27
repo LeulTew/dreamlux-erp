@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, getEffectivePermissions } from "@/lib/api";
 import { User } from "@/lib/types";
 import { useEffect, useState } from "react";
+import { createPermissionMatcher, hasAnyPermission as matchAnyPermission } from "@/lib/permission-matcher";
 
 interface AuthResponse {
   user: User;
@@ -70,19 +71,10 @@ export function useAuth() {
     username: `${user.username} (Preview: ${previewRole})`,
   } : user;
 
-  const hasPermission = (slug: string) => {
-    if (isSuperuser) return true;
-    if (permissionSlugs.includes("*")) return true;
-    if (permissionSlugs.includes(slug)) return true;
-
-    const moduleName = slug.split(":")[0];
-    if (moduleName && permissionSlugs.includes(`${moduleName}:*`)) return true;
-
-    return false;
-  };
+  const hasPermission = createPermissionMatcher(permissionSlugs, isSuperuser);
 
   const hasAnyPermission = (slugs: string[]) => {
-    return slugs.some((slug) => hasPermission(slug));
+    return matchAnyPermission(hasPermission, slugs);
   };
 
   const clearPreview = () => {

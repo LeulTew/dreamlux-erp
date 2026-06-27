@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { EventProposal, EventProposalLog } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
+import { createPermissionMatcher } from "@/lib/permission-matcher";
 import {
   HiInboxStack,
   HiCheckCircle,
@@ -169,9 +170,7 @@ export default function ProposalDetailPage() {
     }
   });
 
-  const hasPermission = (slug: string) => {
-    return authData?.permission_slugs?.includes(slug) || authData?.is_superuser;
-  };
+  const hasPermission = createPermissionMatcher(authData?.permission_slugs || [], !!authData?.is_superuser);
 
   const canApprove = hasPermission("events:proposals:approve");
   const canWrite = hasPermission("events:proposals:write") || hasPermission("events:write");

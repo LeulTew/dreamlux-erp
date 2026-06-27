@@ -13,6 +13,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";
 import { EventType, ProfitReportSummary } from "@/lib/types";
+import { createPermissionMatcher } from "@/lib/permission-matcher";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -167,7 +168,8 @@ export default function FinancialDashboardPage() {
     }
   });
 
-  const hasProfitAccess = authData?.permission_slugs?.includes("reports:profit:read") || authData?.is_superuser;
+  const hasPermission = createPermissionMatcher(authData?.permission_slugs || [], !!authData?.is_superuser);
+  const hasProfitAccess = hasPermission("reports:profit:read");
 
   // Retrieve event types list
   const { data: eventTypesData } = useQuery<EventType[]>({

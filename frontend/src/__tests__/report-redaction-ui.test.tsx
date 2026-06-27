@@ -111,6 +111,74 @@ describe("FinancialDashboardPage Report Redaction & Accessibility", () => {
     expect(screen.getByText("ETB 500,000.00")).toBeInTheDocument();
   });
 
+  it("renders dashboard overview for global wildcard users", () => {
+    mockAuthData = { permission_slugs: ["*"], is_superuser: false };
+    mockReportData = {
+      summary: {
+        totalEvents: 1,
+        totalRevenue: 1000,
+        totalExpenses: 250,
+        netProfit: 750,
+        profitMargin: 75,
+        pendingExpenseExposure: 0,
+      },
+      categoryBreakdown: [],
+      monthlyData: [],
+      eventTypePerformance: [],
+      kpis: {
+        mostProfitableEvent: null,
+        mostProfitableEventType: null,
+        highestMarginEventType: null,
+        lowestMarginEvent: null,
+        pendingExpenseExposure: 0,
+        proposalConversionRate: 0,
+      },
+      proposalVariance: {
+        events: [],
+        averageVariance: 0,
+      },
+    };
+
+    render(<FinancialDashboardPage />);
+
+    expect(screen.getByText("Financial Dashboard & Reports")).toBeInTheDocument();
+    expect(screen.getByText("ETB 1,000.00")).toBeInTheDocument();
+  });
+
+  it("renders dashboard overview for reports module wildcard users", () => {
+    mockAuthData = { permission_slugs: ["reports:*"], is_superuser: false };
+    mockReportData = {
+      summary: {
+        totalEvents: 2,
+        totalRevenue: 2000,
+        totalExpenses: 500,
+        netProfit: 1500,
+        profitMargin: 75,
+        pendingExpenseExposure: 0,
+      },
+      categoryBreakdown: [],
+      monthlyData: [],
+      eventTypePerformance: [],
+      kpis: {
+        mostProfitableEvent: null,
+        mostProfitableEventType: null,
+        highestMarginEventType: null,
+        lowestMarginEvent: null,
+        pendingExpenseExposure: 0,
+        proposalConversionRate: 0,
+      },
+      proposalVariance: {
+        events: [],
+        averageVariance: 0,
+      },
+    };
+
+    render(<FinancialDashboardPage />);
+
+    expect(screen.getByText("Financial Dashboard & Reports")).toBeInTheDocument();
+    expect(screen.getByText("ETB 2,000.00")).toBeInTheDocument();
+  });
+
   it("renders localized dashboard strings in Amharic", () => {
     mockLang = "am";
     mockAuthData = { permission_slugs: ["reports:profit:read"], is_superuser: false };

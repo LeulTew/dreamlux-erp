@@ -33,7 +33,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Only authorized personnel can view inventory reports.": "Only authorized personnel can view inventory reports.",
     "Only authorized personnel can view low stock alerts.": "Only authorized personnel can view low stock alerts.",
     "Only authorized personnel can view trashed inventory items.": "Only authorized personnel can view trashed inventory items.",
-    "Only authorized personnel can view items in this location.": "Only authorized personnel can view items in this location."
+    "Only authorized personnel can view items in this location.": "Only authorized personnel can view items in this location.",
+    "You need event proposal access permissions to view this content.": "You need event proposal access permissions to view this content.",
+    "You need event proposal write permissions to create proposals.": "You need event proposal write permissions to create proposals."
   },
   am: {
     "Forbidden: Insufficient privileges": "ክልክል ነው: በቂ ፈቃድ የለዎትም",
@@ -56,7 +58,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Only authorized personnel can view inventory reports.": "የዕቃዎች ሪፖርቶችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
     "Only authorized personnel can view low stock alerts.": "አነስተኛ ክምችት ማስጠንቀቂያዎችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
     "Only authorized personnel can view trashed inventory items.": "የተጣሉ ዕቃዎችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
-    "Only authorized personnel can view items in this location.": "በዚህ ቦታ ውስጥ ያሉ ዕቃዎችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።"
+    "Only authorized personnel can view items in this location.": "በዚህ ቦታ ውስጥ ያሉ ዕቃዎችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
+    "You need event proposal access permissions to view this content.": "የዝግጅት ፕሮፖዛል ይዘትን ለማየት የሚያስፈልገው ፈቃድ የለዎትም።",
+    "You need event proposal write permissions to create proposals.": "የዝግጅት ፕሮፖዛል ለመፍጠር የሚያስፈልገው የመጻፍ ፈቃድ የለዎትም።"
   }
 };
 
@@ -91,13 +95,13 @@ export default function ForbiddenState({
           {title ? t(title) : t("Forbidden: Insufficient privileges")}
         </h2>
         <p className="text-xs text-muted-foreground font-semibold leading-relaxed max-w-sm">
-          {description ? t(description) : t("Only Admin or System Manager roles can access this page.")}
+          {description ? t(description) : t("You do not have the required permissions to view this content.")}
         </p>
       </div>
 
       <button
         onClick={handleAction}
-        className="h-12 px-6 rounded-lg border border-gold/30 bg-neutral-950 text-gold hover:bg-gold hover:text-black font-extrabold uppercase tracking-wider text-[10px] transition-all duration-300 cursor-pointer shadow-sm active:scale-[0.97]"
+        className="h-12 px-6 rounded-lg border border-gold/30 bg-neutral-950 text-gold [@media(hover:hover)]:hover:bg-gold [@media(hover:hover)]:hover:text-black font-extrabold uppercase tracking-wider text-[10px] transition-all duration-300 cursor-pointer shadow-sm active:scale-[0.97]"
       >
         {actionLabel ? t(actionLabel) : t("Back to Dashboard")}
       </button>
