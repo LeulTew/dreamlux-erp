@@ -151,7 +151,7 @@ router.delete(
       if (empError) throw empError;
 
       if (employees && employees.length > 0) {
-        const names = employees.map(e => e.full_name).slice(0, 3).join(", ");
+        const names = employees.map((e: { full_name: string }) => e.full_name).slice(0, 3).join(", ");
         const suffix = employees.length > 3 ? ` and ${employees.length - 3} others` : "";
         return res.status(400).json({
           error: `Cannot delete office: associated with active employee(s) (${names}${suffix}).`,
@@ -168,7 +168,7 @@ router.delete(
       if (itemError) throw itemError;
 
       if (items && items.length > 0) {
-        const names = items.map(i => i.name).slice(0, 3).join(", ");
+        const names = items.map((i: { name: string }) => i.name).slice(0, 3).join(", ");
         const suffix = items.length > 3 ? ` and ${items.length - 3} others` : "";
         return res.status(400).json({
           error: `Cannot delete office: associated with inventory item(s) (${names}${suffix}).`,

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../db/supabase";
-import { requirePermissionSlugs, requireAuth, AuthRequest } from "../middleware/auth";
+import { requirePermissionSlugs, AuthRequest } from "../middleware/auth";
 import { Response } from "express";
 
 const router = Router();
@@ -89,7 +89,7 @@ router.delete(
     if (empError) return res.status(500).json({ error: empError.message });
 
     if (employees && employees.length > 0) {
-      const names = employees.map(e => e.full_name).slice(0, 3).join(", ");
+      const names = employees.map((e: { full_name: string }) => e.full_name).slice(0, 3).join(", ");
       const suffix = employees.length > 3 ? ` and ${employees.length - 3} others` : "";
       return res.status(400).json({
         error: `Cannot delete department: associated with active employee(s) (${names}${suffix}).`,

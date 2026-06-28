@@ -100,7 +100,7 @@ router.delete(
       if (empError) throw empError;
 
       if (employees && employees.length > 0) {
-        const names = employees.map(e => e.full_name).slice(0, 3).join(", ");
+        const names = employees.map((e: { full_name: string }) => e.full_name).slice(0, 3).join(", ");
         const suffix = employees.length > 3 ? ` and ${employees.length - 3} others` : "";
         return res.status(400).json({
           error: `Cannot delete position: associated with active employee(s) (${names}${suffix}).`,

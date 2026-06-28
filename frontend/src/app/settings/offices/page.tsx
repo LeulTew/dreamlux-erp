@@ -1,9 +1,8 @@
 "use client";
 
-import React, { Suspense, useEffect, useState, useMemo } from "react";
-import Link from "next/link";
+import React, { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { HiOutlineTrash, HiPlus } from "react-icons/hi2";
+import { HiPlus } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllOffices, createOffice, updateOffice, deleteOffice } from "@/lib/api";
@@ -62,6 +61,18 @@ type Office = {
   created_at?: string;
 };
 
+function getMutationErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null) {
+    const maybeAxiosError = error as {
+      response?: { data?: { error?: string } };
+      message?: string;
+    };
+    return maybeAxiosError.response?.data?.error || maybeAxiosError.message || fallback;
+  }
+
+  return fallback;
+}
+
 function OfficesContent() {
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
@@ -101,8 +112,8 @@ function OfficesContent() {
       setForm({ name: "", is_active: true });
       toast.success("Office created successfully");
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || err.message || "Failed to create office");
+    onError: (err: unknown) => {
+      toast.error(getMutationErrorMessage(err, "Failed to create office"));
     }
   });
 
@@ -114,8 +125,8 @@ function OfficesContent() {
       setForm({ name: "", is_active: true });
       toast.success("Office updated successfully");
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || err.message || "Failed to update office");
+    onError: (err: unknown) => {
+      toast.error(getMutationErrorMessage(err, "Failed to update office"));
     }
   });
 
@@ -127,8 +138,8 @@ function OfficesContent() {
       setDeleteId(null);
       toast.success("Office deleted successfully");
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || err.message || "Failed to delete office");
+    onError: (err: unknown) => {
+      toast.error(getMutationErrorMessage(err, "Failed to delete office"));
       setDeleteId(null);
     }
   });

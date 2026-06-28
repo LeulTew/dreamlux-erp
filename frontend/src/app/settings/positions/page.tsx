@@ -1,9 +1,8 @@
 "use client";
 
-import React, { Suspense, useEffect, useState, useMemo } from "react";
-import Link from "next/link";
+import React, { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { HiOutlineTrash, HiPlus } from "react-icons/hi2";
+import { HiPlus } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPositions, createPosition, updatePosition, deletePosition } from "@/lib/api";
@@ -53,6 +52,18 @@ type Position = {
   created_at?: string;
 };
 
+function getMutationErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null) {
+    const maybeAxiosError = error as {
+      response?: { data?: { error?: string } };
+      message?: string;
+    };
+    return maybeAxiosError.response?.data?.error || maybeAxiosError.message || fallback;
+  }
+
+  return fallback;
+}
+
 function PositionsContent() {
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
@@ -91,8 +102,8 @@ function PositionsContent() {
       setForm({ name: "" });
       toast.success("Position created successfully");
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || err.message || "Failed to create position");
+    onError: (err: unknown) => {
+      toast.error(getMutationErrorMessage(err, "Failed to create position"));
     }
   });
 
@@ -103,8 +114,8 @@ function PositionsContent() {
       setForm({ name: "" });
       toast.success("Position updated successfully");
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || err.message || "Failed to update position");
+    onError: (err: unknown) => {
+      toast.error(getMutationErrorMessage(err, "Failed to update position"));
     }
   });
 
@@ -115,8 +126,8 @@ function PositionsContent() {
       setDeleteId(null);
       toast.success("Position deleted successfully");
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error || err.message || "Failed to delete position");
+    onError: (err: unknown) => {
+      toast.error(getMutationErrorMessage(err, "Failed to delete position"));
       setDeleteId(null);
     }
   });

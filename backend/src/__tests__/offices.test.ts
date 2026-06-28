@@ -50,17 +50,6 @@ mock.module("../db/supabase", () => ({
   },
 }));
 
-// Mock permissions cache
-mock.module("../lib/permissions-cache", () => ({
-  getCachedUserPermissions: () => ({
-    roleNames: ["HR_MANAGER"],
-    permissionSlugs: ["offices:manage", "hr:read", "offices:read"],
-  }),
-  setCachedUserPermissions: () => {},
-  invalidateUserPermissionsCache: () => {},
-  invalidateAllPermissionsCache: () => {},
-}));
-
 let app: import("express").Application;
 
 beforeAll(async () => {
