@@ -664,6 +664,8 @@ describe("Events API", () => {
     expect(String(mockQuery.mock.calls[1][0])).toContain("p.created_at ASC");
     expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN users proposer");
     expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN users approver");
+    expect(String(mockQuery.mock.calls[0][0])).toContain("p.deleted_at IS NULL");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("p.deleted_at IS NULL");
   });
 
   test("GET /events/proposals/:id returns proposer and approver metadata with logs", async () => {
@@ -759,6 +761,98 @@ describe("Events API", () => {
     expect(res.body.proposals).toHaveLength(1);
     expect(String(mockQuery.mock.calls[1][0])).toContain(" OR ");
     expect(String(mockQuery.mock.calls[1][0])).toContain("et.name");
+  });
+
+  test("GET /events/proposals/trash/list returns deleted proposals with proposer metadata", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: 1 }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Deleted Proposal",
+        client_name: "Aster",
+        requested_budget: "120000.00",
+        estimated_total_cost: "80000.00",
+        estimated_net_profit: "40000.00",
+        estimated_margin_percentage: "33.33",
+        status: "Draft",
+        deleted_at: "2026-07-01T00:00:00.000Z",
+        proposed_by_name: "Tigist Haile",
+      }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/proposals/trash/list")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposals).toHaveLength(1);
+    expect(res.body.total).toBe(1);
+    expect(res.body.proposals[0].deleted_at).toBeTruthy();
+    expect(String(mockQuery.mock.calls[0][0])).toContain("deleted_at IS NOT NULL");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("p.deleted_at IS NOT NULL");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN users proposer");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("LIMIT $1 OFFSET $2");
+    expect(mockQuery.mock.calls[1][1]).toEqual([10, 0]);
+  });
+
+  test("DELETE /events/proposals/:id blocks users without events:delete", async () => {
+    const res = await request(app)
+      .delete("/events/proposals/proposal-1")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(403);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test("DELETE /events/proposals/:id soft deletes proposal and writes audit log", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Draft", deleted_at: null }], rowCount: 1 }); // lock
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Draft", deleted_at: "2026-07-01T00:00:00.000Z" }], rowCount: 1 }); // update
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .delete("/events/proposals/proposal-1")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposal.deleted_at).toBeTruthy();
+    expect(String(mockQuery.mock.calls[3][0])).toContain("event_proposal_logs");
+  });
+
+  test("POST /events/proposals/:id/restore restores deleted proposal and audits action", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Draft", deleted_at: null }], rowCount: 1 }); // update
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals/proposal-1/restore")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposal.id).toBe("proposal-1");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("deleted_at = NULL");
+    expect(mockQuery.mock.calls[2][1]).toContain("proposal_restored");
+  });
+
+  test("DELETE /events/proposals/:id/permanent blocks converted proposal history", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proposal-1", status: "Converted", converted_event_id: "event-1", deleted_at: "2026-07-01T00:00:00.000Z" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .delete("/events/proposals/proposal-1/permanent")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("Converted proposals cannot be permanently deleted");
+    expect(mockQuery.mock.calls[2][1]).toContain("proposal_permanent_delete_blocked");
   });
 
   test("POST /events/proposals/:id/submit moves Draft to Submitted with audit", async () => {
@@ -1104,6 +1198,7 @@ describe("Events API", () => {
       ],
       rowCount: 1,
     });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
     const res = await request(app)
       .delete("/events/event-1")
@@ -1111,6 +1206,92 @@ describe("Events API", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(String(mockQuery.mock.calls[1][0])).toContain("INSERT INTO event_logs");
+  });
+
+  test("DELETE /events/:id blocks users without events:delete before DB access", async () => {
+    const res = await request(app)
+      .delete("/events/event-1")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("GET /events/trash/list returns only soft-deleted events", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: 1 }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "event-1",
+          name: "Deleted Gala",
+          client_name: "Aster",
+          venue_location: "Hilton",
+          start_date: "2026-07-20",
+          deleted_at: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/trash/list")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.events).toHaveLength(1);
+    expect(res.body.total).toBe(1);
+    expect(res.body.events[0].deleted_at).toBeTruthy();
+    expect(String(mockQuery.mock.calls[0][0])).toContain("deleted_at IS NOT NULL");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("e.deleted_at IS NOT NULL");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("LIMIT $1 OFFSET $2");
+    expect(mockQuery.mock.calls[1][1]).toEqual([10, 0]);
+  });
+
+  test("POST /events/:id/restore restores deleted event and audits action", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", name: "Restored Gala", deleted_at: null }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+    const res = await request(app)
+      .post("/events/event-1/restore")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.event.id).toBe("event-1");
+    expect(String(mockQuery.mock.calls[0][0])).toContain("deleted_at = NULL");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("INSERT INTO event_logs");
+  });
+
+  test("DELETE /events/:id/permanent blocks events with operational dependencies", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", deleted_at: "2026-07-01T00:00:00.000Z" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        assignments: 1,
+        vehicle_assignments: 0,
+        expenses: 0,
+        allocations: 0,
+        checklist_items: 0,
+        converted_proposals: 1,
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .delete("/events/event-1/permanent")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.dependencies).toEqual([
+      { key: "assignments", count: 1 },
+      { key: "converted_proposals", count: 1 },
+    ]);
+    expect(mockQuery.mock.calls[3][1]).toContain("event_permanent_delete_blocked");
   });
 
   // Workspace endpoint

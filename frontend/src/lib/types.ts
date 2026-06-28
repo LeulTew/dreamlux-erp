@@ -591,6 +591,7 @@ export interface EventProposal {
   proposed_by_email?: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface EventProposalLog {

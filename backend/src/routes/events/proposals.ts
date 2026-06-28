@@ -21,6 +21,10 @@ function canReadEventProposals(req: AuthRequest): boolean {
   return canWriteEventProposals(req) || canApproveEventProposals(req);
 }
 
+function canDeleteEventProposals(req: AuthRequest): boolean {
+  return hasPermission(req, "events:delete");
+}
+
 function canImportEvents(req: AuthRequest): boolean {
   return hasPermission(req, "events:write");
 }
@@ -387,6 +391,129 @@ export function createEventProposalsRouter(): Router {
     }
   });
 
+  // GET /events/proposals/trash/list - Deleted proposal queue
+  router.get("/proposals/trash/list", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!canReadEventProposals(req)) {
+        res.status(403).json({ error: "Forbidden: Missing event proposal access permission" });
+        return;
+      }
+
+      const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 10, 1), 100);
+      const offset = (page - 1) * limit;
+
+      const countResult = await pool.query(`SELECT COUNT(*)::int AS count FROM event_proposals WHERE deleted_at IS NOT NULL`);
+      const result = await pool.query(
+        `
+          SELECT
+            p.*,
+            et.name AS event_type_name,
+            p.created_by AS proposed_by_user_id,
+            proposer.full_name AS proposed_by_name,
+            proposer.username AS proposed_by_username,
+            proposer.email AS proposed_by_email,
+            p.approved_by AS approved_by_user_id,
+            approver.full_name AS approved_by_name,
+            approver.username AS approved_by_username,
+            approver.email AS approved_by_email
+          FROM event_proposals p
+          LEFT JOIN event_types et ON p.event_type_id = et.id
+          LEFT JOIN users proposer ON proposer.id = p.created_by AND proposer.deleted_at IS NULL
+          LEFT JOIN users approver ON approver.id = p.approved_by AND approver.deleted_at IS NULL
+          WHERE p.deleted_at IS NOT NULL
+          ORDER BY p.deleted_at DESC, p.updated_at DESC
+          LIMIT $1 OFFSET $2
+        `,
+        [limit, offset],
+      );
+
+      const total = Number(countResult.rows[0]?.count || 0);
+      res.json({ proposals: result.rows.map(formatProposal), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
+    } catch (error: any) {
+      console.error("[event-proposals-trash-list] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // POST /events/proposals/:proposalId/restore - Restore a deleted proposal
+  router.post("/proposals/:proposalId/restore", requireAuth, async (req: AuthRequest, res: Response) => {
+    if (!canDeleteEventProposals(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event delete permission" });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(
+        `
+          UPDATE event_proposals
+          SET deleted_at = NULL, updated_at = NOW()
+          WHERE id = $1 AND deleted_at IS NOT NULL
+          RETURNING *
+        `,
+        [req.params.proposalId],
+      );
+      if (result.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Deleted event proposal not found" });
+        return;
+      }
+
+      await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_restored", null, result.rows[0].status, "Restored from trash");
+      await client.query("COMMIT");
+      res.json({ proposal: formatProposal(result.rows[0]) });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("[event-proposals-restore] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    } finally {
+      client.release();
+    }
+  });
+
+  // DELETE /events/proposals/:proposalId/permanent - Hard delete only unconverted trashed proposals
+  router.delete("/proposals/:proposalId/permanent", requireAuth, async (req: AuthRequest, res: Response) => {
+    if (!canDeleteEventProposals(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event delete permission" });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const existing = await client.query(
+        `SELECT * FROM event_proposals WHERE id = $1 AND deleted_at IS NOT NULL FOR UPDATE`,
+        [req.params.proposalId],
+      );
+      if (existing.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Deleted event proposal not found" });
+        return;
+      }
+
+      const proposal = existing.rows[0];
+      if (proposal.converted_event_id || proposal.status === "Converted") {
+        await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_permanent_delete_blocked", proposal.status, proposal.status, "Converted proposals preserve event traceability");
+        await client.query("COMMIT");
+        res.status(409).json({ error: "Converted proposals cannot be permanently deleted because they preserve event traceability" });
+        return;
+      }
+
+      await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_permanent_deleted", proposal.status, null);
+      await client.query(`DELETE FROM event_proposals WHERE id = $1`, [req.params.proposalId]);
+      await client.query("COMMIT");
+      res.json({ success: true });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("[event-proposals-permanent-delete] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    } finally {
+      client.release();
+    }
+  });
+
   // GET /events/proposals/:proposalId - Proposal detail with optional audit history
   router.get("/proposals/:proposalId", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
@@ -429,6 +556,42 @@ export function createEventProposalsRouter(): Router {
     } catch (error: any) {
       console.error("[event-proposals-detail] Error:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // DELETE /events/proposals/:proposalId - Soft delete proposal
+  router.delete("/proposals/:proposalId", requireAuth, async (req: AuthRequest, res: Response) => {
+    if (!canDeleteEventProposals(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event delete permission" });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const existing = await client.query(
+        `SELECT id, status, deleted_at FROM event_proposals WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+        [req.params.proposalId],
+      );
+      if (existing.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event proposal not found" });
+        return;
+      }
+
+      const result = await client.query(
+        `UPDATE event_proposals SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
+        [req.params.proposalId],
+      );
+      await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_deleted", existing.rows[0].status, existing.rows[0].status, "Moved to trash");
+      await client.query("COMMIT");
+      res.json({ proposal: formatProposal(result.rows[0]) });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("[event-proposals-delete] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    } finally {
+      client.release();
     }
   });
 

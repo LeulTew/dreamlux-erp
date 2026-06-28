@@ -1249,6 +1249,15 @@ export const updateEvent = (id: string, data: Record<string, unknown>) =>
 export const deleteEvent = (id: string) =>
   api.delete(`/events/${id}`).then((r) => r.data);
 
+export const getEventsTrash = (params: Record<string, unknown> = {}) =>
+  api.get("/events/trash/list", { params }).then((r) => r.data);
+
+export const restoreEvent = (id: string) =>
+  api.post(`/events/${id}/restore`).then((r) => r.data);
+
+export const deleteEventPermanent = (id: string) =>
+  api.delete(`/events/${id}/permanent`).then((r) => r.data);
+
 export const updateEventDesign = (
   id: string,
   data: { package_design_notes?: string | null; estimated_design_cost?: number | null }
@@ -1359,6 +1368,9 @@ export const setDefaultEventSavedView = (id: string) =>
 export const getEventProposals = (params: Record<string, unknown> = {}) =>
   api.get("/events/proposals", { params }).then((r) => r.data);
 
+export const getEventProposalsTrash = (params: Record<string, unknown> = {}) =>
+  api.get("/events/proposals/trash/list", { params }).then((r) => r.data);
+
 export type EventProposalFilter = {
   field:
     | "name"
@@ -1381,6 +1393,15 @@ export const createEventProposal = (data: Record<string, unknown>) =>
 
 export const getEventProposal = (id: string) =>
   api.get(`/events/proposals/${id}`).then((r) => r.data);
+
+export const deleteEventProposal = (id: string) =>
+  api.delete(`/events/proposals/${id}`).then((r) => r.data);
+
+export const restoreEventProposal = (id: string) =>
+  api.post(`/events/proposals/${id}/restore`).then((r) => r.data);
+
+export const deleteEventProposalPermanent = (id: string) =>
+  api.delete(`/events/proposals/${id}/permanent`).then((r) => r.data);
 
 export const submitEventProposal = (id: string) =>
   api.post(`/events/proposals/${id}/submit`).then((r) => r.data);

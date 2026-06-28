@@ -12,7 +12,8 @@ import {
   HiEye,
   HiArrowPath,
   HiCheckCircle,
-  HiCurrencyDollar
+  HiCurrencyDollar,
+  HiTrash
 } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import PaginationControls from "@/components/PaginationControls";
@@ -53,7 +54,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Conversion Rate": "Conversion Rate",
     "Avg Margin": "Avg Margin",
     "Date": "Requested Date",
-    "Clear": "Clear"
+    "Clear": "Clear",
+    "Trash": "Trash"
   },
   am: {
     "Event Proposals": "የዝግጅት ፕሮፖዛሎች",
@@ -83,14 +85,15 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Conversion Rate": "የመለወጥ መጠን",
     "Avg Margin": "አማካይ ህዳግ",
     "Date": "የተጠየቀ ቀን",
-    "Clear": "አጽዳ"
+    "Clear": "አጽዳ",
+    "Trash": "ቆሻሻ"
   }
 };
 
 export default function ProposalsPage() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
-  const { hasAnyPermission, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { hasAnyPermission, hasPermission, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -102,6 +105,7 @@ export default function ProposalsPage() {
   const limit = 10;
   const canReadProposals = hasAnyPermission(["events:proposals:write", "events:write", "events:proposals:approve"]);
   const canCreateProposals = hasAnyPermission(["events:proposals:write", "events:write"]);
+  const canDeleteEvents = hasPermission("events:delete");
 
   const serverFilters = useMemo<EventProposalFilter[]>(() => {
     return advancedFilters.map((rule) => {
@@ -199,15 +203,26 @@ export default function ProposalsPage() {
             </div>
           </div>
 
-          {canCreateProposals && (
-            <Link
-              href="/events/proposals/new"
-              className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
-            >
-              <HiPlus className="w-4 h-4" />
-              {t("Add Proposal")}
-            </Link>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {canDeleteEvents && (
+              <Link
+                href="/events/proposals/trash"
+                className="flex h-[44px] items-center justify-center gap-1.5 rounded-md border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground"
+              >
+                <HiTrash className="h-4 w-4 text-danger" />
+                {t("Trash")}
+              </Link>
+            )}
+            {canCreateProposals && (
+              <Link
+                href="/events/proposals/new"
+                className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
+              >
+                <HiPlus className="w-4 h-4" />
+                {t("Add Proposal")}
+              </Link>
+            )}
+          </div>
         </header>
 
         {/* KPI Strip */}
