@@ -15,7 +15,9 @@ export type SidebarNavState = {
   showAdminGroup: boolean;
   eventLinks: SidebarNavLink[];
   financeLinks: SidebarNavLink[];
+  refDataLinks: SidebarNavLink[];
 };
+
 
 const HR_GROUP_PERMISSIONS = [
   "hr:read",
@@ -100,12 +102,49 @@ export function buildSidebarNavState(params: {
     .filter((link) => link.show)
     .map(({ href, label, active }) => ({ href, label, active }));
 
+  const refDataLinks = [
+    {
+      href: "/settings/departments",
+      label: t("Departments"),
+      active: pathname === "/settings/departments",
+      show: hasPermission("departments:manage") || hasPermission("hr:read") || hasPermission("departments:read"),
+    },
+    {
+      href: "/settings/positions",
+      label: t("Positions"),
+      active: pathname === "/settings/positions",
+      show: hasPermission("positions:manage") || hasPermission("hr:read") || hasPermission("positions:read"),
+    },
+    {
+      href: "/settings/offices",
+      label: t("Offices"),
+      active: pathname === "/settings/offices",
+      show: hasPermission("offices:manage") || hasPermission("hr:read") || hasPermission("offices:read"),
+    },
+    {
+      href: "/hr/salary-levels",
+      label: t("Salary Levels"),
+      active: pathname === "/hr/salary-levels",
+      show: hasPermission("salary-levels:manage"),
+    },
+    {
+      href: "/hr/event-types",
+      label: t("Event Types"),
+      active: pathname === "/hr/event-types",
+      show: hasPermission("events:write"),
+    },
+  ]
+    .filter((link) => link.show)
+    .map(({ href, label, active }) => ({ href, label, active }));
+
   return {
     showHRGroup: hasAnyPermission(hasPermission, HR_GROUP_PERMISSIONS),
     showEmployeesMenu: hasAnyPermission(hasPermission, ["hr:read", "hr:write"]),
     showInventoryGroup: hasPermission("assets:read"),
-    showAdminGroup: hasAnyPermission(hasPermission, ADMIN_PERMISSIONS),
+    showAdminGroup: hasAnyPermission(hasPermission, [...ADMIN_PERMISSIONS, "departments:manage", "positions:manage", "offices:manage"]),
     eventLinks,
     financeLinks,
+    refDataLinks,
   };
 }
+
