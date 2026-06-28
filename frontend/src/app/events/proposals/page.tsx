@@ -39,6 +39,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Canceled": "Canceled",
     "Proposal Name": "Proposal Name",
     "Client": "Client",
+    "Proposed By": "Proposed By",
+    "Unknown User": "Unknown user",
     "Budget": "Budget",
     "Estimated Profit": "Estimated Profit",
     "Margin %": "Margin %",
@@ -67,6 +69,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Canceled": "የተሰረዘ",
     "Proposal Name": "የፕሮፖዛል ስም",
     "Client": "ደንበኛ",
+    "Proposed By": "ያቀረበው",
+    "Unknown User": "ያልታወቀ ተጠቃሚ",
     "Budget": "በጀት",
     "Estimated Profit": "የተገመተ ትርፍ",
     "Margin %": "ህዳግ %",
@@ -147,6 +151,11 @@ export default function ProposalsPage() {
   const proposals = useMemo(() => data?.proposals || [], [data?.proposals]);
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
+  const formatProposalUser = (proposal: EventProposal) =>
+    proposal.proposed_by_name ||
+    proposal.proposed_by_username ||
+    proposal.proposed_by_email ||
+    t("Unknown User");
 
   // Compute local KPI stats safely from available data (active page or default)
   const stats = useMemo(() => {
@@ -388,6 +397,7 @@ export default function ProposalsPage() {
                         }}
                       />
                     </th>
+                    <th className="px-6 py-4">{t("Proposed By")}</th>
                     <th className="px-6 py-4">
                       <SortableHeader
                         label={t("Date")}
@@ -461,6 +471,11 @@ export default function ProposalsPage() {
                           {proposal.client_phone && <div className="text-xs font-mono text-muted">{proposal.client_phone}</div>}
                         </div>
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="max-w-[160px] truncate text-xs font-semibold text-foreground" title={formatProposalUser(proposal)}>
+                          {formatProposalUser(proposal)}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 font-mono text-muted text-xs">
                         {proposal.requested_start_date ? proposal.requested_start_date.split("T")[0] : "-"}
                       </td>
@@ -502,6 +517,9 @@ export default function ProposalsPage() {
                     <div>
                       <h4 className="font-bold text-foreground text-base leading-snug">{proposal.name}</h4>
                       <p className="text-xs text-muted font-medium mt-0.5">{proposal.client_name}</p>
+                      <p className="text-[11px] text-muted font-semibold mt-1">
+                        {t("Proposed By")}: <span className="text-foreground">{formatProposalUser(proposal)}</span>
+                      </p>
                     </div>
                     <StatusBadge status={proposal.status} />
                   </div>

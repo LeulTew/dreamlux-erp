@@ -640,6 +640,14 @@ describe("Events API", () => {
         estimated_total_cost: "90000.00",
         estimated_net_profit: "110000.00",
         estimated_margin_percentage: "55.00",
+        proposed_by_user_id: "user-event-manager",
+        proposed_by_name: "Tigist Haile",
+        proposed_by_username: "tigist",
+        proposed_by_email: "tigist@example.com",
+        approved_by_user_id: null,
+        approved_by_name: null,
+        approved_by_username: null,
+        approved_by_email: null,
       }],
       rowCount: 1,
     });
@@ -650,8 +658,52 @@ describe("Events API", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.proposals[0].estimated_margin_percentage).toBe(55);
+    expect(res.body.proposals[0].proposed_by_name).toBe("Tigist Haile");
+    expect(res.body.proposals[0].proposed_by_username).toBe("tigist");
     expect(String(mockQuery.mock.calls[1][0])).toContain("p.estimated_net_profit");
     expect(String(mockQuery.mock.calls[1][0])).toContain("p.created_at ASC");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN users proposer");
+    expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN users approver");
+  });
+
+  test("GET /events/proposals/:id returns proposer and approver metadata with logs", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Approved Gala",
+        status: "Approved",
+        requested_budget: "200000.00",
+        estimated_total_cost: "90000.00",
+        estimated_net_profit: "110000.00",
+        estimated_margin_percentage: "55.00",
+        created_by: "user-event-manager",
+        approved_by: "user-ops-manager",
+        proposed_by_user_id: "user-event-manager",
+        proposed_by_name: "Tigist Haile",
+        proposed_by_username: "tigist",
+        proposed_by_email: "tigist@example.com",
+        approved_by_user_id: "user-ops-manager",
+        approved_by_name: "Mekdes Alemu",
+        approved_by_username: "mekdes",
+        approved_by_email: "mekdes@example.com",
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "log-1", proposal_id: "proposal-1", action: "proposal_approved" }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/proposals/proposal-1")
+      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposal.proposed_by_name).toBe("Tigist Haile");
+    expect(res.body.proposal.approved_by_name).toBe("Mekdes Alemu");
+    expect(res.body.logs).toHaveLength(1);
+    expect(String(mockQuery.mock.calls[0][0])).toContain("LEFT JOIN users proposer");
+    expect(String(mockQuery.mock.calls[0][0])).toContain("LEFT JOIN users approver");
   });
 
   test("GET /events/proposals validates and applies custom sorting", async () => {

@@ -579,8 +579,16 @@ export interface EventProposal {
   converted_event_id: string | null;
   submitted_at: string | null;
   approved_by: string | null;
+  approved_by_user_id?: string | null;
+  approved_by_name?: string | null;
+  approved_by_username?: string | null;
+  approved_by_email?: string | null;
   approved_at: string | null;
   created_by: string | null;
+  proposed_by_user_id?: string | null;
+  proposed_by_name?: string | null;
+  proposed_by_username?: string | null;
+  proposed_by_email?: string | null;
   created_at: string;
   updated_at: string;
 }
