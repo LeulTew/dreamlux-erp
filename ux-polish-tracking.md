@@ -84,16 +84,16 @@ Reminder for the next agent/session: before coding, re-read `project-context.md`
 
 ## Created Issue Map
 
-| Issue | Title | Priority |
-| :--- | :--- | :--- |
-| [#77](https://github.com/LeulTew/dreamlux-erp/issues/77) | Reference data setup pages and sidebar grouping | P1 |
-| [#78](https://github.com/LeulTew/dreamlux-erp/issues/78) | Proposal creator attribution across queue and detail | P1 |
-| [#79](https://github.com/LeulTew/dreamlux-erp/issues/79) | Unified trash and restore for events, proposals, and setup records | P1 |
-| [#80](https://github.com/LeulTew/dreamlux-erp/issues/80) | Seeded admin and user credentials parity with real user accounts | P1 |
-| [#81](https://github.com/LeulTew/dreamlux-erp/issues/81) | Notification center, routing matrix, and permission-safe delivery | P1 |
-| [#82](https://github.com/LeulTew/dreamlux-erp/issues/82) | Record activity timeline and audit drawer | P1 |
-| [#83](https://github.com/LeulTew/dreamlux-erp/issues/83) | Security posture status page with OWASP/CVE tracking | P2 |
-| [#84](https://github.com/LeulTew/dreamlux-erp/issues/84) | PWA installability, offline shell, and notification readiness | P2 |
-| [#85](https://github.com/LeulTew/dreamlux-erp/issues/85) | HR dashboard for workforce, payroll, and staffing readiness | P2 |
-| [#86](https://github.com/LeulTew/dreamlux-erp/issues/86) | Custom role manager UX guardrails and auditability | P2 |
-| [#87](https://github.com/LeulTew/dreamlux-erp/issues/87) | Pagination inventory and unbounded-list hardening | P2 |
+| Issue | Title | Priority | Classification |
+| :--- | :--- | :--- | :--- |
+| [#77](https://github.com/LeulTew/dreamlux-erp/issues/77) | Reference data setup pages and sidebar grouping | P1 | Antigravity (UI) |
+| [#78](https://github.com/LeulTew/dreamlux-erp/issues/78) | Proposal creator attribution across queue and detail | P1 | Codex (Logic) |
+| [#79](https://github.com/LeulTew/dreamlux-erp/issues/79) | Unified trash and restore for events, proposals, and setup records | P1 | Codex (Logic) |
+| [#80](https://github.com/LeulTew/dreamlux-erp/issues/80) | Seeded admin and user credentials parity with real user accounts | P1 | Codex (Logic) |
+| [#81](https://github.com/LeulTew/dreamlux-erp/issues/81) | Notification center, routing matrix, and permission-safe delivery | P1 | Antigravity (UI) |
+| [#82](https://github.com/LeulTew/dreamlux-erp/issues/82) | Record activity timeline and audit drawer | P1 | Antigravity (UI) |
+| [#83](https://github.com/LeulTew/dreamlux-erp/issues/83) | Security posture status page with OWASP/CVE tracking | P2 | Antigravity (UI) |
+| [#84](https://github.com/LeulTew/dreamlux-erp/issues/84) | PWA installability, offline shell, and notification readiness | P2 | Codex (Logic) |
+| [#85](https://github.com/LeulTew/dreamlux-erp/issues/85) | HR dashboard for workforce, payroll, and staffing readiness | P2 | Antigravity (UI) |
+| [#86](https://github.com/LeulTew/dreamlux-erp/issues/86) | Custom role manager UX guardrails and auditability | P2 | Antigravity (UI) |
+| [#87](https://github.com/LeulTew/dreamlux-erp/issues/87) | Pagination inventory and unbounded-list hardening | P2 | Codex (Logic) |
