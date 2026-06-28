@@ -27,7 +27,22 @@ Use these default credentials to log in and verify permission boundaries:
 
 ---
 
-## 3. Test Suites (Verification Tables)
+## 3. Release / PR Coverage Map
+
+Use this table to decide which blackbox suites matter most after a release. A release can touch more than one area, so run the listed suites plus the smoke test.
+
+| Release / PR | Main user-facing change | QA suites to run | Special things to watch | Pass / Fail |
+| :--- | :--- | :--- | :--- | :--- |
+| PR #61-#71 | Permission-aware UX polish, route guards, backend access hardening, Playwright portability. | Smoke, Users/Roles, Events, Finance, Mobile/Amharic. | Forbidden pages must be clean; hidden buttons must not flash; driver must not see finance/admin actions. | |
+| PR #72 | Core event lifecycle closeout and read-permission reconciliation. | Events, Scheduling, Finance, Error Handling. | Event detail/workspace should open for allowed roles; completed/locked event behavior must remain intact. | |
+| PR #74-#75 | Frontend RBAC audit across proposals, profit reports, payroll, event types, and trash screens. | Users/Roles, Finance, Events, Reports. | Read-only users may view allowed data but must not see write/delete/restore buttons. | |
+| PR #88 | Reference Data setup pages and sidebar grouping. | Reference Data & Settings, Users/Roles, Mobile/Amharic. | Departments, Positions, and Offices must sit under Reference Data; delete impact warnings must block active-use records. | |
+| PR #89 | Proposal creator attribution and test isolation fixes. | Events/Proposals, Search/Filters, Users/Roles. | Proposal queue and detail must show **Proposed By**; deleted/missing users must show `Unknown user`, not crash. | |
+| Whole project regression | Any deployment to production or release candidate. | Every suite in this document. | Record browser/device, user role, and exact page where any issue occurs. | |
+
+---
+
+## 4. Test Suites (Verification Tables)
 
 ### Test Suite A: Reference Data & Settings (New)
 *Verify operational reference data CRUD features.*
@@ -138,7 +153,7 @@ Use these default credentials to log in and verify permission boundaries:
 
 ---
 
-## 4. UI Aesthetics & Responsiveness Checklist
+## 5. UI Aesthetics & Responsiveness Checklist
 
 Verify these premium design rules on any device or viewport:
 1. **High Contrast**: Text must be easily readable on dark and light backdrops. Accents use elegant luxury gold (`#D4AF37`).
@@ -148,7 +163,7 @@ Verify these premium design rules on any device or viewport:
 
 ---
 
-## 5. QA Sign-Off Table
+## 6. QA Sign-Off Table
 
 | QA Area | Tester Name | Date | Browser / Device | Result | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
