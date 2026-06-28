@@ -163,9 +163,27 @@ test.describe("Phase 5 access and UX polish", () => {
             requested_budget: 100000,
             estimated_margin_percentage: 35,
             status: "Submitted",
+            proposed_by_user_id: "user-event-manager",
+            proposed_by_name: "Tigist Haile",
+            proposed_by_username: "tigist",
+            proposed_by_email: "tigist@example.com",
+          },
+          {
+            id: "proposal-missing-user",
+            name: "Missing Creator Gala",
+            client_name: "Dream Lux Client",
+            client_phone: "+251922222222",
+            requested_start_date: "2026-08-02",
+            requested_budget: 120000,
+            estimated_margin_percentage: 28,
+            status: "Submitted",
+            proposed_by_user_id: "deleted-user",
+            proposed_by_name: null,
+            proposed_by_username: null,
+            proposed_by_email: null,
           },
         ],
-        total: 1,
+        total: 2,
         page: 1,
         limit: 10,
         totalPages: 1,
@@ -175,6 +193,8 @@ test.describe("Phase 5 access and UX polish", () => {
     await page.goto("/events/proposals");
 
     await expect(page.getByRole("link", { name: "Approval Review Gala" })).toBeVisible();
+    expect(await page.getByText("Tigist Haile").count()).toBeGreaterThan(0);
+    expect(await page.getByText("Unknown user").count()).toBeGreaterThan(0);
     await expect(page.getByRole("link", { name: /new proposal/i })).toHaveCount(0);
   });
 

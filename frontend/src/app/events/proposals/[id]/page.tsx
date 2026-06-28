@@ -33,6 +33,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Client Details": "Client Details",
     "Client Name": "Client Name",
     "Client Phone": "Client Phone",
+    "Proposed By": "Proposed By",
+    "Approved By": "Approved By",
+    "Unknown User": "Unknown user",
     "Requested Budget": "Requested Budget (Revenue)",
     "Requested Dates": "Requested Dates",
     "Venue": "Venue",
@@ -71,6 +74,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Client Details": "የደንበኛ ዝርዝሮች",
     "Client Name": "የደንበኛ ስም",
     "Client Phone": "የደንበኛ ስልክ",
+    "Proposed By": "ያቀረበው",
+    "Approved By": "ያጸደቀው",
+    "Unknown User": "ያልታወቀ ተጠቃሚ",
     "Requested Budget": "የተጠየቀ በጀት (ገቢ)",
     "Requested Dates": "የተጠየቁ ቀናት",
     "Venue": "ቦታ",
@@ -177,6 +183,16 @@ export default function ProposalDetailPage() {
 
   const proposal = data?.proposal;
   const logs = data?.logs || [];
+  const proposedBy =
+    proposal?.proposed_by_name ||
+    proposal?.proposed_by_username ||
+    proposal?.proposed_by_email ||
+    t("Unknown User");
+  const approvedBy =
+    proposal?.approved_by_name ||
+    proposal?.approved_by_username ||
+    proposal?.approved_by_email ||
+    t("Unknown User");
 
   const submitMutation = useMutation({
     mutationFn: () => submitEventProposal(id),
@@ -343,6 +359,10 @@ export default function ProposalDetailPage() {
                   <span className="font-mono font-bold">ETB {Number(proposal.requested_budget).toLocaleString()}</span>
                 </div>
                 <div>
+                  <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Proposed By")}</span>
+                  <span>{proposedBy}</span>
+                </div>
+                <div>
                   <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Venue")}</span>
                   <span>{proposal.venue_location || "-"}</span>
                 </div>
@@ -356,6 +376,12 @@ export default function ProposalDetailPage() {
                 <div>
                   <StatusBadge status={proposal.status} />
                 </div>
+                {(proposal.approved_by || proposal.approved_by_user_id || proposal.approved_at) && (
+                  <div>
+                    <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">{t("Approved By")}</span>
+                    <span>{approvedBy}</span>
+                  </div>
+                )}
               </div>
 
               {proposal.notes && (

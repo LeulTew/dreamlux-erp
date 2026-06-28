@@ -279,9 +279,21 @@ export function createEventProposalsRouter(): Router {
 
       const result = await pool.query(
         `
-          SELECT p.*, et.name AS event_type_name
+          SELECT
+            p.*,
+            et.name AS event_type_name,
+            p.created_by AS proposed_by_user_id,
+            proposer.full_name AS proposed_by_name,
+            proposer.username AS proposed_by_username,
+            proposer.email AS proposed_by_email,
+            p.approved_by AS approved_by_user_id,
+            approver.full_name AS approved_by_name,
+            approver.username AS approved_by_username,
+            approver.email AS approved_by_email
           FROM event_proposals p
           LEFT JOIN event_types et ON p.event_type_id = et.id
+          LEFT JOIN users proposer ON proposer.id = p.created_by AND proposer.deleted_at IS NULL
+          LEFT JOIN users approver ON approver.id = p.approved_by AND approver.deleted_at IS NULL
           WHERE ${whereClause}
           ${orderByClause}
           LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}
@@ -385,9 +397,21 @@ export function createEventProposalsRouter(): Router {
 
       const result = await pool.query(
         `
-          SELECT p.*, et.name AS event_type_name
+          SELECT
+            p.*,
+            et.name AS event_type_name,
+            p.created_by AS proposed_by_user_id,
+            proposer.full_name AS proposed_by_name,
+            proposer.username AS proposed_by_username,
+            proposer.email AS proposed_by_email,
+            p.approved_by AS approved_by_user_id,
+            approver.full_name AS approved_by_name,
+            approver.username AS approved_by_username,
+            approver.email AS approved_by_email
           FROM event_proposals p
           LEFT JOIN event_types et ON p.event_type_id = et.id
+          LEFT JOIN users proposer ON proposer.id = p.created_by AND proposer.deleted_at IS NULL
+          LEFT JOIN users approver ON approver.id = p.approved_by AND approver.deleted_at IS NULL
           WHERE p.id = $1 AND p.deleted_at IS NULL
         `,
         [req.params.proposalId],
