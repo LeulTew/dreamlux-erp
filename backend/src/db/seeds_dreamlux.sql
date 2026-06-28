@@ -5,27 +5,37 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 1. Insert Dream Lux Custom Roles & Permissions
 INSERT INTO roles (name, description, permissions) VALUES
+  ('SUPER_ADMIN', 'Full system access for system administration and role configuration', '{"all": true}'),
   ('OWNER', 'Owner / CEO with full system controls and financial view permissions', '{"all": true}'),
   ('OPS_MANAGER', 'Operations Manager with operational, HR, and assignment permissions', '{"hr": ["read", "write"], "assets": ["read", "write"], "events": ["read", "write", "assign"]}'),
   ('ACCOUNTANT', 'Accountant with financial, payroll, and expense approval permissions', '{"hr": ["read", "write"], "payroll": ["read", "run"], "expenses": ["approve"], "reports": ["read"]}'),
   ('EVENT_MANAGER', 'Event Manager with event creation, team visibility, and expense logging permissions', '{"events": ["read", "write"], "expenses": ["write"]}'),
-  ('INVENTORY_OFFICER', 'Inventory Officer with store management and recount permissions', '{"assets": ["read", "write", "reconcile"]}')
-ON CONFLICT (name) DO NOTHING;
+  ('INVENTORY_OFFICER', 'Inventory Officer with store management and recount permissions', '{"assets": ["read", "write", "reconcile"]}'),
+  ('INVENTORY_CONTROLLER', 'Inventory controller compatibility role with delete/reconcile access', '{"assets": ["read", "write", "reconcile", "delete"]}'),
+  ('DRIVER', 'Driver with assigned-event visibility and trip logging permissions', '{"events": ["read"], "trips": ["create"]}')
+ON CONFLICT (name) DO UPDATE SET
+  description = EXCLUDED.description,
+  permissions = EXCLUDED.permissions;
 
 -- 2. Insert Permissions & Role Mappings
 INSERT INTO permissions (slug, description) VALUES
+  ('assets:read', 'View inventory items and stats'),
+  ('assets:write', 'Create and update inventory items'),
+  ('assets:delete', 'Soft-delete inventory items'),
+  ('assets:reconcile', 'Run inventory reconciliation updates'),
   ('events:read', 'View events list and details'),
   ('events:write', 'Create and update events'),
   ('events:assign', 'Assign staff and vehicles to events'),
   ('expenses:write', 'Log event expenses'),
   ('expenses:approve', 'Approve pending event expenses'),
-  ('reports:read', 'View financial and profit reports')
+  ('reports:read', 'View financial and profit reports'),
+  ('trips:create', 'Create event trip logs and generated fuel expenses')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Map permissions to roles
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-WHERE r.name = 'OWNER' ON CONFLICT DO NOTHING;
+WHERE r.name IN ('SUPER_ADMIN', 'OWNER') ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', 'events:write', 'events:assign', 'expenses:write')
@@ -43,15 +53,33 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile')
 WHERE r.name = 'INVENTORY_OFFICER' ON CONFLICT DO NOTHING;
 
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete')
+WHERE r.name = 'INVENTORY_CONTROLLER' ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', 'trips:create')
+WHERE r.name = 'DRIVER' ON CONFLICT DO NOTHING;
+
 -- 3. Insert Initial Users
--- Password is 'Password123' for all accounts
+-- Dev/test seed password is 'Password123' for all documented local accounts.
+-- Hashes are generated at seed time; do not commit live database hashes or secrets.
 INSERT INTO users (username, password_hash, full_name, email, role_id, is_active) VALUES
+  ('admin', crypt('Password123', gen_salt('bf')), 'System Administrator', 'admin@local.erp', (SELECT id FROM roles WHERE name = 'SUPER_ADMIN'), true),
   ('ceo', crypt('Password123', gen_salt('bf')), 'Dream Lux CEO', 'owner@dreamlux.com', (SELECT id FROM roles WHERE name = 'OWNER'), true),
   ('ops', crypt('Password123', gen_salt('bf')), 'Operations Manager', 'ops@dreamlux.com', (SELECT id FROM roles WHERE name = 'OPS_MANAGER'), true),
   ('acc', crypt('Password123', gen_salt('bf')), 'Senior Accountant', 'accountant@dreamlux.com', (SELECT id FROM roles WHERE name = 'ACCOUNTANT'), true),
   ('eventmgr', crypt('Password123', gen_salt('bf')), 'Event Manager', 'events@dreamlux.com', (SELECT id FROM roles WHERE name = 'EVENT_MANAGER'), true),
-  ('inv', crypt('Password123', gen_salt('bf')), 'Inventory Officer', 'store@dreamlux.com', (SELECT id FROM roles WHERE name = 'INVENTORY_OFFICER'), true)
-ON CONFLICT (username) DO NOTHING;
+  ('inv', crypt('Password123', gen_salt('bf')), 'Inventory Officer', 'store@dreamlux.com', (SELECT id FROM roles WHERE name = 'INVENTORY_OFFICER'), true),
+  ('inventory_user', crypt('Password123', gen_salt('bf')), 'Inventory Controller', 'inventory.controller@dreamlux.com', (SELECT id FROM roles WHERE name = 'INVENTORY_CONTROLLER'), true),
+  ('driver', crypt('Password123', gen_salt('bf')), 'Selam Bekele', 'selam@dreamlux.com', (SELECT id FROM roles WHERE name = 'DRIVER'), true)
+ON CONFLICT (username) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  full_name = EXCLUDED.full_name,
+  email = EXCLUDED.email,
+  role_id = EXCLUDED.role_id,
+  is_active = TRUE,
+  updated_at = NOW();
 
 -- 4. Seed Store Locations
 INSERT INTO stores (name, is_active) VALUES

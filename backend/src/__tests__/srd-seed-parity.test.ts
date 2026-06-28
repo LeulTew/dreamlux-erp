@@ -16,6 +16,37 @@ describe("DreamLux SRD seed parity", () => {
     expect(seedSql).not.toContain("'Selam Bekele', 'EMP-2026-0002', 'Logistics', 'Driver', '0922334455', 'selam@dreamlux.com', 12000.00");
   });
 
+  test("seeds documented dev/test users without committed password hashes", () => {
+    const documentedUsers = [
+      "'admin', crypt('Password123', gen_salt('bf')), 'System Administrator', 'admin@local.erp'",
+      "'ceo', crypt('Password123', gen_salt('bf')), 'Dream Lux CEO', 'owner@dreamlux.com'",
+      "'ops', crypt('Password123', gen_salt('bf')), 'Operations Manager', 'ops@dreamlux.com'",
+      "'acc', crypt('Password123', gen_salt('bf')), 'Senior Accountant', 'accountant@dreamlux.com'",
+      "'eventmgr', crypt('Password123', gen_salt('bf')), 'Event Manager', 'events@dreamlux.com'",
+      "'inv', crypt('Password123', gen_salt('bf')), 'Inventory Officer', 'store@dreamlux.com'",
+      "'inventory_user', crypt('Password123', gen_salt('bf')), 'Inventory Controller', 'inventory.controller@dreamlux.com'",
+      "'driver', crypt('Password123', gen_salt('bf')), 'Selam Bekele', 'selam@dreamlux.com'",
+    ];
+
+    for (const user of documentedUsers) {
+      expect(seedSql).toContain(user);
+    }
+
+    expect(seedSql).toContain("ON CONFLICT (username) DO UPDATE SET");
+    expect(seedSql).toContain("password_hash = EXCLUDED.password_hash");
+    expect(seedSql).toContain("('assets:delete', 'Soft-delete inventory items')");
+    expect(seedSql).toContain("('trips:create', 'Create event trip logs and generated fuel expenses')");
+    expect(seedSql).toContain("WHERE r.name = 'DRIVER' ON CONFLICT DO NOTHING");
+    expect(seedSql).toContain("p.slug IN ('events:read', 'trips:create')");
+    expect(seedSql).not.toMatch(/\$2[aby]\$\d{2}\$/);
+  });
+
+  test("seeds driver account email to match the real Selam Bekele employee record", () => {
+    expect(seedSql).toContain("'driver', crypt('Password123', gen_salt('bf')), 'Selam Bekele', 'selam@dreamlux.com'");
+    expect(seedSql).toContain("'Selam Bekele', 'EMP-2026-0002', 'Logistics', 'Driver'");
+    expect(seedSql).toContain("'selam@dreamlux.com'");
+  });
+
   test("seeds SRD sample event and inventory table values", () => {
     expect(seedSql).toContain("Hana & Daniel Wedding");
     expect(seedSql).toContain("Hana Mohammed");

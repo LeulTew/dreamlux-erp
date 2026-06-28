@@ -7,10 +7,13 @@ Welcome to the QA Test Plan. This guide is written for non-technical QA testers 
 ## 1. Test Credentials
 
 Use these default credentials to log in and verify permission boundaries:
+- **System Administrator**: `admin` (Password: `Password123`) — Has full system administration and role configuration access in dev/test seed environments.
 - **CEO / Owner**: `ceo` (Password: `Password123`) — Has access to all reports, payroll, and settings.
 - **Accountant**: `acc` (Password: `Password123`) — Handles expense reviews and payroll runs.
 - **Inventory Manager**: `inv` (Password: `Password123`) — Manages items and location stock.
+- **Inventory Controller Alias**: `inventory_user` (Password: `Password123`) — Verifies compatibility access for inventory allocation and recount workflows.
 - **Operations Manager**: `ops` (Password: `Password123`) — Coordinates events, proposals, and staff assignments.
+- **Event Manager**: `eventmgr` (Password: `Password123`) — Verifies event lifecycle, checklist tasks, and general expense workflows.
 - **Driver**: `driver` (Password: `Password123`) — Can only view assigned trips and basic event workspaces.
 
 ---
@@ -38,6 +41,7 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | PR #74-#75 | Frontend RBAC audit across proposals, profit reports, payroll, event types, and trash screens. | Users/Roles, Finance, Events, Reports. | Read-only users may view allowed data but must not see write/delete/restore buttons. | |
 | PR #88 | Reference Data setup pages and sidebar grouping. | Reference Data & Settings, Users/Roles, Mobile/Amharic. | Departments, Positions, and Offices must sit under Reference Data; delete impact warnings must block active-use records. | |
 | PR #89 | Proposal creator attribution and test isolation fixes. | Events/Proposals, Search/Filters, Users/Roles. | Proposal queue and detail must show **Proposed By**; deleted/missing users must show `Unknown user`, not crash. | |
+| PR #91 | Seeded admin and user credential parity. | Smoke, Users/Roles, Events, Inventory, Finance, Driver BOLA. | `admin`, `driver`, `eventmgr`, and `inventory_user` must log in with `Password123`; driver must remain mapped to Selam Bekele and blocked from unrelated driver actions. | |
 | Whole project regression | Any deployment to production or release candidate. | Every suite in this document. | Record browser/device, user role, and exact page where any issue occurs. | |
 
 ---
@@ -113,6 +117,7 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | E3 | **Read-Only User** | Log in as a lower-permission user such as `driver`. Try direct URLs: `/settings/users`, `/settings/permissions`, `/hr/reports/profit`. | Access is denied; no hidden admin content flashes on screen. | |
 | E4 | **Sidebar Filtering** | Compare sidebar links for `ceo`, `ops`, `acc`, `inv`, and `driver`. | Each role sees only the modules relevant to that role. | |
 | E5 | **Session Behavior** | Log out, then use the browser back button. | Protected pages do not remain usable after logout. | |
+| E6 | **Seeded Credential Parity** | Log out and log in one-by-one as `admin`, `ceo`, `ops`, `acc`, `eventmgr`, `inv`, `inventory_user`, and `driver`, all with `Password123`. | Every documented dev/test user can log in. Role-specific sidebar and page access still match the user's role. | |
 
 ---
 
