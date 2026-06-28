@@ -66,6 +66,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Syncing: "Syncing",
     "Sync warning": "Sync warning",
     queued: "queued",
+    "Reference Data": "Reference Data",
+    Departments: "Departments",
+    Positions: "Positions",
+    Offices: "Offices",
+    "Salary Levels": "Salary Levels",
   },
   am: {
     Employees: "ሰራተኞች",
@@ -96,6 +101,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Syncing: "በማመሳሰል ላይ",
     "Sync warning": "የማመሳሰል ማስጠንቀቂያ",
     queued: "በወረፋ",
+    "Reference Data": "መሠረታዊ መረጃዎች",
+    Departments: "የሥራ ክፍሎች",
+    Positions: "የስራ መደቦች",
+    Offices: "ቢሮዎች",
+    "Salary Levels": "የደሞዝ ደረጃዎች",
   },
 };
 
@@ -312,6 +322,8 @@ export function AppSidebar() {
   const [itemsOpen, setItemsOpen] = useState(true);
   const [eventsOpen, setEventsOpen] = useState(true);
   const [financeOpen, setFinanceOpen] = useState(true);
+  const [refDataOpen, setRefDataOpen] = useState(false);
+
 
   // Sync user details reactively
   const userSnapshot = useSyncExternalStore(
@@ -382,6 +394,15 @@ export function AppSidebar() {
     { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasPermission("reports:profit:read") },
     { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
   ].filter(l => l.show);
+
+  const refDataLinks = [
+    { href: "/settings/departments", label: t("Departments"), active: pathname === "/settings/departments", show: hasPermission("departments:manage") || hasPermission("hr:read") || hasPermission("departments:read") },
+    { href: "/settings/positions", label: t("Positions"), active: pathname === "/settings/positions", show: hasPermission("positions:manage") || hasPermission("hr:read") || hasPermission("positions:read") },
+    { href: "/settings/offices", label: t("Offices"), active: pathname === "/settings/offices", show: hasPermission("offices:manage") || hasPermission("hr:read") || hasPermission("offices:read") },
+    { href: "/hr/salary-levels", label: t("Salary Levels"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
+    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasPermission("events:write") },
+  ].filter(l => l.show);
+
 
   return (
     <Sidebar
@@ -648,7 +669,71 @@ export function AppSidebar() {
                     )}
                   </SidebarMenuItem>
                 )}
+
+                {/* Reference Data dropdown */}
+                {refDataLinks.length > 0 && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    {isCollapsed ? (
+                      <CollapsedPopout
+                        icon={HiOutlineClipboardDocumentCheck}
+                        label={t("Reference Data")}
+                        isActive={isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices")}
+                        links={refDataLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
+                      />
+                    ) : (
+                      <div className="w-full">
+                        <SidebarMenuButton
+                          onClick={() => setRefDataOpen(!refDataOpen)}
+                          className={`w-full justify-between h-10 border border-transparent transition-all ${
+                            isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices")
+                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              : "rounded-xl"
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <HiOutlineClipboardDocumentCheck className={`w-[18px] h-[18px] shrink-0 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : ""}`} />
+                            <span>{t("Reference Data")}</span>
+                          </span>
+                          <span className="shrink-0">
+                            {refDataOpen ? (
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : "text-muted/60"}`} />
+                            ) : (
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : "text-muted/60"}`} />
+                            )}
+                          </span>
+                        </SidebarMenuButton>
+                        {refDataOpen && (
+                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                            {refDataLinks.map((link, idx) => (
+                              <SidebarMenuSubItem key={link.href} className="relative">
+                                <SubItemBranchLine isLast={idx === refDataLinks.length - 1} />
+                                <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
+                                  <Link
+                                    href={link.href}
+                                    className={
+                                      link.active
+                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        : "text-muted flex items-center gap-1.5"
+                                    }
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                        link.active ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                      }`}
+                                    />
+                                    <span>{link.label}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
+                        )}
+                      </div>
+                    )}
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
+
             </SidebarGroupContent>
           </SidebarGroup>
         )}

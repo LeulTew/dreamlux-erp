@@ -946,6 +946,38 @@ export const getDepartments = () =>
 export const createDepartment = (name: string) =>
   api.post("/departments", { name }).then((r) => r.data);
 
+export const updateDepartment = (id: string, name: string) =>
+  api.put(`/departments/${id}`, { name }).then((r) => r.data);
+
+export const deleteDepartment = (id: string) =>
+  api.delete(`/departments/${id}`).then((r) => r.data);
+
+// Positions
+export const getPositions = () =>
+  api.get("/positions").then((r) => r.data);
+
+export const createPosition = (name: string) =>
+  api.post("/positions", { name }).then((r) => r.data);
+
+export const updatePosition = (id: string, name: string) =>
+  api.put(`/positions/${id}`, { name }).then((r) => r.data);
+
+export const deletePosition = (id: string) =>
+  api.delete(`/positions/${id}`).then((r) => r.data);
+
+// Offices
+export const getAllOffices = () =>
+  api.get("/offices/all").then((r) => r.data);
+
+export const createOffice = (name: string, isActive = true) =>
+  api.post("/offices", { name, is_active: isActive }).then((r) => r.data);
+
+export const updateOffice = (id: string, name: string, isActive: boolean) =>
+  api.put(`/offices/${id}`, { name, is_active: isActive }).then((r) => r.data);
+
+export const deleteOffice = (id: string) =>
+  api.delete(`/offices/${id}`).then((r) => r.data);
+
 // Settings
 export const getAppSettings = () =>
   api.get("/settings").then((r) => r.data);
