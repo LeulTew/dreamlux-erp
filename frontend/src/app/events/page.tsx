@@ -129,6 +129,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save View Description": "Save your current search, filters, and sorting parameters as a saved view.",
     "View Title": "View Title",
     "Proposals": "Proposals",
+    "Trash": "Trash",
     "Logic": "Logic",
     "Filter constraints": "Manage logical filter constraints",
     "Print PDF": "Print PDF",
@@ -235,6 +236,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save View Description": "የአሁኑን ፍለጋ፣ ማጣሪያዎች እና መደርደሪያዎች እንደ የተቀመጠ እይታ ያስቀምጡ።",
     "View Title": "የእይታ ርዕስ",
     "Proposals": "ጥያቄዎች",
+    "Trash": "ቆሻሻ",
     "Logic": "ሎጂክ",
     "Filter constraints": "የማጣሪያ ቅናሾችን ያስተዳድሩ",
     "Print PDF": "PDF አትም",
@@ -455,6 +457,7 @@ function EventsPageContent() {
 
   const hasProfitAccess = hasPermission("reports:profit:read");
   const canWrite = hasPermission("events:write");
+  const canDeleteEvents = hasPermission("events:delete");
 
   // Format dates helper for quick filters
   const dateParams = useMemo(() => {
@@ -731,6 +734,15 @@ function EventsPageContent() {
             >
               {t("Proposals")}
             </Link>
+            {canDeleteEvents && (
+              <Link
+                href="/events/trash"
+                className="flex items-center gap-1.5 px-4 h-[44px] rounded-md text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border"
+              >
+                <HiTrash className="w-4 h-4 text-danger" />
+                {t("Trash")}
+              </Link>
+            )}
             {canWrite && (
               <>
                 <button

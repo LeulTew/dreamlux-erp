@@ -71,6 +71,10 @@ function canViewEventOperations(req: AuthRequest): boolean {
   return hasAnyPermission(req, ["events:write", "event_assignments:write", "vehicle_assignments:write", "events:delete", "expenses:approve"]);
 }
 
+function canDeleteEvents(req: AuthRequest): boolean {
+  return hasPermission(req, "events:delete");
+}
+
 function canLogTrips(req: AuthRequest): boolean {
   return hasPermission(req, "trips:create");
 }
@@ -1375,6 +1379,125 @@ router.get("/:id/profit", requireAuth, async (req: AuthRequest, res: Response) =
   }
 });
 
+// GET /events/trash - Deleted events visible only to users who can read events
+router.get("/trash/list", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canReadEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
+      return;
+    }
+
+    const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 10, 1), 100);
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query(`SELECT COUNT(*)::int AS count FROM events WHERE deleted_at IS NOT NULL`);
+    const result = await pool.query(
+      `
+        SELECT e.*, et.name as event_type_name, u.full_name as created_by_name
+        FROM events e
+        LEFT JOIN event_types et ON e.event_type_id = et.id
+        LEFT JOIN users u ON e.created_by = u.id
+        WHERE e.deleted_at IS NOT NULL
+        ORDER BY e.deleted_at DESC, e.updated_at DESC
+        LIMIT $1 OFFSET $2
+      `,
+      [limit, offset],
+    );
+    const events = await Promise.all(result.rows.map((event) => redactEventForPermissions(event, req)));
+    const total = Number(countResult.rows[0]?.count || 0);
+    res.json({ events, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
+  } catch (error: any) {
+    console.error("[events-trash-list] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/restore - Restore a soft-deleted event
+router.post("/:id/restore", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canDeleteEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event delete permission" });
+      return;
+    }
+
+    const { id } = req.params;
+    const result = await pool.query(
+      `UPDATE events SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND deleted_at IS NOT NULL RETURNING *`,
+      [id],
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: "Deleted event not found" });
+      return;
+    }
+
+    await insertEventAuditLog(pool, id, req.user?.id || null, "event_restored", "deleted", "active");
+    const event = await redactEventForPermissions(result.rows[0], req);
+    res.json({ event });
+  } catch (error: any) {
+    console.error("[events-restore] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// DELETE /events/:id/permanent - Hard delete only empty, already-trashed events
+router.delete("/:id/permanent", requireAuth, async (req: AuthRequest, res: Response) => {
+  if (!canDeleteEvents(req)) {
+    res.status(403).json({ error: "Forbidden: Missing event delete permission" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+    await client.query("BEGIN");
+    const eventResult = await client.query(`SELECT * FROM events WHERE id = $1 AND deleted_at IS NOT NULL FOR UPDATE`, [id]);
+    if (eventResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Deleted event not found" });
+      return;
+    }
+
+    const dependencyResult = await client.query(
+      `
+        SELECT
+          (SELECT COUNT(*)::int FROM event_assignments WHERE event_id = $1) AS assignments,
+          (SELECT COUNT(*)::int FROM vehicle_assignments WHERE event_id = $1) AS vehicle_assignments,
+          (SELECT COUNT(*)::int FROM expenses WHERE event_id = $1) AS expenses,
+          (SELECT COUNT(*)::int FROM event_allocations WHERE event_id = $1) AS allocations,
+          (SELECT COUNT(*)::int FROM event_checklist WHERE event_id = $1) AS checklist_items,
+          (SELECT COUNT(*)::int FROM event_proposals WHERE converted_event_id = $1) AS converted_proposals
+      `,
+      [id],
+    );
+    const dependencies = dependencyResult.rows[0] || {};
+    const blockingDependencies = Object.entries(dependencies)
+      .filter(([, value]) => Number(value || 0) > 0)
+      .map(([key, value]) => ({ key, count: Number(value) }));
+
+    if (blockingDependencies.length > 0) {
+      await insertEventAuditLog(client, id, req.user?.id || null, "event_permanent_delete_blocked", "trashed", JSON.stringify(blockingDependencies));
+      await client.query("COMMIT");
+      res.status(409).json({
+        error: "Event has operational history and cannot be permanently deleted",
+        dependencies: blockingDependencies,
+      });
+      return;
+    }
+
+    await client.query(`DELETE FROM events WHERE id = $1`, [id]);
+    await client.query("COMMIT");
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    console.error("[events-permanent-delete] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /events/:id - Get specific event with history logs
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
@@ -1640,6 +1763,10 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    if (!canDeleteEvents(req)) {
+      res.status(403).json({ error: "Forbidden: Missing event delete permission" });
+      return;
+    }
 
     const result = await pool.query(
       `UPDATE events SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
@@ -1651,6 +1778,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    await insertEventAuditLog(pool, id, req.user?.id || null, "event_deleted", "active", "deleted");
     res.json({ success: true });
   } catch (error: any) {
     console.error("[delete-event] Error:", error);
