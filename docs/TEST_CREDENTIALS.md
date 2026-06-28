@@ -14,9 +14,9 @@ Use the following user credentials to test the various Role-Based Access Control
 | **`acc`** | `ACCOUNTANT` | Senior Accountant | `accountant@dreamlux.com` | Expense approvals, profit dashboards, and payroll runs. |
 | **`eventmgr`** | `EVENT_MANAGER` | Event Manager | `events@dreamlux.com` | Event lifecycle, checklist tasks, and lodging general expenses. |
 | **`inv`** | `INVENTORY_OFFICER` | Inventory Officer | `store@dreamlux.com` | Store inventory, recounts, and allocating items to events. |
-| **`inventory_user`** | `INVENTORY_CONTROLLER`| Inventory Controller | — | Inventory allocations and recounts (compatible alias role). |
+| **`inventory_user`** | `INVENTORY_CONTROLLER`| Inventory Controller | `inventory.controller@dreamlux.com` | Inventory allocations and recounts (compatible alias role). |
 | **`driver`** | `DRIVER` | Selam Bekele (Driver) | `selam@dreamlux.com` | Scoped strictly to viewing assigned events and logging vehicle trips/fuel logs. |
-| **`admin`** | `SUPER_ADMIN` | System Administrator | — | Full administrative and role configuration access. |
+| **`admin`** | `SUPER_ADMIN` | System Administrator | `admin@local.erp` | Full administrative and role configuration access. |
 
 ---
 

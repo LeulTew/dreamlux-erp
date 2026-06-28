@@ -87,10 +87,16 @@ export async function ensureBootstrapAdmin(rawPassword: string): Promise<Bootstr
       if (mustSyncRole || mustActivate) {
         const updated = await client.query(
           `UPDATE users
-           SET role_id = $1, is_active = TRUE, updated_at = NOW()
-           WHERE id = $2
+           SET
+             role_id = $1,
+             password_hash = crypt($2, gen_salt('bf')),
+             full_name = 'System Administrator',
+             email = 'admin@local.erp',
+             is_active = TRUE,
+             updated_at = NOW()
+           WHERE id = $3
            RETURNING id, username, full_name, is_active`,
-          [role.id, existing.id],
+          [role.id, rawPassword, existing.id],
         );
 
         user = {
@@ -102,11 +108,23 @@ export async function ensureBootstrapAdmin(rawPassword: string): Promise<Bootstr
           permissions: role.permissions,
         };
       } else {
+        const updated = await client.query(
+          `UPDATE users
+           SET
+             password_hash = crypt($1, gen_salt('bf')),
+             full_name = 'System Administrator',
+             email = 'admin@local.erp',
+             updated_at = NOW()
+           WHERE id = $2
+           RETURNING id, username, full_name, is_active`,
+          [rawPassword, existing.id],
+        );
+
         user = {
-          id: existing.id,
-          username: existing.username,
-          full_name: existing.full_name,
-          is_active: existing.is_active,
+          id: updated.rows[0].id,
+          username: updated.rows[0].username,
+          full_name: updated.rows[0].full_name,
+          is_active: updated.rows[0].is_active,
           role_name: existing.role_name,
           permissions: normalizePermissions(existing.permissions),
         };
