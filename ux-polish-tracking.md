@@ -20,7 +20,9 @@ Local tracking note for agent continuity and zero-hallucination handoff context.
 | #25 UX polish | Closed | PRs #61-#71 merged; final #25 comment records 100% E2E portability completion. |
 | #2 Core Event Lifecycle | Closed | PR #72 merged; GitHub issue #2 body has all checklist items checked and state is closed. |
 | #73 Frontend RBAC audit | Closed | PRs #74 and #75 merged; GitHub issue #73 state is closed. |
-| Final tracker cleanup | Docs-only | This file was compacted after confirming no open #2/#73 implementation work remained. |
+| #77 Reference Data | Closed | PR #88 merged; adds Departments, Positions, and Offices setup/reference table CRUD screens. |
+| Final tracker cleanup | Docs-only | This file was compacted after confirming no open #2/#73/77 implementation work remained. |
+
 
 ## Completed Issue Ledger
 
@@ -29,6 +31,8 @@ Local tracking note for agent continuity and zero-hallucination handoff context.
 | #25 | UX polish, route guard E2E, backend hardening, Playwright portability | PRs #61-#71 merged; `bun run test`, `bun run lint`, `bun run build`, and `bun run test:e2e` passed in the final phase evidence. | Complete. No remaining local tracking items. |
 | #2 | Core event lifecycle reconciliation and closeout | PR #72 merged; event lifecycle checklist reconciled against merged child issues; issue #2 confirmed closed through GitHub. | Complete. Normalized CRM and DB-level immutability trigger remain future separate scope only if product opens a new issue. |
 | #73 | Frontend RBAC audit and multi-role UX alignment | PR #74 aligned shared frontend permission matching and proposal/profit/event gates; PR #75 tightened payroll and event-type read/write/delete gating; issue #73 confirmed closed through GitHub. | Complete. Backend remains the RBAC source of truth; frontend gates mirror backend permission slugs for UX/access polish. |
+| #77 | Reference data setup pages and sidebar grouping | PR #88 merged; unit tests and frontend build verify layout, permissions, and delete impact validation. | Complete. Departments, positions, and offices screens are now live under the Reference Data collapsible menu group. |
+
 
 ## Issue #73 Final RBAC Audit Closure
 
