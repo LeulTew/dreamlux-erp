@@ -855,6 +855,25 @@ describe("Events API", () => {
     expect(mockQuery.mock.calls[2][1]).toContain("proposal_permanent_delete_blocked");
   });
 
+  test("DELETE /events/proposals/:id/permanent removes unconverted trashed proposal", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "proposal-1", status: "Draft", converted_event_id: null, deleted_at: "2026-07-01T00:00:00.000Z" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // delete
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .delete("/events/proposals/proposal-1/permanent")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(String(mockQuery.mock.calls[2][0])).toContain("DELETE FROM event_proposals");
+    expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("proposal_permanent_deleted"))).toBe(false);
+  });
+
   test("POST /events/proposals/:id/submit moves Draft to Submitted with audit", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
     mockQuery.mockResolvedValueOnce({ rows: [{ id: "proposal-1", status: "Draft" }], rowCount: 1 }); // lock
@@ -1292,6 +1311,33 @@ describe("Events API", () => {
       { key: "converted_proposals", count: 1 },
     ]);
     expect(mockQuery.mock.calls[3][1]).toContain("event_permanent_delete_blocked");
+  });
+
+  test("DELETE /events/:id/permanent removes empty trashed event", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", deleted_at: "2026-07-01T00:00:00.000Z" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        assignments: 0,
+        vehicle_assignments: 0,
+        expenses: 0,
+        allocations: 0,
+        checklist_items: 0,
+        converted_proposals: 0,
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // delete
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .delete("/events/event-1/permanent")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(String(mockQuery.mock.calls[3][0])).toContain("DELETE FROM events");
+    expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("event_permanent_deleted"))).toBe(false);
   });
 
   // Workspace endpoint

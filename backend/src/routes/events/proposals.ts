@@ -501,7 +501,6 @@ export function createEventProposalsRouter(): Router {
         return;
       }
 
-      await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_permanent_deleted", proposal.status, null);
       await client.query(`DELETE FROM event_proposals WHERE id = $1`, [req.params.proposalId]);
       await client.query("COMMIT");
       res.json({ success: true });

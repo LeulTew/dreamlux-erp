@@ -1486,7 +1486,6 @@ router.delete("/:id/permanent", requireAuth, async (req: AuthRequest, res: Respo
       return;
     }
 
-    await insertEventAuditLog(client, id, req.user?.id || null, "event_permanent_deleted", "trashed", "deleted");
     await client.query(`DELETE FROM events WHERE id = $1`, [id]);
     await client.query("COMMIT");
     res.json({ success: true });
