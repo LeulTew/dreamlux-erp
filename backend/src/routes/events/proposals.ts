@@ -835,6 +835,17 @@ export function createEventProposalsRouter(): Router {
         });
       }
 
+      // Broadcast notification to all managers/users with events:read permission
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "events:read",
+        actor_id: req.user?.id,
+        title: "Event Converted from Proposal",
+        message: `Event "${eventResult.rows[0].name}" has been successfully converted from proposal "${proposal.name}".`,
+        entity_type: "event",
+        entity_id: eventResult.rows[0].id,
+        action_url: `/events/${eventResult.rows[0].id}`,
+      });
+
       res.status(201).json({ proposal: formatProposal(updatedProposal.rows[0]), event: eventResult.rows[0] });
     } catch (error: any) {
       await client.query("ROLLBACK");

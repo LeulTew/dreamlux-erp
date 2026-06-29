@@ -170,6 +170,7 @@ describe("Notifications API & Matrix triggers", () => {
       permissionSlug: "users:manage",
       title: "Security Change Alert",
       message: "Role permissions changed",
+      entity_type: "user",
     });
     expect(success).toBeGreaterThan(0);
   });

@@ -635,6 +635,16 @@ router.post(
 
       if (error) throw error;
 
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "assets:read",
+        actor_id: req.user?.id,
+        title: "Asset Catalog Updated",
+        message: `A new inventory item "${itemData.name}" has been added to the store catalog.`,
+        entity_type: "inventory",
+        entity_id: itemData.id,
+        action_url: `/assets`,
+      });
+
       res.status(201).json({
         ...itemData,
         image_url: getPublicUrl(itemData.image_key),
@@ -2067,6 +2077,16 @@ router.patch(
           note: `Asset "${updatedItem.name}" updated.`,
         });
 
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "assets:read",
+          actor_id: req.user?.id,
+          title: "Asset Catalog Updated",
+          message: `Inventory item "${updatedItem.name}" has been updated.`,
+          entity_type: "inventory",
+          entity_id: id,
+          action_url: `/assets`,
+        });
+
         res.json({
           ...updatedItem,
           image_url: updatedItem.image_key ? getPublicUrl(updatedItem.image_key) : null,
@@ -2476,6 +2496,16 @@ router.post(
           entity_id: persistedRunId || undefined,
           action_url: "/inventory/reconciliation",
         });
+      } else if (results.length > 0) {
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "assets:reconcile",
+          actor_id: req.user?.id,
+          title: "Inventory Recount Finalized",
+          message: `Inventory recount run (ID: ${persistedRunId || "N/A"}) completed successfully with no discrepancies detected.`,
+          entity_type: "inventory",
+          entity_id: persistedRunId || undefined,
+          action_url: "/inventory/reconciliation",
+        });
       }
 
       // Log reconciliation activity
@@ -2564,6 +2594,16 @@ router.delete(
       }
         
       if (deleteError) throw deleteError;
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "assets:read",
+        actor_id: req.user?.id,
+        title: "Asset Catalog Updated",
+        message: `Inventory item "${item.name}" has been deleted from the catalog.`,
+        entity_type: "inventory",
+        entity_id: id,
+        action_url: `/assets`,
+      });
 
       res.json({ success: true });
     } catch (error: unknown) {
