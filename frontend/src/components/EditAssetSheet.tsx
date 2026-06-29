@@ -78,13 +78,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Mark as Physically Verified": "በአካል መኖሩን አረጋግጥ",
     "Applying Audit...": "ኦዲት በማስተካከል ላይ...",
     "Reset Changes": "ለውጦችን መልስ",
-    "Changes reset": "ለውጦች ተመልሰዋል"
+    "Changes reset": "ለውጦች ተመልሰዋል",
+    "Duplicate": "Duplicate",
+    "Duplicate Asset": "Duplicate Asset",
+    "Creating duplicate of": "Creating duplicate of",
+    "Asset duplicated successfully!": "Asset duplicated successfully!",
+    "Failed to duplicate asset": "Failed to duplicate asset",
   }
 };
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { updateItem, getStores, rotateImage, deleteItem, reconcileItems } from "@/lib/api";
+import { updateItem, createItem, getStores, rotateImage, deleteItem, reconcileItems } from "@/lib/api";
 import { Item, Store } from "@/lib/types";
 import { notify } from "@/lib/toast";
 import {
@@ -93,6 +98,7 @@ import {
   HiTrash,
   HiCheckCircle,
   HiCheck,
+  HiDocumentDuplicate,
 } from "react-icons/hi2";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
@@ -118,6 +124,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
     item.image_url,
   );
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isDuplicateMode, setIsDuplicateMode] = useState(false);
 
   const handleReset = () => {
     setName(item.name);
@@ -126,12 +133,27 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
     setDescription(item.description || "");
     setImagePreview(item.image_url);
     setImageFile(null);
+    setIsDuplicateMode(false);
     notify.success(t("Changes reset"));
   };
 
   const { data: offices = [] } = useQuery<Store[]>({
     queryKey: ["offices"],
     queryFn: getStores,
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (formData: FormData) => createItem(formData),
+    onSuccess: () => {
+      notify.success("Success", t("Asset duplicated successfully!"));
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
+      onClose();
+    },
+    onError: () => {
+      notify.error("Error", t("Failed to duplicate asset"));
+    },
   });
 
   const updateMutation = useMutation({
@@ -234,7 +256,13 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
     if (imageFile) {
       formData.append("image", imageFile);
     }
-    updateMutation.mutate(formData);
+    
+    if (isDuplicateMode) {
+      formData.append("clone_from_id", item.id);
+      duplicateMutation.mutate(formData);
+    } else {
+      updateMutation.mutate(formData);
+    }
   };
 
   const isDataUrl = imagePreview?.startsWith("data:");
@@ -244,8 +272,8 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       <ResponsiveDrawer
         isOpen={true}
         onClose={onClose}
-        title={t("Edit Asset")}
-        subtitle={`${t("Updating")} ${item.name}`}
+        title={isDuplicateMode ? t("Duplicate Asset") : t("Edit Asset")}
+        subtitle={isDuplicateMode ? `${t("Creating duplicate of")} ${item.name}` : `${t("Updating")} ${item.name}`}
       >
         <form onSubmit={handleSubmit} className="space-y-6 pb-12">
           <div className="lg:grid lg:grid-cols-2 lg:gap-8 items-start">
@@ -450,31 +478,51 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
           {/* Form Actions Footer */}
           <div className="flex flex-wrap justify-between items-center gap-3 mt-8 pt-4 border-t border-border/40">
             {/* Left side: Reconcile Button */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleReconcile}
-              loading={reconcileMutation.isPending}
-              disabled={updateMutation.isPending}
-              className="h-10 px-4 rounded-xl bg-card border border-border text-foreground font-semibold text-xs uppercase tracking-wider hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2"
-            >
-              <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
-              {t("Mark as Physically Verified")}
-            </Button>
-
-            {/* Right side: Delete, Reset, Save Changes */}
-            <div className="flex items-center gap-3">
+            {!isDuplicateMode ? (
               <Button
                 type="button"
-                variant="destructive"
-                loading={deleteMutation.isPending}
-                onClick={handleDelete}
-                className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
-                title={t("Delete Asset")}
+                variant="outline"
+                onClick={handleReconcile}
+                loading={reconcileMutation.isPending}
+                disabled={updateMutation.isPending}
+                className="h-10 px-4 rounded-xl bg-card border border-border text-foreground font-semibold text-xs uppercase tracking-wider hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2"
               >
-                <HiTrash className="w-4.5 h-4.5" />
-                {t("Delete")}
+                <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
+                {t("Mark as Physically Verified")}
               </Button>
+            ) : (
+              <div />
+            )}
+
+            {/* Right side: Delete, Duplicate, Reset, Save Changes */}
+            <div className="flex items-center gap-3">
+              {!isDuplicateMode && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  loading={deleteMutation.isPending}
+                  onClick={handleDelete}
+                  className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                  title={t("Delete Asset")}
+                >
+                  <HiTrash className="w-4.5 h-4.5" />
+                  {t("Delete")}
+                </Button>
+              )}
+
+              {!isDuplicateMode && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setIsDuplicateMode(true);
+                    setName(name + " (Copy)");
+                  }}
+                  className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                >
+                  <HiDocumentDuplicate className="w-4.5 h-4.5" />
+                  {t("Duplicate")}
+                </Button>
+              )}
 
               <Button
                 type="button"
@@ -487,11 +535,11 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
 
               <Button
                 type="submit"
-                loading={updateMutation.isPending}
-                className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                loading={isDuplicateMode ? duplicateMutation.isPending : updateMutation.isPending}
+                className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-50 dark:hover:bg-indigo-200 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
               >
                 <HiCheck className="w-4.5 h-4.5" />
-                {t("Save Changes")}
+                {isDuplicateMode ? t("Duplicate Asset") : t("Save Changes")}
               </Button>
             </div>
           </div>
