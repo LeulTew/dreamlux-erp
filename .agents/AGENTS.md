@@ -74,7 +74,7 @@ These rules apply to all AI agents working in this repository.
   - `docs(<scope>): ...` for documentation changes.
   - `refactor(<scope>): ...` for code restructures.
   - `test(<scope>): ...` for adding/updating tests.
-- **GitHub Operations**: Use `gh` for issues, labels, assignment, PR creation, PR assignment, checklist updates, status checks, comments, and merges. If `gh` is unavailable, use connected GitHub tooling if present; otherwise provide exact manual commands and do not silently skip the workflow.
+- **GitHub Operations**: Use `gh` for issues, labels, assignment, PR creation, PR assignment, checklist updates, status checks, comments, and merges. ALWAYS fetch, check off, and tick all markdown checkboxes in the GitHub issue description before closing it, to prevent GitHub Actions automation from automatically reopening the issue. If `gh` is unavailable, use connected GitHub tooling if present; otherwise provide exact manual commands and do not silently skip the workflow.
 - **PR Readiness**: PRs must reference the issue, list verification commands and outcomes, and clearly separate local QA, CI, deployment, and production smoke evidence when relevant.
 - **Senior Review Before Merge**: Inspect the actual diff for scope hygiene, regressions, security, data integrity, performance, maintainability, and tests before merging. Do not rely only on issue/PR descriptions.
 - **Self-Verification Checklist**: Before completing a task, verify against:
