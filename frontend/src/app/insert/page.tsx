@@ -178,8 +178,8 @@ export default function InsertEmployeePage() {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       resetForm();
     },
-    onError: (err: AxiosError<{ error: string }>) => {
-      notify.error(t("Failed to create employee"), err.response?.data?.error);
+    onError: (err: AxiosError<{ error: string; details?: string }>) => {
+      notify.error(t("Failed to create employee"), err.response?.data?.details || err.response?.data?.error || err.message);
     },
   });
 
