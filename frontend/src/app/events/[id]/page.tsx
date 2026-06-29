@@ -22,6 +22,8 @@ import {
   HiUser,
 } from "react-icons/hi2";
 
+import ActivityDrawer from "@/components/ActivityDrawer";
+import { HiOutlineClock } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -611,6 +613,7 @@ export default function EventWorkspacePage() {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskOwner, setTaskOwner] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
 
   const { hasPermission, hasAnyPermission, user } = useAuth();
   const hasProfitAccess = hasPermission("reports:profit:read");
@@ -899,12 +902,21 @@ export default function EventWorkspacePage() {
               </div>
             </div>
           </div>
-          {event && (
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-card-alt px-3 py-2 text-xs font-bold text-foreground">
-              <span className="text-muted">{t("Status")}</span>
-              <span>{event.status}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsActivityOpen(true)}
+              className="flex items-center justify-center gap-1.5 px-3 h-[38px] rounded-lg text-xs font-black bg-card border border-border text-muted hover:text-foreground transition-all"
+            >
+              <HiOutlineClock className="w-4 h-4" />
+              <span>{t("Activity")}</span>
+            </button>
+            {event && (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-card-alt px-3 py-2 text-xs font-bold text-foreground">
+                <span className="text-muted">{t("Status")}</span>
+                <span>{event.status}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {workspaceQuery.isLoading ? (
@@ -1534,6 +1546,12 @@ export default function EventWorkspacePage() {
           </>
         )}
       </div>
+      <ActivityDrawer
+        entityType="event"
+        entityId={eventId}
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
+      />
     </AuthLayout>
   );
 }

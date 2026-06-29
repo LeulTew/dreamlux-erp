@@ -7,6 +7,7 @@ import { fromBuffer } from "file-type";
 import { supabase } from "../db/supabase";
 import { uploadImage, deleteImage, getPublicUrl } from "../storage/storage";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
+import { ActivityService } from "../services/activity-service";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
@@ -674,6 +675,15 @@ router.patch(
         throw updateError;
       }
 
+      // Log employee update activity
+      ActivityService.logActivity({
+        entity_type: "employee",
+        entity_id: id,
+        user_id: req.user?.id || null,
+        action: "update",
+        note: `Employee profile updated. Skipped columns: ${droppedColumns.join(", ") || "none"}`,
+      });
+
       res.json({
         ...updated,
         id_card_front_url: updated.id_card_front_key ? getPublicUrl(String(updated.id_card_front_key)) : null,
@@ -704,6 +714,13 @@ router.post("/:id/recover", requirePermissionSlugs(["hr:write"]), async (req: Au
       .eq("id", id);
 
     if (error) throw error;
+    ActivityService.logActivity({
+      entity_type: "employee",
+      entity_id: id,
+      user_id: req.user?.id || null,
+      action: "restore",
+      note: "Employee profile recovered from trash.",
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({
@@ -723,6 +740,13 @@ router.delete("/:id", requirePermissionSlugs(["hr:write"]), async (req: AuthRequ
       .eq("id", id);
 
     if (deleteError) throw deleteError;
+    ActivityService.logActivity({
+      entity_type: "employee",
+      entity_id: id,
+      user_id: req.user?.id || null,
+      action: "delete",
+      note: "Employee profile soft deleted.",
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({
@@ -742,6 +766,13 @@ router.delete("/:id/permanent", requirePermissionSlugs(["hr:write"]), async (req
       .eq("id", id);
 
     if (deleteError) throw deleteError;
+    ActivityService.logActivity({
+      entity_type: "employee",
+      entity_id: id,
+      user_id: req.user?.id || null,
+      action: "permanent_delete",
+      note: "Employee profile permanently deleted.",
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({

@@ -724,6 +724,15 @@ router.put("/roles/:id/permissions", async (req: AuthRequest, res: Response) => 
       entity_id: rows[0].id,
     });
 
+    // Log activity
+    ActivityService.logActivity({
+      entity_type: "role",
+      entity_id: rows[0].id,
+      user_id: req.user?.id || null,
+      action: "update_permissions",
+      note: `Permissions for role "${rows[0].name}" were updated.`,
+    });
+
     res.json(rows[0]);
   } catch (error) {
     try {
@@ -1264,6 +1273,15 @@ router.post("/", async (req: AuthRequest, res: Response) => {
             entity_type: "user",
             entity_id: data.id,
           });
+
+          // Log activity
+          ActivityService.logActivity({
+            entity_type: "user",
+            entity_id: data.id,
+            user_id: req.user?.id || null,
+            action: "create",
+            note: `User account "${data.username}" was created.`,
+          });
         }
 
         res.status(201).json(data);
@@ -1463,6 +1481,15 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
           entity_id: id,
         });
 
+        // Log activity
+        ActivityService.logActivity({
+          entity_type: "user",
+          entity_id: id,
+          user_id: req.user?.id || null,
+          action: "update",
+          note: `User account "${result.rows[0].username}" was modified.`,
+        });
+
         res.json(result.rows[0]);
         return;
       } catch (innerError) {
@@ -1560,6 +1587,15 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
           message: `User account "${data.username}" was updated by ${req.user?.username || "Someone"}.`,
           entity_type: "user",
           entity_id: id,
+        });
+
+        // Log activity
+        ActivityService.logActivity({
+          entity_type: "user",
+          entity_id: id,
+          user_id: req.user?.id || null,
+          action: "update",
+          note: `User account "${data.username}" was modified.`,
         });
 
         res.json(data);

@@ -8,6 +8,7 @@ import { supabase } from "../db/supabase";
 import { uploadImage, deleteImage, getPublicUrl, downloadImage } from "../storage/storage";
 import { AuthRequest, requirePermissions, requireAuth } from "../middleware/auth";
 import { NotificationsService } from "../services/notifications-service";
+import { ActivityService } from "../services/activity-service";
 import {
   createItemSchema,
   updateItemSchema,
@@ -2039,6 +2040,15 @@ router.patch(
           }
         }
         
+        // Log asset activity
+        ActivityService.logActivity({
+          entity_type: "asset",
+          entity_id: id,
+          user_id: req.user?.id || null,
+          action: "update",
+          note: `Asset "${updatedItem.name}" updated.`,
+        });
+
         res.json({
           ...updatedItem,
           image_url: updatedItem.image_key ? getPublicUrl(updatedItem.image_key) : null,
@@ -2449,6 +2459,15 @@ router.post(
           action_url: "/inventory/reconciliation",
         });
       }
+
+      // Log reconciliation activity
+      ActivityService.logActivity({
+        entity_type: "asset",
+        entity_id: persistedRunId || "00000000-0000-0000-0000-000000000000",
+        user_id: req.user?.id || null,
+        action: "reconcile",
+        note: `Bulk recount reconciliation run committed. ${changedRows} items modified. Total delta: ${totalDelta}.`,
+      });
 
       res.json({
         success: true,

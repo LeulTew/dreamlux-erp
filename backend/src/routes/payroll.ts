@@ -6,6 +6,7 @@ import { getPublicUrl } from "../storage/storage";
 import { buildPayrollLines, toPayrollEventPayloads, toPayrollLinePayloads } from "../lib/payroll-generation";
 import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
 import { NotificationsService } from "../services/notifications-service";
+import { ActivityService } from "../services/activity-service";
 import { hasPermissionSlug } from "../lib/permissions";
 
 const router = express.Router();
@@ -342,6 +343,15 @@ router.patch("/runs/:id/status", async (req: AuthRequest, res) => {
         action_url: "/payroll",
       });
     }
+
+    // Log payroll activity
+    ActivityService.logActivity({
+      entity_type: "payroll",
+      entity_id: id,
+      user_id: req.user?.id || null,
+      action: "update_status",
+      note: `Payroll run status changed to "${mappedStatus}".`,
+    });
 
     res.json({ ...data, status: toApiStatus(data.status) });
   } catch (error) {

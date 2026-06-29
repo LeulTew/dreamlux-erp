@@ -26,6 +26,8 @@ import {
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ActivityDrawer from "@/components/ActivityDrawer";
+import { HiOutlineClock } from "react-icons/hi2";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -67,7 +69,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Print Proposal": "Print / PDF",
     "Back": "Back to Proposals",
     "Linked Event": "Linked Event",
-    "Open Event Workspace": "Open Event Workspace"
+    "Open Event Workspace": "Open Event Workspace",
+    "Activity": "Activity Timeline"
   },
   am: {
     "Proposal Details": "የፕሮፖዛል ዝርዝሮች",
@@ -108,7 +111,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Print Proposal": "ሪፖርት አትም",
     "Back": "ወደ ፕሮፖዛሎች ተመለስ",
     "Linked Event": "የተያያዘ ዝግጅት",
-    "Open Event Workspace": "የዝግጅቱን ቦርድ ክፈት"
+    "Open Event Workspace": "የዝግጅቱን ቦርድ ክፈት",
+    "Activity": "የእንቅስቃሴ ታሪክ"
   }
 };
 
@@ -122,6 +126,7 @@ export default function ProposalDetailPage() {
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [isConvertOpen, setIsConvertOpen] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [actionError, setActionError] = useState("");
   const rejectDialogRef = useRef<HTMLFormElement>(null);
   const convertDialogRef = useRef<HTMLDivElement>(null);
@@ -323,13 +328,22 @@ export default function ProposalDetailPage() {
             </div>
           </div>
 
-          <button
-            onClick={handlePrint}
-            className="no-print flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-card border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
-          >
-            <HiPrinter className="w-4 h-4" />
-            {t("Print Proposal")}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsActivityOpen(true)}
+              className="no-print flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-card border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
+            >
+              <HiOutlineClock className="w-4 h-4" />
+              {t("Activity")}
+            </button>
+            <button
+              onClick={handlePrint}
+              className="no-print flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-card border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
+            >
+              <HiPrinter className="w-4 h-4" />
+              {t("Print Proposal")}
+            </button>
+          </div>
         </header>
 
         {/* Primary layout */}
@@ -697,6 +711,12 @@ export default function ProposalDetailPage() {
           </div>
         </div>
       )}
+      <ActivityDrawer
+        entityType="proposal"
+        entityId={id}
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
+      />
     </AuthLayout>
   );
 }
