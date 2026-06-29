@@ -41,6 +41,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Expenses: "Expenses",
     Payroll: "Payroll",
     Inventory: "Inventory & Discrepancies",
+    Employees: "Employees",
+    "System Settings & Reference Data": "System Settings & Reference Data",
     "Save Preferences": "Save Preferences",
     "Preferences Saved Successfully": "Notification preferences updated successfully.",
     "All Alerts": "All Alerts",
@@ -67,6 +69,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Expenses: "ወጪዎች",
     Payroll: "ደመወዝ",
     Inventory: "ንብረት እና የቆጠራ ግድፈቶች",
+    Employees: "ሰራተኞች",
+    "System Settings & Reference Data": "የስርዓት ቅንብሮች እና ማመሳከሪያ መረጃዎች",
     "Save Preferences": "ቅንብሮችን አስቀምጥ",
     "Preferences Saved Successfully": "የማሳወቂያ ምርጫዎች በተሳካ ሁኔታ ተዘምነዋል።",
     "All Alerts": "ሁሉም ማንቂያዎች",
@@ -144,6 +148,8 @@ export default function NotificationsPage() {
           expenses: true,
           payroll: true,
           inventory: true,
+          employees: true,
+          settings: true,
         },
       });
     }
@@ -529,13 +535,24 @@ export default function NotificationsPage() {
                   />
                 </label>
 
-                {/* Inventory */}
+                {/* Employees */}
                 <label className="flex items-center justify-between cursor-pointer border-t border-border/40 pt-3 p-1">
-                  <span className="text-xs font-semibold text-foreground">{t("Inventory")}</span>
+                  <span className="text-xs font-semibold text-foreground">{t("Employees")}</span>
                   <input
                     type="checkbox"
-                    checked={localPrefs.categories.inventory}
-                    onChange={() => handleToggleCategory("inventory")}
+                    checked={localPrefs.categories.employees ?? true}
+                    onChange={() => handleToggleCategory("employees")}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary accent-primary"
+                  />
+                </label>
+
+                {/* Settings & Reference Data */}
+                <label className="flex items-center justify-between cursor-pointer border-t border-border/40 pt-3 p-1">
+                  <span className="text-xs font-semibold text-foreground">{t("System Settings & Reference Data")}</span>
+                  <input
+                    type="checkbox"
+                    checked={localPrefs.categories.settings ?? true}
+                    onChange={() => handleToggleCategory("settings")}
                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary accent-primary"
                   />
                 </label>
