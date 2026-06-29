@@ -1,6 +1,6 @@
 "use client";
 
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { PremiumToast } from "@/components/ui/PremiumToast";
 
 export default function ToastTestSupportPage() {

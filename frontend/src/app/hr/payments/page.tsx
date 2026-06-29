@@ -9,7 +9,7 @@ import { HiClock, HiOutlineChevronRight, HiPencilSquare, HiPrinter, HiArrowUturn
 import { Suspense, useEffect, useMemo, useState } from "react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
 import { FancyButton } from "@/components/ui/FancyButton";
 import StatusBadge from "@/components/ui/StatusBadge";

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { HiLockClosed, HiUser, HiEye, HiEyeSlash } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 

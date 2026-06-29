@@ -8,7 +8,7 @@ import { Store } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import { useAuth } from "@/hooks/useAuth";
 import ForbiddenState from "@/components/ForbiddenState";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { HiCamera, HiXMark, HiPhoto, HiChevronLeft } from "react-icons/hi2";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";

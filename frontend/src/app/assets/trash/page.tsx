@@ -14,7 +14,7 @@ import { Item, ItemsResponse, Store } from "@/lib/types";
 import { HiArrowLeft, HiMiniArrowUturnLeft, HiTrash } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import DatePicker from "@/components/ui/DatePicker";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
 
 const ITEMS_PER_PAGE = 10;

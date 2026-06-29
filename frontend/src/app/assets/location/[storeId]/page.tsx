@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import PaginationControls from "@/components/PaginationControls";
 import MobileAssetCard from "@/components/MobileAssetCard";
 import ImageCell from "@/components/ImageCell";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 
 export default function LocationDrilldownPage() {
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();

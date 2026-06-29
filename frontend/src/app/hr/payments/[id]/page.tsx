@@ -11,7 +11,7 @@ import { useState } from "react";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";

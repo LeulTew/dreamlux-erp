@@ -6,7 +6,7 @@ import { HiPlus } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPositions, createPosition, updatePosition, deletePosition } from "@/lib/api";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";

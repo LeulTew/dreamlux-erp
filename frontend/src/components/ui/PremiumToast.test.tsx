@@ -4,10 +4,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { PremiumToast } from "./PremiumToast";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 
 // Mock toast.dismiss
-vi.mock("react-hot-toast", async (importOriginal) => {
+vi.mock("@/lib/toast", async (importOriginal) => {
   const original = await importOriginal<typeof import("react-hot-toast")>();
   return {
     ...original,

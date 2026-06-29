@@ -10,7 +10,7 @@ import { EventProposal } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { HiArrowLeft, HiArrowPath, HiTrash } from "react-icons/hi2";
 import StatusBadge from "@/components/ui/StatusBadge";
 

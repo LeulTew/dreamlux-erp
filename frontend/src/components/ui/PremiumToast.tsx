@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import toast, { Toast } from "react-hot-toast";
+import toast from "@/lib/toast";
 import {
   HiOutlineCheckCircle,
   HiOutlineXCircle,
@@ -9,8 +9,14 @@ import {
   HiChevronDown,
 } from "react-icons/hi2";
 
+interface CompatToast {
+  id: string | number;
+  visible?: boolean;
+  duration?: number;
+}
+
 interface PremiumToastProps {
-  t: Toast;
+  t: CompatToast;
   title: string;
   description?: string;
   type: "success" | "error" | "info";

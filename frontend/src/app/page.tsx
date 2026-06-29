@@ -31,7 +31,7 @@ import EditEmployeeSheet from "@/components/EditEmployeeSheet";
 import PaginationControls from "@/components/PaginationControls";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
 import { AnimatePresence, motion } from "framer-motion";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { useLanguage } from "@/hooks/use-language";
 import { SortableHeader } from "@/components/ui/SortableHeader";

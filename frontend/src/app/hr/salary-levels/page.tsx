@@ -8,7 +8,7 @@ import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSalaryLevels, createSalaryLevel, updateSalaryLevel, deleteSalaryLevel, getSalaryLevelDeleteImpact } from "@/lib/api";
 import { SalaryLevel } from "@/lib/types";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";

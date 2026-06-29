@@ -340,6 +340,7 @@ export default function InsertEmployeePage() {
       }
     });
 
+    createMutation.mutate(fd);
   };
 
   if (authLoading) {

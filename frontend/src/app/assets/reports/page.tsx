@@ -32,7 +32,7 @@ import {
   Line,
 } from "recharts";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
 import { useLanguage } from "@/hooks/use-language";
 

@@ -7,7 +7,7 @@ import { HiArrowUturnLeft, HiTrash, HiCurrencyDollar } from "react-icons/hi2";
 import { useState } from "react";
 import Link from "next/link";
 import AuthLayout from "@/components/AuthLayout";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";

@@ -1,7 +1,47 @@
 "use client";
 import React from "react";
-import toast from "react-hot-toast";
+import { toast as sonnerToast } from "sonner";
 import { PremiumToast } from "@/components/ui/PremiumToast";
+
+export interface CompatToast {
+  id: string | number;
+  visible?: boolean;
+  duration?: number;
+}
+
+const toast = {
+  custom: (
+    renderFn: (t: CompatToast) => React.ReactNode,
+    options?: { duration?: number }
+  ) => {
+    const duration = options?.duration ?? 4000;
+    return sonnerToast.custom(
+      (id) => renderFn({ id, visible: true, duration }),
+      { duration }
+    );
+  },
+  success: (message: string, description?: string | any) => {
+    if (typeof description === "string") {
+      return sonnerToast.success(message, { description });
+    }
+    return sonnerToast.success(message, description);
+  },
+  error: (message: string, description?: string | any) => {
+    if (typeof description === "string") {
+      return sonnerToast.error(message, { description });
+    }
+    return sonnerToast.error(message, description);
+  },
+  info: (message: string, description?: string | any) => {
+    if (typeof description === "string") {
+      return sonnerToast.info(message, { description });
+    }
+    return sonnerToast.info(message, description);
+  },
+  dismiss: (id?: string | number) => {
+    return sonnerToast.dismiss(id);
+  }
+};
 
 export const notify = {
   success: (title: string, description?: string, actionLabel?: string, onAction?: () => void) => {
@@ -20,3 +60,5 @@ export const notify = {
     ), { duration: actionLabel ? 12000 : 4000 });
   },
 };
+
+export default toast;

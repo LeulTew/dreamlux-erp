@@ -32,5 +32,8 @@
     "backup": "bun run backup:storage && bun run backup:db",
     "seed:demo": "bun run --cwd backend ../scripts/seed-demo.ts",
     "ping:db": "bun run --cwd backend src/db/keep-alive.ts"
+  },
+  "dependencies": {
+    "sonner": "^2.0.7"
   }
 }

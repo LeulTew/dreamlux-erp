@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { HiPlus, HiXMark, HiAdjustmentsHorizontal, HiTrash } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import Select from "./ui/Select";
 
 export type FilterOperator = "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "between";

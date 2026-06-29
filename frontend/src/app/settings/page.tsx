@@ -30,7 +30,7 @@ import {
   normalizeEthiopianPhone,
   UserFormState,
 } from "@/components/settings/user-form-utils";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import {
   HiArrowLeft,
   HiArrowPath,

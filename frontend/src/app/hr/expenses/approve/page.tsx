@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { HiCheck, HiXMark, HiClipboardDocumentList, HiChevronDown } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
 

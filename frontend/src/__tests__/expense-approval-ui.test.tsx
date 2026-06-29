@@ -160,7 +160,7 @@ vi.mock("@/lib/api", () => ({
 // Mock hot-toast
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
-vi.mock("react-hot-toast", () => ({
+vi.mock("@/lib/toast", () => ({
   default: {
     success: (msg: string) => mockToastSuccess(msg),
     error: (msg: string) => mockToastError(msg),

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import {
   HiArrowLeft,
   HiCalendarDays,

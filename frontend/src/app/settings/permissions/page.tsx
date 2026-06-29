@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import {
   HiShieldCheck,
   HiArrowLeft,

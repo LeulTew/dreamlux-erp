@@ -44,7 +44,7 @@ import {
 } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import { fuzzySearch } from "@/lib/fuzzy-search";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { findRunForPeriod } from "@/utils/payroll-period";
 import { useLanguage } from "@/hooks/use-language";
 import ForbiddenState from "@/components/ForbiddenState";

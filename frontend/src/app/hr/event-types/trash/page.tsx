@@ -5,7 +5,7 @@ import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getEventTypesTrash, restoreEventType, deleteEventTypePermanent } from "@/lib/api";
 import { EventType } from "@/lib/types";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import Link from "next/link";
 import { HiArrowLeft } from "react-icons/hi2";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";

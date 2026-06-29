@@ -34,7 +34,7 @@ import PaginationControls from "@/components/PaginationControls";
 import AdvancedStatsDashboard from "@/components/AdvancedStatsDashboard";
 import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
 import { useAuth } from "@/hooks/useAuth";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { fuzzySearch } from "@/lib/fuzzy-search";
 import { useLanguage } from "@/hooks/use-language";
 import { SortableHeader } from "@/components/ui/SortableHeader";
@@ -588,6 +588,7 @@ function AssetsContent() {
     mutationFn: (id: string) => deleteItem(id),
     onSuccess: () => {
       toast.success("Asset deleted");
+      setItemToDelete(null);
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });

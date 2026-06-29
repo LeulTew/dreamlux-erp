@@ -4,7 +4,7 @@ import React from "react";
 import { EventType } from "@/lib/types";
 import { HiOutlineTrash, HiPencilSquare, HiCheck, HiXMark } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {

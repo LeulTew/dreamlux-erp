@@ -18,7 +18,7 @@ import {
   HiMagnifyingGlass,
 } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { motion, AnimatePresence } from "framer-motion";
 import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";

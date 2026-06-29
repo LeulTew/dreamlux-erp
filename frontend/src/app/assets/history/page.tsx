@@ -20,7 +20,7 @@ import {
 } from "@/lib/api";
 import { ReconcileRun, ReconcileRunDetail, Store } from "@/lib/types";
 import { fuzzySearch } from "@/lib/fuzzy-search";
-import toast from "react-hot-toast";
+import toast from "@/lib/toast";
 import { 
   HiChevronLeft, 
   HiClock, 
