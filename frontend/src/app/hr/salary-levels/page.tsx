@@ -288,6 +288,11 @@ function SalaryLevelsContent() {
                           setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }} className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">{t("Edit")}</button>
+                        <button onClick={() => {
+                          setForm({ id: undefined, level_name: lvl.level_name + " (Copy)", base_salary: lvl.base_salary.toString() });
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                          toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ ደረጃ አክል የሚለውን ይጫኑ" : "Prefilled duplicate; click Add Level to save");
+                        }} className="text-xs font-semibold tracking-wider text-amber-500 hover:text-amber-600 outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-amber-500/20">{t("Duplicate")}</button>
                         <button onClick={() => setDeleteId(lvl.id)} className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">{t("Delete")}</button>
                       </td>
                     </tr>
