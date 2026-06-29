@@ -240,8 +240,8 @@ function SalaryLevelsContent() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-card rounded-2xl 2xl:rounded-4xl shadow-premium border border-border overflow-hidden p-2">
-            <table className="w-full text-left text-sm border-separate border-spacing-0">
+          <div className="bg-card rounded-2xl 2xl:rounded-4xl shadow-premium border border-border overflow-hidden">
+            <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="bg-muted/30">
                   <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Level Name")}</th>
