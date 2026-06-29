@@ -535,6 +535,17 @@ export default function NotificationsPage() {
                   />
                 </label>
 
+                {/* Inventory */}
+                <label className="flex items-center justify-between cursor-pointer border-t border-border/40 pt-3 p-1">
+                  <span className="text-xs font-semibold text-foreground">{t("Inventory")}</span>
+                  <input
+                    type="checkbox"
+                    checked={localPrefs.categories.inventory}
+                    onChange={() => handleToggleCategory("inventory")}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary accent-primary"
+                  />
+                </label>
+
                 {/* Employees */}
                 <label className="flex items-center justify-between cursor-pointer border-t border-border/40 pt-3 p-1">
                   <span className="text-xs font-semibold text-foreground">{t("Employees")}</span>
