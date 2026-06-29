@@ -32,6 +32,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Active": "Active",
     "Inactive": "Inactive",
     "Status Option": "Active Status",
+    "Duplicate": "Duplicate",
   },
   am: {
     "Office Setup": "የቢሮ ዝግጅት",
@@ -51,6 +52,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Active": "አክቲቭ",
     "Inactive": "ኢንአክቲቭ",
     "Status Option": "የአክቲቭ ሁኔታ",
+    "Duplicate": "ቅጂ ፍጠር",
   }
 };
 
@@ -321,6 +323,16 @@ function OfficesContent() {
                             className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20"
                           >
                             {t("Edit")}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setForm({ id: undefined, name: off.name + " (Copy)", is_active: off.is_active });
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                              toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ ቢሮ ጨምር የሚለውን ይጫኑ" : "Prefilled duplicate; click Add Office to save");
+                            }}
+                            className="text-xs font-semibold tracking-wider text-amber-500 hover:text-amber-600 outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-amber-500/20"
+                          >
+                            {t("Duplicate")}
                           </button>
                           <button
                             onClick={() => setDeleteId(off.id)}

@@ -28,6 +28,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete": "Delete",
     "Delete Department": "Delete Department",
     "Are you sure you want to delete this department?": "Are you sure you want to delete this department? This operation cannot be undone if no employees are using it.",
+    "Duplicate": "Duplicate",
   },
   am: {
     "Department Setup": "የክፍል ዝግጅት",
@@ -43,6 +44,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete": "ሰርዝ",
     "Delete Department": "ክፍል ሰርዝ",
     "Are you sure you want to delete this department?": "ይህንን ክፍል ለመሰረዝ እርግጠኛ ነዎት? ይህንን ክፍል የሚጠቀሙ ሰራተኞች ከሌሉ ድርጊቱ የማይመለስ ይሆናል።",
+    "Duplicate": "ቅጂ ፍጠር",
   }
 };
 
@@ -282,6 +284,16 @@ function DepartmentsContent() {
                             className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20"
                           >
                             {t("Edit")}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setForm({ id: undefined, name: dept.name + " (Copy)" });
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                              toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ ክፍል ጨምር የሚለውን ይጫኑ" : "Prefilled duplicate; click Add Department to save");
+                            }}
+                            className="text-xs font-semibold tracking-wider text-amber-500 hover:text-amber-600 outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-amber-500/20"
+                          >
+                            {t("Duplicate")}
                           </button>
                           <button
                             onClick={() => setDeleteId(dept.id)}

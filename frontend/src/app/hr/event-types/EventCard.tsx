@@ -2,7 +2,7 @@
 
 import React from "react";
 import { EventType } from "@/lib/types";
-import { HiOutlineTrash, HiPencilSquare, HiCheck, HiXMark } from "react-icons/hi2";
+import { HiOutlineTrash, HiPencilSquare, HiCheck, HiXMark, HiDocumentDuplicate } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
@@ -13,14 +13,16 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Name": "Event Name",
     "Description": "Description",
     "Optional description...": "Optional description...",
-    "SAVE": "SAVE"
+    "SAVE": "SAVE",
+    "Duplicate": "Duplicate"
   },
   am: {
     "Metadata": "ተጨማሪ መረጃ",
     "Event Name": "የክስተት ስም",
     "Description": "መግለጫ",
     "Optional description...": "አማራጭ መግለጫ...",
-    "SAVE": "አስቀምጥ"
+    "SAVE": "አስቀምጥ",
+    "Duplicate": "ቅጂ ፍጠር"
   }
 };
 
@@ -28,6 +30,7 @@ interface EventCardProps {
   event: EventType;
   onUpdate: (id: string, data: Partial<EventType>) => Promise<void>;
   onDelete?: (id: string) => void;
+  onDuplicate?: (event: EventType) => void;
   isUpdating: boolean;
   isEditing: boolean;
   onEditStateChange: (config: { isEditing: boolean }) => void;
@@ -37,6 +40,7 @@ export default function EventCard({
   event, 
   onUpdate, 
   onDelete,
+  onDuplicate,
   isUpdating,
   isEditing,
   onEditStateChange 
@@ -106,6 +110,16 @@ export default function EventCard({
                   {t("Metadata")}
                 </div>
                 <div className="flex gap-3">
+                  {onDuplicate && (
+                    <button 
+                      onClick={() => onDuplicate(event)} 
+                      aria-label="Duplicate"
+                      title={t("Duplicate")}
+                      className="p-3 bg-amber-500/10 rounded-xl text-amber-500 hover:bg-amber-50 hover:text-white transition-all active:scale-90"
+                    >
+                      <HiDocumentDuplicate className="w-5 h-5" />
+                    </button>
+                  )}
                   <button 
                     onClick={() => onEditStateChange({ isEditing: true })} 
                     aria-label="Edit"

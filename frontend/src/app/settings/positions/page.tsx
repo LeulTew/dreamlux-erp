@@ -28,6 +28,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete": "Delete",
     "Delete Position": "Delete Position",
     "Are you sure you want to delete this position?": "Are you sure you want to delete this position? This operation cannot be undone if no employees are currently assigned to it.",
+    "Duplicate": "Duplicate",
   },
   am: {
     "Position Setup": "የስራ መደብ ዝግጅት",
@@ -43,6 +44,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete": "ሰርዝ",
     "Delete Position": "የስራ መደብ ሰርዝ",
     "Are you sure you want to delete this position?": "ይህንን የስራ መደብ ለመሰረዝ እርግጠኛ ነዎት? ይህንን የስራ መደብ ላይ የተመደቡ ሰራተኞች ከሌሉ ድርጊቱ የማይመለስ ይሆናል።",
+    "Duplicate": "ቅጂ ፍጠር",
   }
 };
 
@@ -282,6 +284,16 @@ function PositionsContent() {
                             className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20"
                           >
                             {t("Edit")}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setForm({ id: undefined, name: pos.name + " (Copy)" });
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                              toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ መደብ ጨምር የሚለውን ይጫኑ" : "Prefilled duplicate; click Add Position to save");
+                            }}
+                            className="text-xs font-semibold tracking-wider text-amber-500 hover:text-amber-600 outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-amber-500/20"
+                          >
+                            {t("Duplicate")}
                           </button>
                           <button
                             onClick={() => setDeleteId(pos.id)}

@@ -302,6 +302,15 @@ export default function EventTypesPage() {
                       event={event}
                       onUpdate={(id, data) => updateMut.mutateAsync({ id, data })}
                       onDelete={hasEventDeleteAccess ? (id) => setDeleteId(id) : undefined}
+                      onDuplicate={(evt) => {
+                        setForm({
+                          event_name: evt.event_name + " (Copy)",
+                          description: evt.description || ""
+                        });
+                        setShowAddForm(true);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                        toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ ክስተት ፍጠር የሚለውን ይጫኑ" : "Prefilled duplicate; click Create Event to save");
+                      }}
                       isUpdating={updateMut.isPending}
                       isEditing={editingConfigs[event.id]?.isEditing || false}
                       onEditStateChange={(config) => handleEditStateChange(event.id, config)}
