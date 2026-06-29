@@ -345,7 +345,7 @@ function ExpenseApprovalContent() {
               onClick={() => handleTabChange("pending")}
               className={cn(
                 "px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 select-none cursor-pointer",
-                activeTab === "pending" ? "bg-amber-500 text-black shadow-sm" : "text-neutral-400 hover:text-white"
+                activeTab === "pending" ? "bg-amber-500 text-white shadow-sm" : "text-neutral-400 hover:text-white"
               )}
             >
               {t("Pending Queue")}
@@ -354,7 +354,7 @@ function ExpenseApprovalContent() {
               onClick={() => handleTabChange("history")}
               className={cn(
                 "px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 select-none cursor-pointer",
-                activeTab === "history" ? "bg-amber-500 text-black shadow-sm" : "text-neutral-400 hover:text-white"
+                activeTab === "history" ? "bg-amber-500 text-white shadow-sm" : "text-neutral-400 hover:text-white"
               )}
             >
               {t("History")}

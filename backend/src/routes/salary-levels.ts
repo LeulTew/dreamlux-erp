@@ -1,6 +1,7 @@
 import express from "express";
 import { supabase } from "../db/supabase";
 import { createSalaryLevelSchema, updateSalaryLevelSchema } from "../lib/validation";
+import { NotificationsService } from "../services/notifications-service";
 
 const router = express.Router();
 
@@ -156,11 +157,19 @@ router.post("/", async (req, res) => {
       .insert({ code: level_name, amount_etb: base_salary })
       .select()
       .single();
-
     if (error) {
       console.error("Error creating salary level:", error);
       return res.status(500).json({ error: error.message });
     }
+
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: (req as any).user?.id,
+      title: "Salary Level Created",
+      message: `Salary Level "${data.code}" has been created.`,
+      entity_type: "settings",
+      entity_id: data.id,
+    });
 
     res.status(201).json(toApiShape(data));
   } catch (error) {
@@ -210,6 +219,15 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Salary level not found" });
     }
 
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: (req as any).user?.id,
+      title: "Salary Level Updated",
+      message: `Salary Level "${data.code}" has been updated.`,
+      entity_type: "settings",
+      entity_id: data.id,
+    });
+
     res.json(toApiShape(data));
   } catch (error) {
     console.error("Error updating salary level:", error);
@@ -238,6 +256,15 @@ router.delete("/:id", async (req, res) => {
     if (!data) {
       return res.status(404).json({ error: "Salary level not found" });
     }
+
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: (req as any).user?.id,
+      title: "Salary Level Deleted",
+      message: `Salary Level "${data.code}" has been deleted.`,
+      entity_type: "settings",
+      entity_id: id,
+    });
 
     res.json({ message: "Salary level deleted successfully" });
   } catch (error) {

@@ -736,6 +736,15 @@ router.patch(
         note: `Employee profile updated. Skipped columns: ${droppedColumns.join(", ") || "none"}`,
       });
 
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "employees:read",
+        actor_id: req.user?.id,
+        title: "Employee Profile Updated",
+        message: `Employee "${updated.full_name}" profile has been updated.`,
+        entity_type: "employee",
+        entity_id: id,
+      });
+
       res.json({
         ...updated,
         id_card_front_url: updated.id_card_front_key ? getPublicUrl(String(updated.id_card_front_key)) : null,

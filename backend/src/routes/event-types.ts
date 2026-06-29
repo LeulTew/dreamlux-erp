@@ -2,6 +2,7 @@ import express from "express";
 import { supabase } from "../db/supabase";
 import { createEventTypeSchema, updateEventTypeSchema } from "../lib/validation";
 import { requirePermissionSlugs, AuthRequest } from "../middleware/auth";
+import { NotificationsService } from "../services/notifications-service";
 
 const router = express.Router();
 
@@ -98,6 +99,15 @@ router.post("/", requirePermissionSlugs(["events:write"]), async (req: AuthReque
       return res.status(500).json({ error: error.message });
     }
 
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: req.user?.id,
+      title: "Event Type Created",
+      message: `Event Type "${data.name}" has been created.`,
+      entity_type: "settings",
+      entity_id: data.id,
+    });
+
     res.status(201).json(toApiShape(data));
   } catch (error) {
     console.error("Error creating event type:", error);
@@ -145,6 +155,15 @@ router.put("/:id", requirePermissionSlugs(["events:write"]), async (req: AuthReq
       return res.status(404).json({ error: "Event type not found" });
     }
 
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: req.user?.id,
+      title: "Event Type Updated",
+      message: `Event Type "${data.name}" has been updated.`,
+      entity_type: "settings",
+      entity_id: data.id,
+    });
+
     res.json(toApiShape(data));
   } catch (error) {
     console.error("Error updating event type:", error);
@@ -173,6 +192,15 @@ router.delete("/:id", requirePermissionSlugs(["events:delete"]), async (req: Aut
     if (!data) {
       return res.status(404).json({ error: "Event type not found" });
     }
+
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: req.user?.id,
+      title: "Event Type Deleted",
+      message: `Event Type "${data.name}" has been deleted.`,
+      entity_type: "settings",
+      entity_id: id,
+    });
 
     res.json({ message: "Event type deleted successfully" });
   } catch (error) {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase } from "../db/supabase";
 import { requirePermissionSlugs, AuthRequest } from "../middleware/auth";
 import { Response } from "express";
+import { NotificationsService } from "../services/notifications-service";
 
 const router = Router();
 
@@ -40,6 +41,16 @@ router.post(
       if (error.code === "23505") return res.status(400).json({ error: "Department already exists" });
       return res.status(500).json({ error: error.message });
     }
+
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: req.user?.id,
+      title: "Department Created",
+      message: `Department "${data.name}" has been created.`,
+      entity_type: "settings",
+      entity_id: data.id,
+    });
+
     res.status(201).json(data);
   }
 );
@@ -68,6 +79,16 @@ router.put(
     }
 
     if (!data) return res.status(404).json({ error: "Department not found" });
+
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: req.user?.id,
+      title: "Department Updated",
+      message: `Department "${data.name}" has been updated.`,
+      entity_type: "settings",
+      entity_id: data.id,
+    });
+
     res.json(data);
   }
 );
@@ -105,6 +126,15 @@ router.delete(
 
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: "Department not found" });
+
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "settings:write",
+      actor_id: req.user?.id,
+      title: "Department Deleted",
+      message: `Department "${data.name}" has been deleted.`,
+      entity_type: "settings",
+      entity_id: id,
+    });
 
     res.json({ message: "Department deleted successfully", department: data });
   }

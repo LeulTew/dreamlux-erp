@@ -279,7 +279,7 @@ export default function NotificationsPage() {
                 onClick={() => setUnreadOnly(false)}
                 className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   !unreadOnly
-                    ? "bg-primary border-primary text-black"
+                    ? "bg-primary border-primary text-white"
                     : "bg-card border-border text-muted hover:text-foreground"
                 }`}
               >
@@ -289,7 +289,7 @@ export default function NotificationsPage() {
                 onClick={() => setUnreadOnly(true)}
                 className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   unreadOnly
-                    ? "bg-primary border-primary text-black"
+                    ? "bg-primary border-primary text-white"
                     : "bg-card border-border text-muted hover:text-foreground"
                 }`}
               >
@@ -546,7 +546,7 @@ export default function NotificationsPage() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => updatePrefsMutation.mutate(localPrefs)}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary text-black font-black hover:opacity-90 active:scale-95 transition-all text-xs tracking-wider uppercase cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 active:scale-95 transition-all text-xs tracking-wider uppercase cursor-pointer"
               >
                 {t("Save Preferences")}
               </button>
