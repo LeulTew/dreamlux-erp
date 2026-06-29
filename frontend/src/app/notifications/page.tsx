@@ -207,7 +207,7 @@ export default function NotificationsPage() {
 
   const handleTogglePref = (key: string) => {
     if (!localPrefs) return;
-    const current = localPrefs as any;
+    const current = localPrefs as unknown as Record<string, boolean>;
     setLocalPrefs({
       ...localPrefs,
       [key]: !current[key],

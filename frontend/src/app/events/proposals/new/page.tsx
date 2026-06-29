@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createEventProposal, submitEventProposal, getEventTypes, createEventType, getEventProposal } from "@/lib/api";
@@ -166,7 +166,7 @@ interface EstimateLine {
   fuel_price?: number;
 }
 
-export default function NewProposalPage() {
+function NewProposalContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
@@ -1195,5 +1195,21 @@ export default function NewProposalPage() {
         </>
       )}
     </AuthLayout>
+  );
+}
+
+export default function NewProposalPage() {
+  return (
+    <Suspense fallback={
+      <AuthLayout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground animate-pulse">
+            Initializing...
+          </span>
+        </div>
+      </AuthLayout>
+    }>
+      <NewProposalContent />
+    </Suspense>
   );
 }
