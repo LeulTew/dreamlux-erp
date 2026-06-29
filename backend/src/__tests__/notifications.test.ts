@@ -5,6 +5,7 @@ import app from "../index";
 import "./setup"; // Imports mocks for supabase/pg/other tools
 
 // Intercept pg pool to return mocked responses for our notification tables
+import { NotificationsService } from "../services/notifications-service";
 import { pool } from "../db/pool";
 
 const testUserId = "550e8400-e29b-41d4-a716-446655440000";
@@ -66,7 +67,7 @@ pool.query = mock((sql: string, params?: any[]) => {
   }
 
   // Mock single user resolve
-  if (queryLower.includes("select u.id")) {
+  if (queryLower.includes("u.id") || queryLower.includes("users")) {
     return Promise.resolve({ rows: [{ id: testUserId }] });
   }
 
@@ -161,5 +162,15 @@ describe("Notifications API & Matrix triggers", () => {
       });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("success", true);
+  });
+
+  test("NotificationsService.emitNotificationToRoleOrPermission triggers role broadcast", async () => {
+    // Direct call verification
+    const success = await NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "users:manage",
+      title: "Security Change Alert",
+      message: "Role permissions changed",
+    });
+    expect(success).toBeGreaterThan(0);
   });
 });

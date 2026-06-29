@@ -11,6 +11,7 @@ import { PERMISSION_DEFINITIONS, normalizePermissionSlugs } from "../lib/permiss
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
 import { getPublicUrl, uploadImage } from "../storage/storage";
 import { invalidateUserCache, invalidateAllCache } from "../lib/permissions-cache";
+import { NotificationsService } from "../services/notifications-service";
 
 const router = Router();
 const STORAGE_BUCKET = getEnv("SUPABASE_BUCKET", "inventory-images");
@@ -712,6 +713,17 @@ router.put("/roles/:id/permissions", async (req: AuthRequest, res: Response) => 
 
     await pool.query("COMMIT");
     invalidateAllCache();
+
+    // Trigger notification for role permission change
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "users:manage",
+      actor_id: req.user?.id,
+      title: "Security Permissions Modified",
+      message: `Permissions for role "${rows[0].name}" were updated by ${req.user?.username || "Someone"}.`,
+      entity_type: "role",
+      entity_id: rows[0].id,
+    });
+
     res.json(rows[0]);
   } catch (error) {
     try {
@@ -1242,6 +1254,18 @@ router.post("/", async (req: AuthRequest, res: Response) => {
           throw insertError;
         }
 
+        // Trigger notification for new user creation
+        if (data) {
+          NotificationsService.emitNotificationToRoleOrPermission({
+            permissionSlug: "users:manage",
+            actor_id: req.user?.id,
+            title: "New User Account Created",
+            message: `User account "${data.username}" (${data.full_name}) was created by ${req.user?.username || "Someone"}.`,
+            entity_type: "user",
+            entity_id: data.id,
+          });
+        }
+
         res.status(201).json(data);
         return;
       } catch (fallbackError) {
@@ -1428,6 +1452,17 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
         }
 
         invalidateUserCache(id);
+
+        // Trigger notification for user update
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "users:manage",
+          actor_id: req.user?.id,
+          title: "User Account Modified",
+          message: `User account "${result.rows[0].username}" was updated by ${req.user?.username || "Someone"}.`,
+          entity_type: "user",
+          entity_id: id,
+        });
+
         res.json(result.rows[0]);
         return;
       } catch (innerError) {
@@ -1516,6 +1551,17 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
         }
 
         invalidateUserCache(id);
+
+        // Trigger notification for user update
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "users:manage",
+          actor_id: req.user?.id,
+          title: "User Account Modified",
+          message: `User account "${data.username}" was updated by ${req.user?.username || "Someone"}.`,
+          entity_type: "user",
+          entity_id: id,
+        });
+
         res.json(data);
         return;
       } catch (fallbackError) {
