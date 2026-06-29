@@ -56,8 +56,9 @@ app.use(cors({
       return;
     }
 
+    // Always allow localhost / 127.0.0.1 for local development against any backend
     const isLocalhost = origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
-    if (process.env.NODE_ENV !== "production" && isLocalhost) {
+    if (isLocalhost) {
       callback(null, origin);
       return;
     }

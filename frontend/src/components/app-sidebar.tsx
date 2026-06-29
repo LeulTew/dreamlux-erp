@@ -879,22 +879,6 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Notifications */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
-              <SidebarMenuItem className="w-full flex justify-center">
-                <SidebarLink
-                  href="/notifications"
-                  icon={HiOutlineBell}
-                  label={t("Notifications")}
-                  active={isActive("/notifications")}
-                  isCollapsed={isCollapsed}
-                />
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
         {/* Admin Settings Section */}
         {hasAnyPermission(["users:manage", "settings:write"]) && (
