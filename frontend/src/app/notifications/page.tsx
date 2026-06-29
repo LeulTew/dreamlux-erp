@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
 import {
   getNotifications,
@@ -119,7 +119,7 @@ export default function NotificationsPage() {
   }>({
     queryKey: ["notifications-list", page, unreadOnly],
     queryFn: () => getNotifications({ page, limit }),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const { data: prefsData } = useQuery<NotificationPreferences>({
@@ -207,9 +207,10 @@ export default function NotificationsPage() {
 
   const handleTogglePref = (key: string) => {
     if (!localPrefs) return;
+    const current = localPrefs as any;
     setLocalPrefs({
       ...localPrefs,
-      [key]: !localPrefs[key],
+      [key]: !current[key],
     });
   };
 
