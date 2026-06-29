@@ -2,7 +2,7 @@
 
 import React, { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { HiPlus } from "react-icons/hi2";
+import { HiPlus, HiPencilSquare, HiOutlineTrash, HiDocumentDuplicate } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllOffices, createOffice, updateOffice, deleteOffice } from "@/lib/api";
@@ -284,27 +284,15 @@ function OfficesContent() {
                       className={`transition-colors group ${
                         highlightedId === off.id
                           ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
-                          : "hover:bg-primary/2"
+                          : "hover:bg-primary/5"
                       }`}
                     >
-                      <td className="px-4 sm:px-8 py-4 sm:py-6">
-                        {hasWriteAccess ? (
-                          <button
-                            onClick={() => {
-                              setForm({ id: off.id, name: off.name, is_active: off.is_active });
-                              window.scrollTo({ top: 0, behavior: "smooth" });
-                            }}
-                            className="inline-flex items-center justify-center min-w-10 px-3 py-1 bg-foreground text-background rounded-lg font-semibold text-xs uppercase tracking-wider hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-                          >
-                            {off.name}
-                          </button>
-                        ) : (
-                          <span className="font-semibold text-foreground">{off.name}</span>
-                        )}
+                      <td className="px-4 sm:px-8 py-3 sm:py-3.5">
+                        <span className="font-bold text-sm tracking-tight text-foreground">{off.name}</span>
                       </td>
-                      <td className="px-4 sm:px-8 py-4 sm:py-6">
+                      <td className="px-4 sm:px-8 py-3 sm:py-3.5">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                             off.is_active
                               ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
                               : "bg-neutral-500/10 text-neutral-500 border border-neutral-500/20"
@@ -314,15 +302,16 @@ function OfficesContent() {
                         </span>
                       </td>
                       {hasWriteAccess && (
-                        <td className="px-4 sm:px-8 py-4 sm:py-6 text-right space-x-2 sm:space-x-4 opacity-100 md:opacity-20 group-hover:opacity-100 transition-all duration-300">
+                        <td className="px-4 sm:px-8 py-3 sm:py-3.5 text-right space-x-2.5">
                           <button
                             onClick={() => {
                               setForm({ id: off.id, name: off.name, is_active: off.is_active });
                               window.scrollTo({ top: 0, behavior: "smooth" });
                             }}
-                            className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20"
+                            title={t("Edit")}
+                            className="p-2 bg-primary/10 rounded-lg text-primary hover:bg-primary hover:text-background transition-all active:scale-90 inline-flex items-center justify-center border border-primary/20 cursor-pointer"
                           >
-                            {t("Edit")}
+                            <HiPencilSquare className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => {
@@ -330,15 +319,17 @@ function OfficesContent() {
                               window.scrollTo({ top: 0, behavior: "smooth" });
                               toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ ቢሮ ጨምር የሚለውን ይጫኑ" : "Prefilled duplicate; click Add Office to save");
                             }}
-                            className="text-xs font-semibold tracking-wider text-amber-500 hover:text-amber-600 outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-amber-500/20"
+                            title={t("Duplicate")}
+                            className="p-2 bg-amber-500/10 rounded-lg text-amber-500 hover:bg-amber-500 hover:text-white transition-all active:scale-90 inline-flex items-center justify-center border border-amber-500/20 cursor-pointer"
                           >
-                            {t("Duplicate")}
+                            <HiDocumentDuplicate className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteId(off.id)}
-                            className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20"
+                            title={t("Delete")}
+                            className="p-2 bg-danger/10 rounded-lg text-danger hover:bg-danger hover:text-white transition-all active:scale-90 inline-flex items-center justify-center border border-danger/20 cursor-pointer"
                           >
-                            {t("Delete")}
+                            <HiOutlineTrash className="w-4 h-4" />
                           </button>
                         </td>
                       )}

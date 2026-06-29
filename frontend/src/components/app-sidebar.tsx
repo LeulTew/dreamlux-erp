@@ -325,7 +325,19 @@ export function AppSidebar() {
   const [itemsOpen, setItemsOpen] = useState(true);
   const [eventsOpen, setEventsOpen] = useState(true);
   const [financeOpen, setFinanceOpen] = useState(true);
-  const [refDataOpen, setRefDataOpen] = useState(false);
+
+  const isRefDataActive = pathname.startsWith("/settings/departments") || 
+                          pathname.startsWith("/settings/positions") || 
+                          pathname.startsWith("/settings/offices");
+  const [refDataOpen, setRefDataOpen] = useState(isRefDataActive);
+
+  useEffect(() => {
+    if (isRefDataActive) {
+      setRefDataOpen(true);
+    } else {
+      setRefDataOpen(false);
+    }
+  }, [pathname, isRefDataActive]);
 
 
   // Sync user details reactively
@@ -402,8 +414,6 @@ export function AppSidebar() {
     { href: "/settings/departments", label: t("Departments"), active: pathname === "/settings/departments", show: hasPermission("departments:manage") || hasPermission("hr:read") || hasPermission("departments:read") },
     { href: "/settings/positions", label: t("Positions"), active: pathname === "/settings/positions", show: hasPermission("positions:manage") || hasPermission("hr:read") || hasPermission("positions:read") },
     { href: "/settings/offices", label: t("Offices"), active: pathname === "/settings/offices", show: hasPermission("offices:manage") || hasPermission("hr:read") || hasPermission("offices:read") },
-    { href: "/hr/salary-levels", label: t("Salary Levels"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
-    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasPermission("events:write") },
   ].filter(l => l.show);
 
 
