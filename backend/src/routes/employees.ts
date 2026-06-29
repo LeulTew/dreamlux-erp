@@ -21,7 +21,7 @@ const router = Router();
 // GET /employees/next-id — generate suggested sequential ID
 router.get("/next-id", async (_req, res) => {
   try {
-    const prefix = (_req.query.prefix as string) || "EMP";
+    const prefix = (_req.query.prefix as string) || undefined;
     const nextId = await generateNextEmployeeId(prefix);
     res.json({ nextId });
   } catch {
