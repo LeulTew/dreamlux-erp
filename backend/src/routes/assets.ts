@@ -567,18 +567,10 @@ router.post(
 
       const { name, quantity, store_id, description } = parsed.data;
       const file = req.file;
+      const cloneFromId = req.body.clone_from_id as string | undefined;
 
-      if (!file) {
+      if (!file && !cloneFromId) {
         res.status(400).json({ error: "Image is required" });
-        return;
-      }
-
-      // Magic-byte file verification
-      const detectedType = await fromBuffer(file.buffer);
-      if (!detectedType || !["image/jpeg", "image/png"].includes(detectedType.mime)) {
-        res.status(400).json({
-          error: "File content does not match JPEG/PNG format",
-        });
         return;
       }
 
@@ -586,15 +578,41 @@ router.post(
       const itemId = uuidv4();
       imageKey = `${store_id}/${itemId}.webp`;
 
-      // Compress image server-side: auto-rotate EXIF + convert to WebP
-      const compressedBuffer = await sharp(file.buffer)
-        .rotate()
-        .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 80 })
-        .toBuffer();
+      if (file) {
+        // Magic-byte file verification
+        const detectedType = await fromBuffer(file.buffer);
+        if (!detectedType || !["image/jpeg", "image/png"].includes(detectedType.mime)) {
+          res.status(400).json({
+            error: "File content does not match JPEG/PNG format",
+          });
+          return;
+        }
 
-      // Upload to storage FIRST
-      await uploadImage(imageKey, compressedBuffer, "image/webp");
+        // Compress image server-side: auto-rotate EXIF + convert to WebP
+        const compressedBuffer = await sharp(file.buffer)
+          .rotate()
+          .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+
+        // Upload to storage FIRST
+        await uploadImage(imageKey, compressedBuffer, "image/webp");
+      } else if (cloneFromId) {
+        // Fetch source item to copy the image
+        const { data: sourceItem, error: sourceError } = await supabase
+          .from("items")
+          .select("image_key")
+          .eq("id", cloneFromId)
+          .single();
+
+        if (sourceError || !sourceItem?.image_key) {
+          res.status(400).json({ error: "Source asset image not found for cloning" });
+          return;
+        }
+
+        const buffer = await downloadImage(sourceItem.image_key);
+        await uploadImage(imageKey, buffer, "image/webp");
+      }
 
       // Get default category
       const { data: catData } = await supabase.from("categories").select("id").limit(1);

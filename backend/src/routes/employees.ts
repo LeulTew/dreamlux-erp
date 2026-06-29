@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { v4 as uuidv4 } from "uuid";
 import { fromBuffer } from "file-type";
 import { supabase } from "../db/supabase";
-import { uploadImage, deleteImage, getPublicUrl } from "../storage/storage";
+import { uploadImage, deleteImage, getPublicUrl, downloadImage } from "../storage/storage";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { ActivityService } from "../services/activity-service";
 import { NotificationsService } from "../services/notifications-service";
@@ -141,6 +141,48 @@ router.post(
       }
       if (profileFile) {
         profileKey = await processAndUploadImage(profileFile, "profile");
+      }
+
+      const cloneFromId = req.body.clone_from_id as string | undefined;
+      if (cloneFromId) {
+        const { data: sourceEmp } = await supabase
+          .from("employees")
+          .select("id_card_front_key, id_card_back_key, profile_photo_key")
+          .eq("id", cloneFromId)
+          .single();
+
+        if (sourceEmp) {
+          if (sourceEmp.id_card_front_key && !frontFile) {
+            try {
+              const buffer = await downloadImage(String(sourceEmp.id_card_front_key));
+              frontKey = `employees/${employee_id}/${uuidv4()}_front.webp`;
+              await uploadImage(frontKey, buffer, "image/webp");
+              keysToCleanup.push(frontKey);
+            } catch (err) {
+              console.warn(`[Employees] Failed to clone front ID photo:`, err);
+            }
+          }
+          if (sourceEmp.id_card_back_key && !backFile) {
+            try {
+              const buffer = await downloadImage(String(sourceEmp.id_card_back_key));
+              backKey = `employees/${employee_id}/${uuidv4()}_back.webp`;
+              await uploadImage(backKey, buffer, "image/webp");
+              keysToCleanup.push(backKey);
+            } catch (err) {
+              console.warn(`[Employees] Failed to clone back ID photo:`, err);
+            }
+          }
+          if (sourceEmp.profile_photo_key && !profileFile) {
+            try {
+              const buffer = await downloadImage(String(sourceEmp.profile_photo_key));
+              profileKey = `employees/${employee_id}/${uuidv4()}_profile.webp`;
+              await uploadImage(profileKey, buffer, "image/webp");
+              keysToCleanup.push(profileKey);
+            } catch (err) {
+              console.warn(`[Employees] Failed to clone profile photo:`, err);
+            }
+          }
+        }
       }
 
       let parsedEventPrices: Record<string, number> | undefined;
