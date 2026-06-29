@@ -12,6 +12,7 @@ import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
 import { getPublicUrl, uploadImage } from "../storage/storage";
 import { invalidateUserCache, invalidateAllCache } from "../lib/permissions-cache";
 import { NotificationsService } from "../services/notifications-service";
+import { ActivityService } from "../services/activity-service";
 
 const router = Router();
 const STORAGE_BUCKET = getEnv("SUPABASE_BUCKET", "inventory-images");
