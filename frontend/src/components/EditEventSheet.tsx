@@ -7,7 +7,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { createEvent, updateEvent, deleteEvent, getEventTypes } from "@/lib/api";
 import { Event, EventType } from "@/lib/types";
 import { notify } from "@/lib/toast";
-import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser, HiArrowPath, HiCheck, HiArrowTopRightOnSquare } from "react-icons/hi2";
+import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser, HiArrowPath, HiCheck, HiArrowTopRightOnSquare, HiDocumentDuplicate } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
@@ -29,6 +29,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Changes reset": "Changes reset",
     "Workspace": "Workspace",
     "Open Event Workspace": "Open Event Workspace",
+    "Duplicate": "Duplicate",
+    "Duplicate Event": "Duplicate Event",
+    "Creating duplicate of": "Creating duplicate of",
+    "Event duplicated successfully": "Event duplicated successfully",
+    "Failed to duplicate event": "Failed to duplicate event",
   },
   am: {
     "Edit Event": "ዝግጅት ማስተካከያ",
@@ -42,6 +47,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Changes reset": "ለውጦች ተመልሰዋል",
     "Workspace": "የስራ ቦታ",
     "Open Event Workspace": "Open Event Workspace",
+    "Duplicate": "ቅጂ ፍጠር",
+    "Duplicate Event": "ዝግጅት ቅጂ ፍጠር",
+    "Creating duplicate of": "ቅጂ በማዘጋጀት ላይ ለ",
+    "Event duplicated successfully": "ዝግጅት ቅጂ በተሳካ ሁኔታ ተፈጥሯል",
+    "Failed to duplicate event": "ቅጂ መፍጠር አልተቻለም",
   }
 };
 
@@ -109,6 +119,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isDuplicateMode, setIsDuplicateMode] = useState(false);
 
   const handleReset = () => {
     if (!event) return;
@@ -126,6 +137,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       status: event.status || "Planned",
     });
     setFormErrors({});
+    setIsDuplicateMode(false);
     notify.success(t("Changes reset"));
   };
 
@@ -149,7 +161,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
   const saveMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => {
-      if (event) {
+      if (event && !isDuplicateMode) {
         return updateEvent(event.id, data);
       } else {
         return createEvent(data);
@@ -158,12 +170,23 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event", event?.id] });
-      notify.success("Success", event ? "Event updated successfully" : "Event created successfully");
+      notify.success(
+        "Success",
+        isDuplicateMode
+          ? t("Event duplicated successfully")
+          : event
+          ? "Event updated successfully"
+          : "Event created successfully"
+      );
       if (onSuccess) onSuccess();
       onClose();
     },
     onError: (err: AxiosError<{ error?: string }>) => {
-      notify.error("Error", err.response?.data?.error || "Failed to save event");
+      notify.error(
+        "Error",
+        err.response?.data?.error ||
+          (isDuplicateMode ? t("Failed to duplicate event") : "Failed to save event")
+      );
     },
   });
 
@@ -211,8 +234,8 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       <ResponsiveDrawer
         isOpen={true}
         onClose={onClose}
-        title={event ? t("Edit Event") : t("Create Event")}
-        subtitle={event ? t("Managing event details") : t("Register a new event schedule")}
+        title={isDuplicateMode ? t("Duplicate Event") : event ? t("Edit Event") : t("Create Event")}
+        subtitle={isDuplicateMode ? `${t("Creating duplicate of")} ${event?.name}` : event ? t("Managing event details") : t("Register a new event schedule")}
       >
         {/* Warning Banner for Completed Event Locks */}
         {isCompleted && (
@@ -432,7 +455,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                 </Link>
               )}
 
-              {event && (
+              {event && !isDuplicateMode && (
                 <Button
                   type="button"
                   variant="destructive"
@@ -443,6 +466,23 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                 >
                   <HiTrash className="w-4.5 h-4.5" />
                   {t("Delete")}
+                </Button>
+              )}
+
+              {event && !isDuplicateMode && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      name: prev.name + " (Copy)"
+                    }));
+                    setIsDuplicateMode(true);
+                  }}
+                  className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                >
+                  <HiDocumentDuplicate className="w-4.5 h-4.5" />
+                  {t("Duplicate")}
                 </Button>
               )}
 
@@ -463,7 +503,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                 className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
               >
                 <HiCheck className="w-4.5 h-4.5" />
-                {event ? t("Save Changes") : t("Create Event")}
+                {isDuplicateMode ? t("Duplicate Event") : event ? t("Save Changes") : t("Create Event")}
               </Button>
             </div>
           )}
