@@ -8,6 +8,7 @@ import { supabase } from "../db/supabase";
 import { uploadImage, deleteImage, getPublicUrl } from "../storage/storage";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { ActivityService } from "../services/activity-service";
+import { NotificationsService } from "../services/notifications-service";
 import {
   createEmployeeSchema,
   updateEmployeeSchema,
@@ -249,6 +250,15 @@ router.post(
       }
 
       if (insertError || !employeeData) throw insertError;
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "hr:read",
+        actor_id: req.user?.id,
+        title: "New Employee Created",
+        message: `${full_name} (${employee_id}) has been added to the system.`,
+        entity_type: "employee",
+        entity_id: String(employeeData.id),
+      });
 
       res.status(201).json({
         ...employeeData,
@@ -721,6 +731,14 @@ router.post("/:id/recover", requirePermissionSlugs(["hr:write"]), async (req: Au
       action: "restore",
       note: "Employee profile recovered from trash.",
     });
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "hr:read",
+      actor_id: req.user?.id,
+      title: "Employee Record Recovered",
+      message: `Employee record ${id} has been recovered from trash.`,
+      entity_type: "employee",
+      entity_id: id,
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({
@@ -746,6 +764,14 @@ router.delete("/:id", requirePermissionSlugs(["hr:write"]), async (req: AuthRequ
       user_id: req.user?.id || null,
       action: "delete",
       note: "Employee profile soft deleted.",
+    });
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "hr:read",
+      actor_id: req.user?.id,
+      title: "Employee Record Deleted",
+      message: `Employee record ${id} has been soft deleted.`,
+      entity_type: "employee",
+      entity_id: id,
     });
     res.json({ success: true });
   } catch (error: unknown) {
