@@ -14,6 +14,7 @@ import {
   HiChevronDown,
   HiChevronUp,
   HiChevronLeft,
+  HiOutlineBell,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
@@ -71,9 +72,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Positions: "Positions",
     Offices: "Offices",
     "Salary Levels": "Salary Levels",
+    Notifications: "Notifications",
   },
   am: {
     Employees: "ሰራተኞች",
+    Notifications: "ማሳወቂያዎች",
     Payroll: "ደመወዝ",
     Salary: "ደረጃዎች",
     "Expense Approvals": "የወጪ ማጽደቂያ",
@@ -875,6 +878,23 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
+        {/* Notifications */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
+              <SidebarMenuItem className="w-full flex justify-center">
+                <SidebarLink
+                  href="/notifications"
+                  icon={HiOutlineBell}
+                  label={t("Notifications")}
+                  active={isActive("/notifications")}
+                  isCollapsed={isCollapsed}
+                />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         {/* Admin Settings Section */}
         {hasAnyPermission(["users:manage", "settings:write"]) && (

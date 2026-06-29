@@ -7,6 +7,7 @@ import type { Employee, Event, Item, PayrollRun, SalaryLevel } from "@/lib/types
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import PayrollReminder from "@/components/PayrollReminder";
+import NotificationInbox from "@/components/NotificationInbox";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
@@ -718,6 +719,7 @@ export default function AuthLayout({
               </button>
 
               <PayrollReminder />
+              <NotificationInbox />
 
               <div className="h-4 w-px bg-border/50 shrink-0 mx-0.5" />
 

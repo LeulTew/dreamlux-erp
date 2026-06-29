@@ -4,6 +4,7 @@ import ExcelJS from "exceljs";
 import { stringify } from "csv-stringify/sync";
 import { pool } from "../db/pool";
 import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
+import { NotificationsService } from "../services/notifications-service";
 import { hasPermissionSlug } from "../lib/permissions";
 import { fetchHiddenFieldsForRoles } from "../lib/permissions-db";
 import { createEventProposalsRouter } from "./events/proposals";
@@ -1301,6 +1302,26 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
       );
 
       await client.query("COMMIT");
+
+      // Notify the expense creator
+      const expense = result.rows[0];
+      if (expense.created_by) {
+        const title = `Expense ${status}`;
+        let message = `Your expense request for ${expense.category} of amount ${expense.amount} has been ${status.toLowerCase()} by ${req.user?.username || "Someone"}.`;
+        if (status === "Rejected" && rejected_reason) {
+          message += ` Reason: ${rejected_reason}`;
+        }
+        NotificationsService.createNotification({
+          recipient_id: expense.created_by,
+          actor_id: req.user?.id,
+          title,
+          message,
+          entity_type: "expense",
+          entity_id: expense.id,
+          action_url: `/events/${expense.event_id}`,
+        });
+      }
+
       res.json(result.rows[0]);
     } catch (error: any) {
       await client.query("ROLLBACK");
@@ -1746,6 +1767,17 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         } finally {
           client.release();
         }
+      }
+      if (updateData.status && updateData.status !== currentEvent.status) {
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "events:read",
+          actor_id: req.user?.id,
+          title: "Event Status Changed",
+          message: `Event "${currentEvent.name}" status transitioned from ${currentEvent.status} to ${updateData.status}.`,
+          entity_type: "event",
+          entity_id: id,
+          action_url: `/events/${id}`,
+        });
       }
       const event = await redactEventForPermissions(result.rows[0], req);
       res.json({ event });
@@ -2462,6 +2494,22 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
       ]);
 
       await client.query("COMMIT");
+
+      // Notify the assigned employee
+      NotificationsService.getUserIdForEmployee(employee_id).then((userId) => {
+        if (userId) {
+          NotificationsService.createNotification({
+            recipient_id: userId,
+            actor_id: req.user?.id,
+            title: "New Event Assignment",
+            message: `You have been assigned to event "${event.name}" as a ${role || "member"}.`,
+            entity_type: "event",
+            entity_id: id,
+            action_url: `/events/${id}`,
+          });
+        }
+      });
+
       res.status(201).json(result.rows[0]);
     } catch (error: any) {
       await client.query("ROLLBACK");
@@ -2617,6 +2665,24 @@ router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, r
       ]);
 
       await client.query("COMMIT");
+
+      // Notify the assigned driver
+      if (driver_id) {
+        NotificationsService.getUserIdForEmployee(driver_id).then((userId) => {
+          if (userId) {
+            NotificationsService.createNotification({
+              recipient_id: userId,
+              actor_id: req.user?.id,
+              title: "New Driving Assignment",
+              message: `You have been assigned to drive for event "${event.name}".`,
+              entity_type: "event",
+              entity_id: id,
+              action_url: `/events/${id}`,
+            });
+          }
+        });
+      }
+
       res.status(201).json(result.rows[0]);
     } catch (error: any) {
       await client.query("ROLLBACK");
@@ -2764,7 +2830,20 @@ router.post("/:id/expenses", requireAuth, async (req: AuthRequest, res: Response
       [id, category, amount, description, receipt_image_key || null, req.user?.id || null]
     );
 
-    res.status(201).json(result.rows[0]);
+    const expense = result.rows[0];
+
+    // Notify approvers of pending expense
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "expenses:approve",
+      actor_id: req.user?.id,
+      title: "New Expense for Approval",
+      message: `A new ${category} expense of amount ${amount} for event "${event.name}" is pending approval.`,
+      entity_type: "expense",
+      entity_id: expense.id,
+      action_url: `/events/${id}`,
+    });
+
+    res.status(201).json(expense);
   } catch (error: any) {
     console.error("[post-event-expense] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });

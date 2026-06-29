@@ -2,6 +2,7 @@ import { Pool, PoolClient } from "pg";
 import { Router, Response } from "express";
 import { pool } from "../../db/pool";
 import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../../middleware/auth";
+import { NotificationsService } from "../../services/notifications-service";
 import { hasPermissionSlug } from "../../lib/permissions";
 import { eventProposalPayloadSchema, eventProposalListQuerySchema, eventProposalRejectSchema } from "../../lib/validation";
 
@@ -638,6 +639,37 @@ export function createEventProposalsRouter(): Router {
       );
       await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, action, oldStatus, newStatus, note);
       await client.query("COMMIT");
+
+      // Emit notifications (asynchronously)
+      const proposal = updateResult.rows[0];
+      const actorName = req.user?.username || "Someone";
+      if (newStatus === "Submitted") {
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "events:proposals:approve",
+          actor_id: req.user?.id,
+          title: "Proposal Submitted",
+          message: `A new event proposal "${proposal.name}" has been submitted by ${actorName}.`,
+          entity_type: "proposal",
+          entity_id: proposal.id,
+          action_url: `/events/proposals/${proposal.id}`,
+        });
+      } else if (proposal.created_by) {
+        const title = `Proposal ${newStatus}`;
+        let message = `Your proposal "${proposal.name}" has been ${newStatus.toLowerCase()} by ${actorName}.`;
+        if (newStatus === "Rejected" && note) {
+          message += ` Reason: ${note}`;
+        }
+        NotificationsService.createNotification({
+          recipient_id: proposal.created_by,
+          actor_id: req.user?.id,
+          title,
+          message,
+          entity_type: "proposal",
+          entity_id: proposal.id,
+          action_url: `/events/proposals/${proposal.id}`,
+        });
+      }
+
       res.json({ proposal: formatProposal(updateResult.rows[0]) });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -789,6 +821,20 @@ export function createEventProposalsRouter(): Router {
       await insertProposalAuditLog(client, proposal.id, req.user?.id || null, "proposal_converted", proposal.status, "Converted", eventResult.rows[0].id);
       await insertEventAuditLog(client, eventResult.rows[0].id, req.user?.id || null, "event_created_from_proposal", null, proposal.id);
       await client.query("COMMIT");
+
+      // Emit notification to the proposal creator
+      if (proposal.created_by) {
+        NotificationsService.createNotification({
+          recipient_id: proposal.created_by,
+          actor_id: req.user?.id,
+          title: "Proposal Converted",
+          message: `Your proposal "${proposal.name}" has been converted to an active event.`,
+          entity_type: "proposal",
+          entity_id: proposal.id,
+          action_url: `/events/${eventResult.rows[0].id}`,
+        });
+      }
+
       res.status(201).json({ proposal: formatProposal(updatedProposal.rows[0]), event: eventResult.rows[0] });
     } catch (error: any) {
       await client.query("ROLLBACK");

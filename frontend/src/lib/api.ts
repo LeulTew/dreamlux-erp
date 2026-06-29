@@ -1474,3 +1474,28 @@ export const updateRole = (id: string, data: { name: string; description: string
 
 export const deleteRole = (id: string) =>
   api.delete(`/users/roles/${id}`).then((r) => r.data);
+
+export const getNotifications = (params?: { page?: number; limit?: number }) =>
+  api.get("/api/notifications", { params }).then((r) => r.data);
+
+export const getUnreadNotificationsCount = () =>
+  api.get("/api/notifications/unread-count").then((r) => r.data);
+
+export const markNotificationRead = (id: string) =>
+  api.patch(`/api/notifications/${id}/read`).then((r) => r.data);
+
+export const markAllNotificationsRead = () =>
+  api.post("/api/notifications/mark-all-read").then((r) => r.data);
+
+export const archiveNotification = (id: string) =>
+  api.patch(`/api/notifications/${id}/archive`).then((r) => r.data);
+
+export const getNotificationPreferences = () =>
+  api.get("/api/notifications/preferences").then((r) => r.data);
+
+export const updateNotificationPreferences = (data: {
+  in_app_enabled?: boolean;
+  email_enabled?: boolean;
+  push_enabled?: boolean;
+  categories?: Record<string, boolean>;
+}) => api.put("/api/notifications/preferences", data).then((r) => r.data);

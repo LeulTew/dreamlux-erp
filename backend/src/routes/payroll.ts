@@ -5,6 +5,7 @@ import { getMonthlyBounds, getHalfMonthBounds } from "../utils/payroll-utils";
 import { getPublicUrl } from "../storage/storage";
 import { buildPayrollLines, toPayrollEventPayloads, toPayrollLinePayloads } from "../lib/payroll-generation";
 import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
+import { NotificationsService } from "../services/notifications-service";
 import { hasPermissionSlug } from "../lib/permissions";
 
 const router = express.Router();
@@ -329,6 +330,17 @@ router.patch("/runs/:id/status", async (req: AuthRequest, res) => {
     }
     if (!data) {
       return res.status(404).json({ error: "Payroll run not found" });
+    }
+    if (mappedStatus === "finalized") {
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "payroll:read",
+        actor_id: req.user?.id,
+        title: "Payroll Run Finalized",
+        message: `Payroll run (ID: ${id}) has been finalized by ${req.user?.username || "Someone"}.`,
+        entity_type: "payroll",
+        entity_id: id,
+        action_url: "/payroll",
+      });
     }
 
     res.json({ ...data, status: toApiStatus(data.status) });

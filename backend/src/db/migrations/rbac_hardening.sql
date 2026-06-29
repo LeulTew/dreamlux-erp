@@ -179,7 +179,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_notify_user_permissions_changed ON users;
 CREATE TRIGGER trg_notify_user_permissions_changed
-AFTER INSERT OR UPDATE OF role_id, role_ids, is_active OR DELETE ON users
+AFTER INSERT OR UPDATE OF role_id, is_active OR DELETE ON users
 FOR EACH ROW
 EXECUTE FUNCTION notify_permissions_changed();
 

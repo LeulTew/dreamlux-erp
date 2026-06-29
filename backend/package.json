@@ -6,7 +6,7 @@
     "dev": "bun --watch src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun",
     "start": "bun dist/index.js",
-    "db:migrate": "bun src/db/migrate-hr-payments.ts && bun src/db/migrate.ts && bun src/db/migrate-phase3.ts && bun src/db/migrate-rbac.ts && bun src/db/migrate-performance.ts && bun src/db/migrate-reconciliation-audit.ts && bun src/db/migrate-reconciliation-audit-hardening.ts && bun src/db/migrate-events.ts && bun src/db/migrate-event-saved-views.ts && bun src/db/migrate-db-rls.ts && bun src/db/migrate-assignment-integrity.ts",
+    "db:migrate": "bun src/db/migrate-hr-payments.ts && bun src/db/migrate.ts && bun src/db/migrate-phase3.ts && bun src/db/migrate-rbac.ts && bun src/db/migrate-performance.ts && bun src/db/migrate-reconciliation-audit.ts && bun src/db/migrate-reconciliation-audit-hardening.ts && bun src/db/migrate-events.ts && bun src/db/migrate-event-saved-views.ts && bun src/db/migrate-db-rls.ts && bun src/db/migrate-assignment-integrity.ts && bun src/db/migrate-notifications.ts",
     "verify:db-concurrency": "bun src/db/verify-assignment-concurrency.ts",
     "verify:supabase-rls": "bun src/db/verify-supabase-rls.ts",
     "test": "bun test",

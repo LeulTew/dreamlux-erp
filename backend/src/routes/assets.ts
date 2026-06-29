@@ -7,6 +7,7 @@ import { fromBuffer } from "file-type";
 import { supabase } from "../db/supabase";
 import { uploadImage, deleteImage, getPublicUrl, downloadImage } from "../storage/storage";
 import { AuthRequest, requirePermissions, requireAuth } from "../middleware/auth";
+import { NotificationsService } from "../services/notifications-service";
 import {
   createItemSchema,
   updateItemSchema,
@@ -2434,6 +2435,19 @@ router.post(
 
       if (results.length > 0 && !persistedRunId && !auditWarning) {
         throw new Error("Reconciliation run was applied but audit ledger entry was not created");
+      }
+
+      // Emit notifications on discrepancies
+      if (results.length > 0 && changedRows > 0) {
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "assets:reconcile",
+          actor_id: req.user?.id,
+          title: "Reconciliation Discrepancy",
+          message: `Inventory reconciliation run (ID: ${persistedRunId || "N/A"}) detected discrepancies on ${changedRows} items. Total delta: ${totalDelta}.`,
+          entity_type: "inventory",
+          entity_id: persistedRunId || undefined,
+          action_url: "/inventory/reconciliation",
+        });
       }
 
       res.json({

@@ -13,6 +13,7 @@ import eventTypesRouter from "./routes/event-types";
 import payrollRouter from "./routes/payroll";
 import eventsRouter from "./routes/events";
 import positionsRouter from "./routes/positions";
+import { notificationsRouter } from "./routes/notifications";
 
 import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
@@ -120,6 +121,7 @@ app.use("/event-types", requireAuth, eventTypesRouter);
 
 app.use("/payroll", requireAuth, requirePermissionSlugs(["payroll:read", "payroll:write"]), payrollRouter);
 app.use("/events", requireAuth, eventsRouter);
+app.use("/api/notifications", notificationsRouter);
 
 // Error handler
 app.use(
