@@ -78,4 +78,34 @@ describe("PwaLifecycle", () => {
 
     expect(screen.getByText("Offline shell active")).toBeInTheDocument();
   });
+
+  it("does not show install prompt when dismissed in localStorage", () => {
+    window.localStorage.setItem("dreamlux_pwa_install_dismissed", "1");
+    render(<PwaLifecycle />);
+
+    const installEvent = new Event("beforeinstallprompt") as Event & {
+      prompt: () => Promise<void>;
+      userChoice: Promise<{ outcome: "dismissed"; platform: string }>;
+      preventDefault: () => void;
+    };
+    installEvent.prompt = promptMock;
+    installEvent.preventDefault = vi.fn();
+    installEvent.userChoice = Promise.resolve({ outcome: "dismissed", platform: "web" });
+
+    window.dispatchEvent(installEvent);
+    expect(screen.queryByText("Install Dream Lux ERP")).not.toBeInTheDocument();
+  });
+
+  it("gracefully catches service worker registration errors without throwing", async () => {
+    const errorRegisterMock = vi.fn(() => Promise.reject(new Error("SW Registration failed")));
+    Object.defineProperty(window.navigator, "serviceWorker", {
+      value: { register: errorRegisterMock },
+      configurable: true,
+    });
+
+    render(<PwaLifecycle />);
+    await waitFor(() => {
+      expect(errorRegisterMock).toHaveBeenCalledWith("/sw.js");
+    });
+  });
 });
