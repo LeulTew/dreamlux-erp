@@ -224,6 +224,7 @@ describe("Notifications API & Matrix triggers", () => {
     const success = await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "events:read",
       actor_id: testUserId,
+      include_actor: false,
       title: "Event Updated",
       message: "Event details changed",
       entity_type: "event",
@@ -235,12 +236,33 @@ describe("Notifications API & Matrix triggers", () => {
     const success = await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "events:read",
       actor_id: testUserId,
-      include_actor: true,
       title: "Event Updated",
       message: "Event details changed",
       entity_type: "event",
     });
     expect(success).toBe(2);
+  });
+
+  test("NotificationsService includes the actor by default for CRUD audit visibility", async () => {
+    const success = await NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "hr:read",
+      actor_id: testUserId,
+      title: "Employee Record Deleted",
+      message: "Employee record was deleted",
+      entity_type: "employee",
+    });
+    expect(success).toBe(1);
+  });
+
+  test("NotificationsService routes legacy employee read slug to HR readers", async () => {
+    const success = await NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "employees:read",
+      actor_id: testUserId,
+      title: "Employee Profile Updated",
+      message: "Employee profile changed",
+      entity_type: "employee",
+    });
+    expect(success).toBe(1);
   });
 
   test("NotificationsService maps singular entity type to plural preference category", async () => {

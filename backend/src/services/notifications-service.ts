@@ -69,6 +69,22 @@ function moduleWildcardSlug(permissionSlug: string): string | null {
   return moduleName ? `${moduleName}:*` : null;
 }
 
+const PERMISSION_SLUG_ALIASES: Record<string, string[]> = {
+  "employees:read": ["hr:read"],
+  "employees:write": ["hr:write"],
+  "departments:read": ["departments:manage", "hr:read", "settings:write"],
+  "positions:read": ["hr:read", "settings:write"],
+  "offices:read": ["settings:write"],
+  "event-types:read": ["events:read", "events:write", "settings:write"],
+  "salary-levels:read": ["salary-levels:manage", "hr:read"],
+  settings: ["settings:write", "users:manage"],
+};
+
+function expandPermissionSlug(permissionSlug: string): string[] {
+  const normalized = permissionSlug.trim().toLowerCase();
+  return [...new Set([normalized, ...(PERMISSION_SLUG_ALIASES[normalized] || [])])];
+}
+
 function isMissingColumnError(error: unknown): boolean {
   const err = error as { code?: string; message?: string };
   const message = (err?.message || "").toLowerCase();
@@ -159,7 +175,7 @@ export class NotificationsService {
         actor_display_name,
         actor_username,
         actor_type,
-        include_actor = false,
+        include_actor = true,
         title,
         message,
         entity_type,
@@ -176,7 +192,8 @@ export class NotificationsService {
         recipientIds = await this.findRecipientIdsByRole(roleName);
       }
 
-      // De-duplicate actor_id so users do not receive notifications for their own actions
+      // CRUD notifications are user-visible audit signals by default. Callers can opt out
+      // for noisy workflow broadcasts by passing include_actor: false.
       if (actor_id && !include_actor) {
         recipientIds = recipientIds.filter((id) => id !== actor_id);
       }
@@ -207,8 +224,8 @@ export class NotificationsService {
   }
 
   private static async findRecipientIdsByPermission(permissionSlug: string): Promise<string[]> {
-    const normalizedSlug = permissionSlug.trim().toLowerCase();
-    const wildcardSlug = moduleWildcardSlug(normalizedSlug);
+    const candidateSlugs = expandPermissionSlug(permissionSlug);
+    const wildcardSlugs = candidateSlugs.map(moduleWildcardSlug).filter((slug): slug is string => Boolean(slug));
 
     try {
       const res = await pool.query(
@@ -238,7 +255,7 @@ export class NotificationsService {
          GROUP BY user_id, role_name, permissions`,
       );
 
-      return this.filterRecipientsByPermissionRows(res.rows, normalizedSlug, wildcardSlug);
+      return this.filterRecipientsByPermissionRows(res.rows, candidateSlugs, wildcardSlugs);
     } catch (error) {
       if (!isMissingColumnError(error)) {
         throw error;
@@ -255,7 +272,7 @@ export class NotificationsService {
            AND u.is_active = TRUE
          GROUP BY u.id, r.name, r.permissions`,
       );
-      return this.filterRecipientsByPermissionRows(legacyRes.rows, normalizedSlug, wildcardSlug);
+      return this.filterRecipientsByPermissionRows(legacyRes.rows, candidateSlugs, wildcardSlugs);
     }
   }
 
@@ -295,8 +312,8 @@ export class NotificationsService {
 
   private static filterRecipientsByPermissionRows(
     rows: Array<{ id?: string; user_id?: string; role_name?: string; permissions?: unknown; slugs?: string[] }>,
-    requiredSlug: string,
-    wildcardSlug: string | null,
+    requiredSlugs: string[],
+    wildcardSlugs: string[],
   ): string[] {
     const recipientIds = rows
       .filter((row) => {
@@ -310,8 +327,8 @@ export class NotificationsService {
           roleName === "super_admin" ||
           roleName === "admin" ||
           roleName === "owner" ||
-          hasPermissionSlug(effectiveSlugs, requiredSlug) ||
-          Boolean(wildcardSlug && effectiveSlugs.includes(wildcardSlug))
+          requiredSlugs.some((requiredSlug) => hasPermissionSlug(effectiveSlugs, requiredSlug)) ||
+          wildcardSlugs.some((wildcardSlug) => effectiveSlugs.includes(wildcardSlug))
         );
       })
       .map((row) => row.id || row.user_id)
