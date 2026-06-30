@@ -40,6 +40,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Proposals": "Event Proposals",
     "New Proposal": "New Proposal",
     "Role Permissions": "Role Permissions",
+    "Security Posture": "Security Posture",
     "Workspace": "Workspace",
     "Proposal Detail": "Proposal Detail",
     "Location Detail": "Location Detail",
@@ -78,6 +79,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Proposals": "የዝግጅት ፕሮፖዛሎች",
     "New Proposal": "አዲስ ፕሮፖዛል",
     "Role Permissions": "የሥልጣን ፈቃዶች",
+    "Security Posture": "የደህንነት ሁኔታ",
     "Workspace": "የሥራ ቦታ",
     "Proposal Detail": "የፕሮፖዛል ዝርዝር",
     "Location Detail": "የቦታ ዝርዝር",
@@ -114,6 +116,7 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/settings": { label: "Settings", permissions: ["users:manage", "settings:write"] },
   "/settings/users": { label: "Users", permissions: ["users:manage"] },
   "/settings/permissions": { label: "Role Permissions", permissions: ["users:manage", "settings:write"] },
+  "/settings/security": { label: "Security Posture", permissions: ["users:manage", "settings:write"] },
   "/report/employees": { label: "Employee Reports", permissions: ["hr:read", "hr:write"] },
 };
 

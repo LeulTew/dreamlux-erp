@@ -27,6 +27,7 @@ describe("Translation Symmetries & i18n Completeness", () => {
     "app/events/proposals/[id]/page.tsx",
     "app/hr/expenses/approve/page.tsx",
     "app/hr/reports/profit/page.tsx",
+    "app/settings/security/page.tsx",
     "components/app-sidebar.tsx",
   ];
 
