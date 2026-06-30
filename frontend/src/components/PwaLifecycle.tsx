@@ -99,7 +99,7 @@ export default function PwaLifecycle() {
     <>
       {showInstallPrompt ? (
         <div className="fixed bottom-4 left-4 right-4 z-[75] md:left-auto md:right-6 md:w-[360px]">
-          <div className="rounded-md border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Install Dream Lux ERP</p>
             <p className="mt-1 text-sm text-foreground">
               Add the app to this device for a faster launch, an offline shell, and consistent notification readiness.
@@ -108,14 +108,14 @@ export default function PwaLifecycle() {
               <button
                 type="button"
                 onClick={handleInstall}
-                className="min-h-12 flex-1 rounded-md border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition-colors [@media(hover:hover)]:hover:border-primary/50 [@media(hover:hover)]:hover:bg-primary/15"
+                className="min-h-12 flex-1 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition-colors [@media(hover:hover)]:hover:border-primary/50 [@media(hover:hover)]:hover:bg-primary/15"
               >
                 Install app
               </button>
               <button
                 type="button"
                 onClick={handleDismissInstall}
-                className="min-h-12 rounded-md border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/30"
+                className="min-h-12 rounded-xl border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/30"
               >
                 Later
               </button>
@@ -126,7 +126,7 @@ export default function PwaLifecycle() {
 
       {showOfflineNotice ? (
         <div className="pointer-events-none fixed bottom-4 left-4 z-[70] md:bottom-6 md:left-6">
-          <div className="rounded-md border border-border bg-card px-3 py-2 text-[11px] font-semibold text-foreground shadow-sm">
+          <div className="rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-semibold text-foreground shadow-sm">
             <span className="tabular-nums">
               {syncSnapshot.status === "offline"
                 ? "Offline shell active"

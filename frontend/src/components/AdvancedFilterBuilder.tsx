@@ -266,7 +266,7 @@ export default function AdvancedFilterBuilder({
                     <button
                       type="button"
                       onClick={() => setDraftLogic("and")}
-                      className={`h-8 px-3 text-[10px] font-black uppercase tracking-wider rounded-md transition-all ${
+                      className={`h-8 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
                         draftLogic === "and" ? "bg-amber-500/10 text-amber-700" : "text-muted hover:text-foreground"
                       }`}
                     >
@@ -275,7 +275,7 @@ export default function AdvancedFilterBuilder({
                     <button
                       type="button"
                       onClick={() => setDraftLogic("or")}
-                      className={`h-8 px-3 text-[10px] font-black uppercase tracking-wider rounded-md transition-all ${
+                      className={`h-8 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
                         draftLogic === "or" ? "bg-amber-500/10 text-amber-700" : "text-muted hover:text-foreground"
                       }`}
                     >
@@ -328,7 +328,7 @@ export default function AdvancedFilterBuilder({
                       {savedFiltersList.map((f) => (
                         <div
                           key={f.name}
-                          className="flex items-center gap-1 bg-card border border-border px-2.5 py-1 rounded-md text-[10px] font-semibold text-foreground group"
+                          className="flex items-center gap-1 bg-card border border-border px-2.5 py-1 rounded-xl text-[10px] font-semibold text-foreground group"
                         >
                           <button
                             onClick={() => handleLoadFilter(f.name)}

@@ -689,7 +689,7 @@ function ExpenseApprovalContent() {
                               {expense.event_name || "-"}
                             </td>
                             <td className="p-4">
-                              <span className={cn("rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", categoryClass)}>
+                              <span className={cn("rounded-xl border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", categoryClass)}>
                                 {t(expense.category)}
                               </span>
                             </td>

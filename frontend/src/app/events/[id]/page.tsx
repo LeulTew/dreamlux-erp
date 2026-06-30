@@ -558,7 +558,7 @@ function EventProfitPanel({
                     </div>
                   </div>
 
-                  <svg width="100%" height="24" className="rounded-md overflow-hidden bg-muted">
+                  <svg width="100%" height="24" className="rounded-xl overflow-hidden bg-muted">
                     {chartSegments.map((seg, idx: number) => (
                       <rect
                         key={idx}
@@ -1122,7 +1122,7 @@ export default function EventWorkspacePage() {
                         const Content = (
                           <>
                             <span
-                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-xl border ${
                                 item.status === "Done"
                                   ? "border-success bg-success text-white"
                                   : "border-border bg-card-alt text-transparent"

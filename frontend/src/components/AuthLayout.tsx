@@ -349,7 +349,7 @@ function SearchDialog({
               placeholder={lang === "en" ? "Search pages, tools or settings..." : "ገጾችን፣ ዕቃዎችን ወይም ቅንብሮችን ይፈልጉ..."}
               className="w-full bg-transparent border-none text-foreground text-sm focus:outline-none placeholder-muted"
             />
-            <span className="text-[10px] text-muted border border-border px-1.5 py-0.5 rounded-md font-mono shrink-0 select-none">ESC</span>
+            <span className="text-[10px] text-muted border border-border px-1.5 py-0.5 rounded-xl font-mono shrink-0 select-none">ESC</span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 no-scrollbar">
@@ -372,7 +372,7 @@ function SearchDialog({
                         <span className="text-xs font-bold">{lang === "en" ? item.label : item.amLabel}</span>
                         <span className="text-[9px] text-muted">{item.detail || item.href}</span>
                       </div>
-                      <span className="text-[9px] font-black uppercase tracking-wider text-muted bg-border/40 px-2 py-0.5 rounded-md">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-muted bg-border/40 px-2 py-0.5 rounded-xl">
                         {item.category}
                       </span>
                     </button>
@@ -505,7 +505,7 @@ function HeaderUserMenu({
               </span>
               <span>{t("Language")}</span>
             </div>
-            <span className="text-[9px] text-primary font-black uppercase bg-primary-light px-2 py-0.5 rounded-md">
+            <span className="text-[9px] text-primary font-black uppercase bg-primary-light px-2 py-0.5 rounded-xl">
               {lang === "en" ? "English" : "አማርኛ"}
             </span>
           </button>
@@ -535,7 +535,7 @@ function HeaderUserMenu({
               <HiArrowsRightLeft className="w-4 h-4 shrink-0 text-muted" />
               <span>{t("Page Width")}</span>
             </div>
-            <span className="text-[9px] text-primary font-black uppercase bg-primary-light px-2 py-0.5 rounded-md">
+            <span className="text-[9px] text-primary font-black uppercase bg-primary-light px-2 py-0.5 rounded-xl">
               {pageWidth === "contained" ? "Normal" : "Full"}
             </span>
           </button>

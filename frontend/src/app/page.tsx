@@ -144,7 +144,7 @@ function buildColumns(
         header: () => (
           <button
             onClick={toggleAll}
-            className={`w-5 h-5 rounded-md border flex justify-center items-center transition-all ${isAllSelected ? "bg-primary border-primary text-on-primary" : "border-border bg-card-alt"}`}
+            className={`w-5 h-5 rounded-xl border flex justify-center items-center transition-all ${isAllSelected ? "bg-primary border-primary text-on-primary" : "border-border bg-card-alt"}`}
           >
             {isAllSelected && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
           </button>
@@ -152,7 +152,7 @@ function buildColumns(
         cell: ({ row }) => (
           <button
             onClick={() => toggleSelection(row.original.id)}
-            className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedIds.has(row.original.id) ? "bg-primary border-primary text-on-primary" : "border-border bg-card-alt"}`}
+            className={`w-5 h-5 rounded-xl border flex items-center justify-center transition-all ${selectedIds.has(row.original.id) ? "bg-primary border-primary text-on-primary" : "border-border bg-card-alt"}`}
           >
             {selectedIds.has(row.original.id) && <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
           </button>

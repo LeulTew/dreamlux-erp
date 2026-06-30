@@ -103,10 +103,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event ID Prefix *": "Event ID Prefix *",
     "Appearance & Theme": "Appearance & Theme",
     "Select your preferred visual style for the dashboard.": "Select your preferred visual style for the dashboard.",
-    "Security posture review": "Security posture review",
+    "Security posture review": "Security Review",
     "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.":
-      "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.",
-    "Open security posture": "Open security posture",
+      "Check how well the system is protected. A summary prepared by the technical team.",
+    "Open security posture": "Open Security Review",
     "Light Mode": "Light Mode",
     "Dark Mode": "Dark Mode"
   },
@@ -167,7 +167,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Select your preferred visual style for the dashboard.": "ለዳሽቦርዱ የሚመርጡትን የእይታ ገጽታ ይምረጡ።",
     "Security posture review": "የደህንነት ሁኔታ ግምገማ",
     "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.":
-      "ከመጨረሻ ማጽደቅ በፊት የ OWASP፣ RLS፣ audit እና ቀጣይ ጉዳዮች ሁኔታ የተመዘገበበትን የውስጥ የደህንነት ማረጋገጫ ይመልከቱ።",
+      "ስርዓቱ ምን ያህል ተጠብቆ እንዳለ ይመልከቱ። ማጠቃለያው በቴክኒካዊ ቡድኑ የተዘጋጀ ነው።",
     "Open security posture": "የደህንነት ሁኔታን ክፈት",
     "Light Mode": "ብርሃናማ ሁነታ",
     "Dark Mode": "ጨለማማ ሁነታ"
@@ -894,10 +894,10 @@ export default function SettingsPage() {
 
                 </section>
 
-                <section className="rounded-md border border-border bg-card p-5">
+                <section className="rounded-xl border border-border bg-card p-5">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
                         <HiLockClosed className="h-5 w-5" />
                       </div>
                       <div>
@@ -910,7 +910,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => router.push("/settings/security")}
-                      className="inline-flex min-h-12 items-center justify-center rounded-md border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
+                      className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
                     >
                       {t("Open security posture")}
                     </button>
@@ -1486,7 +1486,7 @@ export default function SettingsPage() {
                                 : "border-border bg-card hover:border-border/80 hover:bg-card-alt/30"
                             }`}
                           >
-                            <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
+                            <div className={`w-5 h-5 rounded-xl flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
                               checked
                                 ? "bg-primary border-primary text-on-primary"
                                 : "border-muted-foreground/30 bg-card-alt"
@@ -1550,7 +1550,7 @@ export default function SettingsPage() {
                         : "border-border bg-card hover:border-border/80 hover:bg-card-alt/30"
                     }`}
                   >
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 ${
+                    <div className={`w-5 h-5 rounded-xl flex items-center justify-center border transition-all shrink-0 ${
                       formData.isActive
                         ? "bg-emerald-500 border-emerald-500 text-white"
                         : "border-muted-foreground/30 bg-card-alt"

@@ -4,498 +4,530 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  HiArrowLeft,
-  HiChevronDown,
-  HiChevronUp,
-  HiDocumentText,
-  HiExclamationTriangle,
-  HiLockClosed,
-  HiQueueList,
-  HiShieldCheck,
-} from "react-icons/hi2";
+  ShieldCheck,
+  ShieldAlert,
+  ShieldOff,
+  ChevronDown,
+  ChevronUp,
+  ArrowLeft,
+  Lock,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+} from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/use-language";
 
+// ---------------------------------------------------------------------------
+// Translations — plain, non-technical language for non-technical users
+// ---------------------------------------------------------------------------
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
-    "Security Posture": "Security Posture",
-    "Operational security coverage for admin review. This page summarizes current control status without exposing secrets or live credentials.": "Operational security coverage for admin review. This page summarizes current control status without exposing secrets or live credentials.",
+    "Security Review": "Security Review",
+    "page_subtitle":
+      "A summary of how well the system is protected. Reviewed by the technical team on your behalf.",
     "Go back": "Go back",
-    "Restricted to security reviewers": "Restricted to security reviewers",
-    "Only security reviewers, system managers, and administrators can access this page.": "Only security reviewers, system managers, and administrators can access this page.",
-    "Current Posture": "Current Posture",
-    "Tracked Areas": "Tracked Areas",
-    "Open Follow-ups": "Open Follow-ups",
-    "Security Notes": "Security Notes",
-    "Hidden admin surface": "Hidden admin surface",
-    "This route is intentionally kept out of the main sidebar. Reach it from Settings when conducting an admin or QA security review.": "This route is intentionally kept out of the main sidebar. Reach it from Settings when conducting an admin or QA security review.",
-    "Healthy": "Healthy",
-    "Needs Monitoring": "Needs Monitoring",
-    "Attention Needed": "Attention Needed",
-    "View Doc": "View Doc",
-    "View Issue": "View Issue",
-    "Security review pack": "Security review pack",
-    "Status Summary": "Status Summary",
-    "Control": "Control",
-    "State": "State",
-    "Evidence": "Evidence",
-    "Route hardening and permissions are enforced in the backend, and this page is a reporting surface only.": "Route hardening and permissions are enforced in the backend, and this page is a reporting surface only.",
-    "Review Areas": "Review Areas",
-    "Source Links": "Source Links",
-    "Last reviewed in-code": "Last reviewed in-code",
-    "Security issue tracker": "Security issue tracker",
-    "No runtime secrets, environment values, hashes, or credentials are displayed here.": "No runtime secrets, environment values, hashes, or credentials are displayed here.",
-    "OWASP and API controls": "OWASP and API controls",
-    "Dependency and CVE watch": "Dependency and CVE watch",
-    "Database and RLS posture": "Database and RLS posture",
-    "Audit and activity coverage": "Audit and activity coverage",
-    "Open platform caveats": "Open platform caveats",
-    "Expand": "Expand",
-    "Collapse": "Collapse",
-    "Review the senior prompt, audit reports, and active follow-up issues before production sign-off.": "Review the senior prompt, audit reports, and active follow-up issues before production sign-off.",
-    "Review in Settings": "Review in Settings",
+    "no_secrets_note": "No passwords or private data are shown on this page.",
+    "all_good": "All Good",
+    "needs_attention": "Needs Attention",
+    "being_watched": "Being Monitored",
+    "areas_reviewed": "Areas Reviewed",
+    "protected": "Protected",
+    "monitoring": "Monitoring",
+    "attention": "Action Needed",
+    "last_reviewed": "Last reviewed",
+    "see_detail": "See detail",
+    "hide_detail": "Hide detail",
+    "what_this_means": "What this means",
+    "admin_only_note":
+      "This page is only accessible to system administrators. It is not visible to regular staff.",
+    "back_to_settings": "Back to Settings",
+
+    // --- Area titles (plain language) ---
+    "area_access_title": "Who Can Access What",
+    "area_access_desc":
+      "The system checks that every staff member only sees the data and features they are allowed to use. Access is controlled by their role.",
+    "area_access_details": [
+      "Every page and action is protected — staff can only do what their role allows.",
+      "Access rules are applied on the server, not just on screen, so they cannot be bypassed.",
+      "There is one known limitation being tracked by the team: login tokens are stored in a way that will be improved in a future update.",
+    ],
+
+    "area_software_title": "Software Safety",
+    "area_software_desc":
+      "The system's software components are checked regularly for known safety issues. This is a routine maintenance task.",
+    "area_software_details": [
+      "The technical team reviews software components before each major update.",
+      "This check is done manually during every production release — it is not automated yet.",
+      "Issue #83 adds a permanent checklist so this review is never skipped.",
+    ],
+
+    "area_data_title": "Data Protection",
+    "area_data_desc":
+      "All business data — employees, events, finances — is stored securely. Only the server can access the database directly.",
+    "area_data_details": [
+      "The database has strict rules that prevent unauthorised access even if someone tries to bypass the app.",
+      "No web browser connects directly to the database — all data flows through the secure server.",
+      "Data protection rules have been verified and documented.",
+    ],
+
+    "area_audit_title": "Activity History",
+    "area_audit_desc":
+      "Important actions in the system are recorded so that administrators can review what happened and who did it.",
+    "area_audit_details": [
+      "Events, payroll, proposals, and inventory changes are all tracked.",
+      "Administrators can view a log of recent activity for each record.",
+      "The team will extend this tracking to any new features added in the future.",
+    ],
+
+    "area_caveats_title": "Known Limitations",
+    "area_caveats_desc":
+      "The technical team is aware of a few areas that will be improved in upcoming updates. These are being actively tracked.",
+    "area_caveats_details": [
+      "Login sessions use a method that will be upgraded to a more secure approach in a future release.",
+      "Some internal components will be reorganised as the system grows.",
+      "These are planned improvements, not active problems.",
+    ],
   },
+
   am: {
-    "Security Posture": "የደህንነት ሁኔታ",
-    "Operational security coverage for admin review. This page summarizes current control status without exposing secrets or live credentials.": "ለአስተዳዳሪ ግምገማ የደህንነት ሽፋንን ያሳያል። ይህ ገጽ ሚስጥሮችን ወይም የቀጥታ መግቢያ መረጃን ሳያሳይ የአሁኑን ቁጥጥር ሁኔታ ያጠቃልላል።",
+    "Security Review": "የደህንነት ግምገማ",
+    "page_subtitle":
+      "ስርዓቱ ምን ያህል ተጠብቆ እንዳለ ማጠቃለያ። የቴክኒካዊ ቡድን ለእርስዎ ሲሉ ይገመግማሉ።",
     "Go back": "ተመለስ",
-    "Restricted to security reviewers": "ለደህንነት ግምገማ ብቻ",
-    "Only security reviewers, system managers, and administrators can access this page.": "ይህን ገጽ መድረስ የሚችሉት የደህንነት ግምገማ አካላት፣ የስርዓት አስተዳዳሪዎች እና አስተዳዳሪዎች ብቻ ናቸው።",
-    "Current Posture": "የአሁኑ ሁኔታ",
-    "Tracked Areas": "የሚከታተሉ ክፍሎች",
-    "Open Follow-ups": "ክፍት ቀጣይ ስራዎች",
-    "Security Notes": "የደህንነት ማስታወሻዎች",
-    "Hidden admin surface": "የተደበቀ የአስተዳዳሪ ገጽ",
-    "This route is intentionally kept out of the main sidebar. Reach it from Settings when conducting an admin or QA security review.": "ይህ መንገድ በዋናው የጎን አሰሳ ውስጥ ሆን ተብሎ አልተጨመረም። የአስተዳዳሪ ወይም QA የደህንነት ግምገማ ሲደረግ ከቅንብሮች ውስጥ ይድረሱበት።",
-    "Healthy": "ጤናማ",
-    "Needs Monitoring": "ክትትል ይፈልጋል",
-    "Attention Needed": "ትኩረት ያስፈልጋል",
-    "View Doc": "ሰነድ እይ",
-    "View Issue": "ጉዳይ እይ",
-    "Security review pack": "የደህንነት ግምገማ ጥቅል",
-    "Status Summary": "የሁኔታ ማጠቃለያ",
-    "Control": "መቆጣጠሪያ",
-    "State": "ሁኔታ",
-    "Evidence": "ማስረጃ",
-    "Route hardening and permissions are enforced in the backend, and this page is a reporting surface only.": "የመንገድ ጠንካራነት እና ፈቃዶች በጀርባ አገልግሎት ይፈጸማሉ፣ እና ይህ ገጽ ሪፖርት ለማቅረብ ብቻ ነው።",
-    "Review Areas": "የግምገማ ክፍሎች",
-    "Source Links": "የምንጭ አገናኞች",
-    "Last reviewed in-code": "በኮድ ውስጥ የተገመገመበት ጊዜ",
-    "Security issue tracker": "የደህንነት ጉዳይ መከታተያ",
-    "No runtime secrets, environment values, hashes, or credentials are displayed here.": "እዚህ የሚታዩት የስርዓት ሚስጥሮች፣ የአካባቢ እሴቶች፣ ሃሽ ወይም የመግቢያ መረጃዎች አይደሉም።",
-    "OWASP and API controls": "የ OWASP እና API መቆጣጠሪያዎች",
-    "Dependency and CVE watch": "የጥገኞች እና CVE ክትትል",
-    "Database and RLS posture": "የዳታቤዝ እና RLS ሁኔታ",
-    "Audit and activity coverage": "የኦዲት እና እንቅስቃሴ ሽፋን",
-    "Open platform caveats": "ክፍት የመድረክ ማስጠንቀቂያዎች",
-    "Expand": "ክፈት",
-    "Collapse": "ዝጋ",
-    "Review the senior prompt, audit reports, and active follow-up issues before production sign-off.": "ወደ ፕሮዳክሽን ከመላክ በፊት የከፍተኛ ግምገማ ፕሮምፕቱን፣ የኦዲት ሪፖርቶችን እና ክፍት ቀጣይ ጉዳዮችን ይመልከቱ።",
-    "Review in Settings": "በቅንብሮች ውስጥ ይመልከቱ",
+    "no_secrets_note": "ምስጢሮች ወይም የግል ውሂቦች በዚህ ገጽ ላይ አይታዩም።",
+    "all_good": "ጥሩ ሁኔታ",
+    "needs_attention": "ትኩረት ያስፈልጋል",
+    "being_watched": "እየተከታተለ ነው",
+    "areas_reviewed": "የተገመገሙ ክፍሎች",
+    "protected": "ተጠብቋል",
+    "monitoring": "ክትትል",
+    "attention": "ትኩረት ያስፈልጋል",
+    "last_reviewed": "የተገመገመው",
+    "see_detail": "ዝርዝር ይመልከቱ",
+    "hide_detail": "ዝርዝር ይደብቁ",
+    "what_this_means": "ትርጉሙ ምን ማለት ነው",
+    "admin_only_note":
+      "ይህ ገጽ ለስርዓት አስተዳዳሪዎች ብቻ ነው። ለተራ ሰራተኞች አይታይም።",
+    "back_to_settings": "ወደ ቅንብሮች ተመለስ",
+
+    "area_access_title": "누가 ምን ሊደርስ ይችላል",
+    "area_access_desc":
+      "ስርዓቱ እያንዳንዱ ሰራተኛ የሚፈቀደው ውሂብ እና ባህሪያት ብቻ እንደሚያዩ ያረጋግጣል። ይህ በሚና ቁጥጥር ይደረጋል።",
+    "area_access_details": [
+      "እያንዳንዱ ገጽ እና ድርጊት ተጠብቋል — ሰራተኞች ሚናቸው የሚፈቅደውን ብቻ ማድረግ ይችላሉ።",
+      "ደህንነት ህጎቹ በሰርቨሩ ላይ ተፈጻሚ ናቸው ስለዚህ ሊዘለሉ አይችሉም።",
+      "ቡድኑ የሚከታተለው አንድ ገደብ አለ - ወደፊት በሚደረግ ዝማኔ ይሻሻላል።",
+    ],
+
+    "area_software_title": "የሶፍትዌር ደህንነት",
+    "area_software_desc":
+      "የስርዓቱ ሶፍትዌር ክፍሎች ለሚታወቁ ደህንነት ጉዳዮች በመደበኛነት ይፈተናሉ።",
+    "area_software_details": [
+      "የቴክኒካዊ ቡድን ሶፍትዌር ክፍሎቹን ከእያንዳንዱ ዋና ዝማኔ በፊት ይፈትሻቸዋል።",
+      "ይህ ፍተሻ በእያንዳንዱ ምርት ልቀት ወቅት ይካሄዳል።",
+      "ጉዳይ #83 ይህን ፍተሻ ሁልጊዜ እንዳይዘለል ቋሚ ዝርዝር ይጨምራል።",
+    ],
+
+    "area_data_title": "የውሂብ ጥበቃ",
+    "area_data_desc":
+      "ሁሉም ዝርዝሮች — ሰራተኞች፣ ዝግጅቶች፣ ፋይናንስ — በጥብቅ ይጠበቃሉ። ሰርቨሩ ብቻ ዳታቤዙን ቀጥታ ማግኘት ይችላል።",
+    "area_data_details": [
+      "ዳታቤዙ ፕሮግራሙን ለማለፍ ቢሞከርም ያልተፈቀደ ጋ ሊደርሱ የሚከለክሉ ጥብቅ ህጎች አሉት።",
+      "ምንም ድር አሳሽ ዳታቤዙን ቀጥታ አይደርስም — ሁሉም ውሂብ በደህና ሰርቨሩ ይፈስሳል።",
+      "የውሂብ ጥበቃ ህጎቹ ተረጋግጠው ተመዝግበዋል።",
+    ],
+
+    "area_audit_title": "የተግባር ታሪክ",
+    "area_audit_desc":
+      "አስተዳዳሪዎች ምን እንደተሰራ እና ማን እንደሰራው እንዲያዩ ስርዓቱ ውስጥ አስፈላጊ ድርጊቶች ይቀዳሉ።",
+    "area_audit_details": [
+      "ዝግጅቶች፣ ደሞዝ፣ ሀሳቦች እና የዕቃ ለውጦች ሁሉ ይቀዳሉ።",
+      "አስተዳዳሪዎች ለእያንዳንዱ መዛግብ የቅርብ ጊዜ ተግባሮች ዝርዝር ማየት ይችላሉ።",
+      "ቡድኑ ወደፊት ለሚጨመሩ ባህሪያትም ይህን ክትትል ያራዝማል።",
+    ],
+
+    "area_caveats_title": "የሚታወቁ ገደቦች",
+    "area_caveats_desc":
+      "የቴክኒካዊ ቡድን ወደፊት ዝማኔዎች ውስጥ የሚሻሻሉ ጥቂት ቦታዎችን ያውቃል።",
+    "area_caveats_details": [
+      "ወደፊት ዝማኔ ውስጥ ለበለጠ ደህና አካሄድ ይሻሻላል።",
+      "ስርዓቱ እያደገ ሲሄድ አንዳንድ ክፍሎች ይደራጃሉ።",
+      "እነዚህ የታቀዱ ማሻሻያዎች ናቸው፣ ንቁ ችግሮች አይደሉም።",
+    ],
   },
 };
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type StatusTone = "healthy" | "monitoring" | "attention";
 
-type StatusRow = {
+type AreaRow = {
   id: string;
-  title: string;
+  titleKey: string;
+  descKey: string;
+  detailsKey: string;
   status: StatusTone;
-  evidence: string;
-  details: string[];
-  links: Array<{ label: string; href: string; type: "doc" | "issue" }>;
 };
 
-const STATUS_STYLES: Record<StatusTone, { label: string; badge: string; dot: string }> = {
-  healthy: {
-    label: "Healthy",
-    badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-    dot: "bg-emerald-400",
+// ---------------------------------------------------------------------------
+// Static status area definitions (no jargon exposed to UI)
+// ---------------------------------------------------------------------------
+const AREAS: AreaRow[] = [
+  {
+    id: "access",
+    titleKey: "area_access_title",
+    descKey: "area_access_desc",
+    detailsKey: "area_access_details",
+    status: "monitoring",
   },
-  monitoring: {
-    label: "Needs Monitoring",
-    badge: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-    dot: "bg-amber-400",
+  {
+    id: "software",
+    titleKey: "area_software_title",
+    descKey: "area_software_desc",
+    detailsKey: "area_software_details",
+    status: "monitoring",
   },
-  attention: {
-    label: "Attention Needed",
-    badge: "border-rose-500/30 bg-rose-500/10 text-rose-300",
-    dot: "bg-rose-400",
+  {
+    id: "data",
+    titleKey: "area_data_title",
+    descKey: "area_data_desc",
+    detailsKey: "area_data_details",
+    status: "healthy",
   },
-};
+  {
+    id: "audit",
+    titleKey: "area_audit_title",
+    descKey: "area_audit_desc",
+    detailsKey: "area_audit_details",
+    status: "healthy",
+  },
+  {
+    id: "caveats",
+    titleKey: "area_caveats_title",
+    descKey: "area_caveats_desc",
+    detailsKey: "area_caveats_details",
+    status: "attention",
+  },
+];
 
 const REVIEWED_DATE = "2026-06-30";
 
+// ---------------------------------------------------------------------------
+// Status config — visual only, no technical labels shown to user
+// ---------------------------------------------------------------------------
+const STATUS_CONFIG: Record<
+  StatusTone,
+  {
+    labelKey: string;
+    badge: string;
+    iconBg: string;
+    border: string;
+    Icon: typeof ShieldCheck;
+  }
+> = {
+  healthy: {
+    labelKey: "protected",
+    badge: "bg-success/10 text-success border-success/20",
+    iconBg: "bg-success/10 text-success",
+    border: "border-border/40 hover:border-success/30",
+    Icon: ShieldCheck,
+  },
+  monitoring: {
+    labelKey: "monitoring",
+    badge: "bg-warning/10 text-warning border-warning/20",
+    iconBg: "bg-warning/10 text-warning",
+    border: "border-border/40 hover:border-warning/30",
+    Icon: ShieldAlert,
+  },
+  attention: {
+    labelKey: "attention",
+    badge: "bg-danger/10 text-danger border-danger/20",
+    iconBg: "bg-danger/10 text-danger",
+    border: "border-border/40 hover:border-danger/30",
+    Icon: ShieldOff,
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Page Component
+// ---------------------------------------------------------------------------
 export default function SecurityPosturePage() {
   const router = useRouter();
   const { lang } = useLanguage();
   const { hasPermission, isAuthenticated, isLoading: authLoading } = useAuth();
-  const [expandedId, setExpandedId] = useState<string>("owasp-api");
-  const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
 
-  const canAccessSecurity = hasPermission("users:manage") || hasPermission("settings:write");
-
-  const statusRows = useMemo<StatusRow[]>(
-    () => [
-      {
-        id: "owasp-api",
-        title: t("OWASP and API controls"),
-        status: "monitoring",
-        evidence:
-          "Backend permission middleware and permission-aware UI are in place, but localStorage JWT remains an open XSS blast-radius caveat documented in project context and audit reports.",
-        details: [
-          "Dynamic permission slugs gate direct URLs and backend routes across HR, events, assets, payroll, and settings surfaces.",
-          "The senior review process explicitly audits BOLA, BFLA, sensitive response leakage, and frontend/backend permission parity.",
-          "Known caveat: JWT storage in localStorage is still tracked as a risk until the auth model is upgraded.",
-        ],
-        links: [
-          {
-            label: t("View Doc"),
-            href: "https://github.com/LeulTew/dreamlux-erp/blob/main/docs/SENIOR_ISSUE_REVIEW_PROMPT.md",
-            type: "doc",
-          },
-          {
-            label: t("View Doc"),
-            href: "https://github.com/LeulTew/dreamlux-erp/blob/main/project-context.md",
-            type: "doc",
-          },
-        ],
-      },
-      {
-        id: "dependency-cve",
-        title: t("Dependency and CVE watch"),
-        status: "monitoring",
-        evidence:
-          "Security review guidance exists, but dependency/CVE review is still a manual cadence item rather than a live in-app feed.",
-        details: [
-          "This page intentionally links to the review pack and active GitHub follow-up issues instead of attempting to surface unverified live CVE data.",
-          "The operational expectation is to run dependency and release checks during senior review and before production sign-off.",
-          "Issue #83 adds a stable admin checkpoint so the review does not depend on tribal knowledge.",
-        ],
-        links: [
-          {
-            label: t("View Issue"),
-            href: "https://github.com/LeulTew/dreamlux-erp/issues/83",
-            type: "issue",
-          },
-          {
-            label: t("View Doc"),
-            href: "https://github.com/LeulTew/dreamlux-erp/blob/main/docs/CODEX_AUDIT_REPORT.md",
-            type: "doc",
-          },
-        ],
-      },
-      {
-        id: "db-rls",
-        title: t("Database and RLS posture"),
-        status: "healthy",
-        evidence:
-          "RLS hardening and public privilege revocation are already established. The backend remains the sole data-access gatekeeper.",
-        details: [
-          "The database review documents row-level security coverage across the application tables.",
-          "The frontend does not connect directly to privileged data stores; privileged reads flow through the Express API.",
-          "Security checks for assignment integrity and row-scope boundaries are already covered by backend tests.",
-        ],
-        links: [
-          {
-            label: t("View Doc"),
-            href: "https://github.com/LeulTew/dreamlux-erp/blob/main/docs/issues/issue_31_db_rls_hardening.md",
-            type: "doc",
-          },
-        ],
-      },
-      {
-        id: "audit-coverage",
-        title: t("Audit and activity coverage"),
-        status: "healthy",
-        evidence:
-          "Shared activity feed, proposal/event audit logs, notification hooks, and setup-doctype notifications are present for the current tracked surfaces.",
-        details: [
-          "Activity drawer and normalized activity APIs now cover cross-record review flows.",
-          "Financial, setup, inventory, payroll, and proposal/event changes are expected to remain inside the senior review and audit trail process.",
-          "Future new doctypes should extend the same actor, source, and redaction model rather than inventing a second audit path.",
-        ],
-        links: [
-          {
-            label: t("View Issue"),
-            href: "https://github.com/LeulTew/dreamlux-erp/issues/82",
-            type: "issue",
-          },
-          {
-            label: t("View Issue"),
-            href: "https://github.com/LeulTew/dreamlux-erp/issues/81",
-            type: "issue",
-          },
-        ],
-      },
-      {
-        id: "open-caveats",
-        title: t("Open platform caveats"),
-        status: "attention",
-        evidence:
-          "The codebase still carries known architecture caveats: localStorage JWT usage, in-memory permission cache limits, and the oversized events route file.",
-        details: [
-          "These are not regressions introduced by this issue, but they remain relevant for security posture tracking and production planning.",
-          "This page keeps those caveats visible to admins without exposing any sensitive runtime values.",
-          "Treat these as follow-up hardening targets during future auth and backend modularization work.",
-        ],
-        links: [
-          {
-            label: t("View Doc"),
-            href: "https://github.com/LeulTew/dreamlux-erp/blob/main/project-context.md",
-            type: "doc",
-          },
-        ],
-      },
-    ],
-    [t],
+  const t = useCallback(
+    (key: string) => TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"]?.[key] || key,
+    [lang],
+  );
+  const tArr = useCallback(
+    (key: string): string[] =>
+      (TRANSLATIONS[lang]?.[key] as unknown as string[]) ||
+      (TRANSLATIONS["en"]?.[key] as unknown as string[]) ||
+      [],
+    [lang],
   );
 
-  const counts = statusRows.reduce(
-    (acc, row) => {
-      acc.total += 1;
-      acc[row.status] += 1;
-      return acc;
-    },
-    { total: 0, healthy: 0, monitoring: 0, attention: 0 },
+  const [expandedId, setExpandedId] = useState<string>("access");
+
+  const canAccess = hasPermission("users:manage") || hasPermission("settings:write");
+
+  const counts = useMemo(
+    () =>
+      AREAS.reduce(
+        (acc, a) => {
+          acc.total += 1;
+          acc[a.status] += 1;
+          return acc;
+        },
+        { total: 0, healthy: 0, monitoring: 0, attention: 0 },
+      ),
+    [],
   );
 
+  // ── Loading skeleton ─────────────────────────────────────────────────────
   if (authLoading) {
     return (
       <AuthLayout>
-        <div className="page-container pb-16">
-          <div className="h-40 animate-pulse rounded-md border border-border bg-card" />
+        <div className="page-container pb-16 space-y-4">
+          <div className="h-24 animate-pulse rounded-lg border border-border bg-card" />
+          <div className="h-40 animate-pulse rounded-lg border border-border bg-card" />
         </div>
       </AuthLayout>
     );
   }
 
-  if (!isAuthenticated || !canAccessSecurity) {
+  // ── Permission gate ───────────────────────────────────────────────────────
+  if (!isAuthenticated || !canAccess) {
     return (
       <AuthLayout>
         <ForbiddenState
-          title="Restricted to security reviewers"
-          description="Only security reviewers, system managers, and administrators can access this page."
+          title={t("Restricted to security reviewers")}
+          description={t("Only security reviewers, system managers, and administrators can access this page.")}
         />
       </AuthLayout>
     );
   }
 
+  // ── Overall posture banner ───────────────────────────────────────────────
+  const overallStatus: StatusTone =
+    counts.attention > 0 ? "attention" : counts.monitoring > 0 ? "monitoring" : "healthy";
+  const OverallIcon = STATUS_CONFIG[overallStatus].Icon;
+
   return (
     <AuthLayout>
-      <div className="page-container pb-16 space-y-6">
-        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-3">
+      <div className="page-container pb-16 space-y-6 pt-2 md:py-4 2xl:py-8 px-3 sm:px-4 2xl:px-8">
+
+        {/* ── Page header ─────────────────────────────────────────────────── */}
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-card text-muted transition-colors [@media(hover:hover)]:hover:text-foreground"
-              title={t("Go back")}
+              aria-label={t("Go back")}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/40 bg-card text-muted transition-colors [@media(hover:hover)]:hover:text-foreground"
             >
-              <HiArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
             </button>
-            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
-              <HiLockClosed className="h-6 w-6" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+              <Lock className="h-4 w-4" />
             </div>
-            <div className="space-y-1">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("Security Posture")}</h1>
-              <p className="max-w-3xl text-sm text-muted">
-                {t(
-                  "Operational security coverage for admin review. This page summarizes current control status without exposing secrets or live credentials.",
-                )}
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-foreground leading-tight">
+                {t("Security Review")}
+              </h1>
+              <p className="text-[11px] text-muted leading-tight max-w-sm">
+                {t("page_subtitle")}
               </p>
             </div>
           </div>
 
-          <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs font-semibold text-amber-200">
-            <div className="flex items-center gap-2">
-              <HiExclamationTriangle className="h-4 w-4 shrink-0" />
-              <span>{t("No runtime secrets, environment values, hashes, or credentials are displayed here.")}</span>
-            </div>
+          {/* Reassurance note */}
+          <div className="self-start sm:self-auto flex items-center gap-2 rounded-lg border border-border/30 bg-card-alt px-3 py-2 text-[11px] font-medium text-muted">
+            <Info className="h-3.5 w-3.5 shrink-0 text-primary" />
+            <span>{t("no_secrets_note")}</span>
           </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <MetricCard label={t("Tracked Areas")} value={counts.total} tone="neutral" />
-          <MetricCard label={t("Current Posture")} value={counts.healthy} note={t("Healthy")} tone="healthy" />
-          <MetricCard label={t("Open Follow-ups")} value={counts.monitoring} note={t("Needs Monitoring")} tone="monitoring" />
-          <MetricCard label={t("Security Notes")} value={counts.attention} note={t("Attention Needed")} tone="attention" />
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
-          <div className="space-y-4 rounded-md border border-border bg-card p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">{t("Status Summary")}</h2>
-                <p className="mt-1 text-xs text-muted">
-                  {t("Route hardening and permissions are enforced in the backend, and this page is a reporting surface only.")}
-                </p>
-              </div>
-              <span className="rounded-sm border border-border bg-card-alt px-2 py-1 text-[11px] font-semibold text-muted">
-                {t("Last reviewed in-code")}: {REVIEWED_DATE}
-              </span>
-            </div>
-
-            <div className="overflow-hidden rounded-md border border-border">
-              <div className="grid grid-cols-[minmax(0,1.2fr)_140px_minmax(0,1.7fr)] border-b border-border bg-card-alt px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted">
-                <span>{t("Control")}</span>
-                <span>{t("State")}</span>
-                <span>{t("Evidence")}</span>
-              </div>
-              {statusRows.map((row) => {
-                const open = expandedId === row.id;
-                const statusStyle = STATUS_STYLES[row.status];
-                return (
-                  <div key={row.id} className="border-b border-border last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId((current) => (current === row.id ? "" : row.id))}
-                      className="grid min-h-[72px] w-full grid-cols-[minmax(0,1.2fr)_140px_minmax(0,1.7fr)] items-center gap-3 px-4 py-3 text-left transition-colors [@media(hover:hover)]:hover:bg-card-alt/60"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">{row.title}</p>
-                        <p className="mt-1 text-[11px] text-muted">{open ? t("Collapse") : t("Expand")}</p>
-                      </div>
-                      <div>
-                        <span className={`inline-flex items-center gap-2 rounded-sm border px-2 py-1 text-[11px] font-semibold ${statusStyle.badge}`}>
-                          <span className={`h-2 w-2 rounded-full ${statusStyle.dot}`} />
-                          {t(statusStyle.label)}
-                        </span>
-                      </div>
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-xs leading-5 text-muted">{row.evidence}</p>
-                        {open ? <HiChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-muted" /> : <HiChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted" />}
-                      </div>
-                    </button>
-
-                    {open && (
-                      <div className="grid gap-4 border-t border-border bg-card-alt/30 px-4 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(240px,0.8fr)]">
-                        <div>
-                          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">{t("Review Areas")}</h3>
-                          <ul className="mt-3 space-y-2">
-                            {row.details.map((detail) => (
-                              <li key={detail} className="flex items-start gap-2 text-sm text-foreground">
-                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                                <span>{detail}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div>
-                          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">{t("Source Links")}</h3>
-                          <div className="mt-3 flex flex-col gap-2">
-                            {row.links.map((link) => (
-                              <Link
-                                key={`${row.id}-${link.href}`}
-                                href={link.href}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex min-h-12 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
-                              >
-                                <span className="flex items-center gap-2">
-                                  {link.type === "doc" ? <HiDocumentText className="h-4 w-4" /> : <HiQueueList className="h-4 w-4" />}
-                                  <span>{link.label}</span>
-                                </span>
-                                <span className="text-xs text-muted">{link.type === "doc" ? "GitHub doc" : "GitHub issue"}</span>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+        {/* ── Overall status banner ────────────────────────────────────────── */}
+        <div
+          data-testid="overall-status-banner"
+          className={`flex items-center gap-4 rounded-xl border p-5 ${
+            overallStatus === "healthy"
+              ? "border-success/20 bg-success/5"
+              : overallStatus === "monitoring"
+                ? "border-warning/20 bg-warning/5"
+                : "border-danger/20 bg-danger/5"
+          }`}
+        >
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${STATUS_CONFIG[overallStatus].iconBg}`}
+          >
+            <OverallIcon className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+              {t("last_reviewed")}: {REVIEWED_DATE}
+            </p>
+            <p className="mt-0.5 text-base font-bold text-foreground">
+              {overallStatus === "healthy"
+                ? t("all_good")
+                : overallStatus === "monitoring"
+                  ? t("being_watched")
+                  : t("needs_attention")}
+            </p>
           </div>
 
-          <aside className="space-y-4">
-            <div className="rounded-md border border-border bg-card p-5">
-              <div className="flex items-center gap-2">
-                <HiShieldCheck className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">{t("Security review pack")}</h2>
-              </div>
-              <p className="mt-2 text-sm text-muted">
-                {t("Review the senior prompt, audit reports, and active follow-up issues before production sign-off.")}
-              </p>
-              <div className="mt-4 flex flex-col gap-2">
-                <Link
-                  href="https://github.com/LeulTew/dreamlux-erp/blob/main/docs/SENIOR_ISSUE_REVIEW_PROMPT.md"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-12 items-center justify-between rounded-md border border-border bg-card-alt px-3 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
-                >
-                  <span>docs/SENIOR_ISSUE_REVIEW_PROMPT.md</span>
-                  <HiDocumentText className="h-4 w-4 shrink-0" />
-                </Link>
-                <Link
-                  href="https://github.com/LeulTew/dreamlux-erp/blob/main/docs/FINAL_SRD_AUDIT_REPORT.md"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-12 items-center justify-between rounded-md border border-border bg-card-alt px-3 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
-                >
-                  <span>docs/FINAL_SRD_AUDIT_REPORT.md</span>
-                  <HiDocumentText className="h-4 w-4 shrink-0" />
-                </Link>
-                <Link
-                  href="https://github.com/LeulTew/dreamlux-erp/blob/main/docs/CODEX_AUDIT_REPORT.md"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-12 items-center justify-between rounded-md border border-border bg-card-alt px-3 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
-                >
-                  <span>docs/CODEX_AUDIT_REPORT.md</span>
-                  <HiDocumentText className="h-4 w-4 shrink-0" />
-                </Link>
-              </div>
-            </div>
+          {/* KPI strip */}
+          <div className="hidden sm:flex items-center gap-6">
+            <KpiChip
+              value={counts.healthy}
+              label={t("protected")}
+              color="text-success"
+              Icon={CheckCircle2}
+            />
+            <KpiChip
+              value={counts.monitoring}
+              label={t("monitoring")}
+              color="text-warning"
+              Icon={AlertCircle}
+            />
+            <KpiChip
+              value={counts.attention}
+              label={t("attention")}
+              color="text-danger"
+              Icon={ShieldOff}
+            />
+          </div>
+        </div>
 
-            <div className="rounded-md border border-border bg-card p-5">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">{t("Hidden admin surface")}</h2>
-              <p className="mt-2 text-sm text-muted">
-                {t(
-                  "This route is intentionally kept out of the main sidebar. Reach it from Settings when conducting an admin or QA security review.",
-                )}
-              </p>
-              <Link
-                href="/settings"
-                className="mt-4 inline-flex min-h-12 items-center justify-center rounded-md border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
+        {/* ── Review area cards ────────────────────────────────────────────── */}
+        <div className="space-y-3">
+          {AREAS.map((area) => {
+            const cfg = STATUS_CONFIG[area.status];
+            const isOpen = expandedId === area.id;
+            const details = tArr(area.detailsKey);
+
+            return (
+              <div
+                key={area.id}
+                data-testid={`area-card-${area.id}`}
+                className={`rounded-xl border bg-card transition-colors ${cfg.border}`}
               >
-                {t("Review in Settings")}
-              </Link>
-            </div>
-          </aside>
-        </section>
+                {/* Collapsed row / toggle */}
+                <button
+                  type="button"
+                  data-testid={`area-toggle-${area.id}`}
+                  onClick={() =>
+                    setExpandedId((cur) => (cur === area.id ? "" : area.id))
+                  }
+                  className="flex w-full items-center gap-4 px-5 py-4 text-left"
+                >
+                  {/* Icon */}
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${cfg.iconBg}`}
+                  >
+                    <cfg.Icon className="h-4.5 w-4.5" />
+                  </div>
+
+                  {/* Title + desc */}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground leading-tight">
+                      {t(area.titleKey)}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted leading-snug line-clamp-2">
+                      {t(area.descKey)}
+                    </p>
+                  </div>
+
+                  {/* Status badge */}
+                  <span
+                    className={`hidden sm:inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-semibold ${cfg.badge}`}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                    {t(cfg.labelKey)}
+                  </span>
+
+                  {/* Chevron */}
+                  <span className="shrink-0 text-muted">
+                    {isOpen ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </span>
+                </button>
+
+                {/* Expanded detail */}
+                {isOpen && (
+                  <div
+                    data-testid={`area-detail-${area.id}`}
+                    className="border-t border-border/30 bg-card-alt/50 px-5 py-4 space-y-4"
+                  >
+                    {/* Detail points */}
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted mb-2">
+                        {t("what_this_means")}
+                      </p>
+                      <ul className="space-y-2">
+                        {details.map((d, i) => (
+                          <li
+                            key={i}
+                            className="flex items-start gap-2 text-sm text-foreground"
+                          >
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                            <span>{d}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Footer note ─────────────────────────────────────────────────── */}
+        <footer className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/30 bg-card-alt px-5 py-4">
+          <p className="text-[11px] text-muted">{t("admin_only_note")}</p>
+          <Link
+            href="/settings"
+            className="self-start sm:self-auto inline-flex items-center gap-2 rounded-lg border border-border/40 bg-card px-4 py-2 text-xs font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {t("back_to_settings")}
+          </Link>
+        </footer>
       </div>
     </AuthLayout>
   );
 }
 
-function MetricCard({
-  label,
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+function KpiChip({
   value,
-  note,
-  tone,
+  label,
+  color,
+  Icon,
 }: {
-  label: string;
   value: number;
-  note?: string;
-  tone: "neutral" | "healthy" | "monitoring" | "attention";
+  label: string;
+  color: string;
+  Icon: typeof CheckCircle2;
 }) {
-  const toneClasses =
-    tone === "healthy"
-      ? "border-emerald-500/20 bg-emerald-500/5"
-      : tone === "monitoring"
-        ? "border-amber-500/20 bg-amber-500/5"
-        : tone === "attention"
-          ? "border-rose-500/20 bg-rose-500/5"
-          : "border-border bg-card";
-
   return (
-    <div className={`rounded-md border p-4 ${toneClasses}`}>
-      <p className="text-[11px] font-medium uppercase tracking-wider text-muted">{label}</p>
-      <p className="mt-1 text-4xl font-black tabular-nums tracking-tight text-foreground">{value}</p>
-      {note ? <p className="mt-1 text-xs font-medium text-muted">{note}</p> : null}
+    <div className="flex flex-col items-center gap-0.5">
+      <div className={`flex items-center gap-1 text-2xl font-black tabular-nums tracking-tight ${color}`}>
+        <Icon className="h-4 w-4" />
+        {value}
+      </div>
+      <span className="text-[10px] font-medium text-muted uppercase tracking-wide">{label}</span>
     </div>
   );
 }

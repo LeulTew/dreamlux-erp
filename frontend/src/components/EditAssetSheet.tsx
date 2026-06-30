@@ -366,7 +366,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
             <div className="space-y-4">
               <div
                 onClick={() => !updateMutation.isPending && fileInputRef.current?.click()}
-                className={`relative w-full aspect-square lg:aspect-video rounded-md overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
+                className={`relative w-full aspect-square lg:aspect-video rounded-xl overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
                   updateMutation.isPending ? "cursor-wait opacity-80" : "cursor-pointer group"
                 }`}
               >
@@ -437,7 +437,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   type="button"
                   onClick={() => rotateMutation.mutate()}
                   disabled={rotateMutation.isPending || updateMutation.isPending}
-                  className="flex items-center justify-center gap-2 w-full h-11 rounded-md text-sm font-semibold uppercase tracking-wider border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
+                  className="flex items-center justify-center gap-2 w-full h-11 rounded-xl text-sm font-semibold uppercase tracking-wider border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
                 >
                   <HiArrowPath className={`w-4 h-4 text-primary ${rotateMutation.isPending ? "animate-spin" : ""}`} />
                   {rotateMutation.isPending ? t("Rotating...") : t("Rotate Asset 90°")}
