@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import NotificationInbox from "../components/NotificationInbox";
 import NotificationsPage from "../app/notifications/page";
 
@@ -39,6 +39,16 @@ vi.mock("@/hooks/use-language", () => ({
 }));
 
 const mockInvalidateQueries = vi.fn();
+const requestPermissionMock = vi.fn(() => Promise.resolve("granted"));
+
+Object.defineProperty(window, "Notification", {
+  value: {
+    permission: "default",
+    requestPermission: requestPermissionMock,
+  },
+  configurable: true,
+});
+
 vi.mock("@tanstack/react-query", () => ({
   useQuery: ({ queryKey }: { queryKey: string[] }) => {
     if (queryKey[0] === "notifications-unread-count") {
@@ -104,6 +114,13 @@ vi.mock("next/navigation", () => ({
 describe("Notifications System UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, "Notification", {
+      value: {
+        permission: "default",
+        requestPermission: requestPermissionMock,
+      },
+      configurable: true,
+    });
   });
 
   test("renders NotificationInbox correctly and shows unread badge", () => {
@@ -143,5 +160,14 @@ describe("Notifications System UI", () => {
     // Priority badges
     expect(screen.getByText("High")).toBeDefined();
     expect(screen.getByText("Low")).toBeDefined();
+  });
+
+  test("NotificationInbox requests permission only after explicit user action", async () => {
+    render(<NotificationInbox />);
+
+    fireEvent.click(screen.getByRole("button", { name: /open notifications/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Enable" }));
+
+    expect(requestPermissionMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -27,15 +27,6 @@ export default function PayrollReminder() {
               window.location.href = `/hr/payments/run?period_type=${type}`;
             };
             localStorage.setItem("payroll_notified_date", todayStr);
-          } else if (Notification.permission !== "denied") {
-            Notification.requestPermission().then((permission) => {
-              if (permission === "granted") {
-                new Notification("Payroll Reminder", {
-                  body: "Reminders enabled! We'll notify you on payroll days (1st, 15th, and 30th).",
-                });
-                localStorage.setItem("payroll_notified_date", todayStr);
-              }
-            });
           }
         }
       }
