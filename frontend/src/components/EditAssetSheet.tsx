@@ -510,7 +510,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   variant="destructive"
                   loading={deleteMutation.isPending}
                   onClick={handleDelete}
-                  className="h-10 px-4 rounded-md flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                  className="h-10 px-4 rounded-2xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
                   title={t("Delete Asset")}
                 >
                   <HiTrash className="w-4.5 h-4.5" />
@@ -525,7 +525,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     setIsDuplicateMode(true);
                     setName(name + " (Copy)");
                   }}
-                  className="h-10 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                  className="h-10 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
                 >
                   <HiDocumentDuplicate className="w-4.5 h-4.5" />
                   {t("Duplicate")}

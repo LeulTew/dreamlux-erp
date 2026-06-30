@@ -447,7 +447,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               {event && (
                 <Link
                   href={`/events/${event.id}`}
-                  className="h-10 px-4 rounded-xl bg-card-alt border border-border text-muted hover:text-foreground text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                  className="h-10 px-4 rounded-2xl bg-card-alt border border-border text-muted hover:text-foreground text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
                   title={t('Open Event Workspace')}
                 >
                   <HiArrowTopRightOnSquare className="w-4 h-4" />
@@ -461,7 +461,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                   variant="destructive"
                   loading={deleteMutation.isPending}
                   onClick={() => setShowDeleteModal(true)}
-                  className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                  className="h-10 px-4 rounded-2xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
                   title={t("Delete Event")}
                 >
                   <HiTrash className="w-4.5 h-4.5" />
@@ -479,7 +479,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                     }));
                     setIsDuplicateMode(true);
                   }}
-                  className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                  className="h-10 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
                 >
                   <HiDocumentDuplicate className="w-4.5 h-4.5" />
                   {t("Duplicate")}
@@ -490,7 +490,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                 <Button
                   type="button"
                   onClick={handleReset}
-                  className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+                  className="h-10 px-4 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
                 >
                   <HiArrowPath className="w-4.5 h-4.5" />
                   {t("Reset Changes")}
@@ -500,7 +500,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
               <Button
                 type="submit"
                 loading={saveMutation.isPending}
-                className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
               >
                 <HiCheck className="w-4.5 h-4.5" />
                 {isDuplicateMode ? t("Duplicate Event") : event ? t("Save Changes") : t("Create Event")}
