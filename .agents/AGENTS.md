@@ -29,6 +29,7 @@ These rules apply to all AI agents working in this repository.
 
 - **Package Manager**: Always use **Bun** (`bun`) only. Do not use npm or yarn. If pnpm is needed, use it only as a second-to-last resort.
 - **Commands**: Run tasks like database migrations, tests, and linting through bun (e.g. `bun run db:migrate`, `bun run lint`).
+- **Database Migrations & DDL Changes**: Any task introducing database structure modifications (SQL/DDL changes, new tables, or new columns) MUST have its matching migration applied directly to the remote Supabase database (e.g., using Supabase MCP tools like `apply_migration` or the Supabase CLI) during the implementation and deployment phase, and verified before concluding the task. Never leave the production database schema out of sync with the codebase.
 
 ---
 

@@ -56,7 +56,25 @@ interface NotificationItem {
   created_at?: string;
   actor_username?: string | null;
   actor_name?: string | null;
+  priority?: string | null;
 }
+const renderPriorityBadge = (priority?: string | null) => {
+  if (priority === "high") {
+    return (
+      <span className="inline-flex shrink-0 items-center px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider text-rose-500 bg-rose-500/10 border border-rose-500/20 leading-none">
+        High
+      </span>
+    );
+  }
+  if (priority === "low") {
+    return (
+      <span className="inline-flex shrink-0 items-center px-1 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider text-muted-foreground bg-neutral-100 dark:bg-neutral-800 border border-border leading-none">
+        Low
+      </span>
+    );
+  }
+  return null;
+};
 
 export default function NotificationInbox() {
   const { lang } = useLanguage();
@@ -220,24 +238,26 @@ export default function NotificationInbox() {
               recentNotifications.map((n) => (
                 <div
                   key={n.id}
-                  className={`group relative rounded-lg border p-2 flex items-start gap-2.5 transition-all cursor-pointer ${
-                    n.read_at ? "bg-card border-border/40" : "bg-primary-light/5 border-primary/10"
-                  } [@media(hover:hover)]:hover:border-primary/25`}
+                  className={`group relative rounded-lg border-l-4 p-2.5 flex items-start gap-2.5 transition-all cursor-pointer ${
+                    n.read_at 
+                      ? "bg-card border-y-border/40 border-r-border/40 border-l-transparent text-muted-foreground/90" 
+                      : "bg-primary/5 dark:bg-primary/10 border-y-primary/20 border-r-primary/20 border-l-primary shadow-sm"
+                  } hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40`}
                   onClick={() => handleNotificationClick(n)}
                 >
-                  {/* Unread indicator */}
-                  {!n.read_at && (
-                    <span className="absolute top-2.5 left-2 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                  )}
-
-                  <div className={`flex-1 min-w-0 ${!n.read_at ? "pl-2" : ""}`}>
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-[11px] font-bold text-foreground leading-tight truncate">{n.title}</h4>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h4 className="text-[11px] font-bold text-foreground leading-tight truncate">{n.title}</h4>
+                        {renderPriorityBadge(n.priority)}
+                      </div>
                       <span className="text-[9px] font-mono text-muted shrink-0">
                         {n.created_at ? String(n.created_at).slice(11, 16) : ""}
                       </span>
                     </div>
-                    <p className="text-[10px] text-muted leading-relaxed mt-0.5 break-words line-clamp-2">
+                    <p className={`text-[10px] leading-relaxed mt-1 break-words line-clamp-2 ${
+                      n.read_at ? "text-muted-foreground/75" : "text-foreground/90 font-medium"
+                    }`}>
                       {n.message}
                     </p>
                   </div>
