@@ -5,9 +5,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ActivityDrawer from "./ActivityDrawer";
+import { api } from "@/lib/api";
 
 vi.mock("@/hooks/use-language", () => ({
   useLanguage: () => ({ lang: "en" }),
+}));
+
+vi.mock("@/lib/api", () => ({
+  api: {
+    get: vi.fn(),
+  },
 }));
 
 function renderDrawer(props: Partial<React.ComponentProps<typeof ActivityDrawer>> = {}) {
@@ -36,9 +43,8 @@ describe("ActivityDrawer", () => {
   });
 
   it("fetches encoded activity feed and renders actor, source, and before/after values", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    const mockData = {
+      data: {
         activity: [
           {
             id: "log-1",
@@ -56,9 +62,9 @@ describe("ActivityDrawer", () => {
             created_at: "2026-06-30T02:00:00.000Z",
           },
         ],
-      }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
+      },
+    };
+    vi.mocked(api.get).mockResolvedValue(mockData);
 
     renderDrawer();
 
@@ -66,7 +72,12 @@ describe("ActivityDrawer", () => {
       expect(screen.getByText("Updated record")).toBeInTheDocument();
     });
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/activity?entity_type=event&entity_id=event+123");
+    expect(api.get).toHaveBeenCalledWith("/api/activity", {
+      params: {
+        entity_type: "event",
+        entity_id: "event 123",
+      },
+    });
     expect(screen.getByText("Ops Manager")).toBeInTheDocument();
     expect(screen.getByText(/Source:/)).toBeInTheDocument();
     expect(screen.getByText("event_logs")).toBeInTheDocument();
@@ -75,10 +86,9 @@ describe("ActivityDrawer", () => {
   });
 
   it("renders empty state and closes from the header button", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ activity: [] }),
-    }));
+    vi.mocked(api.get).mockResolvedValue({
+      data: { activity: [] },
+    });
     const onClose = vi.fn();
 
     renderDrawer({ onClose });

@@ -98,7 +98,7 @@ export default function EventsTrashPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/events"
-              className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"
+              className="flex h-12 w-12 items-center justify-center rounded-[6px] border border-border bg-card-alt text-muted [@media(hover:hover)]:hover:bg-neutral-900 [@media(hover:hover)]:hover:text-white transition-all duration-200"
               aria-label="Back to events"
             >
               <HiArrowLeft className="h-5 w-5" />

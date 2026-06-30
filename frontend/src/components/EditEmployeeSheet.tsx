@@ -716,7 +716,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                 variant="destructive"
                 loading={deleteMutation.isPending}
                 onClick={() => setShowDeleteModal(true)}
-                className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                className="h-10 px-4 rounded-md flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
                 title={t("Delete Permanently")}
               >
                 <HiTrash className="w-4.5 h-4.5" />
@@ -742,7 +742,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                     notify.error("Error", "Failed to resolve next sequential ID");
                   }
                 }}
-                className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                className="h-10 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
               >
                 <HiDocumentDuplicate className="w-4.5 h-4.5" />
                 {t("Duplicate")}
@@ -752,7 +752,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             <Button
               type="button"
               onClick={() => setIsActivityOpen(true)}
-              className="h-10 px-4 rounded-xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+              className="h-10 px-4 rounded-md bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
             >
               <HiOutlineClock className="w-4 h-4" />
               {t("Activity")}
@@ -761,7 +761,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             <Button
               type="button"
               onClick={handleReset}
-              className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+              className="h-10 px-4 rounded-md bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
             >
               <HiArrowPath className="w-4.5 h-4.5" />
               {t("Reset Changes")}
@@ -770,7 +770,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             <Button
               type="submit"
               loading={isDuplicateMode ? duplicateMutation.isPending : updateMutation.isPending}
-              className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+              className="h-10 px-6 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
             >
               <HiCheck className="w-4.5 h-4.5" />
               {isDuplicateMode ? t("Duplicate Employee") : t("Save Changes")}

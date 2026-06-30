@@ -284,7 +284,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
             <div className="space-y-4">
               <div
                 onClick={() => !updateMutation.isPending && fileInputRef.current?.click()}
-                className={`relative w-full aspect-square lg:aspect-video rounded-xl overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
+                className={`relative w-full aspect-square lg:aspect-video rounded-md overflow-hidden border-2 border-primary/20 bg-card-alt shadow-sm transition-all ${
                   updateMutation.isPending ? "cursor-wait opacity-80" : "cursor-pointer group"
                 }`}
               >
@@ -355,7 +355,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   type="button"
                   onClick={() => rotateMutation.mutate()}
                   disabled={rotateMutation.isPending || updateMutation.isPending}
-                  className="flex items-center justify-center gap-2 w-full h-11 rounded-xl text-sm font-semibold uppercase tracking-wider border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
+                  className="flex items-center justify-center gap-2 w-full h-11 rounded-md text-sm font-semibold uppercase tracking-wider border border-border hover:bg-card-alt transition-all disabled:opacity-50 font-mono"
                 >
                   <HiArrowPath className={`w-4 h-4 text-primary ${rotateMutation.isPending ? "animate-spin" : ""}`} />
                   {rotateMutation.isPending ? t("Rotating...") : t("Rotate Asset 90°")}
@@ -505,7 +505,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                   variant="destructive"
                   loading={deleteMutation.isPending}
                   onClick={handleDelete}
-                  className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                  className="h-10 px-4 rounded-md flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
                   title={t("Delete Asset")}
                 >
                   <HiTrash className="w-4.5 h-4.5" />
@@ -520,7 +520,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
                     setIsDuplicateMode(true);
                     setName(name + " (Copy)");
                   }}
-                  className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                  className="h-10 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
                 >
                   <HiDocumentDuplicate className="w-4.5 h-4.5" />
                   {t("Duplicate")}
@@ -530,7 +530,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               <Button
                 type="button"
                 onClick={() => setIsActivityOpen(true)}
-                className="h-10 px-4 rounded-xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+                className="h-10 px-4 rounded-md bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
               >
                 <HiOutlineClock className="w-4 h-4" />
                 {t("Activity")}
@@ -539,7 +539,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               <Button
                 type="button"
                 onClick={handleReset}
-                className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+                className="h-10 px-4 rounded-md bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
               >
                 <HiArrowPath className="w-4.5 h-4.5" />
                 {t("Reset Changes")}
@@ -548,7 +548,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               <Button
                 type="submit"
                 loading={isDuplicateMode ? duplicateMutation.isPending : updateMutation.isPending}
-                className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-50 dark:hover:bg-indigo-200 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                className="h-10 px-6 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-50 dark:hover:bg-indigo-200 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
               >
                 <HiCheck className="w-4.5 h-4.5" />
                 {isDuplicateMode ? t("Duplicate Asset") : t("Save Changes")}

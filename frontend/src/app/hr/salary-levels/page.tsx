@@ -185,12 +185,12 @@ function SalaryLevelsContent() {
             <h1 className="text-2xl font-bold uppercase tracking-tight text-foreground">{t("Salary Settings")}</h1>
             <p className="text-xs font-semibold text-muted-foreground mt-1">{t("Manage corporate base salary levels")}</p>
           </div>
-          <Link href="/hr/salary-levels/trash" className="flex items-center gap-2 h-10 px-4 bg-danger/10 text-danger rounded-lg font-semibold text-xs transition-all active:scale-[0.98] shadow-sm border border-danger/20">
+          <Link href="/hr/salary-levels/trash" className="flex items-center gap-2 h-10 px-4 bg-danger/10 text-danger rounded-md font-semibold text-xs [@media(hover:hover)]:hover:bg-danger/20 transition-all active:scale-[0.98] shadow-sm border border-danger/20">
             <HiOutlineTrash className="w-4 h-4" /> {t("TRASH")}
           </Link>
         </header>
 
-        <div className="bg-card p-6 rounded-2xl 2xl:rounded-4xl shadow-premium border border-border mb-6 relative overflow-hidden group">
+        <div className="bg-card p-6 rounded-md shadow-premium border border-border mb-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110" />
 
           <form onSubmit={handleSubmit} className="relative z-10 flex gap-6 items-end flex-wrap">
@@ -199,7 +199,7 @@ function SalaryLevelsContent() {
               <input
                 type="text" required value={form.level_name}
                 onChange={e => setForm({...form, level_name: e.target.value})}
-                className="w-full h-11 px-4 bg-card-alt border border-border/80 rounded-xl font-mono text-sm font-semibold uppercase placeholder:text-muted-foreground/30 outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground"
+                className="w-full h-11 px-4 bg-card-alt border border-border/80 rounded-md font-mono text-sm font-semibold uppercase placeholder:text-muted-foreground/30 outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground"
                 placeholder="e.g. L1"
               />
             </div>

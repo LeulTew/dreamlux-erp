@@ -3,6 +3,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
+import { api } from "@/lib/api";
 import { 
   HiOutlineXMark, 
   HiOutlineClock,
@@ -126,17 +127,14 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
 
   const { data, isLoading, error } = useQuery<{ activity: ActivityLogEntry[] }>({
     queryKey: ["activity-logs", entityType, entityId],
-    queryFn: () => {
-      const params = new URLSearchParams({
-        entity_type: entityType,
-        entity_id: entityId,
+    queryFn: async () => {
+      const res = await api.get<{ activity: ActivityLogEntry[] }>("/api/activity", {
+        params: {
+          entity_type: entityType,
+          entity_id: entityId,
+        },
       });
-
-      return fetch(`/api/activity?${params.toString()}`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to load activity logs");
-          return res.json();
-        });
+      return res.data;
     },
     enabled: isOpen && Boolean(entityId),
   });
