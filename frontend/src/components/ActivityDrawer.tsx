@@ -182,7 +182,7 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
           )}
 
           {error && (
-            <div className="p-4 text-center border border-red-500/20 bg-red-500/10 text-red-400 rounded-md text-sm">
+            <div className="p-4 text-center border border-red-500/20 bg-red-500/10 text-red-400 rounded-xl text-sm">
               {t("Error")}
             </div>
           )}
@@ -218,7 +218,7 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
 
                 return (
                   <div key={log.id} className="relative pl-6">
-                    <span className={`absolute -left-3.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md border text-sm ${colorClasses}`}>
+                    <span className={`absolute -left-3.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-xl border text-sm ${colorClasses}`}>
                       <Icon className="w-4 h-4" />
                     </span>
 

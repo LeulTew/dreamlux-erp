@@ -584,7 +584,7 @@ export default function HRDashboardPage() {
                               <td className={`${tdCls} font-mono text-muted`}>{emp.employee_id}</td>
                               <td className={`${tdCls} text-muted`}>{emp.position || "—"}</td>
                               <td className={tdCls}>
-                                <span className="inline-flex items-center gap-1 rounded-md bg-danger/10 border border-danger/20 px-2 py-0.5 text-[10px] font-medium text-danger">
+                                <span className="inline-flex items-center gap-1 rounded-xl bg-danger/10 border border-danger/20 px-2 py-0.5 text-[10px] font-medium text-danger">
                                   Missing ID Scans
                                 </span>
                               </td>
@@ -635,7 +635,7 @@ export default function HRDashboardPage() {
                               </td>
                               <td className={`${tdCls} font-mono text-muted`}>{emp.employee_id}</td>
                               <td className={tdCls}>
-                                <span className="inline-flex items-center gap-1 rounded-md bg-danger/10 border border-danger/20 px-2 py-0.5 text-[10px] font-medium text-danger">
+                                <span className="inline-flex items-center gap-1 rounded-xl bg-danger/10 border border-danger/20 px-2 py-0.5 text-[10px] font-medium text-danger">
                                   {!emp.hire_date
                                     ? t("Missing hire date")
                                     : emp.contract_status === "Expired"

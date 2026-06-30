@@ -43,14 +43,14 @@ function RepresentativeTablePage({
           placeholder="Search items..."
           value={search}
           onChange={handleSearchChange}
-          className="px-3 py-2 border rounded-md"
+          className="px-3 py-2 border rounded-xl"
         />
         <div className="flex gap-2">
           {["all", "Decor", "Furniture"].map((cat) => (
             <button
               key={cat}
               onClick={() => handleCategoryChange(cat)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border ${
                 category === cat ? "bg-primary text-white border-primary" : "bg-card border-border"
               }`}
             >

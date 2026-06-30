@@ -107,7 +107,7 @@ export default function MobileEmployeeCard({
                  {selectMode && onSelect && (
                    <button
                      onClick={(e) => { e.stopPropagation(); onSelect(employee.id); }}
-                     className={`w-6 h-6 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                     className={`w-6 h-6 rounded-xl border flex items-center justify-center shrink-0 transition-all ${
                        selected ? "bg-primary border-primary text-on-primary" : "border-border bg-card-alt"
                      }`}
                    >

@@ -1454,7 +1454,7 @@ function EventsPageContent() {
                 id="default-view-checkbox"
                 checked={newViewIsDefault}
                 onChange={(e) => setNewViewIsDefault(e.target.checked)}
-                className="w-4 h-4 rounded-md border-border accent-primary"
+                className="w-4 h-4 rounded-xl border-border accent-primary"
               />
               <label htmlFor="default-view-checkbox" className="text-xs font-bold text-muted uppercase tracking-wider">{t("Set as default view")}</label>
             </div>

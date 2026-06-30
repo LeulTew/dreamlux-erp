@@ -476,13 +476,13 @@ export default function RolePermissionsPage() {
         </header>
 
         {roles.length === 0 ? (
-          <div className="text-center py-10 bg-card border border-border rounded-md">
+          <div className="text-center py-10 bg-card border border-border rounded-xl">
             <p className="text-muted font-medium">{t("No roles found")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-start">
             {/* Roles Sidebar List */}
-            <aside className="bg-card border border-border/80 rounded-md p-4 space-y-3 shadow-sm select-none">
+            <aside className="bg-card border border-border/80 rounded-xl p-4 space-y-3 shadow-sm select-none">
               <h3 className="text-xs font-bold text-muted uppercase tracking-wider px-2">{t("Select Role")}</h3>
               <button
                 onClick={() => setIsCreateModalOpen(true)}
@@ -520,7 +520,7 @@ export default function RolePermissionsPage() {
             </aside>
 
             {/* Permission checklist groups */}
-            <main className="bg-card border border-border/80 rounded-md p-6 shadow-sm space-y-6">
+            <main className="bg-card border border-border/80 rounded-xl p-6 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-4 gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -662,7 +662,7 @@ export default function RolePermissionsPage() {
       {/* Create Role Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-card border border-border rounded-md max-w-md w-full p-6 space-y-4 shadow-sm">
+          <div className="bg-card border border-border rounded-xl max-w-md w-full p-6 space-y-4 shadow-sm">
             <h3 className="text-lg font-bold text-foreground">{t("Create Custom Role")}</h3>
             <form onSubmit={handleCreateRole} className="space-y-4">
               <div>
@@ -721,7 +721,7 @@ export default function RolePermissionsPage() {
 
       {rolePendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-card border border-border rounded-md max-w-sm w-full p-6 space-y-4 shadow-sm">
+          <div className="bg-card border border-border rounded-xl max-w-sm w-full p-6 space-y-4 shadow-sm">
             <div className="w-12 h-12 rounded-xl bg-danger/10 flex items-center justify-center text-danger">
               <HiXMark className="w-6 h-6" />
             </div>
@@ -755,7 +755,7 @@ export default function RolePermissionsPage() {
       {/* Edit Role Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-card border border-border rounded-md max-w-md w-full p-6 space-y-4 shadow-sm">
+          <div className="bg-card border border-border rounded-xl max-w-md w-full p-6 space-y-4 shadow-sm">
             <h3 className="text-lg font-bold text-foreground">{t("Edit Role Metadata")}</h3>
             <form onSubmit={handleUpdateRole} className="space-y-4">
               <div>

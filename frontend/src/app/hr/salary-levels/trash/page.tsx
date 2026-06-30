@@ -200,7 +200,7 @@ export default function SalaryLevelsTrashPage() {
               <div className="flex items-center gap-3 px-4 py-2 bg-card-alt rounded-xl border border-border/50">
                 <button
                   onClick={toggleAll}
-                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                  className={`w-5 h-5 rounded-xl border flex items-center justify-center transition-all ${
                     isAllSelected ? "bg-primary border-primary text-white" : "border-border bg-card"
                   }`}
                 >
@@ -231,7 +231,7 @@ export default function SalaryLevelsTrashPage() {
                   {selectMode && (
                     <button
                       onClick={() => toggleSelection(item.id)}
-                      className={`w-5 h-5 rounded-md border flex shrink-0 items-center justify-center transition-all ${
+                      className={`w-5 h-5 rounded-xl border flex shrink-0 items-center justify-center transition-all ${
                         selectedIds.has(item.id)
                           ? "bg-primary border-primary text-white"
                           : "border-border bg-card-alt"

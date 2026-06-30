@@ -224,7 +224,7 @@ export default function ProposalsPage() {
             {canCreateProposals && (
               <Link
                 href="/events/proposals/new"
-                className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-md text-xs font-semibold bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
+                className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-xl text-xs font-semibold bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
               >
                 <HiPlus className="w-4 h-4" />
                 {t("Add Proposal")}
