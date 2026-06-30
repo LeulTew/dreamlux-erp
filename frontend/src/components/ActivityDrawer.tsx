@@ -165,7 +165,7 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
           </div>
           <button 
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-md border border-neutral-800 bg-neutral-950 text-muted [@media(hover:hover)]:hover:bg-neutral-900 [@media(hover:hover)]:hover:text-foreground transition-colors focus:outline-none"
+            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-transparent text-muted hover:bg-card-alt hover:text-foreground transition-colors focus:outline-none"
             aria-label={t("Close")}
           >
             <HiOutlineXMark className="w-5 h-5" />

@@ -485,25 +485,22 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
 
           {/* Form Actions Footer */}
           <div className="flex flex-wrap justify-between items-center gap-3 mt-8 pt-4 border-t border-border/40">
-            {/* Left side: Reconcile Button */}
-            {!isDuplicateMode ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleReconcile}
-                loading={reconcileMutation.isPending}
-                disabled={updateMutation.isPending}
-                className="h-10 px-4 rounded-xl bg-card border border-border text-foreground font-semibold text-xs uppercase tracking-wider hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2"
-              >
-                <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
-                {t("Mark as Physically Verified")}
-              </Button>
-            ) : (
-              <div />
-            )}
+            {/* Left side: All form mutations */}
+            <div className="flex flex-wrap items-center gap-3">
+              {!isDuplicateMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleReconcile}
+                  loading={reconcileMutation.isPending}
+                  disabled={updateMutation.isPending}
+                  className="h-10 px-4 rounded-2xl bg-card border border-border text-foreground font-semibold text-xs uppercase tracking-wider hover:bg-card-alt active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  <HiCheckCircle className="w-4.5 h-4.5 text-primary" />
+                  {t("Mark as Physically Verified")}
+                </Button>
+              )}
 
-            {/* Right side: Delete, Duplicate, Reset, Save Changes */}
-            <div className="flex items-center gap-3">
               {!isDuplicateMode && (
                 <Button
                   type="button"
@@ -534,17 +531,8 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
 
               <Button
                 type="button"
-                onClick={() => setIsActivityOpen(true)}
-                className="h-10 px-4 rounded-md bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
-              >
-                <HiOutlineClock className="w-4 h-4" />
-                {t("Activity")}
-              </Button>
-
-              <Button
-                type="button"
                 onClick={handleReset}
-                className="h-10 px-4 rounded-md bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+                className="h-10 px-4 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
               >
                 <HiArrowPath className="w-4.5 h-4.5" />
                 {t("Reset Changes")}
@@ -553,12 +541,22 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
               <Button
                 type="submit"
                 loading={isDuplicateMode ? duplicateMutation.isPending : updateMutation.isPending}
-                className="h-10 px-6 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-50 dark:hover:bg-indigo-200 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-50 dark:hover:bg-indigo-200 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
               >
                 <HiCheck className="w-4.5 h-4.5" />
                 {isDuplicateMode ? t("Duplicate Asset") : t("Save Changes")}
               </Button>
             </div>
+
+            {/* Right side: Activity alone */}
+            <Button
+              type="button"
+              onClick={() => setIsActivityOpen(true)}
+              className="h-10 px-4 rounded-2xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+            >
+              <HiOutlineClock className="w-4 h-4" />
+              {t("Activity")}
+            </Button>
           </div>
         </form>
       </ResponsiveDrawer>

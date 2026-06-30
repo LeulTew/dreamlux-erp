@@ -7,10 +7,11 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { createEvent, updateEvent, deleteEvent, getEventTypes } from "@/lib/api";
 import { Event, EventType } from "@/lib/types";
 import { notify } from "@/lib/toast";
-import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser, HiArrowPath, HiCheck, HiArrowTopRightOnSquare, HiDocumentDuplicate } from "react-icons/hi2";
+import { HiExclamationCircle, HiTrash, HiCurrencyDollar, HiMapPin, HiUser, HiArrowPath, HiCheck, HiArrowTopRightOnSquare, HiDocumentDuplicate, HiOutlineClock } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
+import ActivityDrawer from "./ActivityDrawer";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
@@ -34,6 +35,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Creating duplicate of": "Creating duplicate of",
     "Event duplicated successfully": "Event duplicated successfully",
     "Failed to duplicate event": "Failed to duplicate event",
+    "Activity": "Activity",
+    "ActivityTimeline": "Activity Timeline",
   },
   am: {
     "Edit Event": "ዝግጅት ማስተካከያ",
@@ -48,10 +51,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Workspace": "የስራ ቦታ",
     "Open Event Workspace": "Open Event Workspace",
     "Duplicate": "ቅጂ ፍጠር",
-    "Duplicate Event": "ዝግጅት ቅጂ ፍጠር",
-    "Creating duplicate of": "ቅጂ በማዘጋጀት ላይ ለ",
-    "Event duplicated successfully": "ዝግጅት ቅጂ በተሳካ ሁኔታ ተፈጥሯል",
-    "Failed to duplicate event": "ቅጂ መፍጠር አልተቻለም",
+    "Duplicate Event": "ዝግጅቱን ኮፒ አድርግ",
+    "Creating duplicate of": "ቅጂ በመፍጠር ላይ ለ",
+    "Event duplicated successfully": "ዝግጅቱ በተሳካ ሁኔታ ተደግሟል",
+    "Failed to duplicate event": "ዝግጅቱን መድገም አልተሳካም",
+    "Activity": "ተግባራት",
+    "ActivityTimeline": "የተግባራት ታሪክ",
   }
 };
 
@@ -120,6 +125,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isDuplicateMode, setIsDuplicateMode] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
 
   const handleReset = () => {
     if (!event) return;
@@ -443,68 +449,83 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
           {/* Form Actions */}
           {!isReadOnly && (
-            <div className="flex justify-end items-center gap-3 mt-8 pt-4 border-t border-border/40">
+            <div className="flex justify-between items-center gap-3 mt-8 pt-4 border-t border-border/40">
+              {/* Left side: All form mutations */}
+              <div className="flex flex-wrap items-center gap-3">
+                {event && (
+                  <Link
+                    href={`/events/${event.id}`}
+                    className="h-10 px-4 rounded-2xl bg-card-alt border border-border text-muted hover:text-foreground text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                    title={t('Open Event Workspace')}
+                  >
+                    <HiArrowTopRightOnSquare className="w-4 h-4" />
+                    {t('Workspace')}
+                  </Link>
+                )}
+
+                {event && !isDuplicateMode && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    loading={deleteMutation.isPending}
+                    onClick={() => setShowDeleteModal(true)}
+                    className="h-10 px-4 rounded-2xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                    title={t("Delete Event")}
+                  >
+                    <HiTrash className="w-4.5 h-4.5" />
+                    {t("Delete")}
+                  </Button>
+                )}
+
+                {event && !isDuplicateMode && (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        name: prev.name + " (Copy)"
+                      }));
+                      setIsDuplicateMode(true);
+                    }}
+                    className="h-10 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                  >
+                    <HiDocumentDuplicate className="w-4.5 h-4.5" />
+                    {t("Duplicate")}
+                  </Button>
+                )}
+
+                {event && (
+                  <Button
+                    type="button"
+                    onClick={handleReset}
+                    className="h-10 px-4 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+                  >
+                    <HiArrowPath className="w-4.5 h-4.5" />
+                    {t("Reset Changes")}
+                  </Button>
+                )}
+
+                <Button
+                  type="submit"
+                  loading={saveMutation.isPending}
+                  className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                >
+                  <HiCheck className="w-4.5 h-4.5" />
+                  {isDuplicateMode ? t("Duplicate Event") : event ? t("Save Changes") : t("Create Event")}
+                </Button>
+              </div>
+
+              {/* Right side: Activity alone */}
               {event && (
-                <Link
-                  href={`/events/${event.id}`}
-                  className="h-10 px-4 rounded-2xl bg-card-alt border border-border text-muted hover:text-foreground text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
-                  title={t('Open Event Workspace')}
-                >
-                  <HiArrowTopRightOnSquare className="w-4 h-4" />
-                  {t('Workspace')}
-                </Link>
-              )}
-
-              {event && !isDuplicateMode && (
                 <Button
                   type="button"
-                  variant="destructive"
-                  loading={deleteMutation.isPending}
-                  onClick={() => setShowDeleteModal(true)}
-                  className="h-10 px-4 rounded-2xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
-                  title={t("Delete Event")}
+                  onClick={() => setIsActivityOpen(true)}
+                  className="h-10 px-4 rounded-2xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
                 >
-                  <HiTrash className="w-4.5 h-4.5" />
-                  {t("Delete")}
+                  <HiOutlineClock className="w-4 h-4" />
+                  {t("Activity")}
                 </Button>
               )}
-
-              {event && !isDuplicateMode && (
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev,
-                      name: prev.name + " (Copy)"
-                    }));
-                    setIsDuplicateMode(true);
-                  }}
-                  className="h-10 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
-                >
-                  <HiDocumentDuplicate className="w-4.5 h-4.5" />
-                  {t("Duplicate")}
-                </Button>
-              )}
-
-              {event && (
-                <Button
-                  type="button"
-                  onClick={handleReset}
-                  className="h-10 px-4 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
-                >
-                  <HiArrowPath className="w-4.5 h-4.5" />
-                  {t("Reset Changes")}
-                </Button>
-              )}
-
-              <Button
-                type="submit"
-                loading={saveMutation.isPending}
-                className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
-              >
-                <HiCheck className="w-4.5 h-4.5" />
-                {isDuplicateMode ? t("Duplicate Event") : event ? t("Save Changes") : t("Create Event")}
-              </Button>
             </div>
           )}
         </form>
@@ -520,6 +541,14 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
           title="Delete Event"
           message="Are you sure you want to delete this event? This action is permanent."
           itemName={event.name}
+        />
+      )}
+      {event && (
+        <ActivityDrawer
+          entityType="event"
+          entityId={event.id}
+          isOpen={isActivityOpen}
+          onClose={() => setIsActivityOpen(false)}
         />
       )}
     </>
