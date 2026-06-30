@@ -13,6 +13,7 @@ export interface ActivityLogEntry {
   old_value: string | null;
   new_value: string | null;
   note: string | null;
+  source_route?: string | null;
   created_at: string;
 }
 

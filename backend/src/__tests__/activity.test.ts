@@ -8,6 +8,7 @@ const testUserId = "550e8400-e29b-41d4-a716-446655440000";
 
 const superAdminToken = getTestToken(testUserId, "super_admin", ["*"]);
 const staffToken = getTestToken(testUserId, "crew", ["events:read"]); // Cannot read payroll/bank details
+const assetOnlyToken = getTestToken(testUserId, "inventory_officer", ["assets:read"]);
 
 const mockLogs = [
   {
@@ -23,20 +24,22 @@ const mockLogs = [
     new_value: "1500",
     note: "Updated design costs",
     created_at: new Date(Date.now() - 60000).toISOString(),
+    source_route: "activity_logs",
   },
   {
     id: "2",
     entity_type: "proposal",
     entity_id: "100e8400-e29b-41d4-a716-446655440000",
     user_id: testUserId,
-    username: "admin_user",
-    full_name: "Admin User",
+    username: null,
+    full_name: null,
     action: "update",
     field_changed: "client_name",
     old_value: "Old Client",
     new_value: "New Client",
     note: "Client changed",
     created_at: new Date().toISOString(),
+    source_route: "event_proposal_logs",
   }
 ];
 
@@ -91,6 +94,9 @@ describe("Activity API & Redaction logs triggers", () => {
     expect(res.body.activity.length).toBe(2);
     // Value remains unredacted for superadmin
     expect(res.body.activity[0].old_value).toBe("1000");
+    expect(res.body.activity[0].source_route).toBe("activity_logs");
+    expect(res.body.activity[1].username).toBeNull();
+    expect(res.body.activity[1].full_name).toBeNull();
   });
 
   test("GET /api/activity redacts sensitive budget/cost fields for standard users", async () => {
@@ -104,5 +110,27 @@ describe("Activity API & Redaction logs triggers", () => {
     expect(res.body.activity[0].new_value).toBe("[REDACTED]");
     // Non-sensitive client name must NOT be redacted
     expect(res.body.activity[1].old_value).toBe("Old Client");
+  });
+
+  test("GET /api/activity blocks users without entity activity permission", async () => {
+    const res = await request(app)
+      .get("/api/activity?entity_type=proposal&entity_id=100e8400-e29b-41d4-a716-446655440000")
+      .set("Authorization", `Bearer ${assetOnlyToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/Missing required activity permission/i);
+  });
+
+  test("GET /api/activity bounds event/proposal feed queries", async () => {
+    const res = await request(app)
+      .get("/api/activity?entity_type=proposal&entity_id=100e8400-e29b-41d4-a716-446655440000")
+      .set("Authorization", `Bearer ${superAdminToken}`);
+
+    expect(res.status).toBe(200);
+    const { pool } = await import("../db/pool");
+    const calls = (pool.query as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const lastSql = String(calls[calls.length - 1][0]);
+    expect(lastSql.toLowerCase()).toContain("limit 100");
+    expect(lastSql).toContain("source_route");
   });
 });

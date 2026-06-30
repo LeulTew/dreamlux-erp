@@ -40,7 +40,7 @@ vi.mock("@/hooks/use-language", () => ({
 
 const mockInvalidateQueries = vi.fn();
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey }: any) => {
+  useQuery: ({ queryKey }: { queryKey: string[] }) => {
     if (queryKey[0] === "notifications-unread-count") {
       return { data: { unread_count: 3 }, isLoading: false };
     }
@@ -80,7 +80,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({
     invalidateQueries: mockInvalidateQueries,
   }),
-  keepPreviousData: (data: any) => data,
+  keepPreviousData: <T,>(data: T) => data,
 }));
 
 // Mock API clients

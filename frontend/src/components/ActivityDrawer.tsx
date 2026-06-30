@@ -26,6 +26,7 @@ interface ActivityLogEntry {
   old_value: string | null;
   new_value: string | null;
   note: string | null;
+  source_route?: string | null;
   created_at: string;
 }
 
@@ -56,6 +57,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Before: "Before",
     After: "After",
     Note: "Note",
+    Source: "Source",
   },
   am: {
     ActivityTimeline: "የእንቅስቃሴ ታሪክ",
@@ -76,6 +78,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Before: "ቀደም ሲል",
     After: "በኋላ",
     Note: "ማስታወሻ",
+    Source: "ምንጭ",
   }
 };
 
@@ -123,12 +126,18 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
 
   const { data, isLoading, error } = useQuery<{ activity: ActivityLogEntry[] }>({
     queryKey: ["activity-logs", entityType, entityId],
-    queryFn: () => 
-      fetch(`/api/activity?entity_type=${entityType}&entity_id=${entityId}`)
+    queryFn: () => {
+      const params = new URLSearchParams({
+        entity_type: entityType,
+        entity_id: entityId,
+      });
+
+      return fetch(`/api/activity?${params.toString()}`)
         .then((res) => {
           if (!res.ok) throw new Error("Failed to load activity logs");
           return res.json();
-        }),
+        });
+    },
     enabled: isOpen && Boolean(entityId),
   });
 
@@ -158,7 +167,7 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
           </div>
           <button 
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-md border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors focus:outline-none"
+            className="w-10 h-10 flex items-center justify-center rounded-md border border-neutral-800 bg-neutral-950 text-neutral-400 [@media(hover:hover)]:hover:bg-neutral-900 [@media(hover:hover)]:hover:text-white transition-colors focus:outline-none"
             aria-label={t("Close")}
           >
             <HiOutlineXMark className="w-5 h-5" />
@@ -229,6 +238,12 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
                         <HiOutlineUser className="w-3.5 h-3.5 text-neutral-500" />
                         <span>{log.full_name || log.username || t("ActorSystem")}</span>
                       </div>
+
+                      {log.source_route && (
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+                          {t("Source")}: <span className="font-mono normal-case tracking-normal">{log.source_route}</span>
+                        </div>
+                      )}
 
                       {log.note && (
                         <p className="text-xs text-neutral-300 mt-2 bg-neutral-900 border border-neutral-800 p-2 rounded-sm italic">

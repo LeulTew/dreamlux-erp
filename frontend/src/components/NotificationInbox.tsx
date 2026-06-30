@@ -106,7 +106,7 @@ export default function NotificationInbox() {
           table: "notifications",
           filter: `recipient_id=eq.${user.id}`,
         },
-        (payload) => {
+        () => {
           // Instantly refresh query caches on any websocket broadcast event
           queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
           queryClient.invalidateQueries({ queryKey: ["notifications-recent"] });
