@@ -2,6 +2,7 @@
 import React from "react";
 import { toast as sonnerToast } from "sonner";
 import { PremiumToast } from "@/components/ui/PremiumToast";
+import type { ExternalToast } from "sonner";
 
 export interface CompatToast {
   id: string | number;
@@ -16,23 +17,23 @@ const toast = {
   ) => {
     const duration = options?.duration ?? 4000;
     return sonnerToast.custom(
-      (id) => renderFn({ id, visible: true, duration }),
+      (id) => <>{renderFn({ id, visible: true, duration })}</>,
       { duration }
     );
   },
-  success: (message: string, description?: string | any) => {
+  success: (message: string, description?: string | ExternalToast) => {
     if (typeof description === "string") {
       return sonnerToast.success(message, { description });
     }
     return sonnerToast.success(message, description);
   },
-  error: (message: string, description?: string | any) => {
+  error: (message: string, description?: string | ExternalToast) => {
     if (typeof description === "string") {
       return sonnerToast.error(message, { description });
     }
     return sonnerToast.error(message, description);
   },
-  info: (message: string, description?: string | any) => {
+  info: (message: string, description?: string | ExternalToast) => {
     if (typeof description === "string") {
       return sonnerToast.info(message, { description });
     }

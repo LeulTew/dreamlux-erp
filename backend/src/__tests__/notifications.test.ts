@@ -35,12 +35,36 @@ const mockPreferences = {
   in_app_enabled: true,
   email_enabled: true,
   push_enabled: false,
-  categories: { proposals: true, events: true, expenses: true, payroll: true, inventory: true },
+  categories: { proposals: true, events: true, expenses: true, payroll: true, inventory: true, employees: true },
 };
 
 // Override pool.query with custom mock logic
 pool.query = mock((sql: string, params?: any[]) => {
   const queryLower = sql.toLowerCase();
+
+  // Mock notification recipient fanout. The SQL intentionally supports primary role_id plus optional role_ids.
+  if (queryLower.includes("with user_roles") || queryLower.includes("select distinct u.id, lower(r.name)")) {
+    return Promise.resolve({
+      rows: [
+        {
+          id: testUserId,
+          role_name: "admin",
+          permissions: {},
+          slugs: ["*"],
+        },
+        {
+          id: anotherUserId,
+          role_name: "event_manager",
+          permissions: { events: ["read"] },
+          slugs: ["events:read"],
+        },
+      ],
+    });
+  }
+
+  if (queryLower.includes("where lower(r.name) = lower")) {
+    return Promise.resolve({ rows: [{ id: testUserId }, { id: anotherUserId }] });
+  }
 
   // Mock notifications list
   if (queryLower.includes("select n.*")) {
@@ -63,6 +87,16 @@ pool.query = mock((sql: string, params?: any[]) => {
 
   // Mock preferences fetch
   if (queryLower.includes("select in_app_enabled")) {
+    if (params?.[0] === "disabled-proposal-user") {
+      return Promise.resolve({
+        rows: [
+          {
+            ...mockPreferences,
+            categories: { proposals: false, events: true },
+          },
+        ],
+      });
+    }
     return Promise.resolve({ rows: [mockPreferences] });
   }
 
@@ -164,13 +198,71 @@ describe("Notifications API & Matrix triggers", () => {
     expect(res.body).toHaveProperty("success", true);
   });
 
+  test("PUT /api/notifications/preferences rejects non-boolean category values", async () => {
+    const res = await request(app)
+      .put("/api/notifications/preferences")
+      .set("Authorization", `Bearer ${superAdminToken}`)
+      .send({
+        categories: { proposals: "no" },
+      });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("error", "Invalid notification preferences payload");
+  });
+
   test("NotificationsService.emitNotificationToRoleOrPermission triggers role broadcast", async () => {
     // Direct call verification
     const success = await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "users:manage",
       title: "Security Change Alert",
       message: "Role permissions changed",
+      entity_type: "security",
     });
     expect(success).toBeGreaterThan(0);
+  });
+
+  test("NotificationsService excludes actor from broad fanout by default", async () => {
+    const success = await NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "events:read",
+      actor_id: testUserId,
+      title: "Event Updated",
+      message: "Event details changed",
+      entity_type: "event",
+    });
+    expect(success).toBe(1);
+  });
+
+  test("NotificationsService can include actor when a workflow needs self-visible audit notice", async () => {
+    const success = await NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "events:read",
+      actor_id: testUserId,
+      include_actor: true,
+      title: "Event Updated",
+      message: "Event details changed",
+      entity_type: "event",
+    });
+    expect(success).toBe(2);
+  });
+
+  test("NotificationsService maps singular entity type to plural preference category", async () => {
+    const success = await NotificationsService.createNotification({
+      recipient_id: "disabled-proposal-user",
+      title: "Proposal Updated",
+      message: "Proposal changed",
+      entity_type: "proposal",
+    });
+    expect(success).toBe(false);
+  });
+
+  test("NotificationsService records system actor snapshots for workflow-generated events", async () => {
+    const success = await NotificationsService.createNotification({
+      recipient_id: testUserId,
+      actor_type: "system",
+      actor_display_name: "System",
+      actor_username: "system",
+      title: "Proposal Converted",
+      message: "A proposal was converted into an event",
+      entity_type: "event",
+    });
+    expect(success).toBe(true);
   });
 });

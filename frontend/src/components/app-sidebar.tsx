@@ -14,7 +14,6 @@ import {
   HiChevronDown,
   HiChevronUp,
   HiChevronLeft,
-  HiOutlineBell,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
