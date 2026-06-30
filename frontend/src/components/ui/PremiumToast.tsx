@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import toast from "@/lib/toast";
+import { toast as sonnerDismiss } from "sonner";
 import {
   HiOutlineCheckCircle,
   HiOutlineXCircle,
@@ -44,7 +44,7 @@ export function PremiumToast({ t, title, description, type, actionLabel, onActio
       setTimeLeft((prev) => {
         if (prev <= interval) {
           clearInterval(timerRef.current!);
-          toast.dismiss(t.id);
+          sonnerDismiss.dismiss(t.id);
           return 0;
         }
         return prev - interval;
@@ -94,7 +94,7 @@ export function PremiumToast({ t, title, description, type, actionLabel, onActio
               )}
               <button
                 type="button"
-                onClick={() => toast.dismiss(t.id)}
+                onClick={() => sonnerDismiss.dismiss(t.id)}
                 className="p-1 rounded-lg text-muted hover:text-foreground hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all cursor-pointer"
                 aria-label="Dismiss notification"
               >
@@ -115,7 +115,7 @@ export function PremiumToast({ t, title, description, type, actionLabel, onActio
                 type="button"
                 onClick={() => {
                   onAction();
-                  toast.dismiss(t.id);
+                  sonnerDismiss.dismiss(t.id);
                 }}
                 className="px-4 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 text-xs font-semibold text-foreground rounded-lg shadow-sm transition-all active:scale-[0.98] cursor-pointer"
               >
