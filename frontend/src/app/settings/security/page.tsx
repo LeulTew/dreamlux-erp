@@ -11,8 +11,6 @@ import {
   ChevronUp,
   ArrowLeft,
   Lock,
-  FileText,
-  ExternalLink,
   CheckCircle2,
   AlertCircle,
   Info,
@@ -43,8 +41,6 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "see_detail": "See detail",
     "hide_detail": "Hide detail",
     "what_this_means": "What this means",
-    "why_it_matters": "Why it matters",
-    "reference": "Reference",
     "admin_only_note":
       "This page is only accessible to system administrators. It is not visible to regular staff.",
     "back_to_settings": "Back to Settings",
@@ -113,8 +109,6 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "see_detail": "ዝርዝር ይመልከቱ",
     "hide_detail": "ዝርዝር ይደብቁ",
     "what_this_means": "ትርጉሙ ምን ማለት ነው",
-    "why_it_matters": "ለምን አስፈላጊ ነው",
-    "reference": "ማጣቀሻ",
     "admin_only_note":
       "ይህ ገጽ ለስርዓት አስተዳዳሪዎች ብቻ ነው። ለተራ ሰራተኞች አይታይም።",
     "back_to_settings": "ወደ ቅንብሮች ተመለስ",
@@ -177,8 +171,6 @@ type AreaRow = {
   descKey: string;
   detailsKey: string;
   status: StatusTone;
-  docHref?: string;
-  issueHref?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -191,8 +183,6 @@ const AREAS: AreaRow[] = [
     descKey: "area_access_desc",
     detailsKey: "area_access_details",
     status: "monitoring",
-    docHref:
-      "https://github.com/LeulTew/dreamlux-erp/blob/main/docs/SENIOR_ISSUE_REVIEW_PROMPT.md",
   },
   {
     id: "software",
@@ -200,9 +190,6 @@ const AREAS: AreaRow[] = [
     descKey: "area_software_desc",
     detailsKey: "area_software_details",
     status: "monitoring",
-    issueHref: "https://github.com/LeulTew/dreamlux-erp/issues/83",
-    docHref:
-      "https://github.com/LeulTew/dreamlux-erp/blob/main/docs/CODEX_AUDIT_REPORT.md",
   },
   {
     id: "data",
@@ -210,8 +197,6 @@ const AREAS: AreaRow[] = [
     descKey: "area_data_desc",
     detailsKey: "area_data_details",
     status: "healthy",
-    docHref:
-      "https://github.com/LeulTew/dreamlux-erp/blob/main/docs/issues/issue_31_db_rls_hardening.md",
   },
   {
     id: "audit",
@@ -219,7 +204,6 @@ const AREAS: AreaRow[] = [
     descKey: "area_audit_desc",
     detailsKey: "area_audit_details",
     status: "healthy",
-    issueHref: "https://github.com/LeulTew/dreamlux-erp/issues/82",
   },
   {
     id: "caveats",
@@ -227,8 +211,6 @@ const AREAS: AreaRow[] = [
     descKey: "area_caveats_desc",
     detailsKey: "area_caveats_details",
     status: "attention",
-    docHref:
-      "https://github.com/LeulTew/dreamlux-erp/blob/main/project-context.md",
   },
 ];
 
@@ -502,35 +484,6 @@ export default function SecurityPosturePage() {
                         ))}
                       </ul>
                     </div>
-
-                    {/* Reference links (admin-only, not labelled with jargon) */}
-                    {(area.docHref || area.issueHref) && (
-                      <div className="flex flex-wrap gap-2">
-                        {area.docHref && (
-                          <Link
-                            href={area.docHref}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-2 text-xs font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            {t("reference")}
-                            <ExternalLink className="h-3 w-3 text-muted" />
-                          </Link>
-                        )}
-                        {area.issueHref && (
-                          <Link
-                            href={area.issueHref}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-2 text-xs font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            {t("reference")}
-                          </Link>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

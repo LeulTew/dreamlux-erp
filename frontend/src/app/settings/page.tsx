@@ -103,10 +103,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event ID Prefix *": "Event ID Prefix *",
     "Appearance & Theme": "Appearance & Theme",
     "Select your preferred visual style for the dashboard.": "Select your preferred visual style for the dashboard.",
-    "Security posture review": "Security posture review",
+    "Security posture review": "Security Review",
     "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.":
-      "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.",
-    "Open security posture": "Open security posture",
+      "Check how well the system is protected. A summary prepared by the technical team.",
+    "Open security posture": "Open Security Review",
     "Light Mode": "Light Mode",
     "Dark Mode": "Dark Mode"
   },
@@ -167,7 +167,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Select your preferred visual style for the dashboard.": "ለዳሽቦርዱ የሚመርጡትን የእይታ ገጽታ ይምረጡ።",
     "Security posture review": "የደህንነት ሁኔታ ግምገማ",
     "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.":
-      "ከመጨረሻ ማጽደቅ በፊት የ OWASP፣ RLS፣ audit እና ቀጣይ ጉዳዮች ሁኔታ የተመዘገበበትን የውስጥ የደህንነት ማረጋገጫ ይመልከቱ።",
+      "ስርዓቱ ምን ያህል ተጠብቆ እንዳለ ይመልከቱ። ማጠቃለያው በቴክኒካዊ ቡድኑ የተዘጋጀ ነው።",
     "Open security posture": "የደህንነት ሁኔታን ክፈት",
     "Light Mode": "ብርሃናማ ሁነታ",
     "Dark Mode": "ጨለማማ ሁነታ"
@@ -910,7 +910,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => router.push("/settings/security")}
-                      className="inline-flex min-h-12 items-center justify-center rounded-md border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
+                      className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
                     >
                       {t("Open security posture")}
                     </button>
