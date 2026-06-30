@@ -6,6 +6,7 @@ import {
 import "./setup";
 import { describe, test, expect, beforeEach, beforeAll, mock } from "bun:test";
 import request from "supertest";
+import { NotificationsService } from "../services/notifications-service";
 
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
 
@@ -189,12 +190,29 @@ describe("Employees API", () => {
       .mockResolvedValueOnce({ rows: [{ id: "1", full_name: "John" }] }) // check existence
       .mockResolvedValueOnce({ rows: [] }); // update
 
-    const res = await request(app)
-      .delete("/employees/1")
-      .set("Authorization", `Bearer ${getToken()}`);
+    const originalEmit = NotificationsService.emitNotificationToRoleOrPermission;
+    const emitMock = mock(() => Promise.resolve(1));
+    NotificationsService.emitNotificationToRoleOrPermission = emitMock as typeof NotificationsService.emitNotificationToRoleOrPermission;
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    try {
+      const res = await request(app)
+        .delete("/employees/1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body._notification_count).toBe(1);
+      expect(emitMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permissionSlug: "hr:read",
+          title: "Employee Record Deleted",
+          entity_type: "employee",
+          entity_id: "1",
+        })
+      );
+    } finally {
+      NotificationsService.emitNotificationToRoleOrPermission = originalEmit;
+    }
   });
 
   test("GET /employees/:id returns 404 for deleted or non-existent", async () => {
