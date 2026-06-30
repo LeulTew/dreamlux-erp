@@ -1,9 +1,17 @@
 import { Router, Response } from "express";
+import { z } from "zod";
 import { pool } from "../db/pool";
 import { requireAuth, AuthRequest } from "../middleware/auth";
 import { NotificationsService } from "../services/notifications-service";
 
 const router = Router();
+
+const notificationPreferencesSchema = z.object({
+  in_app_enabled: z.boolean().optional(),
+  email_enabled: z.boolean().optional(),
+  push_enabled: z.boolean().optional(),
+  categories: z.record(z.boolean()).optional(),
+});
 
 // GET /notifications - Paginated list of unarchived notifications for current user
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -19,7 +27,9 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     // Fetch notifications
     const itemsRes = await pool.query(
-      `SELECT n.*, u.username as actor_username, u.full_name as actor_name
+      `SELECT n.*,
+              COALESCE(n.actor_username, u.username) AS actor_username,
+              COALESCE(n.actor_display_name, u.full_name, CASE WHEN n.actor_type = 'system' THEN 'System' ELSE NULL END) AS actor_name
        FROM public.notifications n
        LEFT JOIN public.users u ON n.actor_id = u.id
        WHERE n.recipient_id = $1 AND n.archived_at IS NULL
@@ -181,12 +191,24 @@ router.put("/preferences", requireAuth, async (req: AuthRequest, res: Response) 
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { in_app_enabled, email_enabled, push_enabled, categories } = req.body;
+    const parsed = notificationPreferencesSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Invalid notification preferences payload",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const { in_app_enabled, email_enabled, push_enabled, categories } = parsed.data;
+    const mergedCategories = {
+      ...NotificationsService.defaultCategories,
+      ...(categories || {}),
+    };
 
     const result = await pool.query(
       `INSERT INTO public.notification_preferences (
         user_id, in_app_enabled, email_enabled, push_enabled, categories, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, NOW())
+      ) VALUES ($1, $2, $3, $4, $5::jsonb, NOW())
        ON CONFLICT (user_id) DO UPDATE
        SET in_app_enabled = EXCLUDED.in_app_enabled,
            email_enabled = EXCLUDED.email_enabled,
@@ -199,7 +221,7 @@ router.put("/preferences", requireAuth, async (req: AuthRequest, res: Response) 
         in_app_enabled !== undefined ? Boolean(in_app_enabled) : true,
         email_enabled !== undefined ? Boolean(email_enabled) : true,
         push_enabled !== undefined ? Boolean(push_enabled) : false,
-        categories || '{"proposals": true, "events": true, "expenses": true, "payroll": true, "inventory": true}',
+        mergedCategories,
       ]
     );
 
