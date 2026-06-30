@@ -23,21 +23,33 @@ const toast = {
   },
   success: (message: string, description?: string | ExternalToast) => {
     if (typeof description === "string") {
-      return sonnerToast.success(message, { description });
+      return toast.custom((t) => (
+        <PremiumToast t={t} title={message} description={description} type="success" />
+      ));
     }
-    return sonnerToast.success(message, description);
+    return toast.custom((t) => (
+      <PremiumToast t={t} title={message} type="success" />
+    ), { duration: description?.duration });
   },
   error: (message: string, description?: string | ExternalToast) => {
     if (typeof description === "string") {
-      return sonnerToast.error(message, { description });
+      return toast.custom((t) => (
+        <PremiumToast t={t} title={message} description={description} type="error" />
+      ), { duration: 5000 });
     }
-    return sonnerToast.error(message, description);
+    return toast.custom((t) => (
+      <PremiumToast t={t} title={message} type="error" />
+    ), { duration: description?.duration ?? 5000 });
   },
   info: (message: string, description?: string | ExternalToast) => {
     if (typeof description === "string") {
-      return sonnerToast.info(message, { description });
+      return toast.custom((t) => (
+        <PremiumToast t={t} title={message} description={description} type="info" />
+      ));
     }
-    return sonnerToast.info(message, description);
+    return toast.custom((t) => (
+      <PremiumToast t={t} title={message} type="info" />
+    ), { duration: description?.duration });
   },
   dismiss: (id?: string | number) => {
     return sonnerToast.dismiss(id);

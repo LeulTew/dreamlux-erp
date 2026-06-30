@@ -4,19 +4,16 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { PremiumToast } from "./PremiumToast";
-import toast from "@/lib/toast";
 
-// Mock toast.dismiss
-vi.mock("@/lib/toast", async (importOriginal) => {
-  const original = await importOriginal<typeof import("react-hot-toast")>();
-  return {
-    ...original,
-    default: {
-      ...original.default,
-      dismiss: vi.fn(),
-    },
-  };
-});
+const { dismissMock } = vi.hoisted(() => ({
+  dismissMock: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    dismiss: dismissMock,
+  },
+}));
 
 describe("PremiumToast Component", () => {
   const mockToast = {
@@ -85,7 +82,7 @@ describe("PremiumToast Component", () => {
 
     fireEvent.click(actionButton);
     expect(handleAction).toHaveBeenCalledTimes(1);
-    expect(toast.dismiss).toHaveBeenCalledWith("toast-123");
+    expect(dismissMock).toHaveBeenCalledWith("toast-123");
   });
 
   it("pauses and resumes the countdown when the footer is clicked", () => {
@@ -125,7 +122,7 @@ describe("PremiumToast Component", () => {
       vi.advanceTimersByTime(1100);
     });
 
-    expect(toast.dismiss).toHaveBeenCalledWith("toast-123");
+    expect(dismissMock).toHaveBeenCalledWith("toast-123");
     vi.useRealTimers();
   });
 });

@@ -48,6 +48,33 @@ interface EmployeeRow {
   salary_levels?: { amount_etb: number } | null;
 }
 
+async function emitEmployeeNotification(params: {
+  req: AuthRequest;
+  permissionSlug: string;
+  title: string;
+  message: string;
+  entityId: string;
+  actionUrl?: string;
+}): Promise<number> {
+  const count = await NotificationsService.emitNotificationToRoleOrPermission({
+    permissionSlug: params.permissionSlug,
+    actor_id: params.req.user?.id,
+    actor_display_name: params.req.user?.username,
+    actor_username: params.req.user?.username,
+    title: params.title,
+    message: params.message,
+    entity_type: "employee",
+    entity_id: params.entityId,
+    action_url: params.actionUrl || "/",
+  });
+
+  if (count === 0) {
+    console.warn(`[Employees] Notification fanout produced 0 recipients for ${params.title} (${params.entityId})`);
+  }
+
+  return count;
+}
+
 async function resolveSalaryLevelIdByCode(code: string): Promise<string | null> {
   if (!code || typeof code !== "string") return null;
 
@@ -293,13 +320,12 @@ router.post(
 
       if (insertError || !employeeData) throw insertError;
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      const notificationCount = await emitEmployeeNotification({
+        req,
         permissionSlug: "hr:read",
-        actor_id: req.user?.id,
         title: "New Employee Created",
         message: `${full_name} (${employee_id}) has been added to the system.`,
-        entity_type: "employee",
-        entity_id: String(employeeData.id),
+        entityId: String(employeeData.id),
       });
 
       res.status(201).json({
@@ -311,6 +337,7 @@ router.post(
         ...(droppedColumns.length > 0
           ? { _warning: `Some fields were skipped because this database is on an older schema: ${droppedColumns.join(", ")}` }
           : {}),
+        _notification_count: notificationCount,
       });
     } catch (error: unknown) {
       // Cleanup
@@ -736,13 +763,12 @@ router.patch(
         note: `Employee profile updated. Skipped columns: ${droppedColumns.join(", ") || "none"}`,
       });
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      const notificationCount = await emitEmployeeNotification({
+        req,
         permissionSlug: "employees:read",
-        actor_id: req.user?.id,
         title: "Employee Profile Updated",
         message: `Employee "${updated.full_name}" profile has been updated.`,
-        entity_type: "employee",
-        entity_id: id,
+        entityId: id,
       });
 
       res.json({
@@ -754,6 +780,7 @@ router.patch(
         ...(droppedColumns.length > 0
           ? { _warning: `Some fields were skipped because this database is on an older schema: ${droppedColumns.join(", ")}` }
           : {}),
+        _notification_count: notificationCount,
       });
     } catch (error: unknown) {
       console.error("Failed to update employee:", error);
@@ -782,15 +809,14 @@ router.post("/:id/recover", requirePermissionSlugs(["hr:write"]), async (req: Au
       action: "restore",
       note: "Employee profile recovered from trash.",
     });
-    NotificationsService.emitNotificationToRoleOrPermission({
+    const notificationCount = await emitEmployeeNotification({
+      req,
       permissionSlug: "hr:read",
-      actor_id: req.user?.id,
       title: "Employee Record Recovered",
       message: `Employee record ${id} has been recovered from trash.`,
-      entity_type: "employee",
-      entity_id: id,
+      entityId: id,
     });
-    res.json({ success: true });
+    res.json({ success: true, _notification_count: notificationCount });
   } catch (error: unknown) {
     res.status(500).json({
       error: "Failed to recover employee",
@@ -816,15 +842,14 @@ router.delete("/:id", requirePermissionSlugs(["hr:write"]), async (req: AuthRequ
       action: "delete",
       note: "Employee profile soft deleted.",
     });
-    NotificationsService.emitNotificationToRoleOrPermission({
+    const notificationCount = await emitEmployeeNotification({
+      req,
       permissionSlug: "hr:read",
-      actor_id: req.user?.id,
       title: "Employee Record Deleted",
       message: `Employee record ${id} has been soft deleted.`,
-      entity_type: "employee",
-      entity_id: id,
+      entityId: id,
     });
-    res.json({ success: true });
+    res.json({ success: true, _notification_count: notificationCount });
   } catch (error: unknown) {
     res.status(500).json({
       error: "Failed to delete employee",
