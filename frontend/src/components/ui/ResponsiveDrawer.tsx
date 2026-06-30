@@ -9,6 +9,7 @@ interface ResponsiveDrawerProps {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 const MOBILE_BREAKPOINT = 768;
@@ -21,6 +22,7 @@ export default function ResponsiveDrawer({
   title,
   subtitle,
   children,
+  footer,
 }: ResponsiveDrawerProps) {
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   // Internal "visible" flag — stays true during exit animation
@@ -127,6 +129,12 @@ export default function ResponsiveDrawer({
               <div className="flex-1 overflow-y-auto px-5 py-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 {children}
               </div>
+
+              {footer && (
+                <div className="px-5 py-4 border-t border-border bg-card shrink-0">
+                  {footer}
+                </div>
+              )}
             </motion.div>
           ) : (
             /* ─── Desktop: right slide-out, wide ─── */
@@ -160,6 +168,12 @@ export default function ResponsiveDrawer({
               <div className="flex-1 overflow-y-auto px-8 py-6">
                 {children}
               </div>
+
+              {footer && (
+                <div className="px-8 py-5 border-t border-border bg-card-alt/30 shrink-0">
+                  {footer}
+                </div>
+              )}
             </motion.div>
           )}
         </div>

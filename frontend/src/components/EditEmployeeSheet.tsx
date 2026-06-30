@@ -401,8 +401,82 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         onClose={onClose}
         title={isDuplicateMode ? t("Duplicate Employee") : t("Edit Employee")}
         subtitle={isDuplicateMode ? `${t("Creating duplicate of")} ${employee.full_name}` : `${t("Updating")} ${employee.full_name}`}
+        footer={
+          <div className="flex flex-wrap justify-between items-end gap-3 w-full">
+            {/* Left side: All form mutations */}
+            <div className="flex flex-wrap items-center gap-3">
+              {!isDuplicateMode && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  loading={deleteMutation.isPending}
+                  onClick={() => setShowDeleteModal(true)}
+                  className="h-10 px-4 rounded-2xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                  title={t("Delete Permanently")}
+                >
+                  <HiTrash className="w-4.5 h-4.5" />
+                  {t("Delete")}
+                </Button>
+              )}
+
+              {!isDuplicateMode && (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await getNextEmployeeId();
+                      setFormData(prev => ({
+                        ...prev,
+                        full_name: prev.full_name + " (Copy)",
+                        employee_id: res.nextId,
+                        phone: "",
+                        email: "",
+                      }));
+                      setIsDuplicateMode(true);
+                    } catch {
+                      notify.error("Error", "Failed to resolve next sequential ID");
+                    }
+                  }}
+                  className="h-10 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                >
+                  <HiDocumentDuplicate className="w-4.5 h-4.5" />
+                  {t("Duplicate")}
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                onClick={handleReset}
+                className="h-10 px-4 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
+              >
+                <HiArrowPath className="w-4.5 h-4.5" />
+                {t("Reset Changes")}
+              </Button>
+
+              <Button
+                type="submit"
+                form="edit-employee-form"
+                loading={isDuplicateMode ? duplicateMutation.isPending : updateMutation.isPending}
+                className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+              >
+                <HiCheck className="w-4.5 h-4.5" />
+                {isDuplicateMode ? t("Duplicate Employee") : t("Save Changes")}
+              </Button>
+            </div>
+
+            {/* Right side: Activity alone */}
+            <Button
+              type="button"
+              onClick={() => setIsActivityOpen(true)}
+              className="h-10 px-4 rounded-2xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+            >
+              <HiOutlineClock className="w-4 h-4" />
+              {t("Activity")}
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-6 pb-12">
+        <form id="edit-employee-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             {/* Left Column: Profile & Contact */}
             <div className="space-y-6">
@@ -712,77 +786,6 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-between items-end gap-3 mt-8 pt-4 border-t border-border/40">
-            {/* Left side: All form mutations */}
-            <div className="flex flex-wrap items-center gap-3">
-              {!isDuplicateMode && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  loading={deleteMutation.isPending}
-                  onClick={() => setShowDeleteModal(true)}
-                  className="h-10 px-4 rounded-2xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
-                  title={t("Delete Permanently")}
-                >
-                  <HiTrash className="w-4.5 h-4.5" />
-                  {t("Delete")}
-                </Button>
-              )}
-
-              {!isDuplicateMode && (
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await getNextEmployeeId();
-                      setFormData(prev => ({
-                        ...prev,
-                        full_name: prev.full_name + " (Copy)",
-                        employee_id: res.nextId,
-                        phone: "",
-                        email: "",
-                      }));
-                      setIsDuplicateMode(true);
-                    } catch {
-                      notify.error("Error", "Failed to resolve next sequential ID");
-                    }
-                  }}
-                  className="h-10 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
-                >
-                  <HiDocumentDuplicate className="w-4.5 h-4.5" />
-                  {t("Duplicate")}
-                </Button>
-              )}
-
-              <Button
-                type="button"
-                onClick={handleReset}
-                className="h-10 px-4 rounded-2xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
-              >
-                <HiArrowPath className="w-4.5 h-4.5" />
-                {t("Reset Changes")}
-              </Button>
-
-              <Button
-                type="submit"
-                loading={isDuplicateMode ? duplicateMutation.isPending : updateMutation.isPending}
-                className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
-              >
-                <HiCheck className="w-4.5 h-4.5" />
-                {isDuplicateMode ? t("Duplicate Employee") : t("Save Changes")}
-              </Button>
-            </div>
-
-            {/* Right side: Activity alone */}
-            <Button
-              type="button"
-              onClick={() => setIsActivityOpen(true)}
-              className="h-10 px-4 rounded-2xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
-            >
-              <HiOutlineClock className="w-4 h-4" />
-              {t("Activity")}
-            </Button>
-          </div>
         </form>
       </ResponsiveDrawer>
 
