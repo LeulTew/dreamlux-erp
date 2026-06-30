@@ -154,7 +154,7 @@ export default function NotificationsPage() {
           table: "notifications",
           filter: `recipient_id=eq.${user.id}`,
         },
-        (payload) => {
+        () => {
           // Instantly refresh list, unread count, etc. on any realtime database change
           queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
           queryClient.invalidateQueries({ queryKey: ["notifications-recent"] });

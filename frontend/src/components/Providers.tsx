@@ -7,6 +7,17 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => {
     const client = new QueryClient({
+      mutationCache: new MutationCache({
+        onSuccess: (_data, _variables, _context, mutation) => {
+          const key = mutation.options.mutationKey;
+          if (Array.isArray(key) && key.includes("notification-action")) return;
+
+          // Instantly trigger query invalidation for notifications
+          client.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+          client.invalidateQueries({ queryKey: ["notifications-recent"] });
+          client.invalidateQueries({ queryKey: ["notifications-list"] });
+        },
+      }),
       defaultOptions: {
         queries: {
           staleTime: 30 * 1000,
@@ -14,17 +25,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         },
       },
     });
-
-    // Register global MutationCache onSuccess handler securely after client instantiation
-    (client.getMutationCache() as any).config.onSuccess = (_data: any, _vars: any, _ctx: any, mutation: any) => {
-      const key = mutation.options.mutationKey;
-      if (Array.isArray(key) && key.includes("notification-action")) return;
-
-      // Instantly trigger query invalidation for notifications
-      client.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-      client.invalidateQueries({ queryKey: ["notifications-recent"] });
-      client.invalidateQueries({ queryKey: ["notifications-list"] });
-    };
 
     return client;
   });
