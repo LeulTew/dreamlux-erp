@@ -391,7 +391,7 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
     } else if (sortBy === "name" || sortBy === "full_name") {
       query = query.order("full_name", { ascending: sortOrder === "asc" });
     } else if (sortBy === "date") {
-      query = query.order("created_at", { ascending: sortOrder === "asc" });
+      query = query.order("updated_at", { ascending: sortOrder === "asc" });
     } else if (sortBy === "employee_id") {
       query = query.order("employee_id", { ascending: sortOrder === "asc" });
     } else if (sortBy === "commission") {
@@ -399,7 +399,7 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
     } else {
       // Default: Salary High to Low per request
       query = query.order("amount_etb", { ascending: false, referencedTable: "salary_levels", nullsFirst: false });
-      query = query.order("created_at", { ascending: false });
+      query = query.order("updated_at", { ascending: false });
     }
 
     query = query.range(offset, offset + limit - 1);
@@ -449,7 +449,7 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
       } else if (sortBy === "commission") {
         fallbackQuery = fallbackQuery.order("commission", { ascending: sortOrder === "asc" });
       } else if (sortBy === "date" || !sortBy) {
-        fallbackQuery = fallbackQuery.order("created_at", { ascending: sortOrder === "asc" });
+        fallbackQuery = fallbackQuery.order("updated_at", { ascending: sortOrder === "asc" });
       } else {
         fallbackQuery = fallbackQuery.order("base_salary", { ascending: false });
       }
@@ -476,7 +476,7 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
         } else if (sortBy === "commission") {
           ultraFallback = ultraFallback.order("commission", { ascending: sortOrder === "asc" });
         } else if (sortBy === "date" || !sortBy) {
-          ultraFallback = ultraFallback.order("created_at", { ascending: sortOrder === "asc" });
+          ultraFallback = ultraFallback.order("updated_at", { ascending: sortOrder === "asc" });
         } else {
           ultraFallback = ultraFallback.order("base_salary", { ascending: false });
         }

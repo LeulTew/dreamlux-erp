@@ -152,6 +152,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "asset", item.id] });
       onClose();
     },
     onError: () => {
@@ -166,6 +167,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "asset", item.id] });
       onClose();
     },
     onError: () => {
@@ -182,6 +184,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       }
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "asset", item.id] });
     },
     onError: () => {
       notify.error("Error", "Rotation failed");
@@ -195,6 +198,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "asset", item.id] });
       onClose();
     },
     onError: () => {
@@ -215,6 +219,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "asset", item.id] });
       onClose();
       onDeleted?.();
     },

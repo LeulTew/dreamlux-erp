@@ -412,7 +412,7 @@ function AssetsContent() {
 
   const [page, setPage] = useState(1);
   const [editMode, setEditMode] = useState(false);
-  const [sortBy, setSortBy] = useState("created_at");
+  const [sortBy, setSortBy] = useState("updated_at");
   const [sortOrder, setSortOrder] = useState("desc");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

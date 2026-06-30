@@ -200,6 +200,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     mutationFn: (id: string) => deleteEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "employee", employee.id] });
       notify.success("Employee Deleted", "Employee deleted successfully");
       onClose();
     },
@@ -212,6 +213,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     mutationFn: (fd: FormData) => createEmployee(fd) as Promise<Employee>,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "employee", employee.id] });
       notify.success("Employee Duplicated", t("Employee duplicated successfully!"));
       onClose();
     },
@@ -229,6 +231,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       if (skippedEventPrices) {
         notify.error("Event Rates Warning", "Employee saved, but event rates were not persisted. Please run DB migration for event_prices.");
         queryClient.invalidateQueries({ queryKey: ["employees"] });
+        queryClient.invalidateQueries({ queryKey: ["activity-logs", "employee", employee.id] });
         return;
       }
 
@@ -253,6 +256,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
       notify.success("Success", "Employee updated successfully!");
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs", "employee", employee.id] });
       onClose();
     },
     onError: (err: AxiosError<{ error?: string; details?: string }>) => {
