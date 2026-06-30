@@ -340,9 +340,9 @@ export default function NotificationsPage() {
                     key={n.id}
                     className={`group relative rounded-xl border-l-4 p-4 flex items-start gap-4 transition-all cursor-pointer ${
                       n.read_at 
-                        ? "bg-card border-y-border/40 border-r-border/40 border-l-transparent text-muted-foreground/90" 
-                        : "bg-primary/5 dark:bg-primary/10 border-y-primary/30 border-r-primary/30 border-l-primary shadow-sm"
-                    } hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40`}
+                        ? "bg-transparent border-y-border/40 border-r-border/40 border-l-transparent text-muted-foreground/80 hover:bg-primary/[0.02] hover:border-primary/10" 
+                        : "bg-primary/[0.04] dark:bg-primary/[0.08] border-y-primary/20 border-r-primary/20 border-l-primary shadow-sm hover:bg-primary/[0.07] dark:hover:bg-primary/[0.12]"
+                    }`}
                     onClick={() => handleRowClick(n)}
                   >
                     <div className="flex-1 min-w-0">
