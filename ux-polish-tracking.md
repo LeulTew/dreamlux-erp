@@ -23,6 +23,7 @@ Local tracking note for agent continuity and zero-hallucination handoff context.
 | #77 Reference Data | Closed | [PR #88](https://github.com/LeulTew/dreamlux-erp/pull/88) merged; adds Departments, Positions, and Offices setup/reference table CRUD screens. |
 | #78 Proposal creator attribution | Closed | [PR #89](https://github.com/LeulTew/dreamlux-erp/pull/89) merged; proposal queue/detail show proposer metadata with missing-user fallback and backend/frontend checks pass. |
 | #79 Unified trash and restore | Closed | [PR #90](https://github.com/LeulTew/dreamlux-erp/pull/90) merged; issue #79 checklist fully ticked and GitHub issue closed. |
+| #83 Security posture | Closed | [PR #101](https://github.com/LeulTew/dreamlux-erp/pull/101) merged; redesigned plain English/Amharic UI, custom radius, 20/20 Vitest tests. |
 | Final tracker cleanup | Docs-only | This file was compacted after confirming no open #2/#73/77 implementation work remained. |
 
 
@@ -36,6 +37,7 @@ Local tracking note for agent continuity and zero-hallucination handoff context.
 | #77 | Reference data setup pages and sidebar grouping | [PR #88](https://github.com/LeulTew/dreamlux-erp/pull/88) merged; unit tests and frontend build verify layout, permissions, and delete impact validation. | Complete. Departments, positions, and offices screens are now live under the Reference Data collapsible menu group. |
 | #78 | Proposal creator attribution across queue and detail | [PR #89](https://github.com/LeulTew/dreamlux-erp/pull/89) merged; backend joins proposer/approver metadata, frontend queue/detail show Proposed by, and missing users fall back to `Unknown user`. | Complete. CI passed: backend-test and frontend-build. Local verification passed: root tests, backend/frontend lint, backend/frontend builds, and targeted proposal E2E. |
 | #79 | Unified trash and restore for events, proposals, and setup records | [PR #90](https://github.com/LeulTew/dreamlux-erp/pull/90) merged; issue #79 is closed. Final verification included backend event tests 111/111, backend full tests 319/319, backend lint/build, frontend trash unit tests 4/4, Playwright issue79 trash tests 4/4, frontend lint/build, GitHub `backend-test`, and GitHub `frontend-build`. | Complete. Event/proposal trash listing, restore, soft delete, hard-delete blocking, permission-aware UI, and bounded pagination are on `main`; setup doctypes were audited and left unchanged because departments/offices/positions lack `deleted_at`. |
+| #83 | Security posture status page with OWASP/CVE tracking | [PR #101](https://github.com/LeulTew/dreamlux-erp/pull/101) merged; redesigned plain English/Amharic UI with zero jargon, premium border radius, 20/20 Vitest tests, and all CI/build checks passing. | Complete. Access is permission-gated (users:manage or settings:write); reference links/acronyms hidden from users; 100% tests green. |
 
 
 
