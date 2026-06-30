@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const browserChannel =
+  process.env.PLAYWRIGHT_BROWSER_CHANNEL ||
+  (process.platform === "win32" ? "msedge" : undefined);
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
@@ -28,11 +32,11 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], channel: browserChannel },
     },
     {
       name: "mobile-chromium",
-      use: { ...devices["Pixel 5"] },
+      use: { ...devices["Pixel 5"], channel: browserChannel },
     },
   ],
 });
