@@ -445,7 +445,7 @@ export default function SecurityPosturePage() {
 
                   {/* Status badge */}
                   <span
-                    className={`hidden sm:inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold ${cfg.badge}`}
+                    className={`hidden sm:inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[11px] font-semibold ${cfg.badge}`}
                   >
                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
                     {t(cfg.labelKey)}

@@ -894,10 +894,10 @@ export default function SettingsPage() {
 
                 </section>
 
-                <section className="rounded-md border border-border bg-card p-5">
+                <section className="rounded-xl border border-border bg-card p-5">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
                         <HiLockClosed className="h-5 w-5" />
                       </div>
                       <div>

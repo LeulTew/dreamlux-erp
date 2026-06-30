@@ -307,15 +307,17 @@ describe("SecurityPosturePage", () => {
   it("19. no external links (GitHub issues or docs) appear in any expanded area card", async () => {
     mockPermissions = new Set(["users:manage"]);
     renderPage();
-    // Expand every card and check no external links appear
     const areaIds = ["access", "software", "data", "audit", "caveats"];
     for (const id of areaIds) {
-      fireEvent.click(screen.getByTestId(`area-toggle-${id}`));
-      await waitFor(() => {
-        expect(screen.getByTestId(`area-detail-${id}`)).toBeInTheDocument();
-      });
+      // Only click to open if not already open (access is open by default)
+      if (!screen.queryByTestId(`area-detail-${id}`)) {
+        fireEvent.click(screen.getByTestId(`area-toggle-${id}`));
+        await waitFor(() => {
+          expect(screen.getByTestId(`area-detail-${id}`)).toBeInTheDocument();
+        });
+      }
       const detail = screen.getByTestId(`area-detail-${id}`);
-      // No external links should exist (no GitHub issues, no GitHub docs)
+      // No external links (no GitHub issues, no GitHub docs) in area cards
       const externalLinks = detail.querySelectorAll("a[target='_blank']");
       expect(externalLinks.length).toBe(0);
     }
