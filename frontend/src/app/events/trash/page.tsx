@@ -110,72 +110,70 @@ export default function EventsTrashPage() {
           </div>
         </header>
 
-        <section className="overflow-hidden rounded-md border border-border bg-card">
-          <div className="border-b border-border bg-card-alt px-4 py-3">
+        <section className="hidden md:block overflow-hidden bg-card border border-border rounded-md table-container">
+          <div className="border-b border-border bg-card-alt px-6 py-3">
             <p className="text-[11px] font-black uppercase tracking-wider text-muted">Restore records or permanently delete only empty events.</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="border-b border-border bg-muted/30">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
+                <th className="px-6 py-5 text-xs font-black tracking-[0.2em] text-muted">Event</th>
+                <th className="px-6 py-5 text-xs font-black tracking-[0.2em] text-muted">Client</th>
+                <th className="px-6 py-5 text-xs font-black tracking-[0.2em] text-muted">Date</th>
+                <th className="px-6 py-5 text-xs font-black tracking-[0.2em] text-muted">Deleted</th>
+                {canDeleteEvents && <th className="px-6 py-5 text-xs font-black tracking-[0.2em] text-muted text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {isLoading ? (
                 <tr>
-                  <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-muted">Event</th>
-                  <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-muted">Client</th>
-                  <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-muted">Date</th>
-                  <th className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-muted">Deleted</th>
-                  {canDeleteEvents && <th className="px-4 py-3 text-right text-[11px] font-black uppercase tracking-wider text-muted">Actions</th>}
+                  <td colSpan={canDeleteEvents ? 5 : 4} className="px-6 py-8 text-center text-xs font-bold uppercase tracking-wider text-muted">
+                    Loading deleted events...
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={canDeleteEvents ? 5 : 4} className="px-4 py-8 text-center text-xs font-bold uppercase tracking-wider text-muted">
-                      Loading deleted events...
+              ) : events.length === 0 ? (
+                <tr>
+                  <td colSpan={canDeleteEvents ? 5 : 4} className="px-6 py-8 text-center text-xs font-bold uppercase tracking-wider text-muted">
+                    Event trash is empty.
+                  </td>
+                </tr>
+              ) : (
+                events.map((event) => (
+                  <tr key={event.id} className="border-b border-border/30 hover:bg-primary-light/5 transition-all">
+                    <td className="px-6 py-4">
+                      <div className="max-w-[260px] truncate font-bold text-foreground">{event.name}</div>
+                      <div className="max-w-[260px] truncate text-xs text-muted">{event.venue_location}</div>
                     </td>
-                  </tr>
-                ) : events.length === 0 ? (
-                  <tr>
-                    <td colSpan={canDeleteEvents ? 5 : 4} className="px-4 py-8 text-center text-xs font-bold uppercase tracking-wider text-muted">
-                      Event trash is empty.
-                    </td>
-                  </tr>
-                ) : (
-                  events.map((event) => (
-                    <tr key={event.id} className="[@media(hover:hover)]:hover:bg-primary-light/5">
-                      <td className="px-4 py-4">
-                        <div className="max-w-[260px] truncate font-bold text-foreground">{event.name}</div>
-                        <div className="max-w-[260px] truncate text-xs text-muted">{event.venue_location}</div>
+                    <td className="px-6 py-4 text-sm font-semibold text-foreground">{event.client_name}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-muted">{event.start_date ? String(event.start_date).slice(0, 10) : "-"}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-muted">{event.deleted_at ? String(event.deleted_at).slice(0, 10) : "-"}</td>
+                    {canDeleteEvents && (
+                      <td className="px-6 py-4">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => restoreMutation.mutate(event.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600/10 text-emerald-600 border border-emerald-600/20 text-xs font-semibold hover:bg-emerald-600 hover:text-white transition-all active:scale-[0.98]"
+                          >
+                            <HiArrowPath className="h-4 w-4" />
+                            Restore
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteId(event.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-rose-600/10 text-rose-600 border border-rose-600/20 text-xs font-semibold hover:bg-rose-600 hover:text-white transition-all active:scale-[0.98]"
+                          >
+                            <HiTrash className="h-4 w-4" />
+                            Delete
+                          </button>
+                        </div>
                       </td>
-                      <td className="px-4 py-4 text-sm font-semibold text-foreground">{event.client_name}</td>
-                      <td className="px-4 py-4 font-mono text-xs text-muted">{event.start_date ? String(event.start_date).slice(0, 10) : "-"}</td>
-                      <td className="px-4 py-4 font-mono text-xs text-muted">{event.deleted_at ? String(event.deleted_at).slice(0, 10) : "-"}</td>
-                      {canDeleteEvents && (
-                        <td className="px-4 py-4">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => restoreMutation.mutate(event.id)}
-                              className="flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-md border border-emerald-700 bg-emerald-600 px-3 text-xs font-black uppercase tracking-wider text-white [@media(hover:hover)]:hover:bg-emerald-700"
-                            >
-                              <HiArrowPath className="h-4 w-4" />
-                              Restore
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteId(event.id)}
-                              className="flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-md border border-danger/80 bg-danger px-3 text-xs font-black uppercase tracking-wider text-white [@media(hover:hover)]:hover:bg-danger/90"
-                            >
-                              <HiTrash className="h-4 w-4" />
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </section>
         <PaginationControls
           page={page}

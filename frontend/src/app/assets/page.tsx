@@ -865,7 +865,7 @@ function AssetsContent() {
                 setSelectedIds(new Set());
                 router.push("/assets/trash");
               }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all bg-card-alt text-foreground border border-border"
+              className="flex items-center gap-1.5 px-4 h-11 rounded-md text-xs font-semibold bg-card-alt text-muted border border-border [@media(hover:hover)]:hover:bg-rose-500/10 [@media(hover:hover)]:hover:border-rose-500/30 [@media(hover:hover)]:hover:text-rose-600 dark:hover:bg-rose-500/20 dark:hover:border-rose-500/40 dark:hover:text-rose-400 transition-all"
             >
               <HiTrash className="w-4 h-4" />
               {t("Trash")}

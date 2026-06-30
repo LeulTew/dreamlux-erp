@@ -215,16 +215,16 @@ export default function ProposalsPage() {
             {canDeleteEvents && (
               <Link
                 href="/events/proposals/trash"
-                className="flex h-[44px] items-center justify-center gap-1.5 rounded-md border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground"
+                className="flex items-center gap-1.5 px-4 h-[44px] rounded-md text-xs font-semibold bg-card-alt text-muted border border-border [@media(hover:hover)]:hover:bg-rose-500/10 [@media(hover:hover)]:hover:border-rose-500/30 [@media(hover:hover)]:hover:text-rose-600 dark:hover:bg-rose-500/20 dark:hover:border-rose-500/40 dark:hover:text-rose-400 transition-all"
               >
-                <HiTrash className="h-4 w-4 text-danger" />
+                <HiTrash className="h-4 w-4" />
                 {t("Trash")}
               </Link>
             )}
             {canCreateProposals && (
               <Link
                 href="/events/proposals/new"
-                className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
+                className="flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-md text-xs font-semibold bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 shadow-md shadow-indigo-600/10 transition-all border border-indigo-600/20 active:scale-[0.98]"
               >
                 <HiPlus className="w-4 h-4" />
                 {t("Add Proposal")}
