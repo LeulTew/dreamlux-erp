@@ -155,6 +155,14 @@ export default function ProposalsPage() {
   const proposals = useMemo(() => data?.proposals || [], [data?.proposals]);
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
+
+  // Automatically adjust page if current page becomes empty due to deletions
+  React.useEffect(() => {
+    if (data && proposals.length === 0 && total > 0 && page > 1) {
+      setPage(Math.min(page - 1, totalPages));
+    }
+  }, [proposals, total, page, totalPages, data]);
+
   const formatProposalUser = (proposal: EventProposal) =>
     proposal.proposed_by_name ||
     proposal.proposed_by_username ||

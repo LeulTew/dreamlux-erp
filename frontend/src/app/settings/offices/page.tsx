@@ -100,6 +100,12 @@ function OfficesContent() {
   const totalPages = Math.ceil((offices?.length || 0) / limit) || 1;
   const safePage = Math.min(page, totalPages);
 
+  React.useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   const paginatedOffices = offices
     ? offices.slice((safePage - 1) * limit, safePage * limit)
     : [];

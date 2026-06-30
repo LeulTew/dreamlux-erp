@@ -91,6 +91,12 @@ function DepartmentsContent() {
   const totalPages = Math.ceil((departments?.length || 0) / limit) || 1;
   const safePage = Math.min(page, totalPages);
 
+  React.useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   const paginatedDepartments = departments
     ? departments.slice((safePage - 1) * limit, safePage * limit)
     : [];

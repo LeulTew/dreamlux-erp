@@ -125,10 +125,7 @@ export class NotificationsService {
         recipientIds = res.rows.map((row) => row.id);
       }
 
-      // De-duplicate actor_id so users do not receive notifications for their own actions
-      if (actor_id) {
-        recipientIds = recipientIds.filter((id) => id !== actor_id);
-      }
+      // Include the actor in the notification recipient list so they can see their own notifications in the feed
 
       let count = 0;
       for (const recipientId of recipientIds) {

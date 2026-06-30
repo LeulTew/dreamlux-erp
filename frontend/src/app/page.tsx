@@ -438,6 +438,13 @@ function EmployeesPageContent() {
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / limit);
 
+  // Automatically adjust page if current page becomes empty due to deletions
+  useEffect(() => {
+    if (data && rawEmployees.length === 0 && total > 0 && page > 1) {
+      setPage(Math.min(page - 1, Math.ceil(total / limit)));
+    }
+  }, [rawEmployees, total, page, limit, data]);
+
   useEffect(() => {
     const editId = searchParams.get("edit");
     let active = true;

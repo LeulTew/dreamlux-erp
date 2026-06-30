@@ -91,6 +91,12 @@ function PositionsContent() {
   const totalPages = Math.ceil((positions?.length || 0) / limit) || 1;
   const safePage = Math.min(page, totalPages);
 
+  React.useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   const paginatedPositions = positions
     ? positions.slice((safePage - 1) * limit, safePage * limit)
     : [];
