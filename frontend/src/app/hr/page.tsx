@@ -9,7 +9,7 @@ import ForbiddenState from "@/components/ForbiddenState";
 import EditEmployeeSheet from "@/components/EditEmployeeSheet";
 import { getEmployees } from "@/lib/api";
 import { Employee } from "@/lib/types";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import {
   Users,
   FileCheck2,
@@ -200,11 +200,11 @@ export default function HRDashboardPage() {
 
   const isRedacted = !canReadPayroll || manualRedaction;
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.07 } },
   };
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 12 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 120, damping: 18 } },
   };

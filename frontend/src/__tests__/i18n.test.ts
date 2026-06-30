@@ -8,7 +8,9 @@ function extractTranslations(filePath: string): { en: Record<string, string>; am
     throw new Error(`File does not exist: ${absolutePath}`);
   }
   const fileContent = fs.readFileSync(absolutePath, "utf-8");
-  const translationsMatch = fileContent.match(/const TRANSLATIONS: Record<string, Record<string, string>> = ([\s\S]*?);/);
+  const translationsMatch =
+    fileContent.match(/const TRANSLATIONS: Record<string, Record<string, string\s*\|\s*string\[\]>> = ([\s\S]*?);/) ||
+    fileContent.match(/const TRANSLATIONS: Record<string, Record<string, string>> = ([\s\S]*?);/);
   if (!translationsMatch) {
     throw new Error(`Could not find TRANSLATIONS map in ${filePath}`);
   }
