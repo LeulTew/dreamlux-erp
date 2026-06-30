@@ -46,7 +46,7 @@ router.post(
         throw error;
       }
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      await NotificationsService.emitNotificationToRoleOrPermission({
         permissionSlug: "settings:write",
         actor_id: req.user?.id,
         title: "Position Created",
@@ -87,7 +87,7 @@ router.put(
 
       if (!data) return res.status(404).json({ error: "Position not found" });
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      await NotificationsService.emitNotificationToRoleOrPermission({
         permissionSlug: "settings:write",
         actor_id: req.user?.id,
         title: "Position Updated",
@@ -138,7 +138,7 @@ router.delete(
       if (error) throw error;
       if (!data) return res.status(404).json({ error: "Position not found" });
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      await NotificationsService.emitNotificationToRoleOrPermission({
         permissionSlug: "settings:write",
         actor_id: req.user?.id,
         title: "Position Deleted",

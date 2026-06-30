@@ -99,7 +99,7 @@ router.post("/", requirePermissionSlugs(["events:write"]), async (req: AuthReque
       return res.status(500).json({ error: error.message });
     }
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: req.user?.id,
       title: "Event Type Created",
@@ -155,7 +155,7 @@ router.put("/:id", requirePermissionSlugs(["events:write"]), async (req: AuthReq
       return res.status(404).json({ error: "Event type not found" });
     }
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: req.user?.id,
       title: "Event Type Updated",
@@ -193,7 +193,7 @@ router.delete("/:id", requirePermissionSlugs(["events:delete"]), async (req: Aut
       return res.status(404).json({ error: "Event type not found" });
     }
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: req.user?.id,
       title: "Event Type Deleted",

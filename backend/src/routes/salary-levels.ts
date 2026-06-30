@@ -162,7 +162,7 @@ router.post("/", async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: (req as any).user?.id,
       title: "Salary Level Created",
@@ -219,7 +219,7 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ error: "Salary level not found" });
     }
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: (req as any).user?.id,
       title: "Salary Level Updated",
@@ -257,7 +257,7 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ error: "Salary level not found" });
     }
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: (req as any).user?.id,
       title: "Salary Level Deleted",

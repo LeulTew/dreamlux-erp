@@ -98,7 +98,7 @@ router.post(
         throw error;
       }
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      await NotificationsService.emitNotificationToRoleOrPermission({
         permissionSlug: "settings:write",
         actor_id: req.user?.id,
         title: "Office Created",
@@ -142,7 +142,7 @@ router.put(
 
       if (!data) return res.status(404).json({ error: "Office not found" });
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      await NotificationsService.emitNotificationToRoleOrPermission({
         permissionSlug: "settings:write",
         actor_id: req.user?.id,
         title: "Office Updated",
@@ -210,7 +210,7 @@ router.delete(
       if (error) throw error;
       if (!data) return res.status(404).json({ error: "Office not found" });
 
-      NotificationsService.emitNotificationToRoleOrPermission({
+      await NotificationsService.emitNotificationToRoleOrPermission({
         permissionSlug: "settings:write",
         actor_id: req.user?.id,
         title: "Office Deleted",

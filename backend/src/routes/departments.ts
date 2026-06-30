@@ -42,7 +42,7 @@ router.post(
       return res.status(500).json({ error: error.message });
     }
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: req.user?.id,
       title: "Department Created",
@@ -80,7 +80,7 @@ router.put(
 
     if (!data) return res.status(404).json({ error: "Department not found" });
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: req.user?.id,
       title: "Department Updated",
@@ -127,7 +127,7 @@ router.delete(
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: "Department not found" });
 
-    NotificationsService.emitNotificationToRoleOrPermission({
+    await NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "settings:write",
       actor_id: req.user?.id,
       title: "Department Deleted",
