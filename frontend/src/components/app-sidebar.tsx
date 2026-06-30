@@ -45,6 +45,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Types": "Event Types",
     "Add Employee": "Add Employee",
     "List Employees": "List Employees",
+    "HR Dashboard": "HR Dashboard",
     Dashboard: "Dashboard",
     Inventory: "Inventory",
     Reconcile: "Reconcile",
@@ -82,6 +83,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event Types": "የዝግጅት አይነቶች",
     "Add Employee": "ሰራተኛ መዝግብ",
     "List Employees": "የሰራተኞች ዝርዝር",
+    "HR Dashboard": "የሰው ኃይል ዳሽቦርድ",
     Dashboard: "ዋና ገጽ",
     Inventory: "ዕቃዎች",
     Reconcile: "ቆጠራ ማመሳከሪያ",
@@ -472,8 +474,9 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiUsers}
                         label={t("Employees")}
-                        isActive={isActive("/") || isActive("/insert")}
+                        isActive={isActive("/") || isActive("/insert") || isActive("/hr")}
                         links={[
+                          { href: "/hr", label: t("HR Dashboard"), active: pathname === "/hr" },
                           { href: "/", label: t("List Employees"), active: pathname === "/" },
                           { href: "/insert", label: t("Add Employee"), active: pathname === "/insert" },
                         ]}
@@ -483,25 +486,45 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setEmployeesOpen(!employeesOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/") || isActive("/insert")
+                            isActive("/") || isActive("/insert") || isActive("/hr")
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiUsers className={`w-[18px] h-[18px] shrink-0 ${isActive("/") || isActive("/insert") ? "text-primary" : ""}`} />
+                            <HiUsers className={`w-[18px] h-[18px] shrink-0 ${isActive("/") || isActive("/insert") || isActive("/hr") ? "text-primary" : ""}`} />
                             <span>{t("Employees")}</span>
                           </span>
                           <span className="shrink-0">
                             {employeesOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") || isActive("/hr") ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") || isActive("/hr") ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
                         {employeesOpen && (
                           <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                            <SidebarMenuSubItem className="relative">
+                              <SubItemBranchLine isLast={false} />
+                              <SidebarMenuSubButton asChild isActive={pathname === "/hr"} className="rounded-xl">
+                                <Link
+                                  href="/hr"
+                                  className={
+                                    pathname === "/hr"
+                                      ? "text-primary font-bold flex items-center gap-1.5"
+                                      : "text-muted flex items-center gap-1.5"
+                                  }
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                      pathname === "/hr" ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                    }`}
+                                  />
+                                  <span>{t("HR Dashboard")}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
                             <SidebarMenuSubItem className="relative">
                               <SubItemBranchLine isLast={false} />
                               <SidebarMenuSubButton asChild isActive={pathname === "/"} className="rounded-xl">
