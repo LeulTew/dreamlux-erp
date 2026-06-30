@@ -484,7 +484,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
           </div>
 
           {/* Form Actions Footer */}
-          <div className="flex flex-wrap justify-between items-center gap-3 mt-8 pt-4 border-t border-border/40">
+          <div className="flex flex-wrap justify-between items-end gap-3 mt-8 pt-4 border-t border-border/40">
             {/* Left side: All form mutations */}
             <div className="flex flex-wrap items-center gap-3">
               {!isDuplicateMode && (

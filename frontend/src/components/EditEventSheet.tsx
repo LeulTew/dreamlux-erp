@@ -449,7 +449,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
           {/* Form Actions */}
           {!isReadOnly && (
-            <div className="flex justify-between items-center gap-3 mt-8 pt-4 border-t border-border/40">
+            <div className="flex justify-between items-end gap-3 mt-8 pt-4 border-t border-border/40">
               {/* Left side: All form mutations */}
               <div className="flex flex-wrap items-center gap-3">
                 {event && (
