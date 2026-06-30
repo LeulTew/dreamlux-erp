@@ -23,7 +23,7 @@ import { useLanguage } from "@/hooks/use-language";
 // ---------------------------------------------------------------------------
 // Translations — plain, non-technical language for non-technical users
 // ---------------------------------------------------------------------------
-const TRANSLATIONS: Record<string, Record<string, string>> = {
+const TRANSLATIONS: Record<string, Record<string, string | string[]>> = {
   en: {
     "Security Review": "Security Review",
     "page_subtitle":
@@ -261,14 +261,17 @@ export default function SecurityPosturePage() {
   const { hasPermission, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const t = useCallback(
-    (key: string) => TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"]?.[key] || key,
+    (key: string): string => {
+      const val = TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"]?.[key] || key;
+      return typeof val === "string" ? val : val[0] || "";
+    },
     [lang],
   );
   const tArr = useCallback(
-    (key: string): string[] =>
-      (TRANSLATIONS[lang]?.[key] as unknown as string[]) ||
-      (TRANSLATIONS["en"]?.[key] as unknown as string[]) ||
-      [],
+    (key: string): string[] => {
+      const val = TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"]?.[key];
+      return Array.isArray(val) ? val : [];
+    },
     [lang],
   );
 
