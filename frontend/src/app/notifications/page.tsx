@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
@@ -13,6 +13,8 @@ import {
   updateNotificationPreferences,
 } from "@/lib/api";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
+import { createClient } from "@/utils/supabase/client";
 import {
   HiOutlineInbox,
   HiOutlineCheck,
@@ -129,12 +131,42 @@ export default function NotificationsPage() {
   const { lang } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"inbox" | "preferences">("inbox");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [page, setPage] = useState(1);
   const limit = 10;
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+
+  // Supabase Realtime Websocket Listener for instant standalone page updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`public:notifications:page:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Instantly refresh list, unread count, etc. on any realtime database change
+          queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+          queryClient.invalidateQueries({ queryKey: ["notifications-recent"] });
+          queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   // 1. Queries
   const { data: notificationsData, isLoading } = useQuery<{
@@ -176,8 +208,9 @@ export default function NotificationsPage() {
     }
   }, [prefsData]);
 
-  // 2. Mutations
+  // 2. Mutations (tagged to skip global MutationCache re-invalidation)
   const markReadMutation = useMutation({
+    mutationKey: ["notification-action"],
     mutationFn: markNotificationRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
@@ -187,6 +220,7 @@ export default function NotificationsPage() {
   });
 
   const markAllReadMutation = useMutation({
+    mutationKey: ["notification-action"],
     mutationFn: markAllNotificationsRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
@@ -196,6 +230,7 @@ export default function NotificationsPage() {
   });
 
   const archiveMutation = useMutation({
+    mutationKey: ["notification-action"],
     mutationFn: archiveNotification,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });

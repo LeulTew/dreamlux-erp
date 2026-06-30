@@ -12,6 +12,8 @@ import {
   archiveNotification,
 } from "@/lib/api";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
+import { createClient } from "@/utils/supabase/client";
 import {
   HiOutlineBell,
   HiBell,
@@ -80,6 +82,7 @@ export default function NotificationInbox() {
   const { lang } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pushSupported, setPushSupported] = useState(false);
@@ -87,21 +90,53 @@ export default function NotificationInbox() {
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
+  // Supabase Realtime Websocket Listener for instant notification updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`public:notifications:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Instantly refresh query caches on any websocket broadcast event
+          queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+          queryClient.invalidateQueries({ queryKey: ["notifications-recent"] });
+          queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
   // 1. Fetch unread count & last 5 notifications
   const { data: countData } = useQuery<{ unread_count: number }>({
     queryKey: ["notifications-unread-count"],
     queryFn: getUnreadNotificationsCount,
-    refetchInterval: 15000, // Poll count every 15s
+    refetchInterval: 30000, // Conservative 30s polling fallback (websockets provide instant updates)
+    refetchIntervalInBackground: true,
   });
 
   const { data: listData } = useQuery<{ notifications: NotificationItem[] }>({
     queryKey: ["notifications-recent"],
     queryFn: () => getNotifications({ page: 1, limit: 5 }),
     enabled: isOpen,
+    staleTime: 0, // Always refetch when dropdown opens — never serve stale cache
   });
 
-  // 2. Mutations
+  // 2. Mutations (tagged to skip global MutationCache re-invalidation)
   const markReadMutation = useMutation({
+    mutationKey: ["notification-action"],
     mutationFn: markNotificationRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
@@ -111,6 +146,7 @@ export default function NotificationInbox() {
   });
 
   const markAllReadMutation = useMutation({
+    mutationKey: ["notification-action"],
     mutationFn: markAllNotificationsRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
@@ -120,6 +156,7 @@ export default function NotificationInbox() {
   });
 
   const archiveMutation = useMutation({
+    mutationKey: ["notification-action"],
     mutationFn: archiveNotification,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
