@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import PayrollReminder from "@/components/PayrollReminder";
 import NotificationInbox from "@/components/NotificationInbox";
+import PwaLifecycle from "@/components/PwaLifecycle";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
@@ -676,6 +677,7 @@ export default function AuthLayout({
   return (
     <SidebarProvider className="h-screen overflow-hidden">
       <div className="flex h-full w-full bg-background overflow-hidden">
+        <PwaLifecycle />
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1 w-full overflow-hidden">
           {isPreviewActive && (
