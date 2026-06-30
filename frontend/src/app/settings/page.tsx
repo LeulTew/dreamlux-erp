@@ -36,6 +36,7 @@ import {
   HiArrowPath,
   HiCircleStack,
   HiCog6Tooth,
+  HiLockClosed,
   HiOutlinePencil,
   HiOutlinePlus,
   HiOutlineTrash,
@@ -102,6 +103,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event ID Prefix *": "Event ID Prefix *",
     "Appearance & Theme": "Appearance & Theme",
     "Select your preferred visual style for the dashboard.": "Select your preferred visual style for the dashboard.",
+    "Security posture review": "Security posture review",
+    "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.":
+      "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.",
+    "Open security posture": "Open security posture",
     "Light Mode": "Light Mode",
     "Dark Mode": "Dark Mode"
   },
@@ -160,6 +165,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event ID Prefix *": "የዝግጅት መለያ መነሻ *",
     "Appearance & Theme": "ገጽታ እና ቀለም",
     "Select your preferred visual style for the dashboard.": "ለዳሽቦርዱ የሚመርጡትን የእይታ ገጽታ ይምረጡ።",
+    "Security posture review": "የደህንነት ሁኔታ ግምገማ",
+    "Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.":
+      "ከመጨረሻ ማጽደቅ በፊት የ OWASP፣ RLS፣ audit እና ቀጣይ ጉዳዮች ሁኔታ የተመዘገበበትን የውስጥ የደህንነት ማረጋገጫ ይመልከቱ።",
+    "Open security posture": "የደህንነት ሁኔታን ክፈት",
     "Light Mode": "ብርሃናማ ሁነታ",
     "Dark Mode": "ጨለማማ ሁነታ"
   }
@@ -883,6 +892,29 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
+                </section>
+
+                <section className="rounded-md border border-border bg-card p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+                        <HiLockClosed className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">{t("Security posture review")}</h3>
+                        <p className="mt-1 text-sm text-muted">
+                          {t("Review the in-app security checkpoint with tracked OWASP, RLS, audit, and follow-up status before sign-off.")}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => router.push("/settings/security")}
+                      className="inline-flex min-h-12 items-center justify-center rounded-md border border-border bg-card-alt px-4 py-3 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
+                    >
+                      {t("Open security posture")}
+                    </button>
+                  </div>
                 </section>
 
                 {/* Diagnostics Monitor Console */}
