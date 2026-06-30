@@ -99,10 +99,12 @@ import {
   HiCheckCircle,
   HiCheck,
   HiDocumentDuplicate,
+  HiOutlineClock,
 } from "react-icons/hi2";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import { Button } from "./ui/button";
+import ActivityDrawer from "./ActivityDrawer";
 
 interface Props {
   item: Item;
@@ -125,6 +127,7 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
   );
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isDuplicateMode, setIsDuplicateMode] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
 
   const handleReset = () => {
     setName(item.name);
@@ -526,6 +529,15 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
 
               <Button
                 type="button"
+                onClick={() => setIsActivityOpen(true)}
+                className="h-10 px-4 rounded-xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+              >
+                <HiOutlineClock className="w-4 h-4" />
+                {t("Activity")}
+              </Button>
+
+              <Button
+                type="button"
                 onClick={handleReset}
                 className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
               >
@@ -553,6 +565,12 @@ export default function EditAssetSheet({ item, onClose, onDeleted }: Props) {
         title={t("Delete Asset")}
         message={t("Delete Warning")}
         itemName={item.name}
+      />
+      <ActivityDrawer
+        entityType="asset"
+        entityId={item.id}
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
       />
     </>
   );

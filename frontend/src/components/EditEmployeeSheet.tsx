@@ -7,13 +7,14 @@ import Image from "next/image";
 import { updateEmployee, createEmployee, getNextEmployeeId, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import { Employee, SalaryLevel, EventType, EmployeesResponse } from "@/lib/types";
 import { notify } from "@/lib/toast";
-import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck, HiArrowPath, HiDocumentDuplicate } from "react-icons/hi2";
+import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck, HiArrowPath, HiDocumentDuplicate, HiOutlineClock } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import { Button } from "./ui/button";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
+import ActivityDrawer from "./ActivityDrawer";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -131,6 +132,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDuplicateMode, setIsDuplicateMode] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     full_name: employee.full_name,
@@ -749,6 +751,15 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
             <Button
               type="button"
+              onClick={() => setIsActivityOpen(true)}
+              className="h-10 px-4 rounded-xl bg-transparent text-muted-foreground border border-border hover:bg-card active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
+            >
+              <HiOutlineClock className="w-4 h-4" />
+              {t("Activity")}
+            </Button>
+
+            <Button
+              type="button"
               onClick={handleReset}
               className="h-10 px-4 rounded-xl bg-transparent text-indigo-600 border border-indigo-600/30 hover:bg-indigo-500/10 active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 dark:text-indigo-400 dark:border-indigo-500/30 dark:hover:bg-indigo-500/10"
             >
@@ -776,6 +787,12 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
         title={t("Delete Record")}
         message={t("Delete Warning")}
         itemName={employee.full_name}
+      />
+      <ActivityDrawer
+        entityType="employee"
+        entityId={employee.id}
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
       />
     </>
   );
