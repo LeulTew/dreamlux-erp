@@ -14,6 +14,7 @@ import {
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/utils/supabase/client";
+import { notify } from "@/lib/toast";
 import {
   HiOutlineBell,
   HiBell,
@@ -133,6 +134,30 @@ export default function NotificationInbox() {
     enabled: isOpen,
     staleTime: 0, // Always refetch when dropdown opens — never serve stale cache
   });
+
+  const prevCountRef = useRef<number | undefined>(undefined);
+
+  // Trigger PremiumToast notification instantly when unread count increases
+  useEffect(() => {
+    if (countData === undefined) return;
+    const currentCount = countData.unread_count;
+
+    if (prevCountRef.current !== undefined && currentCount > prevCountRef.current) {
+      // Unread count increased! A new notification was created for this user.
+      // Fetch the single latest notification to display a premium toast alert.
+      getNotifications({ page: 1, limit: 1 }).then((res) => {
+        const latest = res.notifications?.[0];
+        if (latest) {
+          // Display the custom PremiumToast instantly!
+          notify.info(latest.title, latest.message);
+        }
+      }).catch(() => {
+        // fail silently
+      });
+    }
+
+    prevCountRef.current = currentCount;
+  }, [countData]);
 
   // 2. Mutations (tagged to skip global MutationCache re-invalidation)
   const markReadMutation = useMutation({

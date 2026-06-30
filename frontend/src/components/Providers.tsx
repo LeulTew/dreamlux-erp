@@ -5,28 +5,29 @@ import { useState } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 30 * 1000,
-            retry: 1,
-          },
+  const [queryClient] = useState(() => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 30 * 1000,
+          retry: 1,
         },
-        mutationCache: new MutationCache({
-          onSuccess: (_data, _vars, _ctx, mutation) => {
-            // Skip notification-internal mutations to avoid redundant invalidation loops
-            const key = mutation.options.mutationKey;
-            if (Array.isArray(key) && key.includes("notification-action")) return;
+      },
+    });
 
-            // Instantly refresh the bell badge + dropdown list after any CRUD mutation
-            queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-            queryClient.invalidateQueries({ queryKey: ["notifications-recent"] });
-          },
-        }),
-      })
-  );
+    // Register global MutationCache onSuccess handler securely after client instantiation
+    (client.getMutationCache() as any).config.onSuccess = (_data: any, _vars: any, _ctx: any, mutation: any) => {
+      const key = mutation.options.mutationKey;
+      if (Array.isArray(key) && key.includes("notification-action")) return;
+
+      // Instantly trigger query invalidation for notifications
+      client.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+      client.invalidateQueries({ queryKey: ["notifications-recent"] });
+      client.invalidateQueries({ queryKey: ["notifications-list"] });
+    };
+
+    return client;
+  });
 
   return (
     <QueryClientProvider client={queryClient}>
