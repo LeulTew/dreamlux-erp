@@ -165,27 +165,23 @@ export default function TrashPage() {
   return (
     <AuthLayout>
       <div className="page-container-lg space-y-6">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/assets")}
-              className="p-2.5 rounded-2xl bg-card-alt border border-border hover:bg-border transition-all"
+              className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card-alt text-muted [@media(hover:hover)]:hover:bg-neutral-900 [@media(hover:hover)]:hover:text-white transition-all duration-200"
+              aria-label="Back to assets"
             >
-              <HiArrowLeft className="w-5 h-5 text-foreground" />
+              <HiArrowLeft className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
-                <HiTrash className="w-6 h-6 text-danger" />
-                {t("Trash")}
-              </h1>
-              <p className="text-sm text-muted font-medium">
-                {total} {t(total === 1 ? "deleted item" : "deleted items")}
-              </p>
+              <h1 className="text-xl font-black tracking-tight text-foreground md:text-2xl">Deleted Assets</h1>
+              <p className="text-xs font-medium text-muted">{total} records in trash</p>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-3xl p-4 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl p-4 shadow-sm">
           <div className="lg:col-span-3">
             <label className="block text-[10px] font-black uppercase tracking-widest text-muted mb-2">{t("Location")}</label>
             <Select
@@ -257,7 +253,7 @@ export default function TrashPage() {
           </div>
         </div>
 
-        <div className="overflow-hidden glass-card rounded-4xl border border-border/30">
+        <div className="overflow-hidden glass-card rounded-2xl border border-border/30">
           <table className="w-full text-left border-collapse hidden md:table">
             <thead>
               <tr className="bg-card-alt/30 border-b border-border/50 text-[10px] uppercase tracking-[0.2em] text-muted font-black">
@@ -291,14 +287,14 @@ export default function TrashPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setItemToRecover(item)}
-                          className="px-3 py-2 rounded-xl bg-success text-white text-xs font-black uppercase tracking-wider hover:opacity-90 transition-all inline-flex items-center gap-1"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-600/10 text-emerald-600 border border-emerald-600/20 text-xs font-semibold hover:bg-emerald-600 hover:text-white transition-all active:scale-[0.98]"
                         >
                           <HiMiniArrowUturnLeft className="w-4 h-4" />
                           {t("Restore")}
                         </button>
                         <button
                           onClick={() => setItemToPermanentlyDelete(item)}
-                          className="px-3 py-2 rounded-xl bg-danger text-white text-xs font-black uppercase tracking-wider hover:opacity-90 transition-all"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-600/10 text-rose-600 border border-rose-600/20 text-xs font-semibold hover:bg-rose-600 hover:text-white transition-all active:scale-[0.98]"
                         >
                           {t("Permanent Delete")}
                         </button>

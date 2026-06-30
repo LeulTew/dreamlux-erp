@@ -96,7 +96,7 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/events/trash": { label: "Trash", permissions: ["events:read"] },
   "/events/proposals/trash": { label: "Trash", permissions: ["events:proposals:write", "events:write", "events:proposals:approve"] },
   "/events/proposals/new": { label: "New Proposal", permissions: ["events:proposals:write", "events:write"] },
-  "/hr": { label: "Management", href: "/" },
+  "/hr": { label: "HR Dashboard", permissions: ["hr:read", "payroll:read"] },
   "/hr/event-types": { label: "Event Types", permissions: ["events:write"] },
   "/hr/event-types/trash": { label: "Trash", permissions: ["events:write"] },
   "/hr/payments": { label: "Payroll", permissions: ["payroll:read", "payroll:write"] },

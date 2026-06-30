@@ -737,9 +737,9 @@ function EventsPageContent() {
             {canDeleteEvents && (
               <Link
                 href="/events/trash"
-                className="flex items-center gap-1.5 px-4 h-[44px] rounded-md text-xs font-black uppercase tracking-wider bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground border border-border"
+                className="flex items-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-semibold bg-card-alt text-muted border border-border [@media(hover:hover)]:hover:bg-rose-500/10 [@media(hover:hover)]:hover:border-rose-500/30 [@media(hover:hover)]:hover:text-rose-600 dark:hover:bg-rose-500/20 dark:hover:border-rose-500/40 dark:hover:text-rose-400 transition-all"
               >
-                <HiTrash className="w-4 h-4 text-danger" />
+                <HiTrash className="w-4 h-4" />
                 {t("Trash")}
               </Link>
             )}
@@ -865,7 +865,7 @@ function EventsPageContent() {
                   setDraftFilterLogic(filterLogic);
                   setIsFiltersOpen(true);
                 }}
-                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-amber-500/40 bg-amber-500/5 text-amber-600" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"} active:scale-[0.98] transition-all`}
+                className={`flex items-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-black uppercase tracking-wider border ${filters.length > 0 ? "border-amber-500/40 bg-amber-500/5 text-amber-600" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"} active:scale-[0.98] transition-all`}
               >
                 <HiAdjustmentsHorizontal className="w-4 h-4" />
                 {t("Filters")}

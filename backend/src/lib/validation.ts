@@ -36,7 +36,7 @@ export const paginationSchema = z.object({
 });
 
 export const assetsPaginationSchema = paginationSchema.extend({
-  sortBy: z.enum(["name", "quantity", "created_at", "updated_at", "last_counted_at"]).optional().default("created_at"),
+  sortBy: z.enum(["name", "quantity", "created_at", "updated_at", "last_counted_at"]).optional().default("updated_at"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 

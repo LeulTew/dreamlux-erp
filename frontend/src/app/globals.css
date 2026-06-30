@@ -400,3 +400,13 @@ body {
     width: 0%;
   }
 }
+
+/* Fix native calendar and clock input icon colors in dark mode */
+.dark input::-webkit-calendar-picker-indicator {
+  filter: invert(0.65);
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+.dark input::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.9);
+}

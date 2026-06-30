@@ -3,6 +3,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
+import { api } from "@/lib/api";
 import { 
   HiOutlineXMark, 
   HiOutlineClock,
@@ -116,7 +117,7 @@ const getActionColor = (action: string) => {
     case "update_permissions":
       return "text-amber-500 bg-amber-500/10 border-amber-500/20";
     default:
-      return "text-gold bg-gold/10 border-gold/20";
+      return "text-primary bg-gold/10 border-gold/20";
   }
 };
 
@@ -126,17 +127,14 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
 
   const { data, isLoading, error } = useQuery<{ activity: ActivityLogEntry[] }>({
     queryKey: ["activity-logs", entityType, entityId],
-    queryFn: () => {
-      const params = new URLSearchParams({
-        entity_type: entityType,
-        entity_id: entityId,
+    queryFn: async () => {
+      const res = await api.get<{ activity: ActivityLogEntry[] }>("/api/activity", {
+        params: {
+          entity_type: entityType,
+          entity_id: entityId,
+        },
       });
-
-      return fetch(`/api/activity?${params.toString()}`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to load activity logs");
-          return res.json();
-        });
+      return res.data;
     },
     enabled: isOpen && Boolean(entityId),
   });
@@ -155,19 +153,19 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
 
       {/* Slide-out Sheet Panel */}
       <div 
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-neutral-950 border-l border-neutral-800 text-white flex flex-col shadow-2xl transition-transform duration-300 transform translate-x-0"
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-card border-l border-border text-foreground flex flex-col shadow-massive transition-transform duration-300 transform translate-x-0"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-slate-900/40">
+        <div className="p-4 border-b border-border flex justify-between items-center bg-card-alt/50">
           <div className="flex items-center gap-2">
-            <HiOutlineClock className="w-5 h-5 text-gold" />
-            <h2 className="text-lg font-bold tracking-tight text-white">{t("ActivityTimeline")}</h2>
+            <HiOutlineClock className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-bold tracking-tight text-foreground">{t("ActivityTimeline")}</h2>
           </div>
           <button 
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-md border border-neutral-800 bg-neutral-950 text-neutral-400 [@media(hover:hover)]:hover:bg-neutral-900 [@media(hover:hover)]:hover:text-white transition-colors focus:outline-none"
+            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-transparent text-muted hover:bg-card-alt hover:text-foreground transition-colors focus:outline-none"
             aria-label={t("Close")}
           >
             <HiOutlineXMark className="w-5 h-5" />
@@ -177,8 +175,8 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
         {/* Content body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {isLoading && (
-            <div className="flex flex-col items-center justify-center h-48 space-y-2 text-neutral-400">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold" />
+            <div className="flex flex-col items-center justify-center h-48 space-y-2 text-muted">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               <p className="text-sm">{t("Loading")}</p>
             </div>
           )}
@@ -190,14 +188,14 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
           )}
 
           {!isLoading && !error && logs.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-48 text-neutral-400 text-center">
-              <HiOutlineClock className="w-12 h-12 mb-2 text-neutral-700" />
+            <div className="flex flex-col items-center justify-center h-48 text-muted text-center">
+              <HiOutlineClock className="w-12 h-12 mb-2 text-muted/30" />
               <p className="text-sm">{t("NoActivity")}</p>
             </div>
           )}
 
           {!isLoading && !error && logs.length > 0 && (
-            <div className="relative border-l border-neutral-800 ml-4 space-y-6">
+            <div className="relative border-l border-border ml-4 space-y-6">
               {logs.map((log) => {
                 const Icon = getActionIcon(log.action);
                 const colorClasses = getActionColor(log.action);
@@ -226,40 +224,40 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
 
                     <div className="flex flex-col space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-white text-sm">
+                        <span className="font-semibold text-foreground text-sm">
                           {actionLabel}
                         </span>
-                        <span className="text-xs text-neutral-500 font-mono tabular-nums">
+                        <span className="text-xs text-muted font-mono tabular-nums">
                           {formattedTime}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-xs text-neutral-400 mt-0.5">
-                        <HiOutlineUser className="w-3.5 h-3.5 text-neutral-500" />
+                      <div className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
+                        <HiOutlineUser className="w-3.5 h-3.5 text-muted" />
                         <span>{log.full_name || log.username || t("ActorSystem")}</span>
                       </div>
 
                       {log.source_route && (
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted">
                           {t("Source")}: <span className="font-mono normal-case tracking-normal">{log.source_route}</span>
                         </div>
                       )}
 
                       {log.note && (
-                        <p className="text-xs text-neutral-300 mt-2 bg-neutral-900 border border-neutral-800 p-2 rounded-sm italic">
+                        <p className="text-xs text-foreground mt-2 bg-card-alt border border-border p-2 rounded-sm italic">
                           {log.note}
                         </p>
                       )}
 
                       {log.field_changed && (
-                        <div className="mt-2 text-xs bg-neutral-900/50 border border-neutral-800 p-2 rounded-sm space-y-1.5 font-mono">
-                          <div className="flex justify-between border-b border-neutral-800 pb-1 text-[10px] text-neutral-500">
-                            <span>{t("Field")}: <span className="text-gold font-sans font-semibold">{log.field_changed}</span></span>
+                        <div className="mt-2 text-xs bg-card-alt/50 border border-border p-2 rounded-sm space-y-1.5 font-mono">
+                          <div className="flex justify-between border-b border-border pb-1 text-[10px] text-muted">
+                            <span>{t("Field")}: <span className="text-primary font-sans font-semibold">{log.field_changed}</span></span>
                           </div>
                           <div className="grid grid-cols-2 gap-2 pt-0.5">
                             {log.old_value !== null && (
                               <div className="flex flex-col">
-                                <span className="text-[10px] text-neutral-500 uppercase font-sans">{t("Before")}</span>
+                                <span className="text-[10px] text-muted uppercase font-sans">{t("Before")}</span>
                                 <span className="text-red-400/90 text-xs truncate" title={log.old_value}>
                                   {log.old_value}
                                 </span>
@@ -267,7 +265,7 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
                             )}
                             {log.new_value !== null && (
                               <div className="flex flex-col">
-                                <span className="text-[10px] text-neutral-500 uppercase font-sans">{t("After")}</span>
+                                <span className="text-[10px] text-muted uppercase font-sans">{t("After")}</span>
                                 <span className="text-green-400/90 text-xs truncate" title={log.new_value}>
                                   {log.new_value}
                                 </span>
