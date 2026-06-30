@@ -171,6 +171,7 @@ CSV Importer Path
 *   [x] **[DONE] Issue #31**: Database RLS hardening and assignment concurrency triggers.
 *   [x] **[DONE] Issue #32**: Event completion commission and attendance payroll automation.
 *   [x] **[DONE] Issue #33**: Advanced event proposals intake, filters, import/export, and profit reports.
+*   [x] **[DONE] Issue #85 (STORY)**: HR Dashboard for workforce, payroll, and staffing readiness. Theme-aware dashboard at `/hr` with KPI metric cards, payroll redaction gate, exception tables (Missing Bank/IDs/Contracts), click-to-edit drawer, Amharic i18n, empty/loading states, 15/15 Vitest tests. Merged via PR #100.
 *   [ ] **[ACTIVE] Issue #2**: STORY-2: Core Event Lifecycle. Story remains open to track core lifecycle stages.
 *   [ ] **[ACTIVE] Issue #25 (ux/system)**: Permission-Aware UI/UX Consistency & Access Polish. Gating buttons, links, and drawers dynamically based on `/auth/permissions`.
 
