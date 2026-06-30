@@ -20,23 +20,26 @@ const toast = {
       { duration }
     );
   },
-  success: (message: string, description?: unknown) => {
-    if (typeof description === "string") {
-      return sonnerToast.success(message, { description });
-    }
-    return sonnerToast.success(message, description as Parameters<typeof sonnerToast.success>[1]);
+  success: (message: string, description?: any) => {
+    const desc = typeof description === "string" ? description : undefined;
+    const duration = (description && typeof description === "object" && "duration" in description) ? description.duration : undefined;
+    return toast.custom((t) => (
+      <PremiumToast t={t} title={message} description={desc} type="success" />
+    ), { duration });
   },
-  error: (message: string, description?: unknown) => {
-    if (typeof description === "string") {
-      return sonnerToast.error(message, { description });
-    }
-    return sonnerToast.error(message, description as Parameters<typeof sonnerToast.error>[1]);
+  error: (message: string, description?: any) => {
+    const desc = typeof description === "string" ? description : undefined;
+    const duration = (description && typeof description === "object" && "duration" in description) ? description.duration : undefined;
+    return toast.custom((t) => (
+      <PremiumToast t={t} title={message} description={desc} type="error" />
+    ), { duration });
   },
-  info: (message: string, description?: unknown) => {
-    if (typeof description === "string") {
-      return sonnerToast.info(message, { description });
-    }
-    return sonnerToast.info(message, description as Parameters<typeof sonnerToast.info>[1]);
+  info: (message: string, description?: any) => {
+    const desc = typeof description === "string" ? description : undefined;
+    const duration = (description && typeof description === "object" && "duration" in description) ? description.duration : undefined;
+    return toast.custom((t) => (
+      <PremiumToast t={t} title={message} description={desc} type="info" />
+    ), { duration });
   },
   dismiss: (id?: string | number) => {
     return sonnerToast.dismiss(id);
