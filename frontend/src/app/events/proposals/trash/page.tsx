@@ -103,7 +103,7 @@ export default function ProposalTrashPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/events/proposals"
-              className="flex h-12 w-12 items-center justify-center rounded-[6px] border border-border bg-card-alt text-muted [@media(hover:hover)]:hover:bg-neutral-900 [@media(hover:hover)]:hover:text-white transition-all duration-200"
+              className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card-alt text-muted [@media(hover:hover)]:hover:bg-neutral-900 [@media(hover:hover)]:hover:text-white transition-all duration-200"
               aria-label="Back to proposals"
             >
               <HiArrowLeft className="h-5 w-5" />
@@ -115,7 +115,7 @@ export default function ProposalTrashPage() {
           </div>
         </header>
 
-        <section className="hidden md:block overflow-hidden bg-card border border-border rounded-md table-container">
+        <section className="hidden md:block overflow-hidden bg-card border border-border rounded-2xl table-container">
           <div className="border-b border-border bg-card-alt px-6 py-3">
             <p className="text-[11px] font-black uppercase tracking-wider text-muted">Converted proposals remain protected to preserve event traceability.</p>
           </div>
@@ -168,7 +168,7 @@ export default function ProposalTrashPage() {
                           <button
                             type="button"
                             onClick={() => restoreMutation.mutate(proposal.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600/10 text-emerald-600 border border-emerald-600/20 text-xs font-semibold hover:bg-emerald-600 hover:text-white transition-all active:scale-[0.98]"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-600/10 text-emerald-600 border border-emerald-600/20 text-xs font-semibold hover:bg-emerald-600 hover:text-white transition-all active:scale-[0.98]"
                           >
                             <HiArrowPath className="h-4 w-4" />
                             Restore
@@ -176,7 +176,7 @@ export default function ProposalTrashPage() {
                           <button
                             type="button"
                             onClick={() => setDeleteId(proposal.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-rose-600/10 text-rose-600 border border-rose-600/20 text-xs font-semibold hover:bg-rose-600 hover:text-white transition-all active:scale-[0.98]"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-600/10 text-rose-600 border border-rose-600/20 text-xs font-semibold hover:bg-rose-600 hover:text-white transition-all active:scale-[0.98]"
                           >
                             <HiTrash className="h-4 w-4" />
                             Delete

@@ -215,7 +215,7 @@ export default function ProposalsPage() {
             {canDeleteEvents && (
               <Link
                 href="/events/proposals/trash"
-                className="flex items-center gap-1.5 px-4 h-[44px] rounded-md text-xs font-semibold bg-card-alt text-muted border border-border [@media(hover:hover)]:hover:bg-rose-500/10 [@media(hover:hover)]:hover:border-rose-500/30 [@media(hover:hover)]:hover:text-rose-600 dark:hover:bg-rose-500/20 dark:hover:border-rose-500/40 dark:hover:text-rose-400 transition-all"
+                className="flex items-center gap-1.5 px-4 h-[44px] rounded-2xl text-xs font-semibold bg-card-alt text-muted border border-border [@media(hover:hover)]:hover:bg-rose-500/10 [@media(hover:hover)]:hover:border-rose-500/30 [@media(hover:hover)]:hover:text-rose-600 dark:hover:bg-rose-500/20 dark:hover:border-rose-500/40 dark:hover:text-rose-400 transition-all"
               >
                 <HiTrash className="h-4 w-4" />
                 {t("Trash")}
