@@ -104,6 +104,8 @@ interface NotificationPreferences {
   categories: Record<string, boolean>;
 }
 
+type NotificationPreferenceFlag = "in_app_enabled" | "email_enabled" | "push_enabled";
+
 export default function NotificationsPage() {
   const { lang } = useLanguage();
   const router = useRouter();
@@ -211,12 +213,11 @@ export default function NotificationsPage() {
     }
   };
 
-  const handleTogglePref = (key: string) => {
+  const handleTogglePref = (key: NotificationPreferenceFlag) => {
     if (!localPrefs) return;
-    const current = localPrefs as unknown as Record<string, boolean>;
     setLocalPrefs({
       ...localPrefs,
-      [key]: !current[key],
+      [key]: !localPrefs[key],
     });
   };
 

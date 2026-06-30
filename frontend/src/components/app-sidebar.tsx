@@ -14,7 +14,6 @@ import {
   HiChevronDown,
   HiChevronUp,
   HiChevronLeft,
-  HiOutlineBell,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
@@ -329,15 +328,8 @@ export function AppSidebar() {
   const isRefDataActive = pathname.startsWith("/settings/departments") || 
                           pathname.startsWith("/settings/positions") || 
                           pathname.startsWith("/settings/offices");
-  const [refDataOpen, setRefDataOpen] = useState(isRefDataActive);
-
-  useEffect(() => {
-    if (isRefDataActive) {
-      setRefDataOpen(true);
-    } else {
-      setRefDataOpen(false);
-    }
-  }, [pathname, isRefDataActive]);
+  const [refDataManuallyOpen, setRefDataManuallyOpen] = useState(false);
+  const refDataOpen = isRefDataActive || refDataManuallyOpen;
 
 
   // Sync user details reactively
@@ -696,7 +688,7 @@ export function AppSidebar() {
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
-                          onClick={() => setRefDataOpen(!refDataOpen)}
+                          onClick={() => setRefDataManuallyOpen((open) => !open)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices")
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"

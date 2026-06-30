@@ -1,14 +1,10 @@
-import { describe, test, expect, beforeAll, mock } from "bun:test";
+import { describe, test, expect, mock } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import app from "../index";
 import "./setup"; // Imports setup mocks for Supabase/pg
 
-import { pool } from "../db/pool";
-import { ActivityService } from "../services/activity-service";
-
 const testUserId = "550e8400-e29b-41d4-a716-446655440000";
-const mockNotificationId = "880e8400-e29b-41d4-a716-446655440000";
 
 const superAdminToken = getTestToken(testUserId, "super_admin", ["*"]);
 const staffToken = getTestToken(testUserId, "crew", ["events:read"]); // Cannot read payroll/bank details
@@ -47,7 +43,7 @@ const mockLogs = [
 // Mock pg pool query
 mock.module("../db/pool", () => ({
   pool: {
-    query: mock((sql: string, params?: any[]) => {
+    query: mock((sql: string, _params?: any[]) => {
       const queryLower = sql.toLowerCase();
       
       // Resolve mock logs list

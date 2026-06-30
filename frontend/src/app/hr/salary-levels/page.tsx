@@ -80,12 +80,6 @@ function SalaryLevelsContent() {
   const totalPages = Math.ceil((levels?.length || 0) / limit) || 1;
   const safePage = Math.min(page, totalPages);
 
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
   const paginatedLevels = levels ? levels.slice((safePage - 1) * limit, safePage * limit) : [];
 
   const { data: deleteImpact, isLoading: isDeleteImpactLoading } = useQuery<{ salary_level_id: string; level_name: string; active_employee_count: number }>({

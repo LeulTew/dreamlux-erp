@@ -736,7 +736,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       email: "",
                     }));
                     setIsDuplicateMode(true);
-                  } catch (err) {
+                  } catch {
                     notify.error("Error", "Failed to resolve next sequential ID");
                   }
                 }}

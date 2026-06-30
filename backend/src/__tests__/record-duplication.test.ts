@@ -7,7 +7,6 @@ import {
 import "./setup";
 import { describe, test, expect, mock, beforeEach, beforeAll } from "bun:test";
 import request from "supertest";
-import jwt from "jsonwebtoken";
 
 const sourceItemImageKey = "source-store/source-item.webp";
 const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
