@@ -4,10 +4,10 @@ import { AxiosError } from "axios";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import Image from "next/image";
-import { updateEmployee, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
+import { updateEmployee, createEmployee, getNextEmployeeId, getDepartments, createDepartment, deleteEmployee, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import { Employee, SalaryLevel, EventType, EmployeesResponse } from "@/lib/types";
 import { notify } from "@/lib/toast";
-import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck, HiArrowPath } from "react-icons/hi2";
+import { HiExclamationCircle, HiPlus, HiTrash, HiXMark, HiUserPlus, HiIdentification, HiCheck, HiArrowPath, HiDocumentDuplicate } from "react-icons/hi2";
 import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
@@ -49,7 +49,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Failed to process image": "Failed to process image",
     "Department added!": "Department added!",
     "Failed to add department": "Failed to add department",
-    "Please fix the mistakes in the form": "Please fix the mistakes in the form"
+    "Please fix the mistakes in the form": "Please fix the mistakes in the form",
+    "Duplicate": "Duplicate",
+    "Duplicate Employee": "Duplicate Employee",
+    "Creating duplicate of": "Creating duplicate of",
+    "Employee duplicated successfully!": "Employee duplicated successfully!",
+    "Failed to duplicate employee": "Failed to duplicate employee",
   },
   am: {
     "Edit Employee": "የሰራተኛ መረጃ ማስተካከያ",
@@ -84,7 +89,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Failed to process image": "ፎቶውን ለማዘጋጀት አልተሳካም",
     "Department added!": "ክፍል በተሳካ ሁኔታ ታክሏል!",
     "Failed to add department": "ክፍል ማከል አልተሳካም",
-    "Please fix the mistakes in the form": "እባክዎ በቅጹ ውስጥ ያሉትን ስህተቶች ያስተካክሉ"
+    "Please fix the mistakes in the form": "እባክዎ በቅጹ ውስጥ ያሉትን ስህተቶች ያስተካክሉ",
+    "Duplicate": "ቅጂ ፍጠር",
+    "Duplicate Employee": "ሰራተኛ ቅጂ ፍጠር",
+    "Creating duplicate of": "ቅጂ በማዘጋጀት ላይ ለ",
+    "Employee duplicated successfully!": "ሰራተኛ ቅጂ በተሳካ ሁኔታ ተፈጥሯል!",
+    "Failed to duplicate employee": "ቅጂ መፍጠር አልተቻለም",
   }
 };
 
@@ -120,6 +130,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
   const [backFile, setBackFile] = useState<File | null>(null);
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDuplicateMode, setIsDuplicateMode] = useState(false);
 
   const [formData, setFormData] = useState({
     full_name: employee.full_name,
@@ -153,6 +164,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     setFormErrors({});
     setIsAddingDepartment(false);
     setNewDepartment("");
+    setIsDuplicateMode(false);
     notify.success(t("Changes reset"));
   };
 
@@ -191,6 +203,18 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     },
     onError: () => {
       notify.error("Deletion Failed", "Failed to delete employee");
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (fd: FormData) => createEmployee(fd) as Promise<Employee>,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      notify.success("Employee Duplicated", t("Employee duplicated successfully!"));
+      onClose();
+    },
+    onError: () => {
+      notify.error("Duplication Failed", t("Failed to duplicate employee"));
     },
   });
 
@@ -356,7 +380,12 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       }
     });
 
-    updateMutation.mutate(fd);
+    if (isDuplicateMode) {
+      fd.append("clone_from_id", employee.id);
+      duplicateMutation.mutate(fd);
+    } else {
+      updateMutation.mutate(fd);
+    }
   };
 
   return (
@@ -364,8 +393,8 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       <ResponsiveDrawer
         isOpen={true}
         onClose={onClose}
-        title={t("Edit Employee")}
-        subtitle={`${t("Updating")} ${employee.full_name}`}
+        title={isDuplicateMode ? t("Duplicate Employee") : t("Edit Employee")}
+        subtitle={isDuplicateMode ? `${t("Creating duplicate of")} ${employee.full_name}` : `${t("Updating")} ${employee.full_name}`}
       >
         <form onSubmit={handleSubmit} className="space-y-6 pb-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -677,19 +706,46 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-end items-center gap-3 mt-8 pt-4 border-t border-border/40">
-            <Button
-              type="button"
-              variant="destructive"
-              loading={deleteMutation.isPending}
-              onClick={() => setShowDeleteModal(true)}
-              className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
-              title={t("Delete Permanently")}
-            >
-              <HiTrash className="w-4.5 h-4.5" />
-              {t("Delete")}
-            </Button>
+          {/* Form Actions Footer */}
+          <div className="flex flex-wrap justify-end items-center gap-3 mt-8 pt-4 border-t border-border/40">
+            {!isDuplicateMode && (
+              <Button
+                type="button"
+                variant="destructive"
+                loading={deleteMutation.isPending}
+                onClick={() => setShowDeleteModal(true)}
+                className="h-10 px-4 rounded-xl flex items-center gap-2 transition-all text-xs font-bold uppercase tracking-wider shrink-0"
+                title={t("Delete Permanently")}
+              >
+                <HiTrash className="w-4.5 h-4.5" />
+                {t("Delete")}
+              </Button>
+            )}
+
+            {!isDuplicateMode && (
+              <Button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await getNextEmployeeId();
+                    setFormData(prev => ({
+                      ...prev,
+                      full_name: prev.full_name + " (Copy)",
+                      employee_id: res.nextId,
+                      phone: "",
+                      email: "",
+                    }));
+                    setIsDuplicateMode(true);
+                  } catch {
+                    notify.error("Error", "Failed to resolve next sequential ID");
+                  }
+                }}
+                className="h-10 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+              >
+                <HiDocumentDuplicate className="w-4.5 h-4.5" />
+                {t("Duplicate")}
+              </Button>
+            )}
 
             <Button
               type="button"
@@ -702,11 +758,11 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
             <Button
               type="submit"
-              loading={updateMutation.isPending}
+              loading={isDuplicateMode ? duplicateMutation.isPending : updateMutation.isPending}
               className="h-10 px-6 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
             >
               <HiCheck className="w-4.5 h-4.5" />
-              {t("Save Changes")}
+              {isDuplicateMode ? t("Duplicate Employee") : t("Save Changes")}
             </Button>
           </div>
         </form>

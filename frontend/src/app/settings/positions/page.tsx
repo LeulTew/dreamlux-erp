@@ -2,7 +2,7 @@
 
 import React, { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { HiPlus } from "react-icons/hi2";
+import { HiPlus, HiPencilSquare, HiOutlineTrash, HiDocumentDuplicate } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPositions, createPosition, updatePosition, deletePosition } from "@/lib/api";
@@ -28,6 +28,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete": "Delete",
     "Delete Position": "Delete Position",
     "Are you sure you want to delete this position?": "Are you sure you want to delete this position? This operation cannot be undone if no employees are currently assigned to it.",
+    "Duplicate": "Duplicate",
   },
   am: {
     "Position Setup": "የስራ መደብ ዝግጅት",
@@ -43,6 +44,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete": "ሰርዝ",
     "Delete Position": "የስራ መደብ ሰርዝ",
     "Are you sure you want to delete this position?": "ይህንን የስራ መደብ ለመሰረዝ እርግጠኛ ነዎት? ይህንን የስራ መደብ ላይ የተመደቡ ሰራተኞች ከሌሉ ድርጊቱ የማይመለስ ይሆናል።",
+    "Duplicate": "ቅጂ ፍጠር",
   }
 };
 
@@ -88,6 +90,12 @@ function PositionsContent() {
   const limit = 10;
   const totalPages = Math.ceil((positions?.length || 0) / limit) || 1;
   const safePage = Math.min(page, totalPages);
+
+  React.useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const paginatedPositions = positions
     ? positions.slice((safePage - 1) * limit, safePage * limit)
@@ -220,8 +228,8 @@ function PositionsContent() {
         )}
 
         <div className="space-y-4">
-          <div className="bg-card rounded-2xl shadow-premium border border-border overflow-hidden p-2">
-            <table className="w-full text-left text-sm border-separate border-spacing-0">
+          <div className="bg-card rounded-2xl shadow-premium border border-border overflow-hidden">
+            <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="bg-muted/30">
                   <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">
@@ -254,40 +262,41 @@ function PositionsContent() {
                       className={`transition-colors group ${
                         highlightedId === pos.id
                           ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
-                          : "hover:bg-primary/2"
+                          : "hover:bg-primary/5"
                       }`}
                     >
-                      <td className="px-4 sm:px-8 py-4 sm:py-6">
-                        {hasWriteAccess ? (
-                          <button
-                            onClick={() => {
-                              setForm({ id: pos.id, name: pos.name });
-                              window.scrollTo({ top: 0, behavior: "smooth" });
-                            }}
-                            className="inline-flex items-center justify-center min-w-10 px-3 py-1 bg-foreground text-background rounded-lg font-semibold text-xs uppercase tracking-wider hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-                          >
-                            {pos.name}
-                          </button>
-                        ) : (
-                          <span className="font-semibold text-foreground">{pos.name}</span>
-                        )}
+                      <td className="px-4 sm:px-8 py-3 sm:py-3.5">
+                        <span className="font-bold text-sm tracking-tight text-foreground">{pos.name}</span>
                       </td>
                       {hasWriteAccess && (
-                        <td className="px-4 sm:px-8 py-4 sm:py-6 text-right space-x-2 sm:space-x-4 opacity-100 md:opacity-20 group-hover:opacity-100 transition-all duration-300">
+                        <td className="px-4 sm:px-8 py-3 sm:py-3.5 text-right space-x-2.5">
                           <button
                             onClick={() => {
                               setForm({ id: pos.id, name: pos.name });
                               window.scrollTo({ top: 0, behavior: "smooth" });
                             }}
-                            className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20"
+                            title={t("Edit")}
+                            className="p-2 bg-primary/10 rounded-lg text-primary hover:bg-primary hover:text-background transition-all active:scale-90 inline-flex items-center justify-center border border-primary/20 cursor-pointer"
                           >
-                            {t("Edit")}
+                            <HiPencilSquare className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setForm({ id: undefined, name: pos.name + " (Copy)" });
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                              toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ መደብ ጨምር የሚለውን ይጫኑ" : "Prefilled duplicate; click Add Position to save");
+                            }}
+                            title={t("Duplicate")}
+                            className="p-2 bg-amber-500/10 rounded-lg text-amber-500 hover:bg-amber-500 hover:text-white transition-all active:scale-90 inline-flex items-center justify-center border border-amber-500/20 cursor-pointer"
+                          >
+                            <HiDocumentDuplicate className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteId(pos.id)}
-                            className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20"
+                            title={t("Delete")}
+                            className="p-2 bg-danger/10 rounded-lg text-danger hover:bg-danger hover:text-white transition-all active:scale-90 inline-flex items-center justify-center border border-danger/20 cursor-pointer"
                           >
-                            {t("Delete")}
+                            <HiOutlineTrash className="w-4 h-4" />
                           </button>
                         </td>
                       )}

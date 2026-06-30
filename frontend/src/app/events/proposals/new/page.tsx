@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useMemo, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useMemo, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createEventProposal, submitEventProposal, getEventTypes, createEventType } from "@/lib/api";
+import { createEventProposal, submitEventProposal, getEventTypes, createEventType, getEventProposal } from "@/lib/api";
+import { notify } from "@/lib/toast";
 import { EventType } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
@@ -165,7 +166,7 @@ interface EstimateLine {
   fuel_price?: number;
 }
 
-export default function NewProposalPage() {
+function NewProposalContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
@@ -235,6 +236,52 @@ export default function NewProposalPage() {
   const [teamLines, setTeamLines] = useState<EstimateLine[]>([]);
   const [tripLines, setTripLines] = useState<EstimateLine[]>([]);
   const [otherLines, setOtherLines] = useState<EstimateLine[]>([]);
+
+  const searchParams = useSearchParams();
+  const cloneFromId = searchParams.get("clone_from_id");
+
+  useEffect(() => {
+    if (!cloneFromId) return;
+
+    const formatDateForInput = (d?: string | Date) => {
+      if (!d) return "";
+      const date = new Date(d);
+      if (isNaN(date.getTime())) return "";
+      return date.toISOString().split("T")[0];
+    };
+
+    const formatTimeForInput = (t?: string) => {
+      if (!t) return "";
+      return t.slice(0, 5); // HH:MM
+    };
+
+    getEventProposal(cloneFromId)
+      .then((proposal) => {
+        setName(proposal.name + " (Copy)");
+        setClientName(proposal.client_name);
+        setClientPhone(proposal.client_phone || "");
+        setEventTypeId(proposal.event_type_id || "");
+        setRequestedBudget(proposal.requested_budget);
+        setStartDate(formatDateForInput(proposal.start_date));
+        setEndDate(formatDateForInput(proposal.end_date));
+        setStartTime(formatTimeForInput(proposal.start_time));
+        setEndTime(formatTimeForInput(proposal.end_time));
+        setVenueLocation(proposal.venue_location || "");
+        setNotes(proposal.notes || "");
+        setDesignNotes(proposal.design_notes || "");
+
+        // Set estimate lines
+        setDesignLines(proposal.design_estimate || []);
+        setTeamLines(proposal.team_estimate || []);
+        setTripLines(proposal.trip_estimate || []);
+        setOtherLines(proposal.other_estimate || []);
+
+        notify.success("Duplicated Mode", "Proposal data pre-filled! Please edit or submit.");
+      })
+      .catch(() => {
+        notify.error("Error", "Failed to retrieve source proposal to duplicate");
+      });
+  }, [cloneFromId]);
 
   // Fetch event types for dropdown
   const { data: eventTypesData } = useQuery<EventType[]>({
@@ -1148,5 +1195,21 @@ export default function NewProposalPage() {
         </>
       )}
     </AuthLayout>
+  );
+}
+
+export default function NewProposalPage() {
+  return (
+    <Suspense fallback={
+      <AuthLayout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground animate-pulse">
+            Initializing...
+          </span>
+        </div>
+      </AuthLayout>
+    }>
+      <NewProposalContent />
+    </Suspense>
   );
 }

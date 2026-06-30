@@ -22,7 +22,8 @@ import {
   HiArrowLeft,
   HiExclamationTriangle,
   HiCurrencyDollar,
-  HiArrowTopRightOnSquare
+  HiArrowTopRightOnSquare,
+  HiDocumentDuplicate
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -329,6 +330,15 @@ export default function ProposalDetailPage() {
           </div>
 
           <div className="flex gap-2">
+            {canWrite && (
+              <button
+                onClick={() => router.push(`/events/proposals/new?clone_from_id=${proposal.id}`)}
+                className="no-print flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-amber-500 hover:bg-amber-600 text-white transition-all border border-amber-500/20 active:scale-[0.98]"
+              >
+                <HiDocumentDuplicate className="w-4 h-4" />
+                {t("Duplicate")}
+              </button>
+            )}
             <button
               onClick={() => setIsActivityOpen(true)}
               className="no-print flex items-center justify-center gap-1.5 px-4 h-[44px] rounded-lg text-xs font-black bg-card border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all"

@@ -41,6 +41,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Expenses: "Expenses",
     Payroll: "Payroll",
     Inventory: "Inventory & Discrepancies",
+    Employees: "Employees",
+    "System Settings & Reference Data": "System Settings & Reference Data",
     "Save Preferences": "Save Preferences",
     "Preferences Saved Successfully": "Notification preferences updated successfully.",
     "All Alerts": "All Alerts",
@@ -67,6 +69,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Expenses: "ወጪዎች",
     Payroll: "ደመወዝ",
     Inventory: "ንብረት እና የቆጠራ ግድፈቶች",
+    Employees: "ሰራተኞች",
+    "System Settings & Reference Data": "የስርዓት ቅንብሮች እና ማመሳከሪያ መረጃዎች",
     "Save Preferences": "ቅንብሮችን አስቀምጥ",
     "Preferences Saved Successfully": "የማሳወቂያ ምርጫዎች በተሳካ ሁኔታ ተዘምነዋል።",
     "All Alerts": "ሁሉም ማንቂያዎች",
@@ -146,6 +150,8 @@ export default function NotificationsPage() {
           expenses: true,
           payroll: true,
           inventory: true,
+          employees: true,
+          settings: true,
         },
       });
     }
@@ -280,7 +286,7 @@ export default function NotificationsPage() {
                 onClick={() => setUnreadOnly(false)}
                 className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   !unreadOnly
-                    ? "bg-primary border-primary text-black"
+                    ? "bg-primary border-primary text-white"
                     : "bg-card border-border text-muted hover:text-foreground"
                 }`}
               >
@@ -290,7 +296,7 @@ export default function NotificationsPage() {
                 onClick={() => setUnreadOnly(true)}
                 className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   unreadOnly
-                    ? "bg-primary border-primary text-black"
+                    ? "bg-primary border-primary text-white"
                     : "bg-card border-border text-muted hover:text-foreground"
                 }`}
               >
@@ -540,6 +546,28 @@ export default function NotificationsPage() {
                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary accent-primary"
                   />
                 </label>
+
+                {/* Employees */}
+                <label className="flex items-center justify-between cursor-pointer border-t border-border/40 pt-3 p-1">
+                  <span className="text-xs font-semibold text-foreground">{t("Employees")}</span>
+                  <input
+                    type="checkbox"
+                    checked={localPrefs.categories.employees ?? true}
+                    onChange={() => handleToggleCategory("employees")}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary accent-primary"
+                  />
+                </label>
+
+                {/* Settings & Reference Data */}
+                <label className="flex items-center justify-between cursor-pointer border-t border-border/40 pt-3 p-1">
+                  <span className="text-xs font-semibold text-foreground">{t("System Settings & Reference Data")}</span>
+                  <input
+                    type="checkbox"
+                    checked={localPrefs.categories.settings ?? true}
+                    onChange={() => handleToggleCategory("settings")}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary accent-primary"
+                  />
+                </label>
               </div>
             </div>
 
@@ -547,7 +575,7 @@ export default function NotificationsPage() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => updatePrefsMutation.mutate(localPrefs)}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary text-black font-black hover:opacity-90 active:scale-95 transition-all text-xs tracking-wider uppercase cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 active:scale-95 transition-all text-xs tracking-wider uppercase cursor-pointer"
               >
                 {t("Save Preferences")}
               </button>

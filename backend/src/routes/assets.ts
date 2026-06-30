@@ -567,18 +567,10 @@ router.post(
 
       const { name, quantity, store_id, description } = parsed.data;
       const file = req.file;
+      const cloneFromId = req.body.clone_from_id as string | undefined;
 
-      if (!file) {
+      if (!file && !cloneFromId) {
         res.status(400).json({ error: "Image is required" });
-        return;
-      }
-
-      // Magic-byte file verification
-      const detectedType = await fromBuffer(file.buffer);
-      if (!detectedType || !["image/jpeg", "image/png"].includes(detectedType.mime)) {
-        res.status(400).json({
-          error: "File content does not match JPEG/PNG format",
-        });
         return;
       }
 
@@ -586,15 +578,41 @@ router.post(
       const itemId = uuidv4();
       imageKey = `${store_id}/${itemId}.webp`;
 
-      // Compress image server-side: auto-rotate EXIF + convert to WebP
-      const compressedBuffer = await sharp(file.buffer)
-        .rotate()
-        .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 80 })
-        .toBuffer();
+      if (file) {
+        // Magic-byte file verification
+        const detectedType = await fromBuffer(file.buffer);
+        if (!detectedType || !["image/jpeg", "image/png"].includes(detectedType.mime)) {
+          res.status(400).json({
+            error: "File content does not match JPEG/PNG format",
+          });
+          return;
+        }
 
-      // Upload to storage FIRST
-      await uploadImage(imageKey, compressedBuffer, "image/webp");
+        // Compress image server-side: auto-rotate EXIF + convert to WebP
+        const compressedBuffer = await sharp(file.buffer)
+          .rotate()
+          .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+
+        // Upload to storage FIRST
+        await uploadImage(imageKey, compressedBuffer, "image/webp");
+      } else if (cloneFromId) {
+        // Fetch source item to copy the image
+        const { data: sourceItem, error: sourceError } = await supabase
+          .from("items")
+          .select("image_key")
+          .eq("id", cloneFromId)
+          .single();
+
+        if (sourceError || !sourceItem?.image_key) {
+          res.status(400).json({ error: "Source asset image not found for cloning" });
+          return;
+        }
+
+        const buffer = await downloadImage(sourceItem.image_key);
+        await uploadImage(imageKey, buffer, "image/webp");
+      }
 
       // Get default category
       const { data: catData } = await supabase.from("categories").select("id").limit(1);
@@ -616,6 +634,16 @@ router.post(
         .single();
 
       if (error) throw error;
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "assets:read",
+        actor_id: req.user?.id,
+        title: "Asset Catalog Updated",
+        message: `A new inventory item "${itemData.name}" has been added to the store catalog.`,
+        entity_type: "inventory",
+        entity_id: itemData.id,
+        action_url: `/assets`,
+      });
 
       res.status(201).json({
         ...itemData,
@@ -2049,6 +2077,16 @@ router.patch(
           note: `Asset "${updatedItem.name}" updated.`,
         });
 
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "assets:read",
+          actor_id: req.user?.id,
+          title: "Asset Catalog Updated",
+          message: `Inventory item "${updatedItem.name}" has been updated.`,
+          entity_type: "inventory",
+          entity_id: id,
+          action_url: `/assets`,
+        });
+
         res.json({
           ...updatedItem,
           image_url: updatedItem.image_key ? getPublicUrl(updatedItem.image_key) : null,
@@ -2458,6 +2496,16 @@ router.post(
           entity_id: persistedRunId || undefined,
           action_url: "/inventory/reconciliation",
         });
+      } else if (results.length > 0) {
+        NotificationsService.emitNotificationToRoleOrPermission({
+          permissionSlug: "assets:reconcile",
+          actor_id: req.user?.id,
+          title: "Inventory Recount Finalized",
+          message: `Inventory recount run (ID: ${persistedRunId || "N/A"}) completed successfully with no discrepancies detected.`,
+          entity_type: "inventory",
+          entity_id: persistedRunId || undefined,
+          action_url: "/inventory/reconciliation",
+        });
       }
 
       // Log reconciliation activity
@@ -2546,6 +2594,16 @@ router.delete(
       }
         
       if (deleteError) throw deleteError;
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "assets:read",
+        actor_id: req.user?.id,
+        title: "Asset Catalog Updated",
+        message: `Inventory item "${item.name}" has been deleted from the catalog.`,
+        entity_type: "inventory",
+        entity_id: id,
+        action_url: `/assets`,
+      });
 
       res.json({ success: true });
     } catch (error: unknown) {

@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { HiOutlineTrash, HiPlus } from "react-icons/hi2";
+import { HiOutlineTrash, HiPlus, HiPencilSquare, HiDocumentDuplicate } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSalaryLevels, createSalaryLevel, updateSalaryLevel, deleteSalaryLevel, getSalaryLevelDeleteImpact } from "@/lib/api";
@@ -240,8 +240,8 @@ function SalaryLevelsContent() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-card rounded-2xl 2xl:rounded-4xl shadow-premium border border-border overflow-hidden p-2">
-            <table className="w-full text-left text-sm border-separate border-spacing-0">
+          <div className="bg-card rounded-2xl 2xl:rounded-4xl shadow-premium border border-border overflow-hidden">
+            <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="bg-muted/30">
                   <th className="px-4 sm:px-8 py-4 sm:py-5 text-xs font-semibold uppercase text-muted-foreground tracking-wider border-b border-border/50">{t("Level Name")}</th>
@@ -261,34 +261,49 @@ function SalaryLevelsContent() {
                       className={`transition-colors group ${
                         highlightedId === lvl.id
                           ? "bg-primary/10 ring-1 ring-inset ring-primary/30"
-                          : "hover:bg-primary/2"
+                          : "hover:bg-primary/5"
                       }`}
                     >
-                      <td className="px-4 sm:px-8 py-4 sm:py-6">
+                      <td className="px-4 sm:px-8 py-3 sm:py-3.5">
+                        <span className="font-bold text-sm tracking-tight text-foreground">{lvl.level_name}</span>
+                      </td>
+                      <td className="px-4 sm:px-8 py-3 sm:py-3.5">
+                        <div className="flex flex-col">
+                          <span className="text-sm sm:text-base font-bold tracking-tight text-foreground">
+                            ETB {Number(lvl.base_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest mt-0.5 opacity-60">{t("Gross Base Monthly")}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 sm:px-8 py-3 sm:py-3.5 text-right space-x-2.5">
                         <button
                           onClick={() => {
                             setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
-                          className="inline-flex items-center justify-center min-w-10 px-3 py-1 bg-foreground text-background rounded-lg font-semibold text-xs uppercase tracking-wider hover:opacity-85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+                          title={t("Edit")}
+                          className="p-2 bg-primary/10 rounded-lg text-primary hover:bg-primary hover:text-background transition-all active:scale-90 inline-flex items-center justify-center border border-primary/20 cursor-pointer"
                         >
-                          {lvl.level_name}
+                          <HiPencilSquare className="w-4 h-4" />
                         </button>
-                      </td>
-                      <td className="px-4 sm:px-8 py-4 sm:py-6">
-                        <div className="flex flex-col">
-                          <span className="text-base sm:text-lg font-bold tracking-tight text-foreground">
-                            ETB {Number(lvl.base_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                          <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted-foreground tracking-widest mt-0.5 opacity-60">{t("Gross Base Monthly")}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 sm:px-8 py-4 sm:py-6 text-right space-x-2 sm:space-x-4 opacity-100 md:opacity-20 group-hover:opacity-100 transition-all duration-300">
-                        <button onClick={() => {
-                          setForm({ id: lvl.id, level_name: lvl.level_name, base_salary: lvl.base_salary.toString() });
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }} className="text-xs font-semibold tracking-wider text-primary hover:text-primary-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-primary/20">{t("Edit")}</button>
-                        <button onClick={() => setDeleteId(lvl.id)} className="text-xs font-semibold tracking-wider text-danger hover:text-danger-dark outline-none p-1 uppercase underline decoration-2 underline-offset-4 decoration-danger/20">{t("Delete")}</button>
+                        <button
+                          onClick={() => {
+                            setForm({ id: undefined, level_name: lvl.level_name + " (Copy)", base_salary: lvl.base_salary.toString() });
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            toast.success(lang === "am" ? "የተገለበጠ መረጃ ተሞልቷል፤ ለመመዝገብ ደረጃ አክል የሚለውን ይጫኑ" : "Prefilled duplicate; click Add Level to save");
+                          }}
+                          title={t("Duplicate")}
+                          className="p-2 bg-amber-500/10 rounded-lg text-amber-500 hover:bg-amber-500 hover:text-white transition-all active:scale-90 inline-flex items-center justify-center border border-amber-500/20 cursor-pointer"
+                        >
+                          <HiDocumentDuplicate className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteId(lvl.id)}
+                          title={t("Delete")}
+                          className="p-2 bg-danger/10 rounded-lg text-danger hover:bg-danger hover:text-white transition-all active:scale-90 inline-flex items-center justify-center border border-danger/20 cursor-pointer"
+                        >
+                          <HiOutlineTrash className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))

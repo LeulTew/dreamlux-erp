@@ -2,53 +2,58 @@ import { Router, Response } from "express";
 import { supabase } from "../db/supabase";
 import { requirePermissionSlugs, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
+import { NotificationsService } from "../services/notifications-service";
 
 const router = Router();
 
 // GET /offices — list associated offices (legacy/employee filter fallback)
-router.get("/", requirePermissionSlugs(["offices:manage", "hr:read", "offices:read"]), async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const { data: storesData, error: storesError } = await supabase
-      .from("stores")
-      .select("id, name, is_active")
-      .order("name", { ascending: true });
+router.get(
+  "/",
+  requirePermissionSlugs(["offices:manage", "hr:read", "offices:read"]),
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { data: storesData, error: storesError } = await supabase
+        .from("stores")
+        .select("id, name, is_active")
+        .order("name", { ascending: true });
 
-    if (storesError) throw storesError;
+      if (storesError) throw storesError;
 
-    const { data: itemsData, error: itemsError } = await supabase
-      .from("items")
-      .select("store_id")
-      .neq("quantity", -999999);
+      const { data: itemsData, error: itemsError } = await supabase
+        .from("items")
+        .select("store_id")
+        .neq("quantity", -999999);
 
-    if (itemsError) throw itemsError;
+      if (itemsError) throw itemsError;
 
-    const { data: employeesData, error: employeesError } = await supabase
-      .from("employees")
-      .select("office_id")
-      .is("deleted_at", null)
-      .not("office_id", "is", null);
+      const { data: employeesData, error: employeesError } = await supabase
+        .from("employees")
+        .select("office_id")
+        .is("deleted_at", null)
+        .not("office_id", "is", null);
 
-    if (employeesError) throw employeesError;
+      if (employeesError) throw employeesError;
 
-    const associatedStoreIds = new Set<string>();
-    for (const item of itemsData || []) {
-      if (item.store_id) associatedStoreIds.add(item.store_id);
+      const associatedStoreIds = new Set<string>();
+      for (const item of itemsData || []) {
+        if (item.store_id) associatedStoreIds.add(item.store_id);
+      }
+      for (const employee of employeesData || []) {
+        if (employee.office_id) associatedStoreIds.add(employee.office_id);
+      }
+
+      const stores = (storesData || []).filter((store: any) => associatedStoreIds.has(store.id));
+
+      res.json(stores);
+    } catch (err: unknown) {
+      console.error("Failed to fetch offices:", err);
+      res.status(500).json({
+        error: "Failed to fetch offices",
+        details: err instanceof Error ? err.message : String(err),
+      });
     }
-    for (const employee of employeesData || []) {
-      if (employee.office_id) associatedStoreIds.add(employee.office_id);
-    }
-
-    const stores = (storesData || []).filter((store: any) => associatedStoreIds.has(store.id));
-
-    res.json(stores);
-  } catch (err: unknown) {
-    console.error("Failed to fetch offices:", err);
-    res.status(500).json({
-      error: "Failed to fetch offices",
-      details: err instanceof Error ? err.message : String(err),
-    });
   }
-});
+);
 
 // GET /offices/all — list all offices in database
 router.get(
@@ -92,6 +97,16 @@ router.post(
         }
         throw error;
       }
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "settings:write",
+        actor_id: req.user?.id,
+        title: "Office Created",
+        message: `Office location "${data.name}" has been created.`,
+        entity_type: "settings",
+        entity_id: data.id,
+      });
+
       res.status(201).json(data);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to create office" });
@@ -126,6 +141,16 @@ router.put(
       }
 
       if (!data) return res.status(404).json({ error: "Office not found" });
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "settings:write",
+        actor_id: req.user?.id,
+        title: "Office Updated",
+        message: `Office location "${data.name}" has been updated.`,
+        entity_type: "settings",
+        entity_id: data.id,
+      });
+
       res.json(data);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to update office" });
@@ -184,6 +209,15 @@ router.delete(
 
       if (error) throw error;
       if (!data) return res.status(404).json({ error: "Office not found" });
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "settings:write",
+        actor_id: req.user?.id,
+        title: "Office Deleted",
+        message: `Office location "${data.name}" has been deleted.`,
+        entity_type: "settings",
+        entity_id: id,
+      });
 
       res.json({ message: "Office deleted successfully", office: data });
     } catch (err: any) {

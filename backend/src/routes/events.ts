@@ -1618,6 +1618,16 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
     // Redact contract_price/estimated_design_cost if user doesn't have privileges
     const event = await redactEventForPermissions(result.rows[0], req);
 
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "events:read",
+      actor_id: req.user?.id,
+      title: "New Event Created",
+      message: `A new event "${result.rows[0].name}" has been created by ${req.user?.username || "Someone"}.`,
+      entity_type: "event",
+      entity_id: result.rows[0].id,
+      action_url: `/events/${result.rows[0].id}`,
+    });
+
     res.status(201).json({ event });
   } catch (error: any) {
     console.error("[create-event] Error:", error);
@@ -1811,6 +1821,17 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     }
 
     await insertEventAuditLog(pool, id, req.user?.id || null, "event_deleted", "active", "deleted");
+
+    NotificationsService.emitNotificationToRoleOrPermission({
+      permissionSlug: "events:read",
+      actor_id: req.user?.id,
+      title: "Event Cancelled / Deleted",
+      message: `Event "${result.rows[0].name}" has been deleted by ${req.user?.username || "Someone"}.`,
+      entity_type: "event",
+      entity_id: id,
+      action_url: undefined,
+    });
+
     res.json({ success: true });
   } catch (error: any) {
     console.error("[delete-event] Error:", error);

@@ -163,7 +163,7 @@ export default function NotificationInbox() {
         {unreadCount > 0 ? (
           <>
             <HiBell className="h-4.5 w-4.5 text-primary shrink-0 animate-wiggle" />
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black text-black leading-none tabular-nums border border-card shadow-sm">
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white leading-none tabular-nums border border-card shadow-sm">
               {unreadCount}
             </span>
           </>
@@ -201,7 +201,7 @@ export default function NotificationInbox() {
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={handleRequestPermission}
-                  className="rounded bg-primary px-2.5 py-1 text-[9px] font-black text-black hover:opacity-90 active:scale-95 transition-all cursor-pointer uppercase tracking-wider"
+                  className="rounded bg-primary px-2.5 py-1 text-[9px] font-bold text-white hover:opacity-90 active:scale-95 transition-all cursor-pointer uppercase tracking-wider"
                 >
                   {t("Enable")}
                 </button>

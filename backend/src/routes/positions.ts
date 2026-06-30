@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { supabase } from "../db/supabase";
 import { requirePermissionSlugs, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
+import { NotificationsService } from "../services/notifications-service";
 
 const router = Router();
 
@@ -44,6 +45,16 @@ router.post(
         }
         throw error;
       }
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "settings:write",
+        actor_id: req.user?.id,
+        title: "Position Created",
+        message: `Position "${data.name}" has been created.`,
+        entity_type: "settings",
+        entity_id: data.id,
+      });
+
       res.status(201).json(data);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to create position" });
@@ -75,6 +86,16 @@ router.put(
       }
 
       if (!data) return res.status(404).json({ error: "Position not found" });
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "settings:write",
+        actor_id: req.user?.id,
+        title: "Position Updated",
+        message: `Position "${data.name}" has been updated.`,
+        entity_type: "settings",
+        entity_id: data.id,
+      });
+
       res.json(data);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to update position" });
@@ -116,6 +137,15 @@ router.delete(
 
       if (error) throw error;
       if (!data) return res.status(404).json({ error: "Position not found" });
+
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "settings:write",
+        actor_id: req.user?.id,
+        title: "Position Deleted",
+        message: `Position "${data.name}" has been deleted.`,
+        entity_type: "settings",
+        entity_id: id,
+      });
 
       res.json({ message: "Position deleted successfully", position: data });
     } catch (err: any) {
