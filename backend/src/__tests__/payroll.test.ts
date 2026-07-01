@@ -8,6 +8,18 @@ import "./setup";
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
 let insertPayloads: unknown[] = [];
 
+mock.module("../db/pool", () => ({
+  pool: {
+    query: mockQuery,
+    connect: mock(() =>
+      Promise.resolve({
+        release: mock(() => {}),
+        query: mockQuery,
+      })
+    ),
+  },
+}));
+
 const fakeChain = (isSingle = false): any => {
   const chain: any = {
     select: () => fakeChain(isSingle),
