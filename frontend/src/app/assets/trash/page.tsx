@@ -11,7 +11,7 @@ import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import QuantityModal from "@/components/QuantityModal";
 import { getItems, getStores, recoverItem, permanentlyDeleteItem } from "@/lib/api";
 import { Item, ItemsResponse, Store } from "@/lib/types";
-import { HiArrowLeft, HiMiniArrowUturnLeft, HiTrash } from "react-icons/hi2";
+import { HiArrowLeft, HiMiniArrowUturnLeft } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import DatePicker from "@/components/ui/DatePicker";
 import toast from "@/lib/toast";

@@ -315,11 +315,13 @@ function PaymentRunProcessPageContent() {
     enabled: hasPayrollWrite,
   });
 
-  const { data: runsHistory, isLoading: runsHistoryLoading } = useQuery<PayrollRun[]>({
+  const { data: runsHistoryPayload, isLoading: runsHistoryLoading } = useQuery({
     queryKey: ["payroll-runs", "active"],
-    queryFn: () => getPayrollRuns({ view: "active" }),
+    queryFn: () => getPayrollRuns({ view: "active", limit: 100 }),
     enabled: hasPayrollWrite,
   });
+
+  const runsHistory = useMemo(() => runsHistoryPayload?.runs ?? [], [runsHistoryPayload]);
 
   const existingDraft = useMemo(() => {
     const [y, m] = selectedMonth.split("-").map(Number);

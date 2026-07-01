@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
-import { getPayrollRuns, updatePayrollRunStatus, exportPayrollPDF, permanentlyDeletePayrollRun } from "@/lib/api";
+import { getPayrollRuns, updatePayrollRunStatus, exportPayrollPDF, permanentlyDeletePayrollRun, type PayrollRunsResponse } from "@/lib/api";
 import { HiClock, HiOutlineChevronRight, HiPencilSquare, HiPrinter, HiArrowUturnLeft, HiArrowPath, HiTrash } from "react-icons/hi2";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
@@ -77,17 +77,6 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   }
 };
 
-type PayrollRunRow = {
-  id: string;
-  month?: number;
-  year?: number;
-  period_start?: string;
-  period_end?: string;
-  total_payroll_value?: number;
-  status?: string;
-  created_at?: string;
-};
-
 function PaymentsPageContent() {
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
@@ -109,14 +98,18 @@ function PaymentsPageContent() {
   const hasPayrollAccess = hasPermission("payroll:read") || hasPermission("payroll:write");
   const hasPayrollWrite = hasPermission("payroll:write");
 
-  const { data: runs, isLoading, isRefetching, refetch } = useQuery<PayrollRunRow[]>({
-    queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder],
+  const ITEMS_PER_PAGE = 8;
+
+  const { data: runsPayload, isLoading, isRefetching, refetch } = useQuery<PayrollRunsResponse>({
+    queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder, page],
     queryFn: () => getPayrollRuns({
       view,
       year: yearFilter === "ALL" ? undefined : yearFilter,
       status: statusFilter === "ALL" ? undefined : statusFilter,
       sortBy,
-      sortOrder
+      sortOrder,
+      page,
+      limit: ITEMS_PER_PAGE,
     }),
     enabled: isAuthenticated && hasPayrollAccess,
   });
@@ -157,28 +150,15 @@ function PaymentsPageContent() {
     },
   });
 
-  const sortedRuns = useMemo(() => runs ?? [], [runs]);
-
-  const ITEMS_PER_PAGE = 8;
-  const totalPages = Math.max(1, Math.ceil(sortedRuns.length / ITEMS_PER_PAGE));
-  const paginatedRuns = useMemo(() => {
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    return sortedRuns.slice(start, start + ITEMS_PER_PAGE);
-  }, [page, sortedRuns]);
+  const paginatedRuns = useMemo(() => runsPayload?.runs ?? [], [runsPayload]);
+  const totalPages = runsPayload?.totalPages ?? 1;
 
   const isMutating = trashMutation.isPending || restoreMutation.isPending || permanentDeleteMutation.isPending;
 
   useEffect(() => {
-    if (!highlightedId || sortedRuns.length === 0) return;
-
-    const highlightedIndex = sortedRuns.findIndex((run) => run.id === highlightedId);
-    if (highlightedIndex === -1) return;
-
-    const timer = setTimeout(() => {
-      setPage(Math.floor(highlightedIndex / ITEMS_PER_PAGE) + 1);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [highlightedId, sortedRuns]);
+    if (!highlightedId || paginatedRuns.length === 0) return;
+    if (paginatedRuns.some((run) => run.id === highlightedId)) return;
+  }, [highlightedId, paginatedRuns]);
 
   const executeConfirmAction = async () => {
     if (!confirmState) return;
@@ -339,7 +319,7 @@ function PaymentsPageContent() {
           <div className="p-20 text-center text-muted-foreground animate-pulse font-black uppercase text-[10px] tracking-[0.4em] bg-card rounded-xl border border-border/50 shadow-inner">
             {t("Retrieving payroll audit history...")}
           </div>
-        ) : sortedRuns.length === 0 ? (
+        ) : paginatedRuns.length === 0 ? (
           <div className="p-20 text-center rounded-xl border-2 border-dashed border-border/50 text-muted-foreground font-black uppercase tracking-widest text-sm bg-card shadow-sm">
             {view === "trash" ? t("Trash is empty") : t("No payroll records found in the archive")}
           </div>
@@ -466,7 +446,7 @@ function PaymentsPageContent() {
           </div>
         )}
 
-        {sortedRuns.length > ITEMS_PER_PAGE && (
+        {(runsPayload?.total ?? 0) > ITEMS_PER_PAGE && (
           <div className="pt-2 flex justify-center">
             <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
@@ -492,7 +472,7 @@ function PaymentsPageContent() {
                 ? lang === "am" ? "ይህንን የደሞዝ ክፍያ እና ሁሉንም ተዛማጅ ዝርዝሮች ለዘለቄታው ያጥፉ? ይህ ድርጊት ሊመለስ አይችልም።" : "Permanently delete this payroll run and all related lines? This cannot be undone."
                 : lang === "am" ? "ይህንን የደሞዝ ክፍያ ወደ መጣያ ይውሰዱት? ከገባሪ ዝርዝር ውስጥ ይወገዳል።" : "Archive this payroll run? It will be removed from the active list and moved to trash."
           }
-          itemName={runs?.find(r => r.id === confirmState?.id)?.id.slice(0,8) || ""}
+          itemName={paginatedRuns.find(r => r.id === confirmState?.id)?.id.slice(0,8) || ""}
           isDeleting={isMutating}
         />
       </div>

@@ -247,7 +247,7 @@ describe("Payroll Validation Schema (unit)", () => {
 
 // ─── Integration Tests: GET /payroll/runs ────────────────────────────────────
 describe("Payroll API > GET /payroll/runs", () => {
-  test("returns empty array when no runs exist", async () => {
+  test("returns empty paginated payload when no runs exist", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app)
@@ -255,7 +255,7 @@ describe("Payroll API > GET /payroll/runs", () => {
       .set("Authorization", AUTH());
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+    expect(res.body.runs).toEqual([]);
   });
 
   test("returns formatted runs with aggregated totals", async () => {
@@ -289,11 +289,79 @@ describe("Payroll API > GET /payroll/runs", () => {
       .set("Authorization", AUTH());
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].status).toBe("FINALIZED");
-    expect(res.body[0].total_payroll_value).toBe(15500);
-    expect(res.body[0].month).toBe(4);
-    expect(res.body[0].year).toBe(2026);
+    expect(res.body.runs).toHaveLength(1);
+    expect(res.body.total).toBe(1);
+    expect(res.body.page).toBe(1);
+    expect(res.body.limit).toBe(20);
+    expect(res.body.runs[0].status).toBe("FINALIZED");
+    expect(res.body.runs[0].total_payroll_value).toBe(15500);
+    expect(res.body.runs[0].month).toBe(4);
+    expect(res.body.runs[0].year).toBe(2026);
+  });
+
+  test("caps requested page size and returns pagination metadata", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: RUN_ID,
+          period_start: "2026-04-01",
+          period_end: "2026-04-30",
+          status: "draft",
+          created_at: "2026-04-11T00:00:00Z",
+          updated_at: "2026-04-11T00:00:00Z",
+          finalized_at: null,
+          created_by: null,
+        },
+      ],
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app)
+      .get("/payroll/runs?page=2&limit=500")
+      .set("Authorization", AUTH());
+
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(2);
+    expect(res.body.limit).toBe(100);
+    expect(res.body.totalPages).toBe(1);
+    expect(res.body.runs).toHaveLength(1);
+  });
+
+  test("sorts by total with bounded SQL pagination", async () => {
+    const { pool } = await import("../db/pool");
+    const poolQuery = pool.query as unknown as ReturnType<typeof mock>;
+    poolQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          id: RUN_ID,
+          period_start: "2026-04-01",
+          period_end: "2026-04-30",
+          status: "finalized",
+          created_at: "2026-04-11T00:00:00Z",
+          updated_at: "2026-04-11T00:00:00Z",
+          finalized_at: null,
+          created_by: null,
+          total_payroll_value: 15500,
+          total_count: 11,
+        },
+      ],
+    });
+
+    const res = await request(app)
+      .get("/payroll/runs?sortBy=total&sortOrder=asc&page=2&limit=5&status=FINALIZED&year=2026")
+      .set("Authorization", AUTH());
+
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(2);
+    expect(res.body.limit).toBe(5);
+    const boundedTotalSortCall = poolQuery.mock.calls.find((call: unknown[]) =>
+      String(call[0]).includes("SUM(prel.employee_total_snapshot)")
+    ) as [string, Array<string | number>] | undefined;
+    expect(boundedTotalSortCall).toBeDefined();
+    const [sql, params] = boundedTotalSortCall as [string, Array<string | number>];
+    expect(sql).toContain("SUM(prel.employee_total_snapshot)");
+    expect(sql.toLowerCase()).toContain("limit $4 offset $5");
+    expect(params).toEqual(["finalized", "2026-01-01", "2026-12-31", 5, 5]);
   });
 
   test("rejects unsupported sort fields before querying payroll runs", async () => {
@@ -334,7 +402,7 @@ describe("Payroll API > GET /payroll/runs", () => {
 
     // Should still return 200 — totals just default to 0
     expect(res.status).toBe(200);
-    expect(res.body[0].total_payroll_value).toBe(0);
+    expect(res.body.runs[0].total_payroll_value).toBe(0);
   });
 });
 
@@ -347,7 +415,13 @@ describe("Payroll API > read/write permission split", () => {
       .set("Authorization", PAYROLL_READ_ONLY_AUTH());
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([]);
+    expect(res.body).toEqual({
+      runs: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    });
   });
 
   test("allows payroll:read users to generate preview without persisting", async () => {
@@ -1115,3 +1189,5 @@ describe("Payroll API > DELETE /payroll/runs/:id", () => {
     expect(res.status).toBe(401);
   });
 });
+
+

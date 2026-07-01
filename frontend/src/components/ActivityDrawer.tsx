@@ -125,13 +125,15 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
-  const { data, isLoading, error } = useQuery<{ activity: ActivityLogEntry[] }>({
+  const { data, isLoading, error } = useQuery<{ activity: ActivityLogEntry[]; page: number; limit: number; hasMore: boolean }>({
     queryKey: ["activity-logs", entityType, entityId],
     queryFn: async () => {
-      const res = await api.get<{ activity: ActivityLogEntry[] }>("/api/activity", {
+      const res = await api.get<{ activity: ActivityLogEntry[]; page: number; limit: number; hasMore: boolean }>("/api/activity", {
         params: {
           entity_type: entityType,
           entity_id: entityId,
+          page: 1,
+          limit: 100,
         },
       });
       return res.data;

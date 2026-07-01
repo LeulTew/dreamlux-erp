@@ -11,11 +11,11 @@ import { Employee } from "@/lib/types";
 // ─── Framer Motion: bypass animations so DOM settles immediately ────────────
 // NOTE: vi.mock is hoisted — no outer variables can be referenced inside the factory.
 vi.mock("framer-motion", () => {
-  const React = require("react");
   const el =
     (tag: string) =>
-    ({ children, ...rest }: { children?: React.ReactNode; [k: string]: unknown }) =>
-      React.createElement(tag, rest, children);
+    function MotionMock({ children, ...rest }: { children?: React.ReactNode; [k: string]: unknown }) {
+      return React.createElement(tag, rest, children);
+    };
   return {
     motion: {
       div: el("div"),
@@ -37,7 +37,7 @@ vi.mock("@/hooks/use-language", () => ({
   useLanguage: () => ({ lang: mockLang }),
 }));
 
-let mockPermissions = new Set<string>();
+const mockPermissions = new Set<string>();
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     isAuthenticated: true,

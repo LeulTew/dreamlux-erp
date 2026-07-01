@@ -17,6 +17,8 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+const mockedApiGet = api.get as unknown as ReturnType<typeof vi.fn>;
+
 function renderDrawer(props: Partial<React.ComponentProps<typeof ActivityDrawer>> = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -64,7 +66,7 @@ describe("ActivityDrawer", () => {
         ],
       },
     };
-    vi.mocked(api.get).mockResolvedValue(mockData);
+    mockedApiGet.mockResolvedValue(mockData);
 
     renderDrawer();
 
@@ -76,6 +78,8 @@ describe("ActivityDrawer", () => {
       params: {
         entity_type: "event",
         entity_id: "event 123",
+        page: 1,
+        limit: 100,
       },
     });
     expect(screen.getByText("Ops Manager")).toBeInTheDocument();
@@ -86,7 +90,7 @@ describe("ActivityDrawer", () => {
   });
 
   it("renders empty state and closes from the header button", async () => {
-    vi.mocked(api.get).mockResolvedValue({
+    mockedApiGet.mockResolvedValue({
       data: { activity: [] },
     });
     const onClose = vi.fn();

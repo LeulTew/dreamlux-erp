@@ -175,7 +175,7 @@ function SearchDialog({
       getItems(1, 5, debouncedQuery),
       getEvents(1, 5, debouncedQuery),
       getSalaryLevels(),
-      getPayrollRuns({ view: "active" }),
+      getPayrollRuns({ view: "active", limit: 20 }),
     ])
       .then(([employeesResult, assetsResult, eventsResult, salaryLevelsResult, payrollRunsResult]) => {
         if (!active) return;
@@ -244,7 +244,7 @@ function SearchDialog({
         }
 
         if (payrollRunsResult.status === "fulfilled") {
-          const payrollRuns = ((payrollRunsResult.value || []) as PayrollRun[])
+          const payrollRuns = ((payrollRunsResult.value?.runs || []) as PayrollRun[])
             .filter((run) =>
               compactDetail([
                 run.status,

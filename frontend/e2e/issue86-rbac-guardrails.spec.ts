@@ -78,7 +78,7 @@ test.describe("Issue 86 RBAC Custom Role Manager UX Guardrails", () => {
   });
 
   test("displays pending changes diff preview and requires CONFIRM for dangerous updates", async ({ page }) => {
-    let putRequestPayload: any = null;
+    let putRequestPayload: { permission_slugs: string[] } | null = null;
     await page.route("http://localhost:4000/users/roles/role-custom-1/permissions", async (route) => {
       putRequestPayload = route.request().postDataJSON();
       return fulfillJson(route, { success: true });
