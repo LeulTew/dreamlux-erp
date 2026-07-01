@@ -79,6 +79,8 @@ function getToken(): string {
 
 describe("Auth", () => {
   test("POST /auth/login — valid password returns token", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
     const res = await request(app)
       .post("/auth/login")
       .send({ password: "test-password" });
@@ -96,6 +98,8 @@ describe("Auth", () => {
   });
 
   test("POST /auth/login — wrong password returns 401", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+
     const res = await request(app)
       .post("/auth/login")
       .send({ password: "wrong-password" });

@@ -330,6 +330,7 @@ describe("Payroll API > GET /payroll/runs", () => {
   test("sorts by total with bounded SQL pagination", async () => {
     const { pool } = await import("../db/pool");
     const poolQuery = pool.query as unknown as ReturnType<typeof mock>;
+    poolQuery.mockClear();
     poolQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -362,6 +363,7 @@ describe("Payroll API > GET /payroll/runs", () => {
     expect(sql).toContain("SUM(prel.employee_total_snapshot)");
     expect(sql.toLowerCase()).toContain("limit $4 offset $5");
     expect(params).toEqual(["finalized", "2026-01-01", "2026-12-31", 5, 5]);
+    poolQuery.mockClear();
   });
 
   test("rejects unsupported sort fields before querying payroll runs", async () => {
