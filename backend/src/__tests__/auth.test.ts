@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeAll } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { pool } from "../db/pool";
 
 // Mock storage
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
@@ -79,7 +80,8 @@ function getToken(): string {
 
 describe("Auth", () => {
   test("POST /auth/login — valid password returns token", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const poolQuery = pool.query as unknown as ReturnType<typeof mock>;
+    poolQuery.mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app)
       .post("/auth/login")
@@ -98,7 +100,8 @@ describe("Auth", () => {
   });
 
   test("POST /auth/login — wrong password returns 401", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const poolQuery = pool.query as unknown as ReturnType<typeof mock>;
+    poolQuery.mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app)
       .post("/auth/login")
