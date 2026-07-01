@@ -1145,7 +1145,7 @@ router.delete("/roles/:id", async (req: AuthRequest, res: Response) => {
         const { data: assignedUsers, error: checkErr } = await supabase
           .from("users")
           .select("id, role_id, role_ids")
-          .or(`role_id.eq.${id}`);
+          .or(`role_id.eq.${id},role_ids.cs.["${id}"]`);
 
         if (checkErr) throw checkErr;
 
