@@ -17,8 +17,8 @@ import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
-import { getRoles, getPermissionsCatalog, updateRolePermissions, createRole, updateRole, deleteRole } from "@/lib/api";
-import type { Role } from "@/lib/types";
+import { getRoles, getPermissionsCatalog, updateRolePermissions, createRole, updateRole, deleteRole, getUsers } from "@/lib/api";
+import type { Role, User } from "@/lib/types";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -98,6 +98,16 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete Role": "Delete Role",
     "Delete role confirmation": "Delete role confirmation",
     "This action cannot be undone.": "This action cannot be undone.",
+    "Search Permissions...": "Search Permissions...",
+    "Clear": "Clear",
+    "Dangerous": "Dangerous",
+    "Pending Changes Preview": "Pending Changes Preview",
+    "+ Added": "+ Added",
+    "- Removed": "- Removed",
+    "Confirm Dangerous Permissions": "Confirm Dangerous Permissions",
+    "You are assigning highly privileged administrative permissions to this role:": "You are assigning highly privileged administrative permissions to this role:",
+    "Please type CONFIRM to authorize these security changes.": "Please type CONFIRM to authorize these security changes.",
+    "Confirm": "Confirm",
   },
   am: {
     "Role Permissions Manager": "የሚና ፈቃዶች ማስተዳደሪያ",
@@ -176,6 +186,16 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Delete Role": "ሚና ሰርዝ",
     "Delete role confirmation": "ይህን ሚና መሰረዝ ይፈልጋሉ?",
     "This action cannot be undone.": "ይህ እርምጃ መመለስ አይቻልም።",
+    "Search Permissions...": "ፈቃዶችን ፈልግ...",
+    "Clear": "አጽዳ",
+    "Dangerous": "ከፍተኛ ፈቃድ",
+    "Pending Changes Preview": "የለውጦች ቅድመ እይታ",
+    "+ Added": "+ የሚጨመሩ",
+    "- Removed": "- የሚቀነሱ",
+    "Confirm Dangerous Permissions": "አደገኛ ፈቃዶችን ያረጋግጡ",
+    "You are assigning highly privileged administrative permissions to this role:": "ለዚህ ሚና ከፍተኛ የአስተዳዳሪ ፈቃዶችን እየሰጡ ነው፡",
+    "Please type CONFIRM to authorize these security changes.": "እባክዎ እነዚህን የደህንነት ለውጦች ለማጽደቅ CONFIRM ብለው ይተይቡ።",
+    "Confirm": "አረጋግጥ",
   },
 };
 
@@ -228,6 +248,11 @@ export default function RolePermissionsPage() {
   const [editRoleDesc, setEditRoleDesc] = useState("");
   const [rolePendingDelete, setRolePendingDelete] = useState<Role | null>(null);
 
+  // Search & confirmation state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDangerousConfirmOpen, setIsDangerousConfirmOpen] = useState(false);
+  const [confirmInput, setConfirmInput] = useState("");
+
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const canAccessPermissions = hasPermission("users:manage") || hasPermission("settings:write");
 
@@ -235,6 +260,14 @@ export default function RolePermissionsPage() {
   const { data: roles = [], isLoading: rolesLoading } = useQuery<Role[]>({
     queryKey: ["roles"],
     queryFn: getRoles,
+    enabled: canAccessPermissions,
+    staleTime: 60000,
+  });
+
+  // Fetch users list
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["users"],
+    queryFn: getUsers,
     enabled: canAccessPermissions,
     staleTime: 60000,
   });
@@ -326,12 +359,63 @@ export default function RolePermissionsPage() {
     },
   });
 
-  const handleSave = () => {
+  const DANGEROUS_PERMISSIONS = useMemo(() => [
+    "*",
+    "users:manage",
+    "settings:write",
+    "payroll:write",
+    "payroll:delete",
+    "reports:profit:read",
+    "events:delete",
+    "assets:delete",
+  ], []);
+
+  const filteredCatalog = useMemo(() => {
+    if (!searchTerm.trim()) return catalog;
+    const term = searchTerm.toLowerCase().trim();
+    return catalog.filter(
+      (p) =>
+        p.slug.toLowerCase().includes(term) ||
+        (p.description && p.description.toLowerCase().includes(term))
+    );
+  }, [catalog, searchTerm]);
+
+  const { addedSlugs, removedSlugs } = useMemo(() => {
+    if (!selectedRole) return { addedSlugs: [], removedSlugs: [] };
+    const initial = selectedRole.permission_slugs || [];
+    const current = Array.from(assignedSlugs);
+    const added = current.filter(slug => !initial.includes(slug));
+    const removed = initial.filter(slug => !assignedSlugs.has(slug));
+    return { addedSlugs: added, removedSlugs: removed };
+  }, [selectedRole, assignedSlugs]);
+
+  const assignedUsers = useMemo(() => {
+    if (!rolePendingDelete) return [];
+    return users.filter(
+      (u) =>
+        u.role_id === rolePendingDelete.id ||
+        (Array.isArray(u.role_ids) && u.role_ids.includes(rolePendingDelete.id))
+    );
+  }, [users, rolePendingDelete]);
+
+  const proceedSave = () => {
     if (!selectedRoleId || isSystemRole) return;
     updateMutation.mutate({
       roleId: selectedRoleId,
       slugs: Array.from(assignedSlugs),
     });
+    setIsDangerousConfirmOpen(false);
+  };
+
+  const handleSave = () => {
+    if (!selectedRoleId || isSystemRole) return;
+    const containsNewDangerous = addedSlugs.some(slug => DANGEROUS_PERMISSIONS.includes(slug));
+    if (containsNewDangerous) {
+      setConfirmInput("");
+      setIsDangerousConfirmOpen(true);
+      return;
+    }
+    proceedSave();
   };
 
   const handleCreateRole = async (e: React.FormEvent) => {
@@ -419,7 +503,7 @@ export default function RolePermissionsPage() {
     return false;
   }, [selectedRole, assignedSlugs]);
 
-  if (authLoading || rolesLoading || catalogLoading) {
+  if (authLoading || rolesLoading || catalogLoading || usersLoading) {
     return (
       <AuthLayout>
         <div className="flex h-[50vh] items-center justify-center">
@@ -448,7 +532,7 @@ export default function RolePermissionsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              className="w-10 h-10 rounded-xl bg-card-alt border border-border text-muted hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+              className="w-10 h-10 rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
               title={t("Go back")}
             >
               <HiArrowLeft className="w-5 h-5" />
@@ -467,8 +551,9 @@ export default function RolePermissionsPage() {
             onClick={() => {
               queryClient.invalidateQueries({ queryKey: ["roles"] });
               queryClient.invalidateQueries({ queryKey: ["permissions-catalog"] });
+              queryClient.invalidateQueries({ queryKey: ["users"] });
             }}
-            className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold hover:bg-border transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 h-11 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold [@media(hover:hover)]:hover:bg-border transition-colors cursor-pointer"
           >
             <HiArrowPath className="w-4 h-4" />
             {t("Refresh Data")}
@@ -486,7 +571,7 @@ export default function RolePermissionsPage() {
               <h3 className="text-xs font-bold text-muted uppercase tracking-wider px-2">{t("Select Role")}</h3>
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="w-full inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl border border-dashed border-border text-xs font-bold text-primary hover:border-primary/50 hover:bg-primary/[0.02] transition-all cursor-pointer mb-2"
+                className="w-full inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl border border-dashed border-border text-xs font-bold text-primary [@media(hover:hover)]:hover:border-primary/50 [@media(hover:hover)]:hover:bg-primary/[0.02] transition-all cursor-pointer mb-2"
               >
                 + {t("Create Custom Role")}
               </button>
@@ -500,7 +585,7 @@ export default function RolePermissionsPage() {
                       className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                         isSelected
                           ? "bg-primary text-white shadow-sm"
-                          : "text-foreground/80 hover:bg-card-alt hover:text-foreground"
+                          : "text-foreground/80 [@media(hover:hover)]:hover:bg-card-alt [@media(hover:hover)]:hover:text-foreground"
                       }`}
                     >
                       <div className="truncate">{role.name}</div>
@@ -535,13 +620,13 @@ export default function RolePermissionsPage() {
                               setIsEditModalOpen(true);
                             }
                           }}
-                          className="px-2 py-0.5 rounded bg-card-alt border border-border text-[10px] font-bold text-muted hover:text-foreground cursor-pointer"
+                          className="px-2 py-0.5 rounded bg-card-alt border border-border text-[10px] font-bold text-muted [@media(hover:hover)]:hover:text-foreground cursor-pointer"
                         >
                           {t("Rename/Edit")}
                         </button>
                         <button
                           onClick={() => selectedRole && setRolePendingDelete(selectedRole)}
-                          className="px-2 py-0.5 rounded bg-danger/10 border border-danger/20 text-[10px] font-bold text-danger hover:bg-danger/20 cursor-pointer"
+                          className="px-2 py-0.5 rounded bg-danger/10 border border-danger/20 text-[10px] font-bold text-danger [@media(hover:hover)]:hover:bg-danger/20 cursor-pointer"
                         >
                           {t("Delete")}
                         </button>
@@ -554,7 +639,7 @@ export default function RolePermissionsPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handlePreviewAsRole}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 text-xs font-bold transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-primary/20 bg-primary/5 text-primary [@media(hover:hover)]:hover:bg-primary/10 text-xs font-bold transition-all cursor-pointer"
                   >
                     <HiShieldCheck className="w-3.5 h-3.5" />
                     {t("Preview as Role")}
@@ -567,7 +652,7 @@ export default function RolePermissionsPage() {
                         onClick={handleRevert}
                         className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-bold transition-all cursor-pointer ${
                           isDirty
-                            ? "bg-card-alt text-foreground hover:bg-border"
+                            ? "bg-card-alt text-foreground [@media(hover:hover)]:hover:bg-border"
                             : "bg-card-alt/50 text-muted cursor-not-allowed"
                         }`}
                       >
@@ -577,7 +662,7 @@ export default function RolePermissionsPage() {
                       <button
                         disabled={!isDirty || updateMutation.isPending}
                         onClick={handleSave}
-                        className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-bold text-white transition-all cursor-pointer bg-primary hover:opacity-90 ${
+                        className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-bold text-white transition-all cursor-pointer bg-primary [@media(hover:hover)]:hover:opacity-90 ${
                           isDirty ? "opacity-100" : "opacity-50 cursor-not-allowed"
                         }`}
                       >
@@ -607,51 +692,124 @@ export default function RolePermissionsPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {MODULE_GROUPS.map((group) => {
-                    const availableInGroup = catalog.filter((p) => group.slugs.includes(p.slug));
-                    if (availableInGroup.length === 0) return null;
+                  {/* Permissions Search */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={t("Search Permissions...")}
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl bg-card-alt border border-border/60 text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-foreground text-xs font-bold cursor-pointer"
+                      >
+                        {t("Clear")}
+                      </button>
+                    )}
+                  </div>
 
-                    return (
-                      <div key={group.name} className="space-y-3">
-                        <h4 className="text-xs font-black text-primary uppercase tracking-widest border-b border-border/30 pb-1">
-                          {t(group.name)}
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 select-none">
-                          {availableInGroup.map((perm) => {
-                            const isAssigned = assignedSlugs.has(perm.slug);
-                            return (
-                              <button
-                                key={perm.slug}
-                                onClick={() => handleToggleSlug(perm.slug)}
-                                className={`flex items-start text-left p-3 rounded-xl border transition-all cursor-pointer ${
-                                  isAssigned
-                                    ? "bg-primary/[0.03] border-primary/40 shadow-sm"
-                                    : "bg-card-alt/30 border-border hover:border-muted-foreground/30"
-                                }`}
-                              >
-                                <div className="flex items-center h-5 mr-3 mt-0.5">
-                                  <input
-                                    type="checkbox"
-                                    checked={isAssigned}
-                                    onChange={() => {}} // Controlled by button onClick
-                                    className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary/20 accent-primary cursor-pointer"
-                                  />
-                                </div>
-                                <div>
-                                  <span className="block text-xs font-bold text-foreground font-mono">
-                                    {t(perm.slug)}
-                                  </span>
-                                  <span className="block text-[11px] text-muted mt-1 leading-normal">
-                                    {perm.description}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
+                  {/* Diff Preview */}
+                  {isDirty && (addedSlugs.length > 0 || removedSlugs.length > 0) && (
+                    <div data-testid="diff-preview" className="p-4 rounded-xl border border-border/80 bg-card-alt/20 space-y-3">
+                      <h4 className="text-xs font-bold text-foreground uppercase tracking-wider select-none">
+                        {t("Pending Changes Preview")}
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        {addedSlugs.length > 0 && (
+                          <div className="flex items-start gap-2">
+                            <span className="text-[10px] font-black text-emerald-500 uppercase py-0.5 select-none">{t("+ Added")}:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {addedSlugs.map(slug => (
+                                <span key={slug} className="px-2 py-0.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-bold text-emerald-400 font-mono">
+                                  {slug}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {removedSlugs.length > 0 && (
+                          <div className="flex items-start gap-2">
+                            <span className="text-[10px] font-black text-rose-500 uppercase py-0.5 select-none">{t("- Removed")}:</span>
+                            <div className="flex flex-wrap gap-1 font-mono">
+                              {removedSlugs.map(slug => (
+                                <span key={slug} className="px-2 py-0.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-[10px] font-bold text-rose-400 font-mono">
+                                  {slug}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+
+                  {/* Checklist Groups */}
+                  <div className="space-y-6">
+                    {MODULE_GROUPS.map((group) => {
+                      const availableInGroup = filteredCatalog.filter((p) => group.slugs.includes(p.slug));
+                      if (availableInGroup.length === 0) return null;
+
+                      return (
+                        <div key={group.name} className="space-y-3">
+                          <h4 className="text-xs font-black text-primary uppercase tracking-widest border-b border-border/30 pb-1">
+                            {t(group.name)}
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 select-none">
+                            {availableInGroup.map((perm) => {
+                              const isAssigned = assignedSlugs.has(perm.slug);
+                              const isDangerous = DANGEROUS_PERMISSIONS.includes(perm.slug);
+                              return (
+                                <button
+                                  key={perm.slug}
+                                  onClick={() => handleToggleSlug(perm.slug)}
+                                  className={`flex items-start text-left p-3 rounded-xl border transition-all cursor-pointer min-h-[48px] ${
+                                    isAssigned
+                                      ? "bg-primary/[0.03] border-primary/40 shadow-sm"
+                                      : "bg-card-alt/30 border-border [@media(hover:hover)]:hover:border-muted-foreground/30"
+                                  }`}
+                                >
+                                  <div className="flex items-center h-5 mr-3 mt-0.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={isAssigned}
+                                      onChange={() => {}} // Controlled by button onClick
+                                      className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary/20 accent-primary cursor-pointer"
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="block text-xs font-bold text-foreground font-mono">
+                                        {t(perm.slug)}
+                                      </span>
+                                      {isDangerous && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-500 select-none">
+                                          ⚠ {t("Dangerous")}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="block text-[11px] text-muted mt-1 leading-normal">
+                                      {perm.description}
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {searchTerm.trim() !== "" && filteredCatalog.length === 0 && (
+                      <div className="text-center py-10 border border-dashed border-border rounded-xl">
+                        <p className="text-sm text-muted font-medium">
+                          {t("No permissions match your search query")}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </main>
@@ -703,13 +861,13 @@ export default function RolePermissionsPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="h-9 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold text-muted hover:text-foreground cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold text-muted [@media(hover:hover)]:hover:text-foreground cursor-pointer"
                 >
                   {t("Cancel")}
                 </button>
                 <button
                   type="submit"
-                  className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-semibold [@media(hover:hover)]:hover:opacity-90 cursor-pointer"
                 >
                   {t("Create")}
                 </button>
@@ -719,6 +877,58 @@ export default function RolePermissionsPage() {
         </div>
       )}
 
+      {/* Dangerous Permissions Confirm Verification Modal */}
+      {isDangerousConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-card border border-border rounded-xl max-w-md w-full p-6 space-y-4 shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+              <HiShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">{t("Confirm Dangerous Permissions")}</h3>
+              <p className="mt-1 text-sm text-muted">
+                {t("You are assigning highly privileged administrative permissions to this role:")}
+              </p>
+              <div className="my-2 flex flex-wrap gap-1">
+                {addedSlugs.filter(slug => DANGEROUS_PERMISSIONS.includes(slug)).map(slug => (
+                  <span key={slug} className="px-2 py-0.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[10px] font-bold text-amber-500 font-mono">
+                    {slug}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                {t("Please type CONFIRM to authorize these security changes.")}
+              </p>
+            </div>
+            <input
+              type="text"
+              value={confirmInput}
+              onChange={(e) => setConfirmInput(e.target.value)}
+              placeholder="CONFIRM"
+              className="w-full h-10 px-3 rounded-xl bg-card-alt border border-border/50 focus:ring-2 focus:ring-primary/50 text-sm font-medium text-foreground bg-transparent focus:outline-none"
+            />
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDangerousConfirmOpen(false)}
+                className="h-9 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold text-muted [@media(hover:hover)]:hover:text-foreground cursor-pointer"
+              >
+                {t("Cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={confirmInput.trim().toUpperCase() !== "CONFIRM"}
+                onClick={proceedSave}
+                className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-semibold [@media(hover:hover)]:hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {t("Confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Role Modal */}
       {rolePendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-card border border-border rounded-xl max-w-sm w-full p-6 space-y-4 shadow-sm">
@@ -732,6 +942,19 @@ export default function RolePermissionsPage() {
               </p>
               <p className="mt-1 text-xs text-muted">{t("This action cannot be undone.")}</p>
             </div>
+
+            {assignedUsers.length > 0 ? (
+              <div className="p-3 rounded-xl border border-red-500/20 bg-red-500/5 text-xs text-red-400 space-y-1">
+                <span className="font-bold block text-red-500">
+                  Cannot Delete Role
+                </span>
+                <span>
+                  This role is currently assigned to {assignedUsers.length} user(s):{" "}
+                  <strong>{assignedUsers.map((u) => u.full_name || u.username).join(", ")}</strong>.
+                </span>
+              </div>
+            ) : null}
+
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
@@ -740,13 +963,15 @@ export default function RolePermissionsPage() {
               >
                 {t("Cancel")}
               </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteRole(rolePendingDelete.id)}
-                className="h-10 px-4 rounded-xl bg-danger text-white text-sm font-semibold [@media(hover:hover)]:hover:opacity-90 cursor-pointer"
-              >
-                {t("Delete")}
-              </button>
+              {assignedUsers.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteRole(rolePendingDelete.id)}
+                  className="h-10 px-4 rounded-xl bg-danger text-white text-sm font-semibold [@media(hover:hover)]:hover:opacity-90 cursor-pointer"
+                >
+                  {t("Delete")}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -781,13 +1006,13 @@ export default function RolePermissionsPage() {
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="h-9 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold text-muted hover:text-foreground cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-card-alt border border-border text-sm font-semibold text-muted [@media(hover:hover)]:hover:text-foreground cursor-pointer"
                 >
                   {t("Cancel")}
                 </button>
                 <button
                   type="submit"
-                  className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-semibold hover:opacity-90 cursor-pointer"
+                  className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-semibold [@media(hover:hover)]:hover:opacity-90 cursor-pointer"
                 >
                   {t("Save")}
                 </button>

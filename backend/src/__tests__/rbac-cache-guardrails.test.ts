@@ -8,8 +8,11 @@ let lastAdminTest = false;
 let simulateLegacyRoleIdsMissing = false;
 
 // Mock the DB pool with SQL-matching implementation to prevent startup query pollution
+export const loggedQueries: { sql: string; params: any[] }[] = [];
+
 const mockQuery = mock((sql: string, params?: any[]) => {
   const safeParams = params || [];
+  loggedQueries.push({ sql, params: safeParams });
 
   if (safeParams[0] === "verify-db-error") {
     return Promise.reject(new Error("permission database unavailable"));
@@ -27,12 +30,12 @@ const mockQuery = mock((sql: string, params?: any[]) => {
     return Promise.resolve({ rows: [{ role_id: "role-1" }], rowCount: 1 });
   }
 
-  if (sql.includes("SELECT name FROM roles WHERE id = $1")) {
+  if (sql.includes("SELECT name") && sql.includes("FROM roles WHERE id = $1")) {
     const roleId = safeParams[0];
-    if (roleId === "role-admin") return Promise.resolve({ rows: [{ name: "SUPER_ADMIN" }], rowCount: 1 });
-    if (roleId === "role-owner") return Promise.resolve({ rows: [{ name: "OWNER" }], rowCount: 1 });
-    if (roleId === "role-custom") return Promise.resolve({ rows: [{ name: "CUSTOM" }], rowCount: 1 });
-    return Promise.resolve({ rows: [{ name: "CUSTOM_ROLE" }], rowCount: 1 });
+    if (roleId === "role-admin") return Promise.resolve({ rows: [{ name: "SUPER_ADMIN", description: "Super Admin" }], rowCount: 1 });
+    if (roleId === "role-owner") return Promise.resolve({ rows: [{ name: "OWNER", description: "Owner" }], rowCount: 1 });
+    if (roleId === "role-custom") return Promise.resolve({ rows: [{ name: "CUSTOM", description: "Custom" }], rowCount: 1 });
+    return Promise.resolve({ rows: [{ name: "CUSTOM_ROLE", description: "Custom Role" }], rowCount: 1 });
   }
 
   if (sql.includes("SELECT id FROM users") && sql.includes("role_id = $1")) {
@@ -78,6 +81,18 @@ const mockQuery = mock((sql: string, params?: any[]) => {
 
   if (sql.includes("SELECT\n       r.name,\n       r.permissions")) {
     return Promise.resolve({ rows: [{ name: "STORE_MANAGER", permissions: {}, permission_slugs: ["users:manage", "assets:read"] }], rowCount: 1 });
+  }
+
+  if (sql.includes("COALESCE(array_agg(p.slug")) {
+    return Promise.resolve({
+      rows: [{
+        id: safeParams[0] || "role-custom",
+        name: "CUSTOM",
+        description: "Custom",
+        permission_slugs: ["users:manage"],
+      }],
+      rowCount: 1,
+    });
   }
 
   if (sql.includes("FROM field_permissions fp")) {
@@ -295,5 +310,70 @@ describe("RBAC Caching & Guardrails", () => {
     const hiddenFields = await fetchHiddenFieldsForRoles(["DRIVER"], "events");
 
     expect(hiddenFields).toContain("contract_price");
+  });
+
+  test("Role CRUD logging: POST, PUT, DELETE, and PUT permissions write to activity_logs", async () => {
+    loggedQueries.length = 0; // Clear logged queries
+
+    // 1. Test POST /users/roles
+    const postRes = await request(app)
+      .post("/users/roles")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        name: "AUDITED_ROLE",
+        description: "Audited role description",
+      });
+    expect(postRes.status).toBe(201);
+
+    const postLog = loggedQueries.find(q => q.sql.includes("INSERT INTO public.activity_logs") && q.params.includes("create_role"));
+    expect(postLog).toBeDefined();
+    expect(postLog?.params[0]).toBe("role"); // entity_type
+    expect(postLog?.params[1]).toBe("custom-role-1"); // entity_id
+    expect(postLog?.params[3]).toBe("create_role"); // action
+    expect(postLog?.params[7]).toContain("AUDITED_ROLE"); // note
+
+    // 2. Test PUT /users/roles/:id
+    loggedQueries.length = 0;
+    const putRes = await request(app)
+      .put("/users/roles/role-custom")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        name: "UPDATED_AUDITED_ROLE",
+        description: "New audited description",
+      });
+    expect(putRes.status).toBe(200);
+
+    const putNameLog = loggedQueries.find(q => q.sql.includes("INSERT INTO public.activity_logs") && q.params.includes("update_role") && q.params.includes("name"));
+    const putDescLog = loggedQueries.find(q => q.sql.includes("INSERT INTO public.activity_logs") && q.params.includes("update_role") && q.params.includes("description"));
+    expect(putNameLog).toBeDefined();
+    expect(putNameLog?.params[4]).toBe("name");
+    expect(putDescLog).toBeDefined();
+    expect(putDescLog?.params[4]).toBe("description");
+
+    // 3. Test PUT /users/roles/:id/permissions
+    loggedQueries.length = 0;
+    const permRes = await request(app)
+      .put("/users/roles/role-custom/permissions")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        permission_slugs: ["users:manage"],
+      });
+    expect(permRes.status).toBe(200);
+
+    const permLog = loggedQueries.find(q => q.sql.includes("INSERT INTO public.activity_logs") && q.params.includes("update_permissions"));
+    expect(permLog).toBeDefined();
+    expect(permLog?.params[4]).toBe("permission_slugs");
+    expect(permLog?.params[6]).toContain("users:manage"); // new slugs check
+
+    // 4. Test DELETE /users/roles/:id
+    loggedQueries.length = 0;
+    const deleteRes = await request(app)
+      .delete("/users/roles/role-custom-unused") // mock query resolves empty users array for other custom roles
+      .set("Authorization", `Bearer ${getToken()}`);
+    expect(deleteRes.status).toBe(204);
+
+    const deleteLog = loggedQueries.find(q => q.sql.includes("INSERT INTO public.activity_logs") && q.params.includes("delete_role"));
+    expect(deleteLog).toBeDefined();
+    expect(deleteLog?.params[3]).toBe("delete_role");
   });
 });

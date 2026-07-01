@@ -639,6 +639,39 @@ router.put("/roles/:id/permissions", async (req: AuthRequest, res: Response) => 
   const { id } = req.params;
   const permissionSlugs = normalizePermissionSlugs(req.body?.permission_slugs);
 
+  let oldPermissionSlugs: string[] = [];
+  try {
+    const { rows: currentPerms } = await pool.query(
+      `SELECT p.slug
+       FROM role_permissions rp
+       JOIN permissions p ON p.id = rp.permission_id
+       WHERE rp.role_id = $1`,
+      [id]
+    );
+    oldPermissionSlugs = currentPerms.map(r => r.slug).sort();
+  } catch (err) {
+    if (isPoolUnreachable(err)) {
+      try {
+        const { data: rpData, error: rpError } = await supabase
+          .from("role_permissions")
+          .select("permission_id")
+          .eq("role_id", id);
+        if (!rpError && rpData && rpData.length > 0) {
+          const permIds = rpData.map((rp: any) => rp.permission_id);
+          const { data: permsData, error: permsError } = await supabase
+            .from("permissions")
+            .select("slug")
+            .in("id", permIds);
+          if (!permsError && permsData) {
+            oldPermissionSlugs = permsData.map((p: any) => p.slug).sort();
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   // Guardrail: prevent stripping '*' from administrator roles
   try {
     const { rows: roleCheck } = await pool.query(
@@ -731,6 +764,9 @@ router.put("/roles/:id/permissions", async (req: AuthRequest, res: Response) => 
       entity_id: rows[0].id,
       user_id: req.user?.id || null,
       action: "update_permissions",
+      field_changed: "permission_slugs",
+      old_value: JSON.stringify(oldPermissionSlugs),
+      new_value: JSON.stringify(permissionSlugs.slice().sort()),
       note: `Permissions for role "${rows[0].name}" were updated.`,
     });
 
@@ -789,6 +825,15 @@ router.post("/roles", async (req: AuthRequest, res: Response) => {
 
     invalidateAllCache();
 
+    // Log activity
+    ActivityService.logActivity({
+      entity_type: "role",
+      entity_id: newRoleId,
+      user_id: req.user?.id || null,
+      action: "create_role",
+      note: `Role '${name.trim()}' was created.`,
+    });
+
     res.status(201).json({
       id: newRoleId,
       name: inserted[0].name,
@@ -840,6 +885,16 @@ router.post("/roles", async (req: AuthRequest, res: Response) => {
         }
 
         invalidateAllCache();
+
+        // Log activity
+        ActivityService.logActivity({
+          entity_type: "role",
+          entity_id: newRoleId,
+          user_id: req.user?.id || null,
+          action: "create_role",
+          note: `Role '${name.trim()}' was created.`,
+        });
+
         res.status(201).json({
           id: newRoleId,
           name: (inserted as any).name,
@@ -870,7 +925,7 @@ router.put("/roles/:id", async (req: AuthRequest, res: Response) => {
 
   try {
     const { rows: current } = await pool.query(
-      `SELECT name FROM roles WHERE id = $1 LIMIT 1`,
+      `SELECT name, description FROM roles WHERE id = $1 LIMIT 1`,
       [id]
     );
     if (current.length === 0) {
@@ -879,6 +934,7 @@ router.put("/roles/:id", async (req: AuthRequest, res: Response) => {
     }
 
     const currentName = current[0].name;
+    const currentDescription = current[0].description || "";
     if (SYSTEM_ROLES.includes(currentName.toUpperCase())) {
       res.status(400).json({ error: `System role "${currentName}" cannot be renamed` });
       return;
@@ -899,13 +955,40 @@ router.put("/roles/:id", async (req: AuthRequest, res: Response) => {
     );
 
     invalidateAllCache();
+
+    // Log activity
+    if (currentName !== name.trim()) {
+      ActivityService.logActivity({
+        entity_type: "role",
+        entity_id: id,
+        user_id: req.user?.id || null,
+        action: "update_role",
+        field_changed: "name",
+        old_value: currentName,
+        new_value: name.trim(),
+        note: `Role "${currentName}" was renamed to "${name.trim()}".`,
+      });
+    }
+    if (currentDescription !== (description || "")) {
+      ActivityService.logActivity({
+        entity_type: "role",
+        entity_id: id,
+        user_id: req.user?.id || null,
+        action: "update_role",
+        field_changed: "description",
+        old_value: currentDescription,
+        new_value: description || "",
+        note: `Description for role "${name.trim()}" was updated.`,
+      });
+    }
+
     res.json(updated[0]);
   } catch (error) {
     if (isPoolUnreachable(error)) {
       try {
         const { data: current, error: getErr } = await supabase
           .from("roles")
-          .select("name")
+          .select("name, description")
           .eq("id", id)
           .single();
         if (getErr || !current) {
@@ -914,6 +997,7 @@ router.put("/roles/:id", async (req: AuthRequest, res: Response) => {
         }
 
         const currentName = current.name;
+        const currentDescription = current.description || "";
         if (SYSTEM_ROLES.includes(currentName.toUpperCase())) {
           res.status(400).json({ error: `System role "${currentName}" cannot be renamed` });
           return;
@@ -940,6 +1024,33 @@ router.put("/roles/:id", async (req: AuthRequest, res: Response) => {
         if (updateErr) throw updateErr;
 
         invalidateAllCache();
+
+        // Log activity
+        if (currentName !== name.trim()) {
+          ActivityService.logActivity({
+            entity_type: "role",
+            entity_id: id,
+            user_id: req.user?.id || null,
+            action: "update_role",
+            field_changed: "name",
+            old_value: currentName,
+            new_value: name.trim(),
+            note: `Role "${currentName}" was renamed to "${name.trim()}".`,
+          });
+        }
+        if (currentDescription !== (description || "")) {
+          ActivityService.logActivity({
+            entity_type: "role",
+            entity_id: id,
+            user_id: req.user?.id || null,
+            action: "update_role",
+            field_changed: "description",
+            old_value: currentDescription,
+            new_value: description || "",
+            note: `Description for role "${name.trim()}" was updated.`,
+          });
+        }
+
         res.json(updated);
         return;
       } catch (fallbackError) {
@@ -997,6 +1108,16 @@ router.delete("/roles/:id", async (req: AuthRequest, res: Response) => {
     }
 
     invalidateAllCache();
+
+    // Log activity
+    ActivityService.logActivity({
+      entity_type: "role",
+      entity_id: id,
+      user_id: req.user?.id || null,
+      action: "delete_role",
+      note: `Role "${currentName}" was deleted.`,
+    });
+
     res.status(204).send();
   } catch (error) {
     try { await pool.query("ROLLBACK"); } catch {
@@ -1024,7 +1145,7 @@ router.delete("/roles/:id", async (req: AuthRequest, res: Response) => {
         const { data: assignedUsers, error: checkErr } = await supabase
           .from("users")
           .select("id, role_id, role_ids")
-          .or(`role_id.eq.${id}`);
+          .or(`role_id.eq.${id},role_ids.cs.["${id}"]`);
 
         if (checkErr) throw checkErr;
 
@@ -1052,6 +1173,16 @@ router.delete("/roles/:id", async (req: AuthRequest, res: Response) => {
         if (roleDeleteErr) throw roleDeleteErr;
 
         invalidateAllCache();
+
+        // Log activity
+        ActivityService.logActivity({
+          entity_type: "role",
+          entity_id: id,
+          user_id: req.user?.id || null,
+          action: "delete_role",
+          note: `Role "${currentName}" was deleted.`,
+        });
+
         res.status(204).send();
         return;
       } catch (fallbackError) {
