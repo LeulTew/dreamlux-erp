@@ -64,3 +64,16 @@ Reminder: before coding any row below, branch from latest `main`, assign/move th
 - New labels created for this backlog: `area:finance`, `area:inventory`, and `area:proposals`.
 - Code paths already reviewed for the new issues: `backend/src/db/schema.sql`, `backend/src/routes/events.ts`, `backend/src/routes/events/proposals.ts`, `frontend/src/app/events/[id]/page.tsx`, `frontend/src/app/events/proposals/new/page.tsx`, `frontend/src/app/hr/reports/profit/page.tsx`.
 - Do not implement product code from this tracker alone; open the linked GitHub issue, read its body/checklist, and follow the issue/branch/PR workflow in `RULES.md`.
+
+## Suggested Model Split
+
+| Issue | Primary model | Secondary model | Notes |
+| :--- | :--- | :--- | :--- |
+| #106 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Backend-first because of dispatch integrity, notifications, and auditability. |
+| #107 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Finance semantics and formula correctness first; UI wording second. |
+| #108 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Treat as a formula/rules issue with light UI label cleanup. |
+| #109 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Backend model and aggregation first; report UI after contracts stabilize. |
+| #110 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Finance data model and RBAC first; CRUD/table UX second. |
+| #111 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Backend schema and permissions first; asset/investment UX second. |
+| #112 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Highest financial correctness risk; use UI only after math is locked. |
+| #113 | GPT 5.5 | Antigravity Gemini Flash 3.5 | Parser, transaction safety, and reconciliation rules should be backend-led. |
