@@ -6,6 +6,8 @@ import { getEffectivePermissionSlugsFromUser } from "../middleware/auth";
 import { hasPermissionSlug } from "../lib/permissions";
 
 const router = Router();
+const DEFAULT_ACTIVITY_LIMIT = 50;
+const MAX_ACTIVITY_LIMIT = 100;
 
 const ENTITY_ACTIVITY_PERMISSIONS: Record<string, string[]> = {
   event: ["events:read"],
@@ -37,11 +39,23 @@ function canReadEntityActivity(entityType: string, permissionSlugs: string[]): b
   return requiredSlugs.some((slug) => hasPermissionSlug(permissionSlugs, slug));
 }
 
+function parsePositiveInt(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
+}
+
 // GET /api/activity — retrieve audit timeline feed for a resource
 router.get("/", requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { entity_type, entity_id } = req.query;
     const normalizedEntityType = normalizeEntityType(entity_type);
+    const page = parsePositiveInt(req.query.page, 1);
+    const requestedLimit = parsePositiveInt(req.query.limit, DEFAULT_ACTIVITY_LIMIT);
+    const limit = Math.min(requestedLimit, MAX_ACTIVITY_LIMIT);
+    const offset = (page - 1) * limit;
 
     if (!normalizedEntityType || !entity_id) {
       res.status(400).json({ error: "Missing entity_type or entity_id parameters" });
@@ -55,7 +69,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     }
 
     let query = "";
-    let params: string[] = [];
+    let params: Array<string | number> = [];
 
     // Formulate SQL combining unified generic logs and legacy table logs if applicable
     if (normalizedEntityType === "proposal") {
@@ -99,9 +113,9 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response): Promise<vo
         WHERE al.entity_type = 'proposal' AND al.entity_id = $1
 
         ORDER BY created_at DESC
-        LIMIT 100
+        LIMIT $2 OFFSET $3
       `;
-      params = [String(entity_id)];
+      params = [String(entity_id), limit, offset];
     } else if (normalizedEntityType === "event") {
       query = `
         SELECT 
@@ -143,9 +157,9 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response): Promise<vo
         WHERE al.entity_type = 'event' AND al.entity_id = $1
 
         ORDER BY created_at DESC
-        LIMIT 100
+        LIMIT $2 OFFSET $3
       `;
-      params = [String(entity_id)];
+      params = [String(entity_id), limit, offset];
     } else {
       // General entity fetch
       query = `
@@ -167,9 +181,9 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response): Promise<vo
         LEFT JOIN public.users u ON al.user_id = u.id
         WHERE al.entity_type = $1 AND al.entity_id = $2
         ORDER BY al.created_at DESC
-        LIMIT 100
+        LIMIT $3 OFFSET $4
       `;
-      params = [normalizedEntityType, String(entity_id)];
+      params = [normalizedEntityType, String(entity_id), limit, offset];
     }
 
     const { rows } = await pool.query(query, params);
@@ -177,7 +191,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response): Promise<vo
     // Apply redactions based on user permission slugs
     const sanitizedLogs = ActivityService.redactLogs(rows as ActivityLogEntry[], userPermissions);
 
-    res.json({ activity: sanitizedLogs });
+    res.json({ activity: sanitizedLogs, page, limit, hasMore: sanitizedLogs.length === limit });
   } catch (error) {
     console.error("Failed to fetch activity logs:", error);
     res.status(500).json({ error: "Failed to fetch activity logs" });

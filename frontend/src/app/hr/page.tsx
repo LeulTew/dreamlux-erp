@@ -133,7 +133,7 @@ export default function HRDashboardPage() {
     enabled: canReadHR || canReadPayroll,
   });
 
-  const employees = employeesData?.employees || [];
+  const employees = useMemo(() => employeesData?.employees || [], [employeesData?.employees]);
 
   const stats = useMemo(() => {
     const activeList = employees.filter((emp) => emp.contract_status === "Active");

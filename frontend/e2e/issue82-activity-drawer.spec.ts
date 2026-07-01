@@ -40,7 +40,7 @@ test.describe("Issue 82 activity timeline drawer", () => {
       }),
     );
 
-    await page.route("**/api/activity?entity_type=proposal&entity_id=proposal-activity-e2e", (route) =>
+    await page.route("**/api/activity**", (route) =>
       fulfillJson(route, {
         activity: [
           {

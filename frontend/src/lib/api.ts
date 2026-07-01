@@ -15,6 +15,7 @@ import {
   EventProfitSummary,
   ProfitReportSummary,
   PaginatedExpenseResponse,
+  PayrollRun,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1178,14 +1179,38 @@ export const deleteEventTypePermanent = (id: string) => api.delete(`/event-types
 // ====================================================
 // PAYROLL RUNS
 // ====================================================
+export type PayrollRunsResponse = {
+  runs: PayrollRun[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+
+function normalizePayrollRunsResponse(data: PayrollRun[] | PayrollRunsResponse): PayrollRunsResponse {
+  if (Array.isArray(data)) {
+    return {
+      runs: data,
+      total: data.length,
+      page: 1,
+      limit: data.length || 1,
+      totalPages: 1,
+    };
+  }
+
+  return data;
+}
+
 export const getPayrollRuns = (params?: {
   view?: "active" | "trash",
   status?: string,
   year?: string,
   sortBy?: string,
-  sortOrder?: string
+  sortOrder?: string,
+  page?: number,
+  limit?: number,
 }) =>
-  api.get("/payroll/runs", { params }).then(res => res.data);
+  api.get<PayrollRun[] | PayrollRunsResponse>("/payroll/runs", { params }).then(res => normalizePayrollRunsResponse(res.data));
 export const getPayrollRun = (id: string) => api.get(`/payroll/runs/${id}`).then(res => res.data);
 export const updatePayrollRunStatus = (id: string, status: "DRAFT" | "FINALIZED" | "FLAGGED_WRONG" | "TRASH") =>
   api.patch(`/payroll/runs/${id}/status`, { status }).then(res => res.data);

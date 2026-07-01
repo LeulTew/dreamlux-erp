@@ -8,9 +8,12 @@ import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/
 import { NotificationsService } from "../services/notifications-service";
 import { ActivityService } from "../services/activity-service";
 import { hasPermissionSlug } from "../lib/permissions";
+import { pool } from "../db/pool";
 
 const router = express.Router();
 const PAYROLL_RUN_SORT_FIELDS = new Set(["period_start", "period_end", "created_at", "updated_at", "finalized_at", "status", "total"]);
+const DEFAULT_PAYROLL_RUN_LIMIT = 20;
+const MAX_PAYROLL_RUN_LIMIT = 100;
 
 function canReadPayroll(req: AuthRequest): boolean {
   return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), "payroll:read");
@@ -56,6 +59,14 @@ function toDbStatus(status: string): "draft" | "finalized" | "flagged_wrong" | "
   return "trashed";
 }
 
+function parsePositiveInt(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return parsed;
+}
+
 async function insertPayrollAuditLog(input: {
   payrollRunId: string;
   userId?: string | null;
@@ -92,6 +103,10 @@ router.get("/runs", async (req: AuthRequest, res) => {
     const view = req.query.view === "trash" ? "trash" : "active";
     const statusFilter = req.query.status as string | undefined;
     const yearFilter = req.query.year as string | undefined;
+    const page = parsePositiveInt(req.query.page, 1);
+    const requestedLimit = parsePositiveInt(req.query.limit, DEFAULT_PAYROLL_RUN_LIMIT);
+    const limit = Math.min(requestedLimit, MAX_PAYROLL_RUN_LIMIT);
+    const offset = (page - 1) * limit;
     const sortBy = (req.query.sortBy as string) || "period_start";
     const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
 
@@ -99,15 +114,91 @@ router.get("/runs", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: `Unsupported payroll run sort field: ${sortBy}` });
     }
 
+    if (sortBy === "total") {
+      const whereParts: string[] = [];
+      const params: Array<string | number> = [];
+
+      if (view === "trash") {
+        whereParts.push("pr.deleted_at IS NOT NULL");
+      } else {
+        whereParts.push("pr.deleted_at IS NULL");
+      }
+
+      if (statusFilter && statusFilter !== "ALL") {
+        params.push(toDbStatus(statusFilter));
+        whereParts.push(`pr.status = $${params.length}`);
+      }
+
+      if (yearFilter && yearFilter !== "ALL") {
+        const year = parseInt(yearFilter);
+        params.push(`${year}-01-01`);
+        whereParts.push(`pr.period_start >= $${params.length}`);
+        params.push(`${year}-12-31`);
+        whereParts.push(`pr.period_start <= $${params.length}`);
+      }
+
+      params.push(limit);
+      const limitParam = params.length;
+      params.push(offset);
+      const offsetParam = params.length;
+
+      const totalSortDirection = sortOrder === "asc" ? "ASC" : "DESC";
+      const totalQuery = `
+        SELECT
+          pr.id,
+          pr.title,
+          pr.period_kind,
+          pr.period_start,
+          pr.period_end,
+          pr.status,
+          pr.created_at,
+          pr.updated_at,
+          pr.finalized_at,
+          pr.created_by,
+          COALESCE(SUM(prel.employee_total_snapshot), 0)::numeric AS total_payroll_value,
+          COUNT(*) OVER()::int AS total_count
+        FROM public.payroll_runs pr
+        LEFT JOIN public.payroll_run_employee_lines prel ON prel.run_id = pr.id
+        WHERE ${whereParts.join(" AND ")}
+        GROUP BY pr.id
+        ORDER BY total_payroll_value ${totalSortDirection}, pr.period_start DESC
+        LIMIT $${limitParam} OFFSET $${offsetParam}
+      `;
+
+      const { rows } = await pool.query(totalQuery, params);
+      const total = Number(rows[0]?.total_count ?? 0);
+      const result = rows.map((run: any) => {
+        const d = new Date(run.period_start);
+        return {
+          id: run.id,
+          month: d.getUTCMonth() + 1,
+          year: d.getUTCFullYear(),
+          period_start: run.period_start,
+          period_end: run.period_end,
+          created_at: run.created_at,
+          updated_at: run.updated_at,
+          status: toApiStatus(run.status),
+          total_payroll_value: Number(run.total_payroll_value ?? 0),
+          created_by_username: null,
+        };
+      });
+
+      return res.json({
+        runs: result,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      });
+    }
+
     let runsQuery = supabase
       .from("payroll_runs")
-      .select("id, title, period_kind, period_start, period_end, status, created_at, updated_at, finalized_at, created_by");
+      .select("id, title, period_kind, period_start, period_end, status, created_at, updated_at, finalized_at, created_by", {
+        count: "exact",
+      });
 
-    // Sorting - We'll handle 'total' sorting in memory after aggregation if needed,
-    // but default to period_start
-    if (sortBy !== "total") {
-      runsQuery = runsQuery.order(sortBy, { ascending: sortOrder === "asc" });
-    }
+    runsQuery = runsQuery.order(sortBy, { ascending: sortOrder === "asc" });
 
     runsQuery = view === "trash" ? runsQuery.not("deleted_at", "is", null) : runsQuery.is("deleted_at", null);
 
@@ -120,7 +211,9 @@ router.get("/runs", async (req: AuthRequest, res) => {
       runsQuery = runsQuery.gte("period_start", `${year}-01-01`).lte("period_start", `${year}-12-31`);
     }
 
-    const { data: runs, error: runsError } = await runsQuery;
+    runsQuery = runsQuery.range(offset, offset + limit - 1);
+
+    const { data: runs, error: runsError, count } = await runsQuery;
 
     if (runsError) {
       console.error("Error fetching payroll runs:", runsError);
@@ -128,7 +221,13 @@ router.get("/runs", async (req: AuthRequest, res) => {
     }
 
     if (!runs || runs.length === 0) {
-      return res.json([]);
+      return res.json({
+        runs: [],
+        total: count ?? 0,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil((count ?? 0) / limit)),
+      });
     }
 
     // Fetch employee line totals for all run ids
@@ -166,15 +265,14 @@ router.get("/runs", async (req: AuthRequest, res) => {
       };
     });
 
-    if (sortBy === "total") {
-      result.sort((a: any, b: any) => {
-        return sortOrder === "asc"
-          ? a.total_payroll_value - b.total_payroll_value
-          : b.total_payroll_value - a.total_payroll_value;
-      });
-    }
-
-    res.json(result);
+    const total = count ?? result.length;
+    res.json({
+      runs: result,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
   } catch (error) {
     console.error("Error fetching payroll runs:", error);
     res.status(500).json({ error: "Internal server error" });

@@ -91,6 +91,8 @@ describe("Activity API & Redaction logs triggers", () => {
       .set("Authorization", `Bearer ${superAdminToken}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("activity");
+    expect(res.body.page).toBe(1);
+    expect(res.body.limit).toBe(50);
     expect(res.body.activity.length).toBe(2);
     // Value remains unredacted for superadmin
     expect(res.body.activity[0].old_value).toBe("1000");
@@ -121,16 +123,20 @@ describe("Activity API & Redaction logs triggers", () => {
     expect(res.body.error).toMatch(/Missing required activity permission/i);
   });
 
-  test("GET /api/activity bounds event/proposal feed queries", async () => {
+  test("GET /api/activity bounds event/proposal feed queries with parameterized pagination", async () => {
     const res = await request(app)
-      .get("/api/activity?entity_type=proposal&entity_id=100e8400-e29b-41d4-a716-446655440000")
+      .get("/api/activity?entity_type=proposal&entity_id=100e8400-e29b-41d4-a716-446655440000&page=3&limit=500")
       .set("Authorization", `Bearer ${superAdminToken}`);
 
     expect(res.status).toBe(200);
+    expect(res.body.page).toBe(3);
+    expect(res.body.limit).toBe(100);
     const { pool } = await import("../db/pool");
     const calls = (pool.query as unknown as { mock: { calls: unknown[][] } }).mock.calls;
     const lastSql = String(calls[calls.length - 1][0]);
-    expect(lastSql.toLowerCase()).toContain("limit 100");
+    const lastParams = calls[calls.length - 1][1] as Array<string | number>;
+    expect(lastSql.toLowerCase()).toContain("limit $2 offset $3");
+    expect(lastParams).toEqual(["100e8400-e29b-41d4-a716-446655440000", 100, 200]);
     expect(lastSql).toContain("source_route");
   });
 });

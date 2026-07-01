@@ -91,8 +91,9 @@ vi.mock("@/components/ForbiddenState", () => ({
 vi.mock("lucide-react", () => {
   const Icon =
     (name: string) =>
-    ({ className }: { className?: string }) =>
-      React.createElement("span", { "data-icon": name, className });
+    function IconMock({ className }: { className?: string }) {
+      return React.createElement("span", { "data-icon": name, className });
+    };
   return {
     ShieldCheck: Icon("ShieldCheck"),
     ShieldAlert: Icon("ShieldAlert"),
