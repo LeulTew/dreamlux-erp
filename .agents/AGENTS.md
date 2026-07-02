@@ -10,3 +10,5 @@
 > - **System Architecture & Refactoring**: For module design, folder structures, service abstraction, and error bubble propagation, you MUST read [.claude/rules/architecture.md](file:///.claude/rules/architecture.md).
 > - **Postgres & Database Changes**: For migration setups, query loop warnings, tenant scoping, and transaction wrap blocks, you MUST read [.claude/rules/database.md](file:///.claude/rules/database.md).
 > - **Tooling & Commands**: For package manager standards (Bun), linting, and testing suites execution, you MUST read [.claude/rules/tech-stack.md](file:///.claude/rules/tech-stack.md).
+> - **Senior & Staff PR Auditing**: Before requesting PR merge approvals, you MUST audit the implementation against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) and [STAFF_PR_REVIEW_PROMPT.md](file:///docs/STAFF_PR_REVIEW_PROMPT.md).
+

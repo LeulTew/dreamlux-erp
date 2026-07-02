@@ -41,3 +41,5 @@ DreamLux ERP is an integrated enterprise resource planning system managing event
 > - **System Architecture & Refactoring**: When designing components, services, or abstractions, read [.claude/rules/architecture.md](file:///.claude/rules/architecture.md).
 > - **Postgres & Database Changes**: When writing database operations, schema updates, or applying migrations, read [.claude/rules/database.md](file:///.claude/rules/database.md).
 > - **Tooling & Commands**: For dependency management and scripting, read [.claude/rules/tech-stack.md](file:///.claude/rules/tech-stack.md).
+> - **Senior & Staff PR Auditing**: Before finalizing, creating, or requesting approval on a PR, you MUST audit against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) and [STAFF_PR_REVIEW_PROMPT.md](file:///docs/STAFF_PR_REVIEW_PROMPT.md).
+
