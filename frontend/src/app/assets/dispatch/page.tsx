@@ -87,7 +87,7 @@ export default function DispatchQueuePage() {
         <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <div className="rounded-md bg-primary/10 p-2 text-primary">
+              <div className="rounded-sm bg-primary/10 p-2 text-primary">
                 <HiTruck className="h-5 w-5" />
               </div>
               <div className="min-w-0">
@@ -157,7 +157,7 @@ export default function DispatchQueuePage() {
                     </div>
                     <Link
                       href={`/events/${item.event_id}`}
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-widest text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary-light/10 [@media(hover:hover)]:hover:text-primary"
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-widest text-foreground transition-colors md:hover:border-primary/30 md:hover:bg-primary-light/10 md:hover:text-primary"
                     >
                       {t("Open dispatch")}
                       <HiArrowRight className="h-4 w-4" />
