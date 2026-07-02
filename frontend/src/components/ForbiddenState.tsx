@@ -34,6 +34,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Only authorized personnel can view low stock alerts.": "Only authorized personnel can view low stock alerts.",
     "Only authorized personnel can view trashed inventory items.": "Only authorized personnel can view trashed inventory items.",
     "Only authorized personnel can view items in this location.": "Only authorized personnel can view items in this location.",
+    "Only authorized personnel can manage event dispatch.": "Only authorized personnel can manage event dispatch.",
     "You need event proposal access permissions to view this content.": "You need event proposal access permissions to view this content.",
     "You need event proposal write permissions to create proposals.": "You need event proposal write permissions to create proposals."
   },
@@ -59,6 +60,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Only authorized personnel can view low stock alerts.": "አነስተኛ ክምችት ማስጠንቀቂያዎችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
     "Only authorized personnel can view trashed inventory items.": "የተጣሉ ዕቃዎችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
     "Only authorized personnel can view items in this location.": "በዚህ ቦታ ውስጥ ያሉ ዕቃዎችን መመልከት የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
+    "Only authorized personnel can manage event dispatch.": "የዝግጅት መላኪያን ማስተዳደር የሚችሉት ፈቃድ ያላቸው ሠራተኞች ብቻ ናቸው።",
     "You need event proposal access permissions to view this content.": "የዝግጅት ፕሮፖዛል ይዘትን ለማየት የሚያስፈልገው ፈቃድ የለዎትም።",
     "You need event proposal write permissions to create proposals.": "የዝግጅት ፕሮፖዛል ለመፍጠር የሚያስፈልገው የመጻፍ ፈቃድ የለዎትም።"
   }

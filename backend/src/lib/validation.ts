@@ -496,6 +496,10 @@ export const createEventAllocationSchema = z.object({
   notes: z.string().max(1000, "Allocation notes too long").optional().nullable(),
 });
 
+export const updateEventAllocationDispatchSchema = z.object({
+  dispatch_checked: z.boolean({ required_error: "dispatch_checked is required" }),
+});
+
 export const createEventChecklistItemSchema = z.object({
   title: z.string().min(1, "Task title is required").max(500, "Task title too long"),
   due_date: z.string().optional().nullable().refine((val) => {
@@ -511,6 +515,7 @@ export const updateEventChecklistItemSchema = createEventChecklistItemSchema.par
 
 export type UpdateEventDesignInput = z.infer<typeof updateEventDesignSchema>;
 export type CreateEventAllocationInput = z.infer<typeof createEventAllocationSchema>;
+export type UpdateEventAllocationDispatchInput = z.infer<typeof updateEventAllocationDispatchSchema>;
 export type CreateEventChecklistItemInput = z.infer<typeof createEventChecklistItemSchema>;
 export type UpdateEventChecklistItemInput = z.infer<typeof updateEventChecklistItemSchema>;
 

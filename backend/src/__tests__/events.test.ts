@@ -2400,6 +2400,224 @@ describe("Events API", () => {
       expect(res.body.error).toContain("Forbidden");
     });
 
+    test("GET /events/dispatch/queue blocks users without allocation privileges before DB access", async () => {
+      const res = await request(app)
+        .get("/events/dispatch/queue")
+        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("Forbidden");
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    test("GET /events/dispatch/queue only returns non-completed dispatch work", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          event_id: "event-1",
+          event_name: "Wedding Dispatch",
+          allocation_count: 2,
+          checked_count: 1,
+          departed_count: 0,
+        }],
+        rowCount: 1,
+      });
+
+      const res = await request(app)
+        .get("/events/dispatch/queue")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.queue).toHaveLength(1);
+      expect(String(mockQuery.mock.calls[0][0])).toContain("e.status <> 'Completed'");
+      expect(String(mockQuery.mock.calls[0][0])).toContain("HAVING COUNT(ea.id) FILTER (WHERE ea.departed_at IS NULL) > 0");
+    });
+
+    test("PATCH /events/:id/allocations/:allocationId/dispatch-check rejects string boolean payloads", async () => {
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1/dispatch-check")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`)
+        .send({ dispatch_checked: "false" });
+
+      expect(res.status).toBe(400);
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+
+    test("PATCH /events/:id/allocations/:allocationId/dispatch-check locks event and allocation before updating", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", status: "Ongoing" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "alloc-1", event_id: "event-1", dispatch_checked_at: "2026-07-01T10:00:00.000Z" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1/dispatch-check")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`)
+        .send({ dispatch_checked: true });
+
+      expect(res.status).toBe(200);
+      expect(String(mockQuery.mock.calls[1][0])).toContain("FOR UPDATE");
+      expect(String(mockQuery.mock.calls[2][0])).toContain("departed_at IS NULL");
+      expect(String(mockQuery.mock.calls[3][0])).toContain("INSERT INTO event_logs");
+      expect((mockQuery.mock.calls[3][1] as unknown[])[2]).toBe("dispatch_checklist");
+    });
+
+    test("PATCH /events/:id/allocations/:allocationId/dispatch-check blocks completed events without override", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", status: "Completed" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1/dispatch-check")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`)
+        .send({ dispatch_checked: true });
+
+      expect(res.status).toBe(403);
+      expect(String(mockQuery.mock.calls[2][0])).toBe("ROLLBACK");
+    });
+
+    test("POST /events/:id/dispatch/depart requires all active allocations to be checked", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding Dispatch", status: "Ongoing" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { id: "alloc-1", dispatch_checked_at: "2026-07-01T10:00:00.000Z", departed_at: null },
+          { id: "alloc-2", dispatch_checked_at: null, departed_at: null },
+        ],
+        rowCount: 2,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .post("/events/event-1/dispatch/depart")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain("All active allocations");
+      expect(String(mockQuery.mock.calls[2][0])).toContain("FOR UPDATE");
+      expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("UPDATE event_allocations"))).toBe(false);
+    });
+
+    test("POST /events/:id/dispatch/depart blocks completed events without override", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding Dispatch", status: "Completed" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .post("/events/event-1/dispatch/depart")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(403);
+      expect(String(mockQuery.mock.calls[2][0])).toBe("ROLLBACK");
+    });
+
+    test("POST /events/:id/dispatch/depart is idempotent after departure and skips duplicate notification", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding Dispatch", status: "Ongoing" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { id: "alloc-1", dispatch_checked_at: "2026-07-01T10:00:00.000Z", departed_at: "2026-07-01T11:00:00.000Z" },
+          { id: "alloc-2", dispatch_checked_at: "2026-07-01T10:02:00.000Z", departed_at: "2026-07-01T11:00:00.000Z" },
+        ],
+        rowCount: 2,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .post("/events/event-1/dispatch/depart")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ success: true, departed_count: 0, already_departed: true });
+      expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("UPDATE event_allocations"))).toBe(false);
+      expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO public.notifications"))).toBe(false);
+    });
+
+    test("POST /events/:id/dispatch/depart rolls back when audit log insert fails", async () => {
+      mockQuery.mockImplementation(async (sql: string) => {
+        const sqlStr = String(sql);
+        if (sqlStr === "BEGIN" || sqlStr === "ROLLBACK") return { rows: [], rowCount: 1 };
+        if (sqlStr.includes("SELECT * FROM events")) {
+          return { rows: [{ id: "event-1", name: "Wedding Dispatch", status: "Ongoing" }], rowCount: 1 };
+        }
+        if (sqlStr.includes("SELECT id, dispatch_checked_at, departed_at")) {
+          return {
+            rows: [{ id: "alloc-1", dispatch_checked_at: "2026-07-01T10:00:00.000Z", departed_at: null }],
+            rowCount: 1,
+          };
+        }
+        if (sqlStr.includes("UPDATE event_allocations")) {
+          return { rows: [{ id: "alloc-1", departed_at: "2026-07-01T11:00:00.000Z" }], rowCount: 1 };
+        }
+        if (sqlStr.includes("INSERT INTO event_logs")) {
+          throw new Error("audit insert failed");
+        }
+        return { rows: [], rowCount: 0 };
+      });
+
+      const res = await request(app)
+        .post("/events/event-1/dispatch/depart")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(500);
+      expect(mockQuery.mock.calls.some((call) => String(call[0]) === "ROLLBACK")).toBe(true);
+      expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO public.notifications"))).toBe(false);
+    });
+
+    test("POST /events/:id/dispatch/depart updates checked allocations inside one transaction", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding Dispatch", status: "Ongoing" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { id: "alloc-1", dispatch_checked_at: "2026-07-01T10:00:00.000Z", departed_at: null },
+          { id: "alloc-2", dispatch_checked_at: "2026-07-01T10:02:00.000Z", departed_at: null },
+        ],
+        rowCount: 2,
+      });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { id: "alloc-1", departed_at: "2026-07-01T11:00:00.000Z" },
+          { id: "alloc-2", departed_at: "2026-07-01T11:00:00.000Z" },
+        ],
+        rowCount: 2,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .post("/events/event-1/dispatch/depart")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.departed_count).toBe(2);
+      expect(String(mockQuery.mock.calls[2][0])).toContain("FOR UPDATE");
+      expect(String(mockQuery.mock.calls[3][0])).toContain("departed_at IS NULL");
+      expect(String(mockQuery.mock.calls[3][0])).toContain("status = 'Pulled'");
+      expect(String(mockQuery.mock.calls[4][0])).toContain("INSERT INTO event_logs");
+      expect((mockQuery.mock.calls[4][1] as unknown[])[2]).toBe("dispatch_departure");
+      expect(String((mockQuery.mock.calls[4][1] as unknown[])[4])).toContain("2026-07-01T11:00:00.000Z");
+    });
+
     test("POST /events/:id/checklist blocks low-privilege roles", async () => {
       const res = await request(app)
         .post("/events/event-1/checklist")

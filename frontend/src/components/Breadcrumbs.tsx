@@ -46,6 +46,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Location Detail": "Location Detail",
     "Detail": "Detail",
     "Location": "Location",
+    "Dispatch": "Dispatch",
   },
   am: {
     "HR": "የሰው ኃይል",
@@ -85,6 +86,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Location Detail": "የቦታ ዝርዝር",
     "Detail": "ዝርዝር",
     "Location": "ቦታ",
+    "Dispatch": "መላኪያ",
   }
 };
 
@@ -107,6 +109,7 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/hr/reports/profit": { label: "Profit Reports", permissions: ["reports:profit:read"] },
   "/assets": { label: "Items", permissions: ["assets:read"] },
   "/assets/dashboard": { label: "Dashboard", permissions: ["assets:read"] },
+  "/assets/dispatch": { label: "Dispatch", permissions: ["event_allocations:write", "assets:write"] },
   "/assets/new": { label: "New Item", permissions: ["assets:write"] },
   "/assets/reconcile": { label: "Reconcile", permissions: ["assets:reconcile"] },
   "/assets/history": { label: "Audit Log", permissions: ["assets:read"] },

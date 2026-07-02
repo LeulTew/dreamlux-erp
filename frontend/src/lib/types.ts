@@ -298,6 +298,12 @@ export interface EventInventoryAllocation {
   quantity_allocated: number;
   status: "Reserved" | "Pulled" | "Returned";
   notes: string | null;
+  dispatch_checked_at: string | null;
+  dispatch_checked_by: string | null;
+  dispatch_checked_by_name?: string | null;
+  departed_at: string | null;
+  departed_by: string | null;
+  departed_by_name?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -410,6 +416,19 @@ export interface EventWorkspace {
   vehicleAssignments: VehicleAssignment[];
   expenses: EventExpense[];
   trips: EventTripLog[];
+}
+
+export interface EventDispatchQueueItem {
+  event_id: string;
+  event_name: string;
+  client_name: string;
+  start_date: string;
+  end_date: string;
+  venue_location: string;
+  allocation_count: number;
+  checked_count: number;
+  departed_count: number;
+  departed_at: string | null;
 }
 
 export interface CategoryCost {
