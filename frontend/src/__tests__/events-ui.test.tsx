@@ -91,7 +91,7 @@ describe("Issue #33 Frontend UI Test Suite", () => {
       // Team cost handles Math.max of explicit vs derived commission
       const teamCost = teamLines.reduce((sum, l) => {
         const explicit = Number(l.amount || 0);
-        const derived = Number(l.people_count || 1) * Number(l.commission_per_person || 0);
+        const derived = Number(l.people_count || 0) * Number(l.commission_per_person || 0);
         return sum + Math.max(explicit, derived);
       }, 0);
       

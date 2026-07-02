@@ -448,7 +448,7 @@ export default function ProposalDetailPage() {
                   <h4 className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Team Cost")}</h4>
                   {proposal.cost_breakdown.team.map((line, idx) => {
                     const explicit = Number(line.amount || 0);
-                    const derived = Number(line.people_count || 1) * Number(line.commission_per_person || 0);
+                    const derived = Number(line.people_count || 0) * Number(line.commission_per_person || 0);
                     const applied = Math.max(explicit, derived);
                     return (
                       <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold bg-card-alt p-2 rounded border border-border/30 gap-1">

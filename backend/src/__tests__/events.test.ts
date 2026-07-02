@@ -619,6 +619,45 @@ describe("Events API", () => {
     expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_proposal_logs");
   });
 
+  test("POST /events/proposals calculates team cost correctly with 4 x 3000 = 12000", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-2",
+        name: "Small Gala",
+        client_name: "Aster",
+        requested_budget: "100000.00",
+        estimated_design_cost: "0.00",
+        estimated_team_cost: "12000.00",
+        estimated_trip_cost: "0.00",
+        estimated_other_cost: "0.00",
+        estimated_total_cost: "12000.00",
+        estimated_net_profit: "88000.00",
+        estimated_margin_percentage: "88.00",
+        status: "Draft",
+      }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // proposal audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const res = await request(app)
+      .post("/events/proposals")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        name: "Small Gala",
+        client_name: "Aster",
+        requested_budget: 100000,
+        cost_breakdown: {
+          team: [{ label: "Waitstaff", amount: 12000, people_count: 4, commission_per_person: 3000 }],
+        },
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.proposal.estimated_team_cost).toBe(12000);
+    expect(res.body.proposal.estimated_net_profit).toBe(88000);
+  });
+
   test("POST /events/proposals blocks low-permission users", async () => {
     const res = await request(app)
       .post("/events/proposals")
