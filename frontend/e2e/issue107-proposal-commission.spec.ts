@@ -1,18 +1,31 @@
 import { expect, test } from "@playwright/test";
 import { fulfillJson, mockAuth, mockCommonShellData, seedAuthenticatedSession } from "./helpers";
 
+type ProposalCreatePayload = {
+  name: string;
+  client_name: string;
+  requested_budget: number;
+  cost_breakdown: {
+    team: Array<{
+      amount: number;
+      people_count: number;
+      commission_per_person: number;
+    }>;
+  };
+};
+
 test.describe("Issue 107 proposal commission and team totals flow", () => {
   test("creates proposal with 4 x 3000 team lines and asserts read-only amount total of 12000", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, { permissions: ["events:proposals:write", "events:write"] });
     await mockCommonShellData(page);
 
-    let proposalSavedPayload: any = null;
+    let proposalSavedPayload: ProposalCreatePayload | null = null;
 
     // Mock proposal API calls
     await page.route("http://localhost:4000/events/proposals", async (route) => {
       if (route.request().method() === "POST") {
-        proposalSavedPayload = route.request().postDataJSON();
+        proposalSavedPayload = route.request().postDataJSON() as ProposalCreatePayload;
         await fulfillJson(route, {
           proposal: {
             id: "proposal-e2e-107",
@@ -30,7 +43,10 @@ test.describe("Issue 107 proposal commission and team totals flow", () => {
             estimated_margin_percentage: 76,
           },
         });
+        return;
       }
+
+      await route.fallback();
     });
 
     await page.route("http://localhost:4000/events/proposals/proposal-e2e-107", (route) =>

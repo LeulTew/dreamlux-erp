@@ -298,9 +298,8 @@ function NewProposalContent() {
 
     const designCost = sumLineAmount(designLines);
     const teamCost = teamLines.reduce((sum, l) => {
-      const explicit = Number(l.amount || 0);
       const derived = Number(l.people_count || 0) * Number(l.commission_per_person || 0);
-      return sum + Math.max(explicit, derived);
+      return sum + derived;
     }, 0);
     const tripCost = sumLineAmount(tripLines);
     const otherCost = sumLineAmount(otherLines);

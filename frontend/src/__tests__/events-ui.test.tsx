@@ -88,11 +88,10 @@ describe("Issue #33 Frontend UI Test Suite", () => {
 
       const designCost = sumLineAmount(designLines);
       
-      // Team cost handles Math.max of explicit vs derived commission
+      // Team cost is derived from people count times commission per person.
       const teamCost = teamLines.reduce((sum, l) => {
-        const explicit = Number(l.amount || 0);
         const derived = Number(l.people_count || 0) * Number(l.commission_per_person || 0);
-        return sum + Math.max(explicit, derived);
+        return sum + derived;
       }, 0);
       
       const tripCost = sumLineAmount(tripLines);
@@ -104,13 +103,13 @@ describe("Issue #33 Frontend UI Test Suite", () => {
 
       // Assertions
       expect(designCost).toBe(5000);
-      // Designers: max(0, 3*2000) = 6000. Waitstaff: max(4000, 5*500) = 4000. Total teamCost = 10000
-      expect(teamCost).toBe(10000);
+      // Designers: 3*2000 = 6000. Waitstaff ignores stale amount and uses 5*500 = 2500.
+      expect(teamCost).toBe(8500);
       expect(tripCost).toBe(3000);
       expect(otherCost).toBe(1500);
-      expect(totalCost).toBe(19500);
-      expect(netProfit).toBe(10500);
-      expect(margin).toBe(35); // 10500 / 30000 * 100
+      expect(totalCost).toBe(18000);
+      expect(netProfit).toBe(12000);
+      expect(margin).toBe(40);
     });
 
     it("should trigger margin risk warning when margin is below 25%", () => {

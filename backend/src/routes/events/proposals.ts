@@ -95,23 +95,37 @@ async function insertEventAuditLog(
 }
 
 type ProposalCostBreakdown = {
-  design?: Array<{ amount: number }>;
-  team?: Array<{ amount?: number; people_count?: number; commission_per_person?: number }>;
-  trip?: Array<{ amount: number }>;
-  other?: Array<{ amount: number }>;
+  design?: Array<{ [key: string]: unknown; amount: number }>;
+  team?: Array<{ [key: string]: unknown; amount?: number; people_count?: number; commission_per_person?: number }>;
+  trip?: Array<{ [key: string]: unknown; amount: number }>;
+  other?: Array<{ [key: string]: unknown; amount: number }>;
 };
 
 function sumAmounts(lines: Array<{ amount?: number }> = []): number {
   return lines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
 }
 
+function normalizeProposalCostBreakdown(costBreakdown: ProposalCostBreakdown): ProposalCostBreakdown {
+  return {
+    design: costBreakdown.design || [],
+    team: (costBreakdown.team || []).map((line) => {
+      const peopleCount = Number(line.people_count || 0);
+      const commissionPerPerson = Number(line.commission_per_person || 0);
+      return {
+        ...line,
+        people_count: peopleCount,
+        commission_per_person: commissionPerPerson,
+        amount: peopleCount * commissionPerPerson,
+      };
+    }),
+    trip: costBreakdown.trip || [],
+    other: costBreakdown.other || [],
+  };
+}
+
 function calculateProposalFinancials(requestedBudget: number, costBreakdown: ProposalCostBreakdown) {
   const estimatedDesignCost = sumAmounts(costBreakdown.design || []);
-  const estimatedTeamCost = (costBreakdown.team || []).reduce((sum, line) => {
-    const explicitAmount = Number(line.amount || 0);
-    const derivedAmount = Number(line.people_count || 0) * Number(line.commission_per_person || 0);
-    return sum + Math.max(explicitAmount, derivedAmount);
-  }, 0);
+  const estimatedTeamCost = sumAmounts(costBreakdown.team || []);
   const estimatedTripCost = sumAmounts(costBreakdown.trip || []);
   const estimatedOtherCost = sumAmounts(costBreakdown.other || []);
   const estimatedTotalCost = estimatedDesignCost + estimatedTeamCost + estimatedTripCost + estimatedOtherCost;
@@ -334,7 +348,8 @@ export function createEventProposalsRouter(): Router {
       }
 
       const payload = validationResult.data;
-      const financials = calculateProposalFinancials(payload.requested_budget, payload.cost_breakdown);
+      const normalizedCostBreakdown = normalizeProposalCostBreakdown(payload.cost_breakdown);
+      const financials = calculateProposalFinancials(payload.requested_budget, normalizedCostBreakdown);
       const client = await pool.connect();
 
       try {
@@ -366,7 +381,7 @@ export function createEventProposalsRouter(): Router {
             normalizeOptionalText(payload.venue_location),
             normalizeOptionalText(payload.notes),
             normalizeOptionalText(payload.package_design_notes),
-            JSON.stringify(payload.cost_breakdown),
+            JSON.stringify(normalizedCostBreakdown),
             financials.estimatedDesignCost,
             financials.estimatedTeamCost,
             financials.estimatedTripCost,
