@@ -1101,16 +1101,16 @@ export default function EventWorkspacePage() {
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[280px]">
                       <div className="rounded-md border border-border bg-card-alt px-3 py-2">
-                        <div className="tabular-nums text-lg font-black text-foreground">{activeDispatchAllocations.length}</div>
-                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Allocated")}</div>
+                        <div className="tabular-nums text-2xl font-black text-foreground">{activeDispatchAllocations.length}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-1 leading-tight">{t("Allocated")}</div>
                       </div>
                       <div className="rounded-md border border-border bg-card-alt px-3 py-2">
-                        <div className="tabular-nums text-lg font-black text-foreground">{checkedDispatchCount}</div>
-                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Ready")}</div>
+                        <div className="tabular-nums text-2xl font-black text-foreground">{checkedDispatchCount}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-1 leading-tight">{t("Ready")}</div>
                       </div>
                       <div className="rounded-md border border-border bg-card-alt px-3 py-2">
-                        <div className="tabular-nums text-lg font-black text-foreground">{departedDispatchCount}</div>
-                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Departed")}</div>
+                        <div className="tabular-nums text-2xl font-black text-foreground">{departedDispatchCount}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-1 leading-tight">{t("Departed")}</div>
                       </div>
                     </div>
                   </div>
@@ -1123,7 +1123,7 @@ export default function EventWorkspacePage() {
                     <div className="divide-y divide-border">
                       {allocations.map((allocation) => (
                         <div key={allocation.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex min-w-0 items-start gap-3">
+                          <label className={`flex min-w-0 items-start gap-3 select-none ${(!canWriteAllocations || Boolean(allocation.departed_at) || dispatchCheckMutation.isPending) ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}>
                             <input
                               type="checkbox"
                               aria-label={`${t("Dispatch Checklist")} ${allocation.item_name}`}
@@ -1148,7 +1148,7 @@ export default function EventWorkspacePage() {
                             {allocation.notes && <div className="mt-1 text-xs text-muted">{allocation.notes}</div>}
                             {allocation.departed_at && <div className="mt-1 text-xs font-semibold text-muted">{t("Departed")}: {formatDate(allocation.departed_at)}</div>}
                             </div>
-                          </div>
+                          </label>
                           {canWriteAllocations && (
                             <Button
                               type="button"
@@ -1173,7 +1173,7 @@ export default function EventWorkspacePage() {
                         onClick={() => dispatchDepartMutation.mutate()}
                         loading={dispatchDepartMutation.isPending}
                         disabled={!canDepartDispatch}
-                        className="min-h-12 w-full rounded-lg bg-primary px-5 text-xs font-black uppercase tracking-widest text-on-primary transition-all active:scale-[0.98] sm:w-auto"
+                        className="min-h-12 w-full rounded-lg bg-primary px-5 text-xs font-black uppercase tracking-widest text-on-primary transition-all active:scale-[0.98] md:hover:opacity-90 sm:w-auto"
                       >
                         <HiTruck className="h-4 w-4" />
                         {t("Mark Departed")}

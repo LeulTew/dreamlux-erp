@@ -46,6 +46,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Location Detail": "Location Detail",
     "Detail": "Detail",
     "Location": "Location",
+    "Dispatch": "Dispatch",
   },
   am: {
     "HR": "የሰው ኃይል",
@@ -85,6 +86,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Location Detail": "የቦታ ዝርዝር",
     "Detail": "ዝርዝር",
     "Location": "ቦታ",
+    "Dispatch": "መላኪያ",
   }
 };
 

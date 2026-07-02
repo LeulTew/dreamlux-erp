@@ -87,27 +87,27 @@ export default function DispatchQueuePage() {
         <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-md border border-primary/30 bg-primary-light text-primary-dark">
-                <HiTruck className="h-6 w-6" />
+              <div className="rounded-md bg-primary/10 p-2 text-primary">
+                <HiTruck className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-2xl font-black tracking-tight text-foreground">{t("Dispatch Queue")}</h1>
-                <p className="mt-1 text-sm font-medium text-muted">{t("Storekeeper departure queue grouped by event.")}</p>
+                <h1 className="text-lg 2xl:text-2xl font-bold text-foreground tracking-tight leading-tight">{t("Dispatch Queue")}</h1>
+                <p className="text-[11px] text-muted font-medium leading-tight mt-1">{t("Storekeeper departure queue grouped by event.")}</p>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[280px]">
             <div className="rounded-md border border-border bg-card px-3 py-2">
-              <div className="tabular-nums text-2xl font-black tracking-tight text-foreground">{queue.length}</div>
-              <div className="text-[11px] font-medium leading-tight text-muted">{t("Events")}</div>
+              <div className="tabular-nums text-3xl font-black tracking-tight text-foreground">{queue.length}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-1 leading-tight">{t("Events")}</div>
             </div>
             <div className="rounded-md border border-border bg-card px-3 py-2">
-              <div className="tabular-nums text-2xl font-black tracking-tight text-foreground">{totalReady}/{totalAllocations}</div>
-              <div className="text-[11px] font-medium leading-tight text-muted">{t("Ready")}</div>
+              <div className="tabular-nums text-3xl font-black tracking-tight text-foreground">{totalReady}/{totalAllocations}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-1 leading-tight">{t("Ready")}</div>
             </div>
             <div className="rounded-md border border-border bg-card px-3 py-2">
-              <div className="tabular-nums text-2xl font-black tracking-tight text-foreground">{totalDeparted}</div>
-              <div className="text-[11px] font-medium leading-tight text-muted">{t("Departed")}</div>
+              <div className="tabular-nums text-3xl font-black tracking-tight text-foreground">{totalDeparted}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-1 leading-tight">{t("Departed")}</div>
             </div>
           </div>
         </div>
@@ -143,21 +143,21 @@ export default function DispatchQueuePage() {
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div>
-                        <div className="tabular-nums text-lg font-black text-foreground">{item.allocation_count}</div>
-                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Allocations")}</div>
+                        <div className="tabular-nums text-xl font-bold tracking-tight text-foreground">{item.allocation_count}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-0.5 leading-tight">{t("Allocations")}</div>
                       </div>
                       <div>
-                        <div className="tabular-nums text-lg font-black text-foreground">{item.checked_count}</div>
-                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Ready")}</div>
+                        <div className="tabular-nums text-xl font-bold tracking-tight text-foreground">{item.checked_count}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-0.5 leading-tight">{t("Ready")}</div>
                       </div>
                       <div>
-                        <div className="tabular-nums text-lg font-black text-foreground">{pendingCount}</div>
-                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Pending")}</div>
+                        <div className="tabular-nums text-xl font-bold tracking-tight text-foreground">{pendingCount}</div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted/80 mt-0.5 leading-tight">{t("Pending")}</div>
                       </div>
                     </div>
                     <Link
                       href={`/events/${item.event_id}`}
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-widest text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40"
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-widest text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary-light/10 [@media(hover:hover)]:hover:text-primary"
                     >
                       {t("Open dispatch")}
                       <HiArrowRight className="h-4 w-4" />
