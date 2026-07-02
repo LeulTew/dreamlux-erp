@@ -811,8 +811,8 @@ export function AppSidebar() {
                           onClick={() => setItemsOpen(!itemsOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isActive("/assets") || isActive("/assets/insert")
-                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
-                              : "rounded-xl"
+                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-md dark:border-transparent dark:rounded-md"
+                              : "rounded-md"
                           }`}
                         >
                           <span className="flex items-center gap-3">
@@ -831,7 +831,7 @@ export function AppSidebar() {
                           <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
                             <SidebarMenuSubItem className="relative">
                               <SubItemBranchLine isLast={false} />
-                              <SidebarMenuSubButton asChild isActive={pathname === "/assets"} className="rounded-xl">
+                              <SidebarMenuSubButton asChild isActive={pathname === "/assets"} className="rounded-md">
                                 <Link
                                   href="/assets"
                                   className={
@@ -851,7 +851,7 @@ export function AppSidebar() {
                             </SidebarMenuSubItem>
                             <SidebarMenuSubItem className="relative">
                               <SubItemBranchLine isLast={true} />
-                              <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"} className="rounded-xl">
+                              <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"} className="rounded-md">
                                 <Link
                                   href="/assets/insert"
                                   className={

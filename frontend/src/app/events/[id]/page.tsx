@@ -1173,7 +1173,7 @@ export default function EventWorkspacePage() {
                         onClick={() => dispatchDepartMutation.mutate()}
                         loading={dispatchDepartMutation.isPending}
                         disabled={!canDepartDispatch}
-                        className="min-h-12 w-full rounded-lg bg-primary px-5 text-xs font-black uppercase tracking-widest text-on-primary transition-all active:scale-[0.98] md:hover:opacity-90 sm:w-auto"
+                        className="min-h-12 w-full rounded-md bg-primary px-5 text-xs font-black uppercase tracking-widest text-on-primary transition-all active:scale-[0.98] [@media(hover:hover)]:hover:opacity-90 sm:w-auto"
                       >
                         <HiTruck className="h-4 w-4" />
                         {t("Mark Departed")}

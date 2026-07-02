@@ -157,7 +157,7 @@ export default function DispatchQueuePage() {
                     </div>
                     <Link
                       href={`/events/${item.event_id}`}
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-widest text-foreground transition-colors md:hover:border-primary/30 md:hover:bg-primary-light/10 md:hover:text-primary"
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-sm border border-border bg-card-alt px-4 text-xs font-black uppercase tracking-widest text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:bg-primary-light/10 [@media(hover:hover)]:hover:text-primary"
                     >
                       {t("Open dispatch")}
                       <HiArrowRight className="h-4 w-4" />
