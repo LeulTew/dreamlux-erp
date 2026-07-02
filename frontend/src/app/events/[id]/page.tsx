@@ -333,7 +333,7 @@ function formatTime(value?: string | null) {
 }
 
 function formatCurrency(value?: number | string | null) {
-  return `ETB ${Number(value || 0).toLocaleString()}`;
+  return `ETB ${Number(value || 0).toLocaleString("en-US")}`;
 }
 
 function FieldRow({ label, value, icon: Icon }: { label: string; value: string; icon: typeof HiUser }) {
@@ -446,7 +446,7 @@ function EventProfitPanel({
   }
 
   const formatCurrency = (value: number) => {
-    return `ETB ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `ETB ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const colors = {
@@ -1003,7 +1003,7 @@ export default function EventWorkspacePage() {
 
             {activeTab === "details" && (
               <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <section className="rounded-lg border border-border bg-card p-4">
+                <section className="rounded-md border border-border bg-card p-4">
                   <h2 className="mb-4 text-base font-bold text-foreground">{t("Details")}</h2>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <FieldRow label={t("Client")} value={event.client_name} icon={HiUser} />

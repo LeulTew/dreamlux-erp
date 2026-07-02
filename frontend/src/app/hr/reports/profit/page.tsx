@@ -192,7 +192,7 @@ export default function FinancialDashboardPage() {
   });
 
   const formatCurrency = (value: number) => {
-    return `ETB ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `ETB ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const handlePrint = () => {
@@ -531,10 +531,10 @@ export default function FinancialDashboardPage() {
 
                           {/* Y-axis labels */}
                           <text x={paddingX - 10} y={paddingY + 4} textAnchor="end" className="fill-muted font-mono text-[9px] font-semibold">
-                            {Math.round(yMax).toLocaleString()}
+                            {Math.round(yMax).toLocaleString("en-US")}
                           </text>
                           <text x={paddingX - 10} y={(chartHeight - paddingY * 2) / 2 + paddingY + 4} textAnchor="end" className="fill-muted font-mono text-[9px] font-semibold">
-                            {Math.round(yMax / 2).toLocaleString()}
+                            {Math.round(yMax / 2).toLocaleString("en-US")}
                           </text>
                           <text x={paddingX - 10} y={chartHeight - paddingY + 4} textAnchor="end" className="fill-muted font-mono text-[9px] font-semibold">
                             0
@@ -603,7 +603,7 @@ export default function FinancialDashboardPage() {
                     <div className="flex justify-between items-center py-2">
                       <span className="text-muted font-bold uppercase tracking-wide">{t("Avg Variance (Est vs Act)")}</span>
                       <span className={`font-mono font-black ${data.proposalVariance.averageVariance < 0 ? "text-danger" : "text-success"}`}>
-                        ETB {data.proposalVariance.averageVariance.toLocaleString()}
+                        ETB {data.proposalVariance.averageVariance.toLocaleString("en-US")}
                       </span>
                     </div>
                   </div>

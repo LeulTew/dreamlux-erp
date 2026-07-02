@@ -361,7 +361,7 @@ export default function HRDashboardPage() {
                   <h3 className="text-3xl font-bold tracking-tight text-foreground font-mono tabular-nums">
                     {isRedacted
                       ? "••••••"
-                      : `${stats.monthlyPayrollCommitment.toLocaleString()} ETB`}
+                      : `${stats.monthlyPayrollCommitment.toLocaleString("en-US")} ETB`}
                   </h3>
                   <p className="text-[11px] text-muted mt-1">{t("Basic Payroll Liability")}</p>
                 </div>
@@ -533,7 +533,7 @@ export default function HRDashboardPage() {
                               <td className={`${tdCls} text-right font-mono tabular-nums text-foreground`}>
                                 {isRedacted
                                   ? "••••••"
-                                  : `${(Number(emp.base_salary) || 0).toLocaleString()} ETB`}
+                                  : `${(Number(emp.base_salary) || 0).toLocaleString("en-US")} ETB`}
                               </td>
                               <td className={`${tdCls} text-right`}>
                                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-warning">
