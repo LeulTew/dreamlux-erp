@@ -720,6 +720,10 @@ CREATE TABLE IF NOT EXISTS event_allocations (
   quantity_allocated INTEGER NOT NULL CHECK (quantity_allocated > 0),
   status TEXT NOT NULL CHECK (status IN ('Reserved', 'Pulled', 'Returned')) DEFAULT 'Reserved',
   notes TEXT,
+  dispatch_checked_at TIMESTAMP DEFAULT NULL,
+  dispatch_checked_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  departed_at TIMESTAMP DEFAULT NULL,
+  departed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -727,6 +731,9 @@ CREATE TABLE IF NOT EXISTS event_allocations (
 
 CREATE INDEX IF NOT EXISTS idx_event_allocations_event ON event_allocations(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_allocations_item ON event_allocations(item_id);
+CREATE INDEX IF NOT EXISTS idx_event_allocations_dispatch_queue
+  ON event_allocations(event_id, departed_at, dispatch_checked_at)
+  WHERE status <> 'Returned';
 CREATE INDEX IF NOT EXISTS idx_event_allocations_active_item
   ON event_allocations(item_id, status)
   WHERE status <> 'Returned';

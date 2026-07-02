@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import EventWorkspacePage from "../app/events/[id]/page";
 
@@ -25,36 +25,63 @@ const apiMocks = vi.hoisted(() => ({
   getItems: vi.fn().mockResolvedValue({ items: [] }),
   getAvailableEmployees: vi.fn().mockResolvedValue([]),
   getAvailableVehicles: vi.fn().mockResolvedValue([]),
+  updateEventAllocationDispatchCheck: vi.fn().mockResolvedValue({}),
+  markEventDispatchDeparted: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+const workspaceData = vi.hoisted(() => ({
+  event: {
+    id: "event-123",
+    name: "Wedding Decoration",
+    client_name: "John Doe",
+    venue_location: "Sheraton",
+    contract_price: 150000,
+    estimated_design_cost: 20000,
+  },
+  allocations: [
+    {
+      id: "alloc-1",
+      item_id: "item-1",
+      item_name: "Gold Chairs",
+      status: "Reserved",
+      quantity_allocated: 50,
+      dispatch_checked_at: null,
+      departed_at: null,
+    },
+  ],
+  checklist: [
+    { id: "task-1", title: "Stage Setup", status: "Pending" },
+  ],
+  assignments: [
+    { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000 },
+  ],
+  vehicleAssignments: [
+    { id: "va-1", vehicle_id: "v-1", plate_number: "AA-2-345", driver_name: "Driver Joe", vehicle_type: "Truck" },
+  ],
+  expenses: [],
+  trips: [],
 }));
 
 vi.mock("@/lib/api", () => ({
-  getEventWorkspace: vi.fn().mockResolvedValue({
-    event: {
-      id: "event-123",
-      name: "Wedding Decoration",
-      client_name: "John Doe",
-      venue_location: "Sheraton",
-      contract_price: 150000,
-      estimated_design_cost: 20000,
-    },
-    allocations: [
-      { id: "alloc-1", item_id: "item-1", item_name: "Gold Chairs", status: "Allocated", quantity_allocated: 50 },
-    ],
-    checklist: [
-      { id: "task-1", title: "Stage Setup", status: "Pending" },
-    ],
-    assignments: [
-      { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000 },
-    ],
-    vehicleAssignments: [
-      { id: "va-1", vehicle_id: "v-1", plate_number: "AA-2-345", driver_name: "Driver Joe", vehicle_type: "Truck" },
-    ],
-    expenses: [],
-    trips: [],
-  }),
+  getEventWorkspace: vi.fn().mockResolvedValue(workspaceData),
   getItems: apiMocks.getItems,
   getAvailableEmployees: apiMocks.getAvailableEmployees,
   getAvailableVehicles: apiMocks.getAvailableVehicles,
+  createEventAllocation: vi.fn(),
+  deleteEventAllocation: vi.fn(),
+  updateEventAllocationDispatchCheck: apiMocks.updateEventAllocationDispatchCheck,
+  markEventDispatchDeparted: apiMocks.markEventDispatchDeparted,
+  createEventChecklistItem: vi.fn(),
+  updateEventChecklistItem: vi.fn(),
+  updateEventDesign: vi.fn(),
+  createEmployeeAssignment: vi.fn(),
+  deleteEmployeeAssignment: vi.fn(),
+  createVehicleAssignment: vi.fn(),
+  deleteVehicleAssignment: vi.fn(),
+  updateEmployeeAttendance: vi.fn(),
+  createEventTripLog: vi.fn(),
+  createEventExpense: vi.fn(),
+  generateEventLaborExpense: vi.fn(),
   getEventProfit: vi.fn().mockResolvedValue({}),
 }));
 
@@ -67,37 +94,17 @@ vi.mock("@tanstack/react-query", () => ({
     // If it's workspace query, return mock data
     if (options.queryKey[0] === "event-workspace") {
       return {
-        data: {
-          event: {
-            id: "event-123",
-            name: "Wedding Decoration",
-            client_name: "John Doe",
-            venue_location: "Sheraton",
-            contract_price: 150000,
-            estimated_design_cost: 20000,
-          },
-          allocations: [
-            { id: "alloc-1", item_id: "item-1", item_name: "Gold Chairs", status: "Allocated", quantity_allocated: 50 },
-          ],
-          checklist: [
-            { id: "task-1", title: "Stage Setup", status: "Pending" },
-          ],
-          assignments: [
-            { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000 },
-          ],
-          vehicleAssignments: [
-            { id: "va-1", vehicle_id: "v-1", plate_number: "AA-2-345", driver_name: "Driver Joe", vehicle_type: "Truck" },
-          ],
-          expenses: [],
-          trips: [],
-        },
+        data: workspaceData,
         isLoading: false,
       };
     }
     return { data: undefined, isLoading: false };
   },
-  useMutation: () => ({
-    mutate: vi.fn(),
+  useMutation: (options: { mutationFn?: (payload?: unknown) => unknown; onSuccess?: () => void }) => ({
+    mutate: vi.fn((payload?: unknown) => {
+      options.mutationFn?.(payload);
+      options.onSuccess?.();
+    }),
     isPending: false,
   }),
   useQueryClient: () => ({
@@ -132,6 +139,7 @@ vi.mock("@/components/ui/button", () => ({
   Button: ({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) => <button onClick={onClick} disabled={disabled}>{children}</button>,
 }));
 vi.mock("@/components/ui/input", () => ({
+  Input: (props: React.ComponentPropsWithoutRef<"input">) => <input {...props} />,
   default: (props: React.ComponentPropsWithoutRef<"input">) => <input {...props} />,
 }));
 vi.mock("@/components/ui/Select", () => ({
@@ -158,6 +166,19 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     apiMocks.getItems.mockClear();
     apiMocks.getAvailableEmployees.mockClear();
     apiMocks.getAvailableVehicles.mockClear();
+    apiMocks.updateEventAllocationDispatchCheck.mockClear();
+    apiMocks.markEventDispatchDeparted.mockClear();
+    workspaceData.allocations = [
+      {
+        id: "alloc-1",
+        item_id: "item-1",
+        item_name: "Gold Chairs",
+        status: "Reserved",
+        quantity_allocated: 50,
+        dispatch_checked_at: null,
+        departed_at: null,
+      },
+    ];
     vi.clearAllMocks();
   });
 
@@ -184,5 +205,55 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     expect(apiMocks.getItems).not.toHaveBeenCalled();
     expect(apiMocks.getAvailableEmployees).not.toHaveBeenCalled();
     expect(apiMocks.getAvailableVehicles).not.toHaveBeenCalled();
+  });
+
+  it("disables dispatch departure until every allocation is checked", () => {
+    mockPermissions = ["events:read", "event_allocations:write"];
+    render(<EventWorkspacePage />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Inventory Allocation/i }));
+
+    expect(screen.getByRole("checkbox", { name: /Dispatch Checklist Gold Chairs/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Mark Departed/i })).toBeDisabled();
+  });
+
+  it("calls dispatch check mutation when storekeeper checks an allocation", () => {
+    mockPermissions = ["events:read", "event_allocations:write"];
+    render(<EventWorkspacePage />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Inventory Allocation/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Dispatch Checklist Gold Chairs/i }));
+
+    expect(apiMocks.updateEventAllocationDispatchCheck).toHaveBeenCalledWith("event-123", "alloc-1", true);
+  });
+
+  it("enables departure for checked allocations and disables departed rows", () => {
+    mockPermissions = ["events:read", "event_allocations:write"];
+    workspaceData.allocations = [
+      {
+        id: "alloc-1",
+        item_id: "item-1",
+        item_name: "Gold Chairs",
+        status: "Pulled",
+        quantity_allocated: 50,
+        dispatch_checked_at: "2026-07-01T10:00:00.000Z",
+        departed_at: null,
+      },
+      {
+        id: "alloc-2",
+        item_id: "item-2",
+        item_name: "Silver Stands",
+        status: "Pulled",
+        quantity_allocated: 10,
+        dispatch_checked_at: "2026-07-01T10:01:00.000Z",
+        departed_at: "2026-07-01T11:00:00.000Z",
+      },
+    ];
+
+    render(<EventWorkspacePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Inventory Allocation/i }));
+
+    expect(screen.getByRole("button", { name: /Mark Departed/i })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: /Dispatch Checklist Silver Stands/i })).toBeDisabled();
   });
 });

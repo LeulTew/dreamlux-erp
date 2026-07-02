@@ -17,6 +17,7 @@ import {
   HiPaintBrush,
   HiPhone,
   HiPlus,
+  HiTruck,
   HiShieldExclamation,
   HiArrowTrendingUp,
   HiUser,
@@ -32,6 +33,8 @@ import {
   createEventAllocation,
   createEventChecklistItem,
   deleteEventAllocation,
+  markEventDispatchDeparted,
+  updateEventAllocationDispatchCheck,
   getEventWorkspace,
   getItems,
   updateEventChecklistItem,
@@ -85,6 +88,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Allocation exceeds available stock.": "Allocation exceeds available stock.",
     "Allocation saved": "Allocation saved",
     "Allocation released": "Allocation released",
+    "Dispatch Checklist": "Dispatch Checklist",
+    "Ready": "Ready",
+    "Departed": "Departed",
+    "Mark Departed": "Mark Departed",
+    "Dispatch complete": "Dispatch complete",
+    "Check every allocation before departure.": "Check every allocation before departure.",
+    "All allocations departed.": "All allocations departed.",
     "Design details saved": "Design details saved",
     "Event Checklist": "Event Checklist",
     "Task title": "Task title",
@@ -204,6 +214,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Allocation exceeds available stock.": "ምደባው ካለው ክምችት በላይ ነው።",
     "Allocation saved": "ምደባ ተቀምጧል",
     "Allocation released": "ምደባ ተለቋል",
+    "Dispatch Checklist": "የመላኪያ ማረጋገጫ",
+    "Ready": "ዝግጁ",
+    "Departed": "ተነስቷል",
+    "Mark Departed": "ተነስቷል ብለው ያስመዝግቡ",
+    "Dispatch complete": "መላኪያ ተጠናቋል",
+    "Check every allocation before departure.": "ከመነሳት በፊት ሁሉንም ምደባዎች ያረጋግጡ።",
+    "All allocations departed.": "ሁሉም ምደባዎች ተነስተዋል።",
     "Design details saved": "የዲዛይን ዝርዝር ተቀምጧል",
     "Event Checklist": "የዝግጅት የስራ ዝርዝር",
     "Task title": "የስራ ርዕስ",
@@ -678,6 +695,28 @@ export default function EventWorkspacePage() {
     },
   });
 
+  const dispatchCheckMutation = useMutation({
+    mutationFn: (payload: { allocationId: string; checked: boolean }) =>
+      updateEventAllocationDispatchCheck(eventId, payload.allocationId, payload.checked),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      toast.error(err.response?.data?.error || err.message || t("Required"));
+    },
+  });
+
+  const dispatchDepartMutation = useMutation({
+    mutationFn: () => markEventDispatchDeparted(eventId),
+    onSuccess: () => {
+      toast.success(t("Dispatch complete"));
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+    },
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      toast.error(err.response?.data?.error || err.message || t("Check every allocation before departure."));
+    },
+  });
+
   const addTaskMutation = useMutation({
     mutationFn: () =>
       createEventChecklistItem(eventId, {
@@ -882,6 +921,15 @@ export default function EventWorkspacePage() {
     Number(allocationQty) > 0 &&
     Number(allocationQty) <= selectedAvailable &&
     !allocationMutation.isPending;
+  const activeDispatchAllocations = allocations.filter((allocation) => allocation.status !== "Returned");
+  const checkedDispatchCount = activeDispatchAllocations.filter((allocation) => allocation.dispatch_checked_at).length;
+  const departedDispatchCount = activeDispatchAllocations.filter((allocation) => allocation.departed_at).length;
+  const canDepartDispatch =
+    canWriteAllocations &&
+    activeDispatchAllocations.length > 0 &&
+    checkedDispatchCount === activeDispatchAllocations.length &&
+    departedDispatchCount < activeDispatchAllocations.length &&
+    !dispatchDepartMutation.isPending;
 
   return (
     <AuthLayout>
@@ -1042,6 +1090,30 @@ export default function EventWorkspacePage() {
                 )}
 
                 <section className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-4 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-base font-bold text-foreground">{t("Dispatch Checklist")}</h2>
+                      <p className="mt-1 text-xs font-semibold text-muted">
+                        {departedDispatchCount === activeDispatchAllocations.length && activeDispatchAllocations.length > 0
+                          ? t("All allocations departed.")
+                          : t("Check every allocation before departure.")}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[280px]">
+                      <div className="rounded-md border border-border bg-card-alt px-3 py-2">
+                        <div className="tabular-nums text-lg font-black text-foreground">{activeDispatchAllocations.length}</div>
+                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Allocated")}</div>
+                      </div>
+                      <div className="rounded-md border border-border bg-card-alt px-3 py-2">
+                        <div className="tabular-nums text-lg font-black text-foreground">{checkedDispatchCount}</div>
+                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Ready")}</div>
+                      </div>
+                      <div className="rounded-md border border-border bg-card-alt px-3 py-2">
+                        <div className="tabular-nums text-lg font-black text-foreground">{departedDispatchCount}</div>
+                        <div className="text-[11px] font-medium leading-tight text-muted">{t("Departed")}</div>
+                      </div>
+                    </div>
+                  </div>
                   {!canWriteAllocations && (
                     <ReadOnlyBanner message={t("Read-only view. You do not have permission to allocate inventory items.")} />
                   )}
@@ -1051,7 +1123,18 @@ export default function EventWorkspacePage() {
                     <div className="divide-y divide-border">
                       {allocations.map((allocation) => (
                         <div key={allocation.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <input
+                              type="checkbox"
+                              aria-label={`${t("Dispatch Checklist")} ${allocation.item_name}`}
+                              checked={Boolean(allocation.dispatch_checked_at)}
+                              disabled={!canWriteAllocations || Boolean(allocation.departed_at) || dispatchCheckMutation.isPending}
+                              onChange={(eventChange) =>
+                                dispatchCheckMutation.mutate({ allocationId: allocation.id, checked: eventChange.target.checked })
+                              }
+                              className="mt-1 h-5 w-5 rounded border-border text-primary focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                            <div className="min-w-0">
                             <div className="font-semibold text-foreground">{allocation.item_name}</div>
                             <div className="mt-1 text-xs text-muted flex flex-wrap items-center gap-2">
                               <span>{allocation.store_name || "-"}</span>
@@ -1059,8 +1142,12 @@ export default function EventWorkspacePage() {
                               <span>{t("Allocated")}: {allocation.quantity_allocated}</span>
                               <span className="opacity-40">|</span>
                               <StatusBadge status={allocation.status} />
+                              <span className="opacity-40">|</span>
+                              <StatusBadge status={allocation.departed_at ? "Departed" : allocation.dispatch_checked_at ? "Ready" : "Pending"} />
                             </div>
                             {allocation.notes && <div className="mt-1 text-xs text-muted">{allocation.notes}</div>}
+                            {allocation.departed_at && <div className="mt-1 text-xs font-semibold text-muted">{t("Departed")}: {formatDate(allocation.departed_at)}</div>}
+                            </div>
                           </div>
                           {canWriteAllocations && (
                             <Button
@@ -1069,6 +1156,7 @@ export default function EventWorkspacePage() {
                               size="sm"
                               onClick={() => releaseMutation.mutate(allocation.id)}
                               loading={releaseMutation.isPending}
+                              disabled={Boolean(allocation.departed_at)}
                             >
                               <HiMinusCircle className="h-4 w-4" />
                               {t("Release")}
@@ -1076,6 +1164,20 @@ export default function EventWorkspacePage() {
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {canWriteAllocations && allocations.length > 0 && (
+                    <div className="sticky bottom-3 mt-4 flex justify-end border-t border-border bg-card pt-4">
+                      <Button
+                        type="button"
+                        onClick={() => dispatchDepartMutation.mutate()}
+                        loading={dispatchDepartMutation.isPending}
+                        disabled={!canDepartDispatch}
+                        className="min-h-12 w-full rounded-lg bg-primary px-5 text-xs font-black uppercase tracking-widest text-on-primary transition-all active:scale-[0.98] sm:w-auto"
+                      >
+                        <HiTruck className="h-4 w-4" />
+                        {t("Mark Departed")}
+                      </Button>
                     </div>
                   )}
                 </section>

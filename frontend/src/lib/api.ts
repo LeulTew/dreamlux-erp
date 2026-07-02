@@ -1296,6 +1296,15 @@ export const createEventAllocation = (
 export const deleteEventAllocation = (eventId: string, allocationId: string) =>
   api.delete(`/events/${eventId}/allocations/${allocationId}`).then((r) => r.data);
 
+export const updateEventAllocationDispatchCheck = (eventId: string, allocationId: string, dispatch_checked: boolean) =>
+  api.patch(`/events/${eventId}/allocations/${allocationId}/dispatch-check`, { dispatch_checked }).then((r) => r.data);
+
+export const markEventDispatchDeparted = (eventId: string) =>
+  api.post(`/events/${eventId}/dispatch/depart`).then((r) => r.data);
+
+export const getEventDispatchQueue = () =>
+  api.get("/events/dispatch/queue").then((r) => r.data);
+
 export const createEventChecklistItem = (
   id: string,
   data: { title: string; due_date?: string | null; owner_name?: string | null }

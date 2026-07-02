@@ -11,6 +11,7 @@ import {
   HiOutlineClipboardDocumentCheck,
   HiCog6Tooth,
   HiOutlineDocumentChartBar,
+  HiTruck,
   HiChevronDown,
   HiChevronUp,
   HiChevronLeft,
@@ -49,6 +50,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Dashboard: "Dashboard",
     Inventory: "Inventory",
     Reconcile: "Reconcile",
+    Dispatch: "Dispatch",
     "Audit Log": "Audit Log",
     Reports: "Reports",
     "Add Item": "Add Item",
@@ -87,6 +89,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Dashboard: "ዋና ገጽ",
     Inventory: "ዕቃዎች",
     Reconcile: "ቆጠራ ማመሳከሪያ",
+    Dispatch: "መላኪያ",
     "Audit Log": "የቆጠራ ታሪክ",
     Reports: "ሪፖርቶች",
     "Add Item": "ዕቃ መዝግብ",
@@ -370,6 +373,8 @@ export function AppSidebar() {
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   const { hasPermission, hasAnyPermission } = useAuth();
+  const hasAssetsRead = hasPermission("assets:read");
+  const canManageDispatch = hasAnyPermission(["event_allocations:write", "assets:write"]);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -767,7 +772,7 @@ export function AppSidebar() {
         )}
 
         {/* Inventory Management Section */}
-        {hasPermission("assets:read") && (
+        {(hasAssetsRead || canManageDispatch) && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
               {t("Inventory Management")}
@@ -775,130 +780,152 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
                 {/* Dashboard */}
-                <SidebarMenuItem className="w-full flex justify-center">
-                  <SidebarLink
-                    href="/assets/dashboard"
-                    icon={HiBuildingOffice}
-                    label={t("Dashboard")}
-                    active={isActive("/assets/dashboard")}
-                    isCollapsed={isCollapsed}
-                  />
-                </SidebarMenuItem>
+                {hasAssetsRead && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    <SidebarLink
+                      href="/assets/dashboard"
+                      icon={HiBuildingOffice}
+                      label={t("Dashboard")}
+                      active={isActive("/assets/dashboard")}
+                      isCollapsed={isCollapsed}
+                    />
+                  </SidebarMenuItem>
+                )}
 
                 {/* Items (Nested) */}
-                <SidebarMenuItem className="w-full flex justify-center">
-                  {isCollapsed ? (
-                    <CollapsedPopout
-                      icon={HiTableCells}
-                      label={t("Inventory")}
-                      isActive={isActive("/assets") || isActive("/assets/insert")}
-                      links={[
-                        { href: "/assets", label: t("List Items"), active: pathname === "/assets" },
-                        { href: "/assets/insert", label: t("Add Item"), active: pathname === "/assets/insert" },
-                      ]}
+                {hasAssetsRead && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    {isCollapsed ? (
+                      <CollapsedPopout
+                        icon={HiTableCells}
+                        label={t("Inventory")}
+                        isActive={isActive("/assets") || isActive("/assets/insert")}
+                        links={[
+                          { href: "/assets", label: t("List Items"), active: pathname === "/assets" },
+                          { href: "/assets/insert", label: t("Add Item"), active: pathname === "/assets/insert" },
+                        ]}
+                      />
+                    ) : (
+                      <div className="w-full">
+                        <SidebarMenuButton
+                          onClick={() => setItemsOpen(!itemsOpen)}
+                          className={`w-full justify-between h-10 border border-transparent transition-all ${
+                            isActive("/assets") || isActive("/assets/insert")
+                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              : "rounded-xl"
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <HiTableCells className={`w-[18px] h-[18px] shrink-0 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : ""}`} />
+                            <span>{t("Inventory")}</span>
+                          </span>
+                          <span className="shrink-0">
+                            {itemsOpen ? (
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
+                            ) : (
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
+                            )}
+                          </span>
+                        </SidebarMenuButton>
+                        {itemsOpen && (
+                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                            <SidebarMenuSubItem className="relative">
+                              <SubItemBranchLine isLast={false} />
+                              <SidebarMenuSubButton asChild isActive={pathname === "/assets"} className="rounded-xl">
+                                <Link
+                                  href="/assets"
+                                  className={
+                                    pathname === "/assets"
+                                      ? "text-primary font-bold flex items-center gap-1.5"
+                                      : "text-muted flex items-center gap-1.5"
+                                  }
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                      pathname === "/assets" ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                    }`}
+                                  />
+                                  <span>{t("List Items")}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                            <SidebarMenuSubItem className="relative">
+                              <SubItemBranchLine isLast={true} />
+                              <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"} className="rounded-xl">
+                                <Link
+                                  href="/assets/insert"
+                                  className={
+                                    pathname === "/assets/insert"
+                                      ? "text-primary font-bold flex items-center gap-1.5"
+                                      : "text-muted flex items-center gap-1.5"
+                                  }
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                      pathname === "/assets/insert" ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                    }`}
+                                  />
+                                  <span>{t("Add Item")}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          </SidebarMenuSub>
+                        )}
+                      </div>
+                    )}
+                  </SidebarMenuItem>
+                )}
+
+                {canManageDispatch && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    <SidebarLink
+                      href="/assets/dispatch"
+                      icon={HiTruck}
+                      label={t("Dispatch")}
+                      active={isActive("/assets/dispatch")}
+                      isCollapsed={isCollapsed}
                     />
-                  ) : (
-                    <div className="w-full">
-                      <SidebarMenuButton
-                        onClick={() => setItemsOpen(!itemsOpen)}
-                        className={`w-full justify-between h-10 border border-transparent transition-all ${
-                          isActive("/assets") || isActive("/assets/insert")
-                            ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
-                            : "rounded-xl"
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <HiTableCells className={`w-[18px] h-[18px] shrink-0 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : ""}`} />
-                          <span>{t("Inventory")}</span>
-                        </span>
-                        <span className="shrink-0">
-                          {itemsOpen ? (
-                            <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
-                          ) : (
-                            <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
-                          )}
-                        </span>
-                      </SidebarMenuButton>
-                      {itemsOpen && (
-                        <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
-                          <SidebarMenuSubItem className="relative">
-                            <SubItemBranchLine isLast={false} />
-                            <SidebarMenuSubButton asChild isActive={pathname === "/assets"} className="rounded-xl">
-                              <Link
-                                href="/assets"
-                                className={
-                                  pathname === "/assets"
-                                    ? "text-primary font-bold flex items-center gap-1.5"
-                                    : "text-muted flex items-center gap-1.5"
-                                }
-                              >
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                    pathname === "/assets" ? "bg-primary scale-100" : "bg-transparent scale-0"
-                                  }`}
-                                />
-                                <span>{t("List Items")}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                          <SidebarMenuSubItem className="relative">
-                            <SubItemBranchLine isLast={true} />
-                            <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"} className="rounded-xl">
-                              <Link
-                                href="/assets/insert"
-                                className={
-                                  pathname === "/assets/insert"
-                                    ? "text-primary font-bold flex items-center gap-1.5"
-                                    : "text-muted flex items-center gap-1.5"
-                                }
-                              >
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                    pathname === "/assets/insert" ? "bg-primary scale-100" : "bg-transparent scale-0"
-                                  }`}
-                                />
-                                <span>{t("Add Item")}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        </SidebarMenuSub>
-                      )}
-                    </div>
-                  )}
-                </SidebarMenuItem>
+                  </SidebarMenuItem>
+                )}
 
                 {/* Reconcile */}
-                <SidebarMenuItem className="w-full flex justify-center">
-                  <SidebarLink
-                    href="/assets/reconcile"
-                    icon={HiOutlineClipboardDocumentCheck}
-                    label={t("Reconcile")}
-                    active={isActive("/assets/reconcile")}
-                    isCollapsed={isCollapsed}
-                  />
-                </SidebarMenuItem>
+                {hasAssetsRead && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    <SidebarLink
+                      href="/assets/reconcile"
+                      icon={HiOutlineClipboardDocumentCheck}
+                      label={t("Reconcile")}
+                      active={isActive("/assets/reconcile")}
+                      isCollapsed={isCollapsed}
+                    />
+                  </SidebarMenuItem>
+                )}
 
                 {/* Audit Log */}
-                <SidebarMenuItem className="w-full flex justify-center">
-                  <SidebarLink
-                    href="/assets/history"
-                    icon={HiOutlineClipboardDocumentCheck}
-                    label={t("Audit Log")}
-                    active={isActive("/assets/history")}
-                    isCollapsed={isCollapsed}
-                  />
-                </SidebarMenuItem>
+                {hasAssetsRead && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    <SidebarLink
+                      href="/assets/history"
+                      icon={HiOutlineClipboardDocumentCheck}
+                      label={t("Audit Log")}
+                      active={isActive("/assets/history")}
+                      isCollapsed={isCollapsed}
+                    />
+                  </SidebarMenuItem>
+                )}
 
                 {/* Reports */}
-                <SidebarMenuItem className="w-full flex justify-center">
-                  <SidebarLink
-                    href="/assets/reports"
-                    icon={HiOutlineDocumentChartBar}
-                    label={t("Reports")}
-                    active={isActive("/assets/reports")}
-                    isCollapsed={isCollapsed}
-                  />
-                </SidebarMenuItem>
+                {hasAssetsRead && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    <SidebarLink
+                      href="/assets/reports"
+                      icon={HiOutlineDocumentChartBar}
+                      label={t("Reports")}
+                      active={isActive("/assets/reports")}
+                      isCollapsed={isCollapsed}
+                    />
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

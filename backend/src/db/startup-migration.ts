@@ -34,6 +34,16 @@ export async function runStartupMigrations() {
       ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS event_id_prefix TEXT NOT NULL DEFAULT 'EVT';
     `);
 
+    await client.query(`
+      ALTER TABLE event_allocations
+        ADD COLUMN IF NOT EXISTS dispatch_checked_at TIMESTAMP DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS dispatch_checked_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS departed_at TIMESTAMP DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS departed_by UUID REFERENCES users(id) ON DELETE SET NULL;
+    `).catch(() => {
+      // Ignore if event_allocations has not been created yet.
+    });
+
     console.log("[StartupMigration] Success: Schema is up to date.");
   } catch (err: any) {
     console.warn("[StartupMigration] Note: Automatic migration skip/fail:", err.message);

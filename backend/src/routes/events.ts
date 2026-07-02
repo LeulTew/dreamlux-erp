@@ -25,6 +25,7 @@ import {
   eventListQuerySchema,
   eventExportQuerySchema,
   eventImportPayloadSchema,
+  updateEventAllocationDispatchSchema,
 } from "../lib/validation";
 
 
@@ -94,6 +95,10 @@ function canImportEvents(req: AuthRequest): boolean {
 
 function canReadEvents(req: AuthRequest): boolean {
   return hasPermission(req, "events:read");
+}
+
+function canManageDispatch(req: AuthRequest): boolean {
+  return hasAnyPermission(req, ["event_allocations:write", "assets:write"]);
 }
 
 async function getHiddenEventFields(req: AuthRequest): Promise<string[]> {
@@ -1872,6 +1877,12 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
         ea.quantity_allocated,
         ea.status,
         ea.notes,
+        ea.dispatch_checked_at,
+        ea.dispatch_checked_by,
+        dispatch_user.full_name AS dispatch_checked_by_name,
+        ea.departed_at,
+        ea.departed_by,
+        departed_user.full_name AS departed_by_name,
         ea.created_by,
         ea.created_at,
         ea.updated_at,
@@ -1890,7 +1901,10 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
       FROM event_allocations ea
       JOIN items i ON ea.item_id = i.id
       LEFT JOIN stores s ON i.store_id = s.id
+      LEFT JOIN users dispatch_user ON ea.dispatch_checked_by = dispatch_user.id
+      LEFT JOIN users departed_user ON ea.departed_by = departed_user.id
       WHERE ea.event_id = $1
+      ORDER BY ea.departed_at NULLS FIRST, ea.dispatch_checked_at NULLS FIRST, i.name ASC
     `;
     const allocationsResult = await pool.query(allocationsQuery, [id]);
 
@@ -1982,6 +1996,235 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     });
   } catch (error: any) {
     console.error("[get-event-workspace] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// GET /events/dispatch/queue - Storekeeper dispatch queue grouped by event
+router.get("/dispatch/queue", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canManageDispatch(req)) {
+      res.status(403).json({ error: "Forbidden: Missing dispatch queue privileges" });
+      return;
+    }
+
+    const result = await pool.query(`
+      SELECT
+        e.id AS event_id,
+        e.name AS event_name,
+        e.client_name,
+        e.start_date,
+        e.end_date,
+        e.venue_location,
+        COUNT(ea.id)::int AS allocation_count,
+        COUNT(ea.id) FILTER (WHERE ea.dispatch_checked_at IS NOT NULL)::int AS checked_count,
+        COUNT(ea.id) FILTER (WHERE ea.departed_at IS NOT NULL)::int AS departed_count,
+        MIN(ea.departed_at) AS departed_at
+      FROM events e
+      JOIN event_allocations ea ON ea.event_id = e.id AND ea.status <> 'Returned'
+      WHERE e.deleted_at IS NULL
+        AND e.status <> 'Completed'
+      GROUP BY e.id
+      HAVING COUNT(ea.id) FILTER (WHERE ea.departed_at IS NULL) > 0
+      ORDER BY e.start_date ASC, e.name ASC
+    `);
+
+    res.json({ queue: result.rows });
+  } catch (error: any) {
+    console.error("[get-dispatch-queue] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// PATCH /events/:id/allocations/:allocationId/dispatch-check - Toggle dispatch checklist item
+router.patch("/:id/allocations/:allocationId/dispatch-check", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, allocationId } = req.params;
+    if (!canManageDispatch(req)) {
+      res.status(403).json({ error: "Forbidden: Missing dispatch checklist privileges" });
+      return;
+    }
+
+    const validationResult = updateEventAllocationDispatchSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
+      if (eventResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+
+      const event = eventResult.rows[0];
+      if (event.status === "Completed" && !canOverrideCompleted(req)) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Completed event dispatch cannot be changed except by administrators or accountants" });
+        return;
+      }
+
+      const result = await client.query(
+        `
+          UPDATE event_allocations
+          SET
+            dispatch_checked_at = CASE WHEN $3::boolean THEN COALESCE(dispatch_checked_at, NOW()) ELSE NULL END,
+            dispatch_checked_by = CASE WHEN $3::boolean THEN COALESCE(dispatch_checked_by, $4) ELSE NULL END,
+            updated_at = NOW()
+          WHERE id = $1
+            AND event_id = $2
+            AND status <> 'Returned'
+            AND departed_at IS NULL
+          RETURNING *
+        `,
+        [allocationId, id, validationResult.data.dispatch_checked, req.user?.id || null],
+      );
+
+      if (result.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Active, undeparted allocation not found" });
+        return;
+      }
+
+      await insertEventAuditLog(
+        client,
+        id,
+        req.user?.id || null,
+        "dispatch_checklist",
+        allocationId,
+        validationResult.data.dispatch_checked ? "checked" : "unchecked",
+      );
+
+      await client.query("COMMIT");
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error("[patch-allocation-dispatch-check] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// POST /events/:id/dispatch/depart - Mark all checked allocations as departed
+router.post("/:id/dispatch/depart", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!canManageDispatch(req)) {
+      res.status(403).json({ error: "Forbidden: Missing dispatch departure privileges" });
+      return;
+    }
+
+    const client = await pool.connect();
+    let eventName = "";
+    let departedCount = 0;
+    let departedAt: string | null = null;
+    try {
+      await client.query("BEGIN");
+
+      const eventResult = await client.query("SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id]);
+      if (eventResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+
+      const event = eventResult.rows[0];
+      eventName = event.name;
+      if (event.status === "Completed" && !canOverrideCompleted(req)) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "Completed event dispatch cannot be changed except by administrators or accountants" });
+        return;
+      }
+
+      const lockedAllocations = await client.query(
+        `
+          SELECT id, dispatch_checked_at, departed_at
+          FROM event_allocations
+          WHERE event_id = $1 AND status <> 'Returned'
+          FOR UPDATE
+        `,
+        [id],
+      );
+
+      const activeCount = lockedAllocations.rowCount || 0;
+      const checkedCount = lockedAllocations.rows.filter((row) => row.dispatch_checked_at).length;
+      const existingDepartedCount = lockedAllocations.rows.filter((row) => row.departed_at).length;
+
+      if (activeCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "No active allocations to dispatch" });
+        return;
+      }
+
+      if (existingDepartedCount === activeCount) {
+        await client.query("COMMIT");
+        res.json({ success: true, departed_count: 0, already_departed: true });
+        return;
+      }
+
+      if (checkedCount < activeCount) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "All active allocations must be checked before departure" });
+        return;
+      }
+
+      const updateResult = await client.query(
+        `
+          UPDATE event_allocations
+          SET departed_at = NOW(), departed_by = $2, status = 'Pulled', updated_at = NOW()
+          WHERE event_id = $1
+            AND status <> 'Returned'
+            AND dispatch_checked_at IS NOT NULL
+            AND departed_at IS NULL
+          RETURNING id, departed_at
+        `,
+        [id, req.user?.id || null],
+      );
+      departedCount = updateResult.rowCount || 0;
+      departedAt = updateResult.rows[0]?.departed_at ? new Date(updateResult.rows[0].departed_at).toISOString() : null;
+
+      await insertEventAuditLog(
+        client,
+        id,
+        req.user?.id || null,
+        "dispatch_departure",
+        null,
+        JSON.stringify({ departed_count: departedCount, departed_at: departedAt }),
+      );
+
+      await client.query("COMMIT");
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    if (departedCount > 0) {
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "event_checklist:write",
+        actor_id: req.user?.id,
+        include_actor: false,
+        title: "Inventory Departed",
+        message: `Storekeeper dispatched ${departedCount} allocation${departedCount === 1 ? "" : "s"} for event "${eventName}" at ${departedAt || "server time"}.`,
+        entity_type: "event",
+        entity_id: id,
+        action_url: `/events/${id}`,
+        priority: "high",
+      });
+    }
+
+    res.json({ success: true, departed_count: departedCount, already_departed: departedCount === 0 });
+  } catch (error: any) {
+    console.error("[post-dispatch-departure] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
