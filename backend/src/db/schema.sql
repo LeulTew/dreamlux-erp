@@ -76,7 +76,10 @@ INSERT INTO permissions (slug, description) VALUES
   ('expenses:write', 'Create manual event expenses'),
   ('expenses:labor_generate', 'Generate labor expenses from attended event assignments'),
   ('expenses:approve', 'Approve expenses'),
-  ('approvals:history:read', 'View approval history')
+  ('approvals:history:read', 'View approval history'),
+  ('finance:hisab:read', 'View weekly/monthly Hisab rollups and operational expense ledger'),
+  ('finance:opex:write', 'Create and update non-event operational expenses'),
+  ('finance:opex:approve', 'Approve or reject non-event operational expenses')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Role-to-permission mappings
@@ -139,7 +142,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read', 'finance:hisab:read', 'finance:opex:write', 'finance:opex:approve')
 WHERE LOWER(r.name) IN ('accountant')
 ON CONFLICT DO NOTHING;
 
@@ -756,3 +759,27 @@ CREATE INDEX IF NOT EXISTS idx_event_checklist_event ON event_checklist(event_id
 
 
 
+
+-- 22. Finance Operational Expenses (non-event weekly/monthly Hisab ledger)
+CREATE TABLE IF NOT EXISTS finance_operational_expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  expense_date DATE NOT NULL,
+  category TEXT NOT NULL,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
+  description TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('Pending', 'Approved', 'Rejected')) DEFAULT 'Pending',
+  rejected_reason TEXT DEFAULT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  approved_at TIMESTAMP DEFAULT NULL,
+  deleted_at TIMESTAMP DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_finance_opex_date
+  ON finance_operational_expenses(expense_date)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_finance_opex_status_date
+  ON finance_operational_expenses(status, expense_date)
+  WHERE deleted_at IS NULL;
