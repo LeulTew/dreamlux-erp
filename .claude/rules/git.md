@@ -37,6 +37,7 @@ PR descriptions must include:
 ---
 
 ## 5. Senior Review & Merge Discipline
+- **Senior Audit Mandate**: Before finalizing your changes or creating a Pull Request, you MUST review the code against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) to verify requirement coverage, data integrity, performance, and security constraints.
 - **DO NOT MERGE**: Never merge a PR or proceed to subsequent deployment stages unless you receive explicit user authorization. Leave PRs open as drafts or marked "Ready for Review".
 - **Senior Diff Audit**: Before declaring a task finished, inspect the actual git diff. Review it for:
   - Scope hygiene (ensure no unrelated files are modified).
@@ -44,3 +45,4 @@ PR descriptions must include:
   - Security constraints (BOLA/BFLA).
   - Correctness of unit/E2E test coverage.
 - **Destructive Command Ban**: Never run destructive git commands like `git reset --hard` or `git checkout --` on modified files unless the user explicitly commands it after being warned.
+
