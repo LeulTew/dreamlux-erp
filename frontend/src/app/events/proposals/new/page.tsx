@@ -298,9 +298,8 @@ function NewProposalContent() {
 
     const designCost = sumLineAmount(designLines);
     const teamCost = teamLines.reduce((sum, l) => {
-      const explicit = Number(l.amount || 0);
-      const derived = Number(l.people_count || 1) * Number(l.commission_per_person || 0);
-      return sum + Math.max(explicit, derived);
+      const derived = Number(l.people_count || 0) * Number(l.commission_per_person || 0);
+      return sum + derived;
     }, 0);
     const tripCost = sumLineAmount(tripLines);
     const otherCost = sumLineAmount(otherLines);
@@ -418,13 +417,24 @@ function NewProposalContent() {
   const addLine = (category: "design" | "team" | "trip" | "other") => {
     const newLine = { label: "", amount: 0, notes: "" };
     if (category === "design") setDesignLines([...designLines, newLine]);
-    if (category === "team") setTeamLines([...teamLines, { ...newLine, people_count: 1, commission_per_person: 0 }]);
+    if (category === "team") setTeamLines([...teamLines, { ...newLine, people_count: 1, commission_per_person: 0, amount: 0 }]);
     if (category === "trip") setTripLines([...tripLines, { ...newLine, km: 0, fuel_price: 80 }]);
     if (category === "other") setOtherLines([...otherLines, newLine]);
   };
 
   const updateLine = (category: "design" | "team" | "trip" | "other", idx: number, key: string, val: string | number) => {
-    const mapLine = (lines: EstimateLine[]) => lines.map((line, i) => i === idx ? { ...line, [key]: val } : line);
+    const mapLine = (lines: EstimateLine[]) => lines.map((line, i) => {
+      if (i === idx) {
+        const updated = { ...line, [key]: val };
+        if (category === "team") {
+          const pc = Number(updated.people_count || 0);
+          const cpp = Number(updated.commission_per_person || 0);
+          updated.amount = pc * cpp;
+        }
+        return updated;
+      }
+      return line;
+    });
     if (category === "design") setDesignLines(mapLine(designLines));
     if (category === "team") setTeamLines(mapLine(teamLines));
     if (category === "trip") setTripLines(mapLine(tripLines));
@@ -790,9 +800,10 @@ function NewProposalContent() {
                         <input
                           type="number"
                           placeholder={t("Amount")}
-                          value={line.amount || ""}
-                          onChange={(e) => updateLine("team", idx, "amount", Number(e.target.value))}
-                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                          value={line.amount || 0}
+                          readOnly
+                          title="Calculated: People Count × Commission per Person"
+                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card-alt border border-border/40 text-muted cursor-not-allowed font-mono"
                         />
                         <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
                           <HiTrash className="w-4 h-4" />

@@ -447,9 +447,7 @@ export default function ProposalDetailPage() {
                 <div className="space-y-2">
                   <h4 className="text-[10px] text-muted uppercase tracking-wider font-bold">{t("Team Cost")}</h4>
                   {proposal.cost_breakdown.team.map((line, idx) => {
-                    const explicit = Number(line.amount || 0);
-                    const derived = Number(line.people_count || 1) * Number(line.commission_per_person || 0);
-                    const applied = Math.max(explicit, derived);
+                    const derived = Number(line.people_count || 0) * Number(line.commission_per_person || 0);
                     return (
                       <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-semibold bg-card-alt p-2 rounded border border-border/30 gap-1">
                         <div>
@@ -458,7 +456,7 @@ export default function ProposalDetailPage() {
                             {line.people_count} people × ETB {line.commission_per_person} commission
                           </span>
                         </div>
-                        <span className="font-mono">ETB {applied.toLocaleString()}</span>
+                        <span className="font-mono">ETB {derived.toLocaleString()}</span>
                       </div>
                     );
                   })}
