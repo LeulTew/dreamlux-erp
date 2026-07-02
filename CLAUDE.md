@@ -31,11 +31,13 @@ DreamLux ERP is an integrated enterprise resource planning system managing event
 
 ## 3. Rules Register (Gateway Index)
 
-Whenever performing specific tasks, you must load and prioritize the relevant rule file in `.claude/rules/`:
-
-*   **General Development & Tasks**: Start by reading `.claude/rules/workflow.md` to align on task pipelines, issue assignment, and branching.
-*   **Git Commits & Pull Requests**: Before staging, committing, pushing, or requesting review/merges, read `.claude/rules/git.md`.
-*   **Frontend / UI Development**: When modifying styling, layouts, components, or typography, read `.claude/rules/ui-design.md`.
-*   **System Architecture & Refactoring**: When designing components, services, or abstractions, read `.claude/rules/architecture.md`.
-*   **Postgres & Database Changes**: When writing database operations, schema updates, or applying migrations, read `.claude/rules/database.md`.
-*   **Tooling & Commands**: For dependency management and scripting, read `.claude/rules/tech-stack.md`.
+> [!IMPORTANT]
+> **READING AND FOLLOWING THESE MODULAR RULES IS MANDATORY & NOT OPTIONAL.**
+> Before starting any coding task, staging commits, designing UI, or updating the database, you MUST load and adhere to the relevant rule files in `.claude/rules/`:
+>
+> - **General Development & Tasks**: Start by reading [.claude/rules/workflow.md](file:///.claude/rules/workflow.md) to align on task pipelines, issue assignment, and branching.
+> - **Git Commits & Pull Requests**: Before staging, committing, pushing, or requesting review/merges, read [.claude/rules/git.md](file:///.claude/rules/git.md).
+> - **Frontend / UI Development**: When modifying styling, layouts, components, or typography, read [.claude/rules/ui-design.md](file:///.claude/rules/ui-design.md).
+> - **System Architecture & Refactoring**: When designing components, services, or abstractions, read [.claude/rules/architecture.md](file:///.claude/rules/architecture.md).
+> - **Postgres & Database Changes**: When writing database operations, schema updates, or applying migrations, read [.claude/rules/database.md](file:///.claude/rules/database.md).
+> - **Tooling & Commands**: For dependency management and scripting, read [.claude/rules/tech-stack.md](file:///.claude/rules/tech-stack.md).
