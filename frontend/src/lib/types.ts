@@ -707,3 +707,70 @@ export interface HisabReportResponse {
     net: number;
   };
 }
+
+// ====================================================
+// FINANCE — Monthly Overhead & Shared Operating Register (#110)
+// ====================================================
+
+export interface FinanceOverhead {
+  id: string;
+  expense_month: string;
+  due_date: string | null;
+  category: string;
+  payee: string | null;
+  scope: "Office" | "Store" | "Shared" | "General";
+  shared_with: string | null;
+  payment_kind: "overhead" | "staff_payment";
+  employee_id: string | null;
+  employee_name?: string | null;
+  is_recurring: boolean;
+  amount: number;
+  notes: string | null;
+  status: "Pending" | "Approved" | "Rejected";
+  rejected_reason: string | null;
+  created_by: string | null;
+  created_by_username?: string | null;
+  approved_by: string | null;
+  approved_by_username?: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface FinanceOverheadSummary {
+  month: string;
+  closed: boolean;
+  closure: {
+    closed_at: string;
+    closed_by_username: string | null;
+  } | null;
+  blocks: {
+    officeStaff: number;
+    storeStaff: number;
+    shared: number;
+    rentalAndOther: number;
+    grandOfficeStore: number;
+    grandSharedRental: number;
+  };
+  totals: {
+    subtotalMonthly: number;
+    staffPayments: number;
+    nonPayrollOverhead: number;
+    pendingExposure: number;
+    pendingCount: number;
+  };
+  byCategory: Array<{
+    category: string;
+    amount: number;
+  }>;
+}
+
+export interface FinanceOverheadListResponse {
+  overheads: FinanceOverhead[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+

@@ -18,6 +18,9 @@ import {
   PayrollRun,
   FinanceOpexListResponse,
   HisabReportResponse,
+  FinanceOverhead,
+  FinanceOverheadSummary,
+  FinanceOverheadListResponse,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1604,3 +1607,54 @@ export const approveFinanceOperationalExpense = (id: string) =>
 
 export const rejectFinanceOperationalExpense = (id: string, rejected_reason: string) =>
   api.post(`/finance/operational-expenses/${id}/reject`, { rejected_reason }).then((r) => r.data);
+
+// ====================================================
+// FINANCE — Monthly Overhead & Shared Operating Register (#110)
+// ====================================================
+
+export const OVERHEAD_CATEGORIES = [
+  "Salary",
+  "Fuel",
+  "Car Rental",
+  "Office Rent",
+  "Store Rent",
+  "Wifi",
+  "Water & Electric",
+  "Marketing/Boost",
+  "Sticker",
+  "Seasonal/Ekub",
+  "Food",
+  "House Expense",
+  "Supplies",
+  "Other",
+] as const;
+
+export const getFinanceOverheads = (
+  params: Record<string, unknown> = {}
+): Promise<FinanceOverheadListResponse> =>
+  api.get("/finance/overheads", { params }).then((r) => r.data);
+
+export const getFinanceOverheadSummary = (month: string): Promise<FinanceOverheadSummary> =>
+  api.get("/finance/overheads/summary", { params: { month } }).then((r) => r.data);
+
+export const createFinanceOverhead = (data: Partial<FinanceOverhead>) =>
+  api.post<{ overhead: FinanceOverhead }>("/finance/overheads", data).then((r) => r.data);
+
+export const updateFinanceOverhead = (id: string, data: Partial<FinanceOverhead>) =>
+  api.patch<{ overhead: FinanceOverhead }>(`/finance/overheads/${id}`, data).then((r) => r.data);
+
+export const deleteFinanceOverhead = (id: string) =>
+  api.delete<{ deleted: boolean }>(`/finance/overheads/${id}`).then((r) => r.data);
+
+export const approveFinanceOverhead = (id: string) =>
+  api.post<{ overhead: FinanceOverhead }>(`/finance/overheads/${id}/approve`).then((r) => r.data);
+
+export const rejectFinanceOverhead = (id: string, rejected_reason: string) =>
+  api.post<{ overhead: FinanceOverhead }>(`/finance/overheads/${id}/reject`, { rejected_reason }).then((r) => r.data);
+
+export const closeOverheadMonth = (month: string) =>
+  api.post<{ month: string; closed: boolean }>(`/finance/overheads/months/${month}/close`).then((r) => r.data);
+
+export const reopenOverheadMonth = (month: string) =>
+  api.post<{ month: string; closed: boolean }>(`/finance/overheads/months/${month}/reopen`).then((r) => r.data);
+
