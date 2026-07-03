@@ -65,6 +65,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Profit Reports": "Profit Reports",
     "Hisab Reports": "Hisab Reports",
     "Overhead Register": "Overhead Register",
+    "Capital Register": "Capital Register",
     "Event Proposals": "Event Proposals",
     Synced: "Synced",
     Offline: "Offline",
@@ -106,6 +107,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Profit Reports": "የትርፍ ሪፖርቶች",
     "Hisab Reports": "የሂሳብ ሪፖርቶች",
     "Overhead Register": "የወጪ መዝገብ",
+    "Capital Register": "የካፒታል መዝገብ",
     "Event Proposals": "የዝግጅት ፕሮፖዛሎች",
     Synced: "ተመሳስሏል",
     Offline: "ከመስመር ውጭ",
@@ -399,7 +401,8 @@ export function AppSidebar() {
     "salary-levels:manage",
     "departments:manage",
     "finance:hisab:read",
-    "finance:overheads:read"
+    "finance:overheads:read",
+    "finance:investments:read"
   ]);
 
   const eventLinks = [
@@ -414,6 +417,7 @@ export function AppSidebar() {
     { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasPermission("reports:profit:read") },
     { href: "/hr/finance/hisab", label: t("Hisab Reports"), active: pathname === "/hr/finance/hisab", show: hasPermission("finance:hisab:read") },
     { href: "/hr/finance/overheads", label: t("Overhead Register"), active: pathname === "/hr/finance/overheads", show: hasPermission("finance:overheads:read") },
+    { href: "/hr/finance/investments", label: t("Capital Register"), active: pathname === "/hr/finance/investments", show: hasPermission("finance:investments:read") },
     { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
   ].filter(l => l.show);
 
