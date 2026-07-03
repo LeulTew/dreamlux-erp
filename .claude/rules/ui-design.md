@@ -23,6 +23,7 @@ Before modifying or creating any component, page, stylesheet, or asset, you MUST
   - Avoid bare `rounded`, un-tokened CSS `border-radius`, and one-off radius values. Use `rounded-full` only for true circles, avatars, progress dots, and loading spinners.
 - **Shadows**: Keep shadows minimal or completely flat. Rely on clean, high-contrast borders (`1px border-border` or `border-gold/20`) to separate components instead of large, blurred shadows.
 
+
 ---
 
 ## 4. Contrast & Legibility
