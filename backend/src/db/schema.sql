@@ -765,7 +765,7 @@ CREATE TABLE IF NOT EXISTS finance_operational_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   expense_date DATE NOT NULL,
   category TEXT NOT NULL,
-  amount NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
   description TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('Pending', 'Approved', 'Rejected')) DEFAULT 'Pending',
   rejected_reason TEXT DEFAULT NULL,

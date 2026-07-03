@@ -361,7 +361,7 @@ export default function HisabReportPage() {
 
   const handleSubmitForm = () => {
     const amount = Number(form.amount);
-    if (!form.expense_date || !form.category || !form.description.trim() || !Number.isFinite(amount) || amount < 0) {
+    if (!form.expense_date || !form.category || !form.description.trim() || !Number.isFinite(amount) || amount <= 0) {
       toast.error(t("Workspace unavailable"));
       return;
     }
@@ -890,7 +890,7 @@ export default function HisabReportPage() {
               <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-1.5">{t("Amount")} (ETB)</label>
               <input
                 type="number"
-                min="0"
+                min="0.01"
                 step="0.01"
                 value={form.amount}
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}

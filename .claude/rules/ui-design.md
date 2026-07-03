@@ -19,10 +19,10 @@ Before modifying or creating any component, page, stylesheet, or asset, you MUST
 ---
 
 ## 3. Geometric Elements & Borders
-- **Border Radius**: Keep border radius minimal matching our global custom theme variables:
-  - Use `rounded-sm` (which maps to **`8px`** in `globals.css`) as the default maximum for structural icons and small buttons.
-  - Use `rounded-md` (which maps to **`10px`** in `globals.css`) as the absolute ceiling for cards or main content blocks.
-  - Avoid overly pill-shaped or round shapes for structural containers unless explicitly requested.
+- **Border Radius**: Use only the token-backed global radius utilities defined in `frontend/src/app/globals.css`; do not use arbitrary radius classes like `rounded-[...]` for new or touched UI.
+  - Dense form controls and compact inline buttons may use `rounded-lg` or `rounded-xl` when the surrounding UI uses the same curved system.
+  - Cards, drawers, panels, tables, and primary content blocks should use the site's curved global scale such as `rounded-2xl`, `rounded-3xl`, or `rounded-4xl` consistently with nearby surfaces.
+  - Avoid bare `rounded`, un-tokened CSS `border-radius`, and one-off radius values. Use `rounded-full` only for true circles, avatars, progress dots, and loading spinners.
 - **Shadows**: Keep shadows minimal or completely flat. Rely on clean, high-contrast borders (`1px border-border` or `border-gold/20`) to separate components instead of large, blurred shadows.
 
 ---

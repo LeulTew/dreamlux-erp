@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.finance_operational_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   expense_date DATE NOT NULL,
   category TEXT NOT NULL,
-  amount NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
   description TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('Pending', 'Approved', 'Rejected')) DEFAULT 'Pending',
   rejected_reason TEXT DEFAULT NULL,
@@ -25,6 +25,33 @@ CREATE INDEX IF NOT EXISTS idx_finance_opex_date
 CREATE INDEX IF NOT EXISTS idx_finance_opex_status_date
   ON public.finance_operational_expenses(status, expense_date)
   WHERE deleted_at IS NULL;
+
+DO $$
+DECLARE
+  existing_check text;
+BEGIN
+  SELECT conname INTO existing_check
+  FROM pg_constraint
+  WHERE conrelid = 'public.finance_operational_expenses'::regclass
+    AND contype = 'c'
+    AND pg_get_constraintdef(oid) ILIKE '%amount >= 0%'
+  LIMIT 1;
+
+  IF existing_check IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.finance_operational_expenses DROP CONSTRAINT %I', existing_check);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.finance_operational_expenses'::regclass
+      AND conname = 'finance_operational_expenses_amount_positive_check'
+  ) THEN
+    ALTER TABLE public.finance_operational_expenses
+      ADD CONSTRAINT finance_operational_expenses_amount_positive_check
+      CHECK (amount > 0) NOT VALID;
+  END IF;
+END $$;
 
 -- Backend-owned table: block direct Supabase Data API access (project standard).
 ALTER TABLE public.finance_operational_expenses ENABLE ROW LEVEL SECURITY;

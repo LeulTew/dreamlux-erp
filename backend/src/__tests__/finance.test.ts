@@ -148,6 +148,12 @@ describe("Operational expense ledger", () => {
       .send({ expense_date: "2026-05-04", category: "Other", amount: -5, description: "x" });
     expect(negative.status).toBe(400);
 
+    const zero = await request(app)
+      .post("/finance/operational-expenses")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({ expense_date: "2026-05-04", category: "Other", amount: 0, description: "x" });
+    expect(zero.status).toBe(400);
+
     const badCategory = await request(app)
       .post("/finance/operational-expenses")
       .set("Authorization", `Bearer ${getToken()}`)

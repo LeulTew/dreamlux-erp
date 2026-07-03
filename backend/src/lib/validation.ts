@@ -589,14 +589,14 @@ const financeOpexCategorySchema = z.enum(FINANCE_OPEX_CATEGORIES);
 export const createFinanceOpexSchema = z.object({
   expense_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid expense date"),
   category: financeOpexCategorySchema,
-  amount: z.coerce.number().min(0, "Amount cannot be negative").max(100_000_000, "Amount too large"),
+  amount: z.coerce.number().min(0.01, "Amount must be greater than zero").max(100_000_000, "Amount too large"),
   description: z.string().trim().min(1, "Description is required").max(1000, "Description too long"),
 });
 
 export const updateFinanceOpexSchema = z.object({
   expense_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid expense date").optional(),
   category: financeOpexCategorySchema.optional(),
-  amount: z.coerce.number().min(0, "Amount cannot be negative").max(100_000_000, "Amount too large").optional(),
+  amount: z.coerce.number().min(0.01, "Amount must be greater than zero").max(100_000_000, "Amount too large").optional(),
   description: z.string().trim().min(1, "Description is required").max(1000, "Description too long").optional(),
 }).refine((data) => Object.keys(data).length > 0, { message: "At least one field is required" });
 
