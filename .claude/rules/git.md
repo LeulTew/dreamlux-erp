@@ -24,7 +24,7 @@ All commits must be prefix-based to maintain clean changelogs. Use the format `<
 
 ## 3. GitHub & CLI Tooling
 - **GitHub CLI (`gh`)**: Always use `gh` for managing issues, labels, assignments, PRs, comments, and status checks.
-- **Checklist Maintenance**: Ensure you fetch and tick all markdown checkboxes in the GitHub issue description before closing it. This prevents automated CD webhooks from automatically reopening the issue.
+- **Checklist Maintenance**: Before closing an issue or declaring it complete, you MUST fetch the GitHub issue description, systematically go through the task checklist items one by one to verify and test them, and tick them off (`[x]`) in the GitHub issue description. This ensures no features or requirements are missed and prevents automation pipelines from failing or reopening issues.
 
 ---
 
@@ -37,7 +37,7 @@ PR descriptions must include:
 ---
 
 ## 5. Senior Review & Merge Discipline
-- **Senior Audit Mandate**: Before finalizing your changes or creating a Pull Request, you MUST review the code against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) and [STAFF_PR_REVIEW_PROMPT.md](file:///docs/STAFF_PR_REVIEW_PROMPT.md) to verify requirement coverage, data integrity, performance, and security constraints.
+- **Senior Audit Mandate**: Before finalizing your changes or creating a Pull Request, you MUST review the code against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) to verify requirement coverage, data integrity, performance, and security constraints.
 - **DO NOT MERGE**: Never merge a PR or proceed to subsequent deployment stages unless you receive explicit user authorization. Leave PRs open as drafts or marked "Ready for Review".
 - **Senior Diff Audit**: Before declaring a task finished, inspect the actual git diff. Review it for:
   - Scope hygiene (ensure no unrelated files are modified).
