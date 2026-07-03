@@ -7,6 +7,7 @@ import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from ".
 import { NotificationsService } from "../services/notifications-service";
 import { hasPermissionSlug } from "../lib/permissions";
 import { fetchHiddenFieldsForRoles } from "../lib/permissions-db";
+import { calculateFuelCostLitersPerKm, FUEL_CONSUMPTION_UNIT, validateFuelConsumptionRateLitersPerKm } from "../lib/fuel";
 import { createEventProposalsRouter } from "./events/proposals";
 import { createEventProfitReportsRouter } from "./events/profit-reports";
 import { createEventSavedViewsRouter } from "./events/saved-views";
@@ -3189,8 +3190,18 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
         return;
       }
 
-      const fuelLitersUsed = Number((Number(distance_km) * Number(assignment.fuel_consumption_rate)).toFixed(2));
-      const fuelCostEtb = Number((fuelLitersUsed * Number(fuel_price_etb)).toFixed(2));
+      const fuelConsumptionRate = validateFuelConsumptionRateLitersPerKm(assignment.fuel_consumption_rate);
+      if (fuelConsumptionRate === null) {
+        await client.query("ROLLBACK");
+        res.status(400).json({ error: "Vehicle fuel consumption rate must be a positive liters-per-kilometer value" });
+        return;
+      }
+
+      const { fuelLitersUsed, fuelCostEtb } = calculateFuelCostLitersPerKm({
+        distanceKm: Number(distance_km),
+        fuelConsumptionRateLitersPerKm: fuelConsumptionRate,
+        fuelPriceEtbPerLiter: Number(fuel_price_etb),
+      });
 
       const tripResult = await client.query(
         `
@@ -3201,7 +3212,7 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
         [vehicle_assignment_id, destination, distance_km, fuelLitersUsed, fuelCostEtb]
       );
 
-      const description = `Fuel for ${destination} (${distance_km} km, ${assignment.fuel_consumption_rate} L/km, ${fuel_price_etb} ETB/L)`;
+      const description = `Fuel for ${destination} (${distance_km} km, ${fuelConsumptionRate} ${FUEL_CONSUMPTION_UNIT}, ${fuel_price_etb} ETB/L)`;
       const expenseResult = await client.query(
         `
           INSERT INTO expenses (event_id, category, amount, description, status, created_by)
@@ -3217,6 +3228,7 @@ router.post("/:id/trips", requireAuth, async (req: AuthRequest, res: Response) =
         expense: expenseResult.rows[0],
         fuel_liters_used: fuelLitersUsed,
         fuel_cost_etb: fuelCostEtb,
+        fuel_consumption_unit: FUEL_CONSUMPTION_UNIT,
       });
     } catch (error: any) {
       await client.query("ROLLBACK");

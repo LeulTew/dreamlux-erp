@@ -1890,15 +1890,15 @@ describe("Events API", () => {
   test("POST /events/:id/trips calculates fuel cost and creates pending fuel expense", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "va-1", fuel_consumption_rate: "0.10", plate_number: "AA-3-A12345" }],
+      rows: [{ id: "va-1", fuel_consumption_rate: "0.22", plate_number: "AA-3-B98765", event_status: "Ongoing" }],
       rowCount: 1,
     });
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "trip-1", fuel_liters_used: 5, fuel_cost_etb: 500 }],
+      rows: [{ id: "trip-1", fuel_liters_used: 2.64, fuel_cost_etb: 446.16 }],
       rowCount: 1,
     });
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "expense-fuel-1", category: "Fuel", amount: 500, status: "Pending" }],
+      rows: [{ id: "expense-fuel-1", category: "Fuel", amount: 446.16, status: "Pending" }],
       rowCount: 1,
     });
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
@@ -1909,14 +1909,47 @@ describe("Events API", () => {
       .send({
         vehicle_assignment_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
         destination: "Friendship Hotel",
-        distance_km: 50,
-        fuel_price_etb: 100,
+        distance_km: 12,
+        fuel_price_etb: 169,
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.fuel_liters_used).toBe(5);
-    expect(res.body.fuel_cost_etb).toBe(500);
+    expect(res.body.fuel_liters_used).toBe(2.64);
+    expect(res.body.fuel_cost_etb).toBe(446.16);
+    expect(res.body.fuel_consumption_unit).toBe("L/km");
     expect(res.body.expense.status).toBe("Pending");
+    expect(mockQuery.mock.calls[2][1]).toEqual([
+      "7891594c-ecc0-4f66-a51f-a29d530587a2",
+      "Friendship Hotel",
+      12,
+      2.64,
+      446.16,
+    ]);
+    expect(mockQuery.mock.calls[3][1][2]).toContain("12 km, 0.22 L/km, 169 ETB/L");
+  });
+
+  test("POST /events/:id/trips rejects invalid vehicle fuel rates before creating trip or expense", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "va-1", fuel_consumption_rate: "0", plate_number: "AA-3-B98765", event_status: "Ongoing" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+    const res = await request(app)
+      .post("/events/event-1/trips")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({
+        vehicle_assignment_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        destination: "Friendship Hotel",
+        distance_km: 12,
+        fuel_price_etb: 169,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("liters-per-kilometer");
+    expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO trips"))).toBe(false);
+    expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO expenses"))).toBe(false);
   });
 
   test("GET /events/expenses/pending returns accountant approval queue (paginated)", async () => {
