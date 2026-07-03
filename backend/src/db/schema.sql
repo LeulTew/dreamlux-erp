@@ -630,7 +630,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   plate_number TEXT UNIQUE NOT NULL,
   vehicle_type TEXT NOT NULL,
   fuel_type TEXT NOT NULL,
-  fuel_consumption_rate NUMERIC(6, 2) NOT NULL, -- liters per km
+  fuel_consumption_rate NUMERIC(6, 2) NOT NULL CONSTRAINT vehicles_fuel_consumption_rate_l_per_km_check CHECK (fuel_consumption_rate > 0 AND fuel_consumption_rate <= 5), -- liters per kilometer (L/km)
   driver_license_details TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW(),

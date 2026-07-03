@@ -55,6 +55,7 @@ import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Empl
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { calculateFuelCostPreviewLitersPerKm, FUEL_CONSUMPTION_UNIT, FUEL_CONSUMPTION_UNIT_LABEL, validateFuelConsumptionRateLitersPerKm } from "@/lib/fuel";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -154,6 +155,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Fuel cost preview": "Fuel cost preview",
     "No expenses yet. Log event costs as they happen.": "No expenses yet. Log event costs as they happen.",
     "No trips yet. Drivers can log distance after vehicle assignment.": "No trips yet. Drivers can log distance after vehicle assignment.",
+    "Vehicle consumption": "Vehicle consumption",
+    "Vehicle fuel consumption rate is invalid. Ask an administrator to correct the vehicle record.": "Vehicle fuel consumption rate is invalid. Ask an administrator to correct the vehicle record.",
     Pending: "Pending",
     Approved: "Approved",
     Rejected: "Rejected",
@@ -280,6 +283,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Fuel cost preview": "የነዳጅ ወጪ ቅድመ እይታ",
     "No expenses yet. Log event costs as they happen.": "እስካሁን ወጪ የለም። የዝግጅት ወጪዎችን ሲፈጠሩ ይመዝግቡ።",
     "No trips yet. Drivers can log distance after vehicle assignment.": "እስካሁን ጉዞ የለም። ሾፌሮች ተሽከርካሪ ከተመደበ በኋላ ርቀት መመዝገብ ይችላሉ።",
+    "Vehicle consumption": "የተሽከርካሪ ነዳጅ ፍጆታ",
+    "Vehicle fuel consumption rate is invalid. Ask an administrator to correct the vehicle record.": "የተሽከርካሪው የነዳጅ ፍጆታ መጠን ትክክል አይደለም። የተሽከርካሪ መዝገቡን እንዲያስተካክል አስተዳዳሪን ያነጋግሩ።",
     Pending: "በመጠባበቅ ላይ",
     Approved: "ጸድቋል",
     Rejected: "ውድቅ ተደርጓል",
@@ -774,10 +779,15 @@ export default function EventWorkspacePage() {
   });
 
   const selectedTripVehicle = vehicleAssignments.find((vehicleAssignment) => vehicleAssignment.id === tripVehicleAssignmentId);
-  const fuelCostPreview =
-    selectedTripVehicle && Number(tripDistance) > 0 && Number(fuelPrice) > 0
-      ? Number((Number(tripDistance) * Number(selectedTripVehicle.fuel_consumption_rate || 0) * Number(fuelPrice)).toFixed(2))
-      : 0;
+  const selectedFuelConsumptionRate = selectedTripVehicle
+    ? validateFuelConsumptionRateLitersPerKm(selectedTripVehicle.fuel_consumption_rate)
+    : null;
+  const hasInvalidSelectedFuelRate = Boolean(selectedTripVehicle) && selectedFuelConsumptionRate === null;
+  const fuelCostPreview = calculateFuelCostPreviewLitersPerKm({
+    distanceKm: Number(tripDistance || 0),
+    fuelConsumptionRateLitersPerKm: selectedFuelConsumptionRate,
+    fuelPriceEtbPerLiter: Number(fuelPrice || 0),
+  });
 
   const availableEmployeesQuery = useQuery({
     queryKey: ["available-employees", eventId],
@@ -1575,15 +1585,31 @@ export default function EventWorkspacePage() {
                       <Input value={tripDestination} onChange={(eventChange) => setTripDestination(eventChange.target.value)} placeholder={t("Destination")} />
                       <Input type="number" min="0" value={tripDistance} onChange={(eventChange) => setTripDistance(eventChange.target.value)} placeholder={t("Distance (km)")} />
                       <Input type="number" min="0" value={fuelPrice} onChange={(eventChange) => setFuelPrice(eventChange.target.value)} placeholder={t("Fuel Price")} />
-                      <div className="rounded-lg border border-border bg-card-alt/50 p-3 text-xs font-semibold text-muted">
-                        {t("Fuel cost preview")}: <span className="text-foreground tabular-nums">{formatCurrency(fuelCostPreview)}</span>
+                      <div className="rounded-md border border-border bg-card-alt/50 p-3 text-xs font-semibold text-muted">
+                        <div>
+                          {t("Fuel cost preview")}: <span className="text-foreground tabular-nums">{formatCurrency(fuelCostPreview.fuelCostEtb)}</span>
+                        </div>
+                        {selectedFuelConsumptionRate !== null && (
+                          <div className="mt-1 text-[11px] leading-tight">
+                            {t("Vehicle consumption")}: <span className="text-foreground tabular-nums">{selectedFuelConsumptionRate} {FUEL_CONSUMPTION_UNIT}</span>
+                          </div>
+                        )}
+                        {fuelCostPreview.fuelLitersUsed > 0 && selectedFuelConsumptionRate !== null && (
+                          <div className="mt-1 text-[11px] leading-tight tabular-nums">
+                            {Number(tripDistance)} km x {selectedFuelConsumptionRate} {FUEL_CONSUMPTION_UNIT} = {fuelCostPreview.fuelLitersUsed} L; {fuelCostPreview.fuelLitersUsed} L x {Number(fuelPrice)} ETB/L = {formatCurrency(fuelCostPreview.fuelCostEtb)}
+                          </div>
+                        )}
+                        <div className="mt-1 text-[11px] leading-tight">{FUEL_CONSUMPTION_UNIT_LABEL}</div>
+                        {hasInvalidSelectedFuelRate && (
+                          <div className="mt-2 text-[11px] leading-tight text-danger">{t("Vehicle fuel consumption rate is invalid. Ask an administrator to correct the vehicle record.")}</div>
+                        )}
                       </div>
                       <Button
                         type="button"
-                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                        className="w-full h-11 px-5 rounded-md bg-primary text-on-primary text-xs font-black uppercase tracking-widest md:hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
                         loading={createTripMutation.isPending}
                         onClick={() => {
-                          if (!tripVehicleAssignmentId || !tripDestination.trim() || Number(tripDistance) <= 0 || Number(fuelPrice) <= 0) {
+                          if (!tripVehicleAssignmentId || !tripDestination.trim() || Number(tripDistance) <= 0 || Number(fuelPrice) <= 0 || hasInvalidSelectedFuelRate) {
                             toast.error(t("Required"));
                             return;
                           }

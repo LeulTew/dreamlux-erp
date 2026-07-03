@@ -27,6 +27,7 @@ const apiMocks = vi.hoisted(() => ({
   getAvailableVehicles: vi.fn().mockResolvedValue([]),
   updateEventAllocationDispatchCheck: vi.fn().mockResolvedValue({}),
   markEventDispatchDeparted: vi.fn().mockResolvedValue({ success: true }),
+  createEventTripLog: vi.fn().mockResolvedValue({}),
 }));
 
 const workspaceData = vi.hoisted(() => ({
@@ -56,7 +57,7 @@ const workspaceData = vi.hoisted(() => ({
     { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000 },
   ],
   vehicleAssignments: [
-    { id: "va-1", vehicle_id: "v-1", plate_number: "AA-2-345", driver_name: "Driver Joe", vehicle_type: "Truck" },
+    { id: "va-1", vehicle_id: "v-1", plate_number: "AA-2-345", driver_name: "Driver Joe", vehicle_type: "Truck", fuel_consumption_rate: 0.22 },
   ],
   expenses: [],
   trips: [],
@@ -79,7 +80,7 @@ vi.mock("@/lib/api", () => ({
   createVehicleAssignment: vi.fn(),
   deleteVehicleAssignment: vi.fn(),
   updateEmployeeAttendance: vi.fn(),
-  createEventTripLog: vi.fn(),
+  createEventTripLog: apiMocks.createEventTripLog,
   createEventExpense: vi.fn(),
   generateEventLaborExpense: vi.fn(),
   getEventProfit: vi.fn().mockResolvedValue({}),
@@ -168,6 +169,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     apiMocks.getAvailableVehicles.mockClear();
     apiMocks.updateEventAllocationDispatchCheck.mockClear();
     apiMocks.markEventDispatchDeparted.mockClear();
+    apiMocks.createEventTripLog.mockClear();
     workspaceData.allocations = [
       {
         id: "alloc-1",
@@ -255,5 +257,28 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
 
     expect(screen.getByRole("button", { name: /Mark Departed/i })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: /Dispatch Checklist Silver Stands/i })).toBeDisabled();
+  });
+
+  it("shows L/km fuel preview formula and submits trip data unchanged", () => {
+    mockPermissions = ["events:read", "trips:create"];
+    render(<EventWorkspacePage />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "va-1" } });
+    fireEvent.change(screen.getByPlaceholderText("Destination"), { target: { value: "Friendship Hotel" } });
+    fireEvent.change(screen.getByPlaceholderText("Distance (km)"), { target: { value: "12" } });
+    fireEvent.change(screen.getByPlaceholderText("Fuel Price"), { target: { value: "169" } });
+
+    expect(screen.getByText("Vehicle consumption:")).toBeInTheDocument();
+    expect(screen.getByText("0.22 L/km")).toBeInTheDocument();
+    expect(screen.getByText(/12 km x 0.22 L\/km = 2.64 L; 2.64 L x 169 ETB\/L = ETB 446.16/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Log Trip/i }));
+    expect(apiMocks.createEventTripLog).toHaveBeenCalledWith("event-123", {
+      vehicle_assignment_id: "va-1",
+      destination: "Friendship Hotel",
+      distance_km: 12,
+      fuel_price_etb: 169,
+    });
   });
 });

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const seedSql = readFileSync(join(process.cwd(), "src/db/seeds_dreamlux.sql"), "utf8");
+const schemaSql = readFileSync(join(process.cwd(), "src/db/schema.sql"), "utf8");
 
 describe("DreamLux SRD seed parity", () => {
   test("seeds exact SRD salary and commission anchors", () => {
@@ -138,5 +139,10 @@ describe("DreamLux SRD seed parity", () => {
     expect(seedSql).toContain("WHERE NOT EXISTS");
     expect(seedSql).toContain("AND t.destination = seed.destination");
     expect(seedSql).toContain("AND exp.description = seed.description");
+  });
+
+  test("documents vehicle fuel consumption as liters per kilometer", () => {
+    expect(schemaSql).toContain("fuel_consumption_rate NUMERIC(6, 2) NOT NULL CONSTRAINT vehicles_fuel_consumption_rate_l_per_km_check CHECK (fuel_consumption_rate > 0 AND fuel_consumption_rate <= 5), -- liters per kilometer (L/km)");
+    expect(seedSql).toContain("('AA-3-B98765', 'Isuzu FSR Medium Truck', 'Diesel', 0.22");
   });
 });
