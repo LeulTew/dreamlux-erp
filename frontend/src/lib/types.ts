@@ -623,3 +623,87 @@ export interface EventProposalLog {
   note: string | null;
   created_at: string;
 }
+
+// ====================================================
+// FINANCE — Hisab rollup & operational expenses (#109)
+// ====================================================
+
+export type FinanceOpexStatus = "Pending" | "Approved" | "Rejected";
+
+export interface FinanceOperationalExpense {
+  id: string;
+  expense_date: string;
+  category: string;
+  amount: number;
+  description: string;
+  status: FinanceOpexStatus;
+  rejected_reason: string | null;
+  created_by: string | null;
+  created_by_username?: string | null;
+  approved_by: string | null;
+  approved_by_username?: string | null;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+}
+
+export interface FinanceOpexListResponse {
+  expenses: FinanceOperationalExpense[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface HisabEventRow {
+  event_id: string;
+  event_name: string;
+  event_date: string;
+  period_start: string;
+  income: number;
+  transport: number;
+  rental: number;
+  labour: number;
+  other: number;
+  expense_total: number;
+  profit: number;
+}
+
+export interface HisabPeriod {
+  period_start: string;
+  period_end: string;
+  label: string;
+  events: HisabEventRow[];
+  eventTotals: {
+    income: number;
+    transport: number;
+    rental: number;
+    labour: number;
+    other: number;
+    expenses: number;
+    profit: number;
+  };
+  operational: {
+    byCategory: Array<{ category: string; amount: number }>;
+    total: number;
+    pendingExposure: number;
+  };
+  net: number;
+}
+
+export interface HisabReportResponse {
+  period_type: "week" | "month";
+  start_date: string;
+  end_date: string;
+  periods: HisabPeriod[];
+  summary: {
+    periodCount: number;
+    eventCount: number;
+    eventIncome: number;
+    eventExpenses: number;
+    eventProfit: number;
+    operationalExpenses: number;
+    pendingOperationalExposure: number;
+    net: number;
+  };
+}

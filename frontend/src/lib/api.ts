@@ -16,6 +16,8 @@ import {
   ProfitReportSummary,
   PaginatedExpenseResponse,
   PayrollRun,
+  FinanceOpexListResponse,
+  HisabReportResponse,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1533,3 +1535,72 @@ export const updateNotificationPreferences = (data: {
   push_enabled?: boolean;
   categories?: Record<string, boolean>;
 }) => api.put("/api/notifications/preferences", data).then((r) => r.data);
+
+// ====================================================
+// FINANCE — Hisab rollup & operational expenses (#109)
+// ====================================================
+
+export const FINANCE_OPEX_CATEGORIES = [
+  "Transport",
+  "Rental",
+  "Labour",
+  "Office Lunch",
+  "Lunch",
+  "Utilities",
+  "Supplies",
+  "Maintenance",
+  "Other",
+] as const;
+
+export const getHisabReport = (params: {
+  period_type: "week" | "month";
+  start_date: string;
+  end_date: string;
+}): Promise<HisabReportResponse> =>
+  api.get("/finance/hisab", { params }).then((r) => r.data);
+
+// Downloads through the authenticated axios client (window.open cannot send the
+// Authorization header) and triggers a browser save of the returned file.
+export const downloadHisabExport = async (params: {
+  period_type: "week" | "month";
+  start_date: string;
+  end_date: string;
+  format: "csv" | "xlsx";
+}): Promise<void> => {
+  const response = await api.get("/finance/hisab/export", { params, responseType: "blob" });
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const url = window.URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `hisab-report-${dateTag}.${params.format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const getFinanceOperationalExpenses = (
+  params: Record<string, unknown> = {}
+): Promise<FinanceOpexListResponse> =>
+  api.get("/finance/operational-expenses", { params }).then((r) => r.data);
+
+export const createFinanceOperationalExpense = (data: {
+  expense_date: string;
+  category: string;
+  amount: number;
+  description: string;
+}) => api.post("/finance/operational-expenses", data).then((r) => r.data);
+
+export const updateFinanceOperationalExpense = (
+  id: string,
+  data: Partial<{ expense_date: string; category: string; amount: number; description: string }>
+) => api.patch(`/finance/operational-expenses/${id}`, data).then((r) => r.data);
+
+export const deleteFinanceOperationalExpense = (id: string) =>
+  api.delete(`/finance/operational-expenses/${id}`).then((r) => r.data);
+
+export const approveFinanceOperationalExpense = (id: string) =>
+  api.post(`/finance/operational-expenses/${id}/approve`).then((r) => r.data);
+
+export const rejectFinanceOperationalExpense = (id: string, rejected_reason: string) =>
+  api.post(`/finance/operational-expenses/${id}/reject`, { rejected_reason }).then((r) => r.data);

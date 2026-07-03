@@ -569,3 +569,87 @@ export type CreateVehicleAssignmentInput = z.infer<typeof createVehicleAssignmen
 export type CreateEventExpenseInput = z.infer<typeof createEventExpenseSchema>;
 export type ReviewEventExpenseInput = z.infer<typeof reviewEventExpenseSchema>;
 export type CreateTripLogInput = z.infer<typeof createTripLogSchema>;
+
+// --- Issue #109: Finance Hisab / non-event operational expenses ---
+
+export const FINANCE_OPEX_CATEGORIES = [
+  "Transport",
+  "Rental",
+  "Labour",
+  "Office Lunch",
+  "Lunch",
+  "Utilities",
+  "Supplies",
+  "Maintenance",
+  "Other",
+] as const;
+
+const financeOpexCategorySchema = z.enum(FINANCE_OPEX_CATEGORIES);
+
+export const createFinanceOpexSchema = z.object({
+  expense_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid expense date"),
+  category: financeOpexCategorySchema,
+  amount: z.coerce.number().min(0, "Amount cannot be negative").max(100_000_000, "Amount too large"),
+  description: z.string().trim().min(1, "Description is required").max(1000, "Description too long"),
+});
+
+export const updateFinanceOpexSchema = z.object({
+  expense_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid expense date").optional(),
+  category: financeOpexCategorySchema.optional(),
+  amount: z.coerce.number().min(0, "Amount cannot be negative").max(100_000_000, "Amount too large").optional(),
+  description: z.string().trim().min(1, "Description is required").max(1000, "Description too long").optional(),
+}).refine((data) => Object.keys(data).length > 0, { message: "At least one field is required" });
+
+export const rejectFinanceOpexSchema = z.object({
+  rejected_reason: z.string().trim().min(1, "Rejection reason is required").max(1000, "Rejection reason too long"),
+});
+
+export const financeOpexListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
+  category: financeOpexCategorySchema.optional(),
+  search: z.string().max(200).optional(),
+  start_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid start_date"),
+  end_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid end_date"),
+}).refine((data) => {
+  if (!data.start_date || !data.end_date) return true;
+  return new Date(data.start_date) <= new Date(data.end_date);
+}, {
+  message: "end_date must be on or after start_date",
+  path: ["end_date"],
+});
+
+const HISAB_MAX_RANGE_DAYS = 400;
+
+const hisabQueryBaseSchema = z.object({
+  period_type: z.enum(["week", "month"]).optional().default("week"),
+  start_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid start_date"),
+  end_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid end_date"),
+});
+
+const hisabRangeRefinement = [
+  (data: { start_date: string; end_date: string }) => {
+    const start = new Date(data.start_date).getTime();
+    const end = new Date(data.end_date).getTime();
+    if (start > end) return false;
+    return (end - start) / 86_400_000 <= HISAB_MAX_RANGE_DAYS;
+  },
+  {
+    message: `Date range must be valid and cover at most ${HISAB_MAX_RANGE_DAYS} days`,
+    path: ["end_date"] as [string],
+  },
+] as const;
+
+export const hisabQuerySchema = hisabQueryBaseSchema.refine(...hisabRangeRefinement);
+
+export const hisabExportQuerySchema = hisabQueryBaseSchema.extend({
+  format: z.enum(["csv", "xlsx"]).optional().default("csv"),
+  maxRows: z.coerce.number().int().min(1).max(1000).optional().default(1000),
+}).refine(...hisabRangeRefinement);
+
+export type CreateFinanceOpexInput = z.infer<typeof createFinanceOpexSchema>;
+export type UpdateFinanceOpexInput = z.infer<typeof updateFinanceOpexSchema>;
+export type FinanceOpexListQueryInput = z.infer<typeof financeOpexListQuerySchema>;
+export type HisabQueryInput = z.infer<typeof hisabQuerySchema>;
+export type HisabExportQueryInput = z.infer<typeof hisabExportQuerySchema>;

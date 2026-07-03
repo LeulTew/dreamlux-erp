@@ -36,6 +36,9 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { slug: "expenses:labor_generate", description: "Generate labor expenses from attended event assignments" },
   { slug: "expenses:approve", description: "Approve expenses" },
   { slug: "approvals:history:read", description: "View approval history" },
+  { slug: "finance:hisab:read", description: "View weekly/monthly Hisab rollups and operational expense ledger" },
+  { slug: "finance:opex:write", description: "Create and update non-event operational expenses" },
+  { slug: "finance:opex:approve", description: "Approve or reject non-event operational expenses" },
 ];
 
 export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
@@ -78,6 +81,9 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
     "expenses:labor_generate",
     "expenses:approve",
     "approvals:history:read",
+    "finance:hisab:read",
+    "finance:opex:write",
+    "finance:opex:approve",
   ],
   driver: ["events:read", "trips:create"],
 };
