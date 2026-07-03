@@ -79,7 +79,10 @@ INSERT INTO permissions (slug, description) VALUES
   ('approvals:history:read', 'View approval history'),
   ('finance:hisab:read', 'View weekly/monthly Hisab rollups and operational expense ledger'),
   ('finance:opex:write', 'Create and update non-event operational expenses'),
-  ('finance:opex:approve', 'Approve or reject non-event operational expenses')
+  ('finance:opex:approve', 'Approve or reject non-event operational expenses'),
+  ('finance:overheads:read', 'View monthly overhead register and summaries'),
+  ('finance:overheads:write', 'Create and update monthly overhead expenses'),
+  ('finance:overheads:approve', 'Approve, reject, and close monthly overhead expenses')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Role-to-permission mappings
@@ -142,7 +145,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read', 'finance:hisab:read', 'finance:opex:write', 'finance:opex:approve')
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read', 'finance:hisab:read', 'finance:opex:write', 'finance:opex:approve', 'finance:overheads:read', 'finance:overheads:write', 'finance:overheads:approve')
 WHERE LOWER(r.name) IN ('accountant')
 ON CONFLICT DO NOTHING;
 
@@ -783,3 +786,45 @@ CREATE INDEX IF NOT EXISTS idx_finance_opex_date
 CREATE INDEX IF NOT EXISTS idx_finance_opex_status_date
   ON finance_operational_expenses(status, expense_date)
   WHERE deleted_at IS NULL;
+
+-- 23. Finance Overhead Expenses (monthly overhead & shared operating register)
+CREATE TABLE IF NOT EXISTS finance_overhead_expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  expense_month DATE NOT NULL,
+  due_date DATE DEFAULT NULL,
+  category TEXT NOT NULL,
+  payee TEXT DEFAULT NULL,
+  scope TEXT NOT NULL CHECK (scope IN ('Office', 'Store', 'Shared', 'General')) DEFAULT 'Office',
+  shared_with TEXT DEFAULT NULL,
+  payment_kind TEXT NOT NULL CHECK (payment_kind IN ('overhead', 'staff_payment')) DEFAULT 'overhead',
+  employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+  is_recurring BOOLEAN NOT NULL DEFAULT false,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+  notes TEXT DEFAULT NULL,
+  status TEXT NOT NULL CHECK (status IN ('Pending', 'Approved', 'Rejected')) DEFAULT 'Pending',
+  rejected_reason TEXT DEFAULT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  approved_at TIMESTAMP DEFAULT NULL,
+  deleted_at TIMESTAMP DEFAULT NULL,
+  CONSTRAINT finance_overhead_expenses_kind_employee_check CHECK (payment_kind = 'staff_payment' OR employee_id IS NULL),
+  CONSTRAINT finance_overhead_expenses_shared_scope_check CHECK (scope = 'Shared' OR shared_with IS NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_finance_overheads_month
+  ON finance_overhead_expenses(expense_month)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_finance_overheads_status_month
+  ON finance_overhead_expenses(status, expense_month)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_finance_overheads_staff_employee_month
+  ON finance_overhead_expenses(employee_id, expense_month)
+  WHERE deleted_at IS NULL AND payment_kind = 'staff_payment' AND employee_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS finance_overhead_month_closures (
+  month DATE PRIMARY KEY,
+  closed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  closed_at TIMESTAMP DEFAULT NOW()
+);

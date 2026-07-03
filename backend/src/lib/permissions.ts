@@ -39,6 +39,9 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { slug: "finance:hisab:read", description: "View weekly/monthly Hisab rollups and operational expense ledger" },
   { slug: "finance:opex:write", description: "Create and update non-event operational expenses" },
   { slug: "finance:opex:approve", description: "Approve or reject non-event operational expenses" },
+  { slug: "finance:overheads:read", description: "View monthly overhead register and summaries" },
+  { slug: "finance:overheads:write", description: "Create and update monthly overhead expenses" },
+  { slug: "finance:overheads:approve", description: "Approve, reject, and close monthly overhead expenses" },
 ];
 
 export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
@@ -84,6 +87,9 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
     "finance:hisab:read",
     "finance:opex:write",
     "finance:opex:approve",
+    "finance:overheads:read",
+    "finance:overheads:write",
+    "finance:overheads:approve",
   ],
   driver: ["events:read", "trips:create"],
 };

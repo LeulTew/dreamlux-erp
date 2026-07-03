@@ -22,6 +22,8 @@ DECLARE
     'events',
     'expenses',
     'field_permissions',
+    'finance_overhead_expenses',
+    'finance_overhead_month_closures',
     'inventory_reconciliation_items',
     'inventory_reconciliation_legacy_deleted',
     'inventory_reconciliation_legacy_trash',

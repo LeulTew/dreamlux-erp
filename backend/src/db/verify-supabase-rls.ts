@@ -15,6 +15,8 @@ const protectedTables = [
   "event_logs",
   "event_proposals",
   "event_proposal_logs",
+  "finance_overhead_expenses",
+  "finance_overhead_month_closures",
 ];
 
 function isDenied(status: number): boolean {

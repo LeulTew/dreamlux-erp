@@ -16,6 +16,7 @@ import positionsRouter from "./routes/positions";
 import { notificationsRouter } from "./routes/notifications";
 import activityRouter from "./routes/activity";
 import financeRouter from "./routes/finance";
+import financeOverheadsRouter from "./routes/finance-overheads";
 
 import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
@@ -124,6 +125,7 @@ app.use("/event-types", requireAuth, eventTypesRouter);
 
 app.use("/payroll", requireAuth, requirePermissionSlugs(["payroll:read", "payroll:write"]), payrollRouter);
 app.use("/events", requireAuth, eventsRouter);
+app.use("/finance/overheads", requireAuth, financeOverheadsRouter);
 app.use("/finance", requireAuth, financeRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/activity", activityRouter);

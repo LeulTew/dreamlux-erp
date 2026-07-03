@@ -653,3 +653,101 @@ export type UpdateFinanceOpexInput = z.infer<typeof updateFinanceOpexSchema>;
 export type FinanceOpexListQueryInput = z.infer<typeof financeOpexListQuerySchema>;
 export type HisabQueryInput = z.infer<typeof hisabQuerySchema>;
 export type HisabExportQueryInput = z.infer<typeof hisabExportQuerySchema>;
+
+// --- Issue #110: Monthly overhead & shared operating expense register ---
+
+export const FINANCE_OVERHEAD_CATEGORIES = [
+  "Salary",
+  "Fuel",
+  "Car Rental",
+  "Office Rent",
+  "Store Rent",
+  "Wifi",
+  "Water & Electric",
+  "Marketing/Boost",
+  "Sticker",
+  "Seasonal/Ekub",
+  "Food",
+  "House Expense",
+  "Supplies",
+  "Other",
+] as const;
+
+export const FINANCE_OVERHEAD_SCOPES = ["Office", "Store", "Shared", "General"] as const;
+export const FINANCE_OVERHEAD_PAYMENT_KINDS = ["overhead", "staff_payment"] as const;
+
+const overheadCategorySchema = z.enum(FINANCE_OVERHEAD_CATEGORIES);
+const overheadScopeSchema = z.enum(FINANCE_OVERHEAD_SCOPES);
+const overheadPaymentKindSchema = z.enum(FINANCE_OVERHEAD_PAYMENT_KINDS);
+
+// Months travel as "YYYY-MM"; the DB stores the first day of the month.
+const overheadMonthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Month must use the YYYY-MM format");
+
+export function overheadMonthToDate(month: string): string {
+  return `${month}-01`;
+}
+
+const overheadCoreFields = {
+  category: overheadCategorySchema,
+  amount: z.coerce.number().min(0.01, "Amount must be greater than zero").max(100_000_000, "Amount too large"),
+  payee: nullableText(300, "Payee too long"),
+  scope: overheadScopeSchema,
+  shared_with: nullableText(200, "Shared-with label too long"),
+  payment_kind: overheadPaymentKindSchema,
+  employee_id: nullableUuid("Invalid employee ID"),
+  is_recurring: z.coerce.boolean().optional().default(false),
+  due_date: optionalDate("Invalid due date"),
+  notes: nullableText(1000, "Notes too long"),
+};
+
+export const createFinanceOverheadSchema = z.object({
+  expense_month: overheadMonthSchema,
+  ...overheadCoreFields,
+}).refine((data) => data.payment_kind === "staff_payment" || !data.employee_id, {
+  message: "Employee links are only valid for staff payments",
+  path: ["employee_id"],
+}).refine((data) => data.scope === "Shared" || !data.shared_with?.trim(), {
+  message: "shared_with is only valid for Shared scope entries",
+  path: ["shared_with"],
+});
+
+export const updateFinanceOverheadSchema = z.object({
+  expense_month: overheadMonthSchema.optional(),
+  category: overheadCategorySchema.optional(),
+  amount: z.coerce.number().min(0.01, "Amount must be greater than zero").max(100_000_000, "Amount too large").optional(),
+  payee: nullableText(300, "Payee too long"),
+  scope: overheadScopeSchema.optional(),
+  shared_with: nullableText(200, "Shared-with label too long"),
+  payment_kind: overheadPaymentKindSchema.optional(),
+  employee_id: nullableUuid("Invalid employee ID"),
+  is_recurring: z.coerce.boolean().optional(),
+  due_date: optionalDate("Invalid due date"),
+  notes: nullableText(1000, "Notes too long"),
+}).refine((data) => Object.keys(data).length > 0, { message: "At least one field is required" });
+
+export const rejectFinanceOverheadSchema = z.object({
+  rejected_reason: z.string().trim().min(1, "Rejection reason is required").max(1000, "Rejection reason too long"),
+});
+
+export const financeOverheadListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  month: overheadMonthSchema.optional(),
+  status: z.enum(["Pending", "Approved", "Rejected"]).optional(),
+  category: overheadCategorySchema.optional(),
+  scope: overheadScopeSchema.optional(),
+  payment_kind: overheadPaymentKindSchema.optional(),
+  search: z.string().max(200).optional(),
+});
+
+export const financeOverheadSummaryQuerySchema = z.object({
+  month: overheadMonthSchema,
+});
+
+export const financeOverheadMonthParamSchema = overheadMonthSchema;
+
+export type CreateFinanceOverheadInput = z.infer<typeof createFinanceOverheadSchema>;
+export type UpdateFinanceOverheadInput = z.infer<typeof updateFinanceOverheadSchema>;
+export type FinanceOverheadListQueryInput = z.infer<typeof financeOverheadListQuerySchema>;

@@ -1,9 +1,9 @@
 import { Router, Response } from "express";
-import { PoolClient } from "pg";
 import ExcelJS from "exceljs";
 import { stringify } from "csv-stringify/sync";
 import { pool } from "../db/pool";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
+import { insertFinanceAuditLog, roundMoney, toDateString } from "../lib/finance-audit";
 import {
   createFinanceOpexSchema,
   updateFinanceOpexSchema,
@@ -19,49 +19,8 @@ const router = Router();
 const OPEX_ENTITY_TYPE = "finance_operational_expense";
 const HISAB_ENTITY_TYPE = "finance_hisab_report";
 
-function roundMoney(value: unknown): number {
-  return Number(Number(value || 0).toFixed(2));
-}
-
-async function insertFinanceAuditLog(
-  client: PoolClient,
-  input: {
-    entityType: string;
-    entityId: string;
-    userId: string | null;
-    action: string;
-    fieldChanged?: string | null;
-    oldValue?: string | null;
-    newValue?: string | null;
-    note?: string | null;
-  },
-): Promise<void> {
-  await client.query(
-    `INSERT INTO public.activity_logs (entity_type, entity_id, user_id, action, field_changed, old_value, new_value, note)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      input.entityType,
-      input.entityId,
-      input.userId,
-      input.action,
-      input.fieldChanged ?? null,
-      input.oldValue ?? null,
-      input.newValue ?? null,
-      input.note ?? null,
-    ],
-  );
-}
-
 function formatOpexRow(row: Record<string, any>): Record<string, any> {
   return { ...row, amount: roundMoney(row.amount) };
-}
-
-// pg returns DATE columns as Date objects; audit values need plain YYYY-MM-DD.
-function toDateString(value: unknown): string {
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-  return String(value).slice(0, 10);
 }
 
 // GET /finance/operational-expenses — paginated non-event operational expense ledger

@@ -30,6 +30,7 @@ describe("Issue #31 final verification hooks", () => {
     expect(rlsScript).toContain("SUPABASE_ANON_KEY");
     expect(rlsScript).toContain("employees");
     expect(rlsScript).toContain("event_allocations");
+    expect(rlsScript).toContain("finance_overhead_expenses");
     expect(rlsScript).toContain("401 || status === 403 || status === 404");
   });
 });
