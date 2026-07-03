@@ -28,13 +28,14 @@ vi.mock("@/components/AuthLayout", () => ({
 
 // Mock react-query
 let mockAuthData: unknown = null;
+let mockAuthLoading = false;
 let mockSummaryData: unknown = null;
 let mockListData: unknown = null;
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {
     if (options.queryKey[0] === "auth-permissions") {
-      return { data: mockAuthData, isLoading: false };
+      return { data: mockAuthData, isLoading: mockAuthLoading };
     }
     if (options.queryKey[0] === "finance-investments-summary") {
       return { data: mockSummaryData, isLoading: false };
@@ -65,7 +66,7 @@ vi.mock("@/lib/api", () => ({
   deleteCapitalInvestment: vi.fn(),
   approveCapitalInvestment: vi.fn(),
   rejectCapitalInvestment: vi.fn(),
-  getCapitalInvestmentsExportUrl: vi.fn().mockReturnValue("https://mock-export-url"),
+  downloadCapitalInvestmentsExport: vi.fn().mockResolvedValue(undefined),
   getItems: vi.fn().mockResolvedValue({ items: [] }),
   api: { get: vi.fn(), defaults: { baseURL: "http://localhost:4000" } },
 }));
@@ -138,6 +139,7 @@ describe("Capital Investments Page UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLang = "en";
+    mockAuthLoading = false;
     mockAuthData = {
       permission_slugs: ["finance:investments:read", "finance:investments:write"],
       is_superuser: false,
@@ -151,6 +153,14 @@ describe("Capital Investments Page UI", () => {
     render(<InvestmentsPage />);
     expect(screen.queryByTestId("auth-layout")).not.toBeInTheDocument();
     expect(screen.getByText(/forbidden/i)).toBeInTheDocument();
+  });
+
+  it("shows loading skeleton instead of forbidden state while permissions load", () => {
+    mockAuthLoading = true;
+    mockAuthData = null;
+    render(<InvestmentsPage />);
+    expect(screen.getByTestId("auth-layout")).toBeInTheDocument();
+    expect(screen.queryByText(/forbidden/i)).not.toBeInTheDocument();
   });
 
   it("renders summary blocks correctly with workbook capex metrics", () => {

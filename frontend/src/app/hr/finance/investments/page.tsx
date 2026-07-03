@@ -34,7 +34,7 @@ import {
   deleteCapitalInvestment,
   approveCapitalInvestment,
   rejectCapitalInvestment,
-  getCapitalInvestmentsExportUrl,
+  downloadCapitalInvestmentsExport,
   getItems,
   INVESTMENT_CATEGORIES,
   CAPEX_CLASSIFICATIONS,
@@ -189,7 +189,7 @@ export default function InvestmentsPage() {
   const [form, setForm] = useState(defaultForm);
 
   // Queries
-  const { data: permissions } = useQuery({
+  const { data: permissions, isLoading: permissionsLoading } = useQuery({
     queryKey: ["auth-permissions"],
     queryFn: async () => {
       const res = await api.get("/auth/permissions");
@@ -300,6 +300,18 @@ export default function InvestmentsPage() {
     },
   });
 
+  if (permissionsLoading) {
+    return (
+      <AuthLayout>
+        <div className="space-y-4">
+          <Skeleton className="h-[64px] w-full dl-radius-xl" />
+          <Skeleton className="h-[96px] w-full dl-radius-xl" />
+          <Skeleton className="h-[320px] w-full dl-radius-xl" />
+        </div>
+      </AuthLayout>
+    );
+  }
+
   if (!canRead) {
     return <ForbiddenState />;
   }
@@ -363,31 +375,25 @@ export default function InvestmentsPage() {
     saveMutation.mutate(payload);
   };
 
-  const getExportLink = (format: "csv" | "xlsx") => {
-    return getCapitalInvestmentsExportUrl({
-      month: selectedMonth || undefined,
-      status: statusFilter === "all" ? undefined : statusFilter,
-      category: categoryFilter === "all" ? undefined : categoryFilter,
-      capex_classification: classificationFilter === "all" ? undefined : classificationFilter,
-      linked: linkedFilter === "all" ? undefined : linkedFilter,
-      search: searchQuery.trim() || undefined,
-      format,
-    });
+  const handleExport = async (format: "csv" | "xlsx") => {
+    try {
+      await downloadCapitalInvestmentsExport({
+        month: selectedMonth || undefined,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        category: categoryFilter === "all" ? undefined : categoryFilter,
+        capex_classification: classificationFilter === "all" ? undefined : classificationFilter,
+        linked: linkedFilter === "all" ? undefined : linkedFilter,
+        search: searchQuery.trim() || undefined,
+        format,
+      });
+    } catch (err: unknown) {
+      const error = err as Error & { response?: { data?: { error?: string } } };
+      toast.error(error.response?.data?.error || error.message || "Export failed");
+    }
   };
 
   return (
     <AuthLayout>
-      <style dangerouslySetInnerHTML={{ __html: `
-        .dl-radius-sm { border-radius: var(--radius-sm); }
-        .dl-radius-md { border-radius: var(--radius-md); }
-        .dl-radius-lg { border-radius: var(--radius-lg); }
-        .dl-radius-xl { border-radius: var(--radius-xl); }
-        .dl-radius-2xl { border-radius: var(--radius-2xl); }
-        @media print {
-          .no-print { display: none !important; }
-        }
-      `}} />
-
       <div className="space-y-6">
         {/* Header Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/40 pb-4 no-print">
@@ -401,23 +407,23 @@ export default function InvestmentsPage() {
           <div className="flex items-center gap-2 self-end sm:self-auto">
             {canApprove && (
               <div className="flex items-center gap-1 bg-card border border-border dl-radius-lg p-1">
-                <a
-                  href={getExportLink("csv")}
-                  download="capital-investments.csv"
-                  className="flex items-center gap-1.5 h-[32px] px-3 text-[10px] font-black uppercase tracking-wider text-muted hover:text-foreground transition-all"
+                <button
+                  type="button"
+                  onClick={() => handleExport("csv")}
+                  className="flex items-center gap-1.5 h-[32px] px-3 text-[10px] font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
                 >
                   <HiArrowDownTray className="w-3.5 h-3.5" />
                   CSV
-                </a>
+                </button>
                 <div className="w-[1px] h-4 bg-border/60" />
-                <a
-                  href={getExportLink("xlsx")}
-                  download="capital-investments.xlsx"
-                  className="flex items-center gap-1.5 h-[32px] px-3 text-[10px] font-black uppercase tracking-wider text-muted hover:text-foreground transition-all"
+                <button
+                  type="button"
+                  onClick={() => handleExport("xlsx")}
+                  className="flex items-center gap-1.5 h-[32px] px-3 text-[10px] font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
                 >
                   <HiArrowDownTray className="w-3.5 h-3.5" />
                   XLSX
-                </a>
+                </button>
               </div>
             )}
             <button
@@ -477,7 +483,7 @@ export default function InvestmentsPage() {
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
               placeholder={t("Search") + "..."}
-              className="w-full pl-10 pr-4 h-[38px] text-xs font-semibold rounded-lg bg-card-alt border border-border/80 outline-none focus:ring-1 focus:ring-primary/20"
+              className="w-full pl-10 pr-4 h-[38px] text-xs font-semibold dl-radius-lg bg-card-alt border border-border/80 outline-none focus:ring-1 focus:ring-primary/20"
             />
           </div>
 
@@ -486,7 +492,7 @@ export default function InvestmentsPage() {
               type="month"
               value={selectedMonth}
               onChange={(e) => { setSelectedMonth(e.target.value); setPage(1); }}
-              className="w-full px-3 h-[38px] text-xs font-semibold rounded-lg bg-card-alt border border-border/80 outline-none"
+              className="w-full px-3 h-[38px] text-xs font-semibold dl-radius-lg bg-card-alt border border-border/80 outline-none"
             />
           </div>
 
@@ -552,7 +558,7 @@ export default function InvestmentsPage() {
               setPage(1);
             }}
             aria-label={t("Reset Filters")}
-            className="flex items-center justify-center w-[38px] h-[38px] rounded-lg border border-border/80 text-muted [@media(hover:hover)]:hover:text-foreground transition-all bg-card-alt"
+            className="flex items-center justify-center w-[38px] h-[38px] dl-radius-lg border border-border/80 text-muted [@media(hover:hover)]:hover:text-foreground transition-all bg-card-alt"
           >
             <HiArrowPath className="w-4 h-4" />
           </button>
@@ -836,7 +842,7 @@ export default function InvestmentsPage() {
                   id="creates_inventory_stock"
                   checked={form.creates_inventory_stock}
                   onChange={(e) => setForm((f) => ({ ...f, creates_inventory_stock: e.target.checked }))}
-                  className="w-4 h-4 text-primary border-border rounded focus:ring-primary/30 bg-card-alt"
+                  className="w-4 h-4 text-primary border-border dl-radius-sm focus:ring-primary/30 bg-card-alt"
                 />
                 <label htmlFor="creates_inventory_stock" className="text-xs font-bold text-foreground cursor-pointer select-none">{t("Creates Stock?")}</label>
               </div>

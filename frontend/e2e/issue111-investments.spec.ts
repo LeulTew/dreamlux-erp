@@ -129,9 +129,21 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     await page.getByRole("button", { name: "Approve" }).click();
     await expect(page.getByText("Approved", { exact: true })).toBeVisible();
 
-    // Verify export triggers are present
-    await expect(page.getByRole("link", { name: "CSV" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "XLSX" })).toBeVisible();
+    let exportRequestedWithAuth = false;
+    await page.route((url) => url.pathname === "/finance/investments/export", (route) => {
+      exportRequestedWithAuth = route.request().headers().authorization?.startsWith("Bearer ") ?? false;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/csv",
+        body: "item_name,total_cost\nIndustrial Fabric Machine,50000\n",
+      });
+    });
+
+    // Verify export uses the authenticated axios client instead of a naked link.
+    await expect(page.getByRole("button", { name: "CSV" })).toBeVisible();
+    await page.getByRole("button", { name: "CSV" }).click();
+    await expect.poll(() => exportRequestedWithAuth).toBe(true);
+    await expect(page.getByRole("button", { name: "XLSX" })).toBeVisible();
   });
 
   test("Non-finance users are denied access and shown ForbiddenState", async ({ page }) => {

@@ -163,6 +163,32 @@
   --color-card-foreground: var(--card-foreground);
 }
 
+.dl-radius-sm {
+  border-radius: var(--radius-sm);
+}
+
+.dl-radius-md {
+  border-radius: var(--radius-md);
+}
+
+.dl-radius-lg {
+  border-radius: var(--radius-lg);
+}
+
+.dl-radius-xl {
+  border-radius: var(--radius-xl);
+}
+
+.dl-radius-2xl {
+  border-radius: var(--radius-2xl);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
 /* Page width container rules */
 .page-container {
   width: 100%;

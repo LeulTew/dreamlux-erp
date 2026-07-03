@@ -1709,12 +1709,17 @@ export const approveCapitalInvestment = (id: string) =>
 export const rejectCapitalInvestment = (id: string, rejected_reason: string) =>
   api.post<{ investment: CapitalInvestment }>(`/finance/investments/${id}/reject`, { rejected_reason }).then((r) => r.data);
 
-export const getCapitalInvestmentsExportUrl = (params: Record<string, unknown> = {}) => {
-  const url = new URL("/finance/investments/export", api.defaults.baseURL || window.location.origin);
-  for (const [key, val] of Object.entries(params)) {
-    if (val !== undefined && val !== null && val !== "") {
-      url.searchParams.append(key, String(val));
-    }
-  }
-  return url.toString();
+export const downloadCapitalInvestmentsExport = async (
+  params: Record<string, unknown> & { format: "csv" | "xlsx" }
+): Promise<void> => {
+  const response = await api.get("/finance/investments/export", { params, responseType: "blob" });
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const url = window.URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `capital-investments-${dateTag}.${params.format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };
