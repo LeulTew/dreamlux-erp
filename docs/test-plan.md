@@ -42,7 +42,19 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | PR #88 | Reference Data setup pages and sidebar grouping. | Reference Data & Settings, Users/Roles, Mobile/Amharic. | Departments, Positions, and Offices must sit under Reference Data; delete impact warnings must block active-use records. | |
 | PR #89 | Proposal creator attribution and test isolation fixes. | Events/Proposals, Search/Filters, Users/Roles. | Proposal queue and detail must show **Proposed By**; deleted/missing users must show `Unknown user`, not crash. | |
 | PR #91 | Seeded admin and user credential parity. | Smoke, Users/Roles, Events, Inventory, Finance, Driver BOLA. | `admin`, `driver`, `eventmgr`, and `inventory_user` must log in with `Password123`; driver must remain mapped to Selam Bekele and blocked from unrelated driver actions. | |
+| PR #90 | Unified trash and restore page. | Events, Inventory, Reference Data. | Soft-deleted events/assets must be restorable from the trash pages; restore respects role permissions. | |
+| PR #98 | Notification center, permission-safe delivery, live toast notifications. | Smoke, Users/Roles, Notifications. | Mutation actions (creation, deletion, updates) must fire beautiful premium toasts; notifications load in real-time. | |
+| PR #99 | Record activity timeline drawer and visual audit logs. | Smoke, Events, Inventory, Finance. | Actions should be audited and visible in the activity timeline log drawers on relevant pages. | |
+| PR #100/103 | HR Dashboard, click-to-edit drawer, exception lists. | Finance/Payroll, HR Dashboard exception checks. | Workforce overview shows metric summaries; list exceptions (Missing Bank/ID/Contract) open side drawers to fix. | |
+| PR #101 | Security posture page (OWASP/CVE). | Reference Data & Settings, Security checks. | Settings / Security shows a plain-language summary of access controls, dynamic safety checks, and SSL/database indicators. | |
+| PR #102 | PWA installability, service worker caching, and offline shell. | Smoke, PWA/Offline support. | Bottom PWA banner shows on first launch; offline simulated mode loads a clean local fallback shell. | |
+| PR #104 | Custom role manager changes preview, warning validation popups. | Users/Roles, Permission changes. | Diff pane preview appears for role modification changes; dangerous changes prompt additional alert validations. | |
+| PR #105 | Pagination support, unbounded list safety, and scroll indicators. | Search/Filters, Pagination. | Virtualized scrolling and paging controls prevent memory leaks and browser locks on large lists. | |
+| PR #114 | Storekeeper allocation dispatch checklist and departure flows. | Inventory & Assets, Dispatch checklist. | Dispatch queue allocates items to events; Mark Departed requires all storekeeper checklist items to be checked off. | |
+| PR #115 | Read-only commission inputs, parity backend/frontend math totals. | Events/Proposals, Finance. | Proposal commission fields compute values programmatically; user cannot modify calculated totals manually. | |
+| Issue #108 | Fuel cost preview calculations, liters-per-kilometer (L/km) verification. | Events, Logistics/Trips. | Trip distance logs show explicit Liters per kilometer (L/km) breakdown preview; invalid rates warn user and block logging. | |
 | Whole project regression | Any deployment to production or release candidate. | Every suite in this document. | Record browser/device, user role, and exact page where any issue occurs. | |
+
 
 ---
 
@@ -76,6 +88,9 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | B7 | **Vehicle/Driver Assignment** | Locate the **Vehicles & Trips** area. Assign a driver and vehicle. | Trip/vehicle assignment saves; overlapping vehicle/driver use is blocked. | |
 | B8 | **Checklist** | Add event checklist items and check them off. | Checklist progress updates and remains saved after refresh. | |
 | B9 | **Trash/Soft Delete** | Delete an event if the UI allows it, then check trash/recovery area if available. | Deleted records disappear from normal lists and are only shown in trash/recovery views. | |
+| B10 | **Proposal Commission Math** | Open `/events/proposals/new` as `ops` or `ceo`. Set crew members and commission rate (e.g. 4 people x 3000 ETB). | Amount calculates as `12000` programmatically. Total field is read-only (disabled) and user cannot type a manual value. | |
+| B11 | **Fuel Cost Units** | Log in as `driver` or `ops`. Go to event page, select assigned truck, log a trip (12 km, 169 ETB/L). | Preview displays the calculation `12 km x 0.22 L/km = 2.64 L; 2.64 L x 169 ETB/L = ETB 446.16`. Invalid fuel rate displays a warning. | |
+
 
 ---
 
@@ -89,6 +104,9 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | C3 | **Reconciliation** | Go to `/assets/reconcile`. Select a warehouse store location. Input a manual counted count. | The system audits physical count discrepancies and generates a log. | |
 | C4 | **Asset Allocation** | From an event workspace, allocate inventory to the event. Try allocating more than available. | Valid allocation saves; over-allocation is blocked with a clear message. | |
 | C5 | **Asset Trash** | Move an asset to trash if allowed by your role. | Item disappears from active lists; restore/permanent delete actions obey permissions. | |
+| C6 | **Dispatch Checklist** | Log in as `inv` (Inventory Officer). Navigate to `/assets/dispatch`. Find an active event. Check off all allocations. | The "Mark Departed" button remains disabled until every checklist item is checked. Clicking it updates the event dispatch status. | |
+| C7 | **Stock Recount Pagination**| View `/assets/history` with more than 10 recount sessions. Scroll/navigate pages. | Recount history lists paginate correctly and virtualized views render without lag. | |
+
 
 ---
 
@@ -104,6 +122,8 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | D5 | **Financial Redaction** | Log in as `driver` or another non-financial user and open event pages/reports. | Financial totals, profit, payroll, and sensitive cost data are hidden or Forbidden. | |
 | D6 | **Payroll Run** | Log in as `acc` or `ceo`. Create or preview a payroll run. | Payroll lines show expected employees, attendance/commission data, totals, and status. | |
 | D7 | **Payroll Locking** | Finalize a payroll run if available. Try to edit finalized values. | Finalized payroll cannot be casually changed; correction flow is required if available. | |
+| D8 | **HR Dashboard Audit** | Log in as `ceo`. Go to `/hr` dashboard. Review workforce metrics and Exception Lists (Missing Bank/Contract/IDs). | Exceptions show exact flags; clicking an employee opens the quick-edit side drawer to patch data. | |
+
 
 ---
 
@@ -118,6 +138,8 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | E4 | **Sidebar Filtering** | Compare sidebar links for `ceo`, `ops`, `acc`, `inv`, and `driver`. | Each role sees only the modules relevant to that role. | |
 | E5 | **Session Behavior** | Log out, then use the browser back button. | Protected pages do not remain usable after logout. | |
 | E6 | **Seeded Credential Parity** | Log out and log in one-by-one as `admin`, `ceo`, `ops`, `acc`, `eventmgr`, `inv`, `inventory_user`, and `driver`, all with `Password123`. | Every documented dev/test user can log in. Role-specific sidebar and page access still match the user's role. | |
+| E7 | **Custom Role Change Preview**| Go to `/settings/permissions`. Edit a role (e.g. check/uncheck permission slugs). Review changes pane. | Pane shows exact diff comparison of modifications before saving; dangerous changes trigger alert modals. | |
+
 
 ---
 
@@ -157,6 +179,21 @@ Use this table to decide which blackbox suites matter most after a release. A re
 | H5 | **Missing User Fallback** | Open proposal records created by a deleted/missing user if test data exists. | UI shows `Unknown user`, not a crash or blank broken field. | |
 
 ---
+
+### Test Suite I: Live Notifications, Auditing, and Offline Shell (New)
+*Verify real-time mutations, PWA offline behavior, security postures, and unified trash views.*
+
+| Step | Page / URL | Actions | Expected Outcome | Pass / Fail |
+| :--- | :--- | :--- | :--- | :--- |
+| I1 | **Live Toasts** | Perform any database save or delete operation. | A premium toast notification pops up indicating success/failure with brand-appropriate design. | |
+| I2 | **Activity logs** | Create/Update an asset or event. Go to `/assets` or `/events` and open the **Activity Timeline** side drawer. | The activity log records the operation, user account, timestamp, and field level audit details. | |
+| I3 | **Security Posture**| Log in as `ceo` or `admin`. Go to `/settings/security`. | Shows traffic-light security posture cards, plain language access overview, database indicators, and no raw jargon. | |
+| I4 | **PWA Offline Mode** | Simulating offline connection using Chrome devtools. Load the site. | The PWA install bottom sheet prompt displays correctly; offline mode opens the offline fallback shell showing a friendly offline warning. | |
+| I5 | **Unified Trash page**| Go to `/events/trash` or `/assets/trash`. Trash an active item, then click **Restore**. | Soft deleted items appear in the trash queue; clicking restore returns them to active tables; permanent deletion destroys them. | |
+| I6 | **Record Duplication**| Go to `/employees` or `/assets`. Click **Clone** / **Duplicate**. | Cloned record duplicates field data (names, classifications, details) and images dynamically. | |
+
+---
+
 
 ## 5. UI Aesthetics & Responsiveness Checklist
 
