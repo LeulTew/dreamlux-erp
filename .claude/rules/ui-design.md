@@ -19,9 +19,7 @@ Before modifying or creating any component, page, stylesheet, or asset, you MUST
 ---
 
 ## 3. Geometric Elements & Borders
-- **Border Radius**: Use only the token-backed global radius utilities defined in `frontend/src/app/globals.css`; do not use arbitrary radius classes like `rounded-[...]` for new or touched UI.
-  - Dense form controls and compact inline buttons may use `rounded-lg` or `rounded-xl` when the surrounding UI uses the same curved system.
-  - Cards, drawers, panels, tables, and primary content blocks should use the site's curved global scale such as `rounded-2xl`, `rounded-3xl`, or `rounded-4xl` consistently with nearby surfaces.
+- **Border Radius**: Use only our global custom border-radius CSS variables/tokens defined in `globals.css` (`--radius-sm`, `--radius-md`, `--radius-lg`/`--radius`, `--radius-xl`, `--radius-2xl`, `--radius-3xl`, `--radius-4xl`) for all containers, buttons, and cards consistently to maintain our highly curved design language. Banish arbitrary hardcoded border radius values or default Tailwind radius overrides.
   - Avoid bare `rounded`, un-tokened CSS `border-radius`, and one-off radius values. Use `rounded-full` only for true circles, avatars, progress dots, and loading spinners.
 - **Shadows**: Keep shadows minimal or completely flat. Rely on clean, high-contrast borders (`1px border-border` or `border-gold/20`) to separate components instead of large, blurred shadows.
 
