@@ -411,6 +411,13 @@ export default function HisabReportPage() {
           header, footer, nav, aside, [data-sidebar], .toolbar-container, .tabs-container { display: none !important; }
           main, .page-container-lg { border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; background: transparent !important; }
         }
+        .dl-radius-sm { border-radius: var(--radius-sm) !important; }
+        .dl-radius-md { border-radius: var(--radius-md) !important; }
+        .dl-radius-lg { border-radius: var(--radius-lg) !important; }
+        .dl-radius-xl { border-radius: var(--radius-xl) !important; }
+        .dl-radius-2xl { border-radius: var(--radius-2xl) !important; }
+        .dl-radius-3xl { border-radius: var(--radius-3xl) !important; }
+        .dl-radius-4xl { border-radius: var(--radius-4xl) !important; }
       `}} />
 
       <div className="page-container-lg space-y-6 px-4 sm:px-6 md:px-8 pt-4 md:py-8 print-container">
@@ -433,7 +440,7 @@ export default function HisabReportPage() {
         <div className="flex flex-col gap-4 border-b border-border/50 pb-5 lg:flex-row lg:items-end lg:justify-between no-print">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/30 bg-primary-light text-primary-dark">
+              <div className="flex h-11 w-11 items-center justify-center dl-radius-xl border border-primary/30 bg-primary-light text-primary-dark">
                 <HiBanknotes className="h-6 w-6" />
               </div>
               <div className="min-w-0">
@@ -451,16 +458,16 @@ export default function HisabReportPage() {
         </div>
 
         {/* Filters Toolbar */}
-        <div className="toolbar-container bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 no-print">
+        <div className="toolbar-container bg-card border border-border dl-radius-2xl 2xl:dl-radius-4xl p-3.5 no-print">
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div className="flex flex-wrap items-center gap-3">
               {/* Period type segmented control */}
-              <div className="flex h-[44px] items-center rounded-xl border border-border bg-card-alt p-1">
+              <div className="flex h-[44px] items-center dl-radius-xl border border-border bg-card-alt p-1">
                 {(["week", "month"] as const).map((option) => (
                   <button
                     key={option}
                     onClick={() => setPeriodType(option)}
-                    className={`h-full px-4 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${periodType === option ? "bg-primary text-primary-foreground" : "text-muted [@media(hover:hover)]:hover:text-foreground"}`}
+                    className={`h-full px-4 text-xs font-black uppercase tracking-wider dl-radius-lg transition-all ${periodType === option ? "bg-primary text-primary-foreground" : "text-muted [@media(hover:hover)]:hover:text-foreground"}`}
                   >
                     {option === "week" ? t("Weekly") : t("Monthly")}
                   </button>
@@ -478,7 +485,7 @@ export default function HisabReportPage() {
 
               <button
                 onClick={handleResetFilters}
-                className="h-[44px] px-4 text-xs font-black uppercase tracking-wider rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] flex items-center gap-1.5"
+                className="h-[44px] px-4 text-xs font-black uppercase tracking-wider dl-radius-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] flex items-center gap-1.5"
               >
                 <HiArrowPath className="w-3.5 h-3.5" />
                 {t("Reset")}
@@ -488,13 +495,13 @@ export default function HisabReportPage() {
             <div className="relative">
               <button
                 onClick={() => setIsExportOpen(!isExportOpen)}
-                className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
+                className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider dl-radius-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground"
               >
                 <HiArrowDownTray className="w-4 h-4" />
                 {t("Export")}
               </button>
               {isExportOpen && (
-                <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-xl shadow-massive z-10 py-1">
+                <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border dl-radius-xl shadow-massive z-10 py-1">
                   <button onClick={() => handleExport("csv")} className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt">
                     {t("Export CSV")}
                   </button>
@@ -526,25 +533,25 @@ export default function HisabReportPage() {
         {/* KPI strip */}
         {summary && (
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="dl-radius-2xl border border-border bg-card p-4">
               <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Event Income")}</div>
               <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">{formatCurrency(summary.eventIncome)}</div>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="dl-radius-2xl border border-border bg-card p-4">
               <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Event Expenses")}</div>
               <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">{formatCurrency(summary.eventExpenses)}</div>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="dl-radius-2xl border border-border bg-card p-4">
               <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Event Profit")}</div>
               <div className={`mt-2 text-xl font-black font-mono tabular-nums ${summary.eventProfit >= 0 ? "text-success" : "text-danger"}`}>
                 {formatCurrency(summary.eventProfit)}
               </div>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="dl-radius-2xl border border-border bg-card p-4">
               <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Operational Spend")}</div>
               <div className="mt-2 text-xl font-black text-foreground font-mono tabular-nums">{formatCurrency(summary.operationalExpenses)}</div>
             </div>
-            <div className="rounded-2xl border border-border bg-card p-4 col-span-2 lg:col-span-1">
+            <div className="dl-radius-2xl border border-border bg-card p-4 col-span-2 lg:col-span-1">
               <div className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Net")}</div>
               <div className={`mt-2 text-xl font-black font-mono tabular-nums ${summary.net >= 0 ? "text-success" : "text-danger"}`}>
                 {formatCurrency(summary.net)}
@@ -563,17 +570,17 @@ export default function HisabReportPage() {
               <Skeleton className="h-64 w-full" />
             </div>
           ) : rollupError || !rollup ? (
-            <div className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-8 text-center text-muted">
+            <div className="dl-radius-2xl 2xl:dl-radius-4xl border border-border bg-card p-8 text-center text-muted">
               {t("Workspace unavailable")}
             </div>
           ) : periods.length === 0 ? (
-            <div className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-8 text-center text-sm text-muted">
+            <div className="dl-radius-2xl 2xl:dl-radius-4xl border border-border bg-card p-8 text-center text-sm text-muted">
               {t("No data found for the selected date range.")}
             </div>
           ) : (
             <div className="space-y-6">
               {periods.map((period) => (
-                <section key={period.period_start} className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5 space-y-4">
+                <section key={period.period_start} className="dl-radius-2xl 2xl:dl-radius-4xl border border-border bg-card p-5 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
                     <div className="flex items-center gap-2">
                       <HiCalendarDays className="h-5 w-5 text-primary-dark" />
@@ -639,7 +646,7 @@ export default function HisabReportPage() {
                   )}
 
                   {(period.operational.byCategory.length > 0 || period.operational.pendingExposure > 0) && (
-                    <div className="rounded-xl border border-border/60 bg-card-alt/20 p-4">
+                    <div className="dl-radius-xl border border-border/60 bg-card-alt/20 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                         <h3 className="text-[10px] font-black text-muted uppercase tracking-[0.2em]">{t("Non-Event Expenses")}</h3>
                         {period.operational.pendingExposure > 0 && (
@@ -670,7 +677,7 @@ export default function HisabReportPage() {
 
         {/* Ledger view */}
         {activeTab === "ledger" && (
-          <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5 space-y-4 no-print">
+          <section className="dl-radius-2xl 2xl:dl-radius-4xl border border-border bg-card p-5 space-y-4 no-print">
             <div className="flex flex-wrap items-center gap-3 justify-between">
               <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
                 <div className="relative flex-1 max-w-xs">
@@ -680,7 +687,7 @@ export default function HisabReportPage() {
                     placeholder={t("Search descriptions...")}
                     value={ledgerSearch}
                     onChange={(e) => { setLedgerSearch(e.target.value); setLedgerPage(1); }}
-                    className="w-full pl-10 pr-4 h-[44px] rounded-xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
+                    className="w-full pl-10 pr-4 h-[44px] dl-radius-xl bg-card-alt text-sm focus:ring-1 focus:ring-primary/30 outline-none border border-border transition-all"
                   />
                 </div>
                 <Select
@@ -755,7 +762,7 @@ export default function HisabReportPage() {
                                       onClick={() => reviewMutation.mutate({ id: expense.id, decision: "approve" })}
                                       disabled={reviewMutation.isPending}
                                       aria-label={t("Approve")}
-                                      className="flex items-center gap-1 h-[36px] px-3 text-[10px] font-black uppercase tracking-wider rounded-lg border border-success/40 text-success [@media(hover:hover)]:hover:bg-success/10 transition-all disabled:opacity-50"
+                                      className="flex items-center gap-1 h-[36px] px-3 text-[10px] font-black uppercase tracking-wider dl-radius-lg border border-success/40 text-success [@media(hover:hover)]:hover:bg-success/10 transition-all disabled:opacity-50"
                                     >
                                       <HiCheck className="w-3.5 h-3.5" />
                                       {t("Approve")}
@@ -764,7 +771,7 @@ export default function HisabReportPage() {
                                       onClick={() => { setRejectingId(expense.id); setRejectReason(""); }}
                                       disabled={reviewMutation.isPending}
                                       aria-label={t("Reject")}
-                                      className="flex items-center gap-1 h-[36px] px-3 text-[10px] font-black uppercase tracking-wider rounded-lg border border-danger/40 text-danger [@media(hover:hover)]:hover:bg-danger/10 transition-all disabled:opacity-50"
+                                      className="flex items-center gap-1 h-[36px] px-3 text-[10px] font-black uppercase tracking-wider dl-radius-lg border border-danger/40 text-danger [@media(hover:hover)]:hover:bg-danger/10 transition-all disabled:opacity-50"
                                     >
                                       <HiXMark className="w-3.5 h-3.5" />
                                       {t("Reject")}
@@ -779,7 +786,7 @@ export default function HisabReportPage() {
                                       value={rejectReason}
                                       onChange={(e) => setRejectReason(e.target.value)}
                                       placeholder={t("Rejection reason")}
-                                      className="h-[36px] w-40 px-3 rounded-lg bg-card-alt text-xs outline-none border border-border focus:ring-1 focus:ring-danger/30"
+                                      className="h-[36px] w-40 px-3 dl-radius-lg bg-card-alt text-xs outline-none border border-border focus:ring-1 focus:ring-danger/30"
                                     />
                                     <button
                                       onClick={() => {
@@ -791,14 +798,14 @@ export default function HisabReportPage() {
                                       }}
                                       disabled={reviewMutation.isPending}
                                       aria-label={t("Reject")}
-                                      className="h-[36px] px-3 text-[10px] font-black uppercase tracking-wider rounded-lg bg-danger text-white transition-all disabled:opacity-50"
+                                      className="h-[36px] px-3 text-[10px] font-black uppercase tracking-wider dl-radius-lg bg-danger text-white transition-all disabled:opacity-50"
                                     >
                                       {t("Reject")}
                                     </button>
                                     <button
                                       onClick={() => setRejectingId(null)}
                                       aria-label={t("Cancel")}
-                                      className="h-[36px] px-2 text-[10px] font-black uppercase tracking-wider rounded-lg border border-border text-muted"
+                                      className="h-[36px] px-2 text-[10px] font-black uppercase tracking-wider dl-radius-lg border border-border text-muted"
                                     >
                                       <HiXMark className="w-3.5 h-3.5" />
                                     </button>
@@ -809,7 +816,7 @@ export default function HisabReportPage() {
                                     <button
                                       onClick={() => openEditForm(expense)}
                                       aria-label={t("Edit")}
-                                      className="flex items-center justify-center h-[36px] w-[36px] rounded-lg border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
+                                      className="flex items-center justify-center h-[36px] w-[36px] dl-radius-lg border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all"
                                     >
                                       <HiPencilSquare className="w-3.5 h-3.5" />
                                     </button>
@@ -817,7 +824,7 @@ export default function HisabReportPage() {
                                       onClick={() => setDeletingExpense(expense)}
                                       disabled={deleteMutation.isPending}
                                       aria-label={t("Delete")}
-                                      className="flex items-center justify-center h-[36px] w-[36px] rounded-lg border border-danger/40 text-danger [@media(hover:hover)]:hover:bg-danger/10 transition-all disabled:opacity-50"
+                                      className="flex items-center justify-center h-[36px] w-[36px] dl-radius-lg border border-danger/40 text-danger [@media(hover:hover)]:hover:bg-danger/10 transition-all disabled:opacity-50"
                                     >
                                       <HiTrash className="w-3.5 h-3.5" />
                                     </button>
@@ -879,7 +886,7 @@ export default function HisabReportPage() {
                   <button
                     key={category}
                     onClick={() => setForm((f) => ({ ...f, category }))}
-                    className={`h-[40px] px-3.5 text-[11px] font-black uppercase tracking-wider rounded-lg border transition-all ${form.category === category ? "border-primary bg-primary/10 text-primary" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"}`}
+                    className={`h-[40px] px-3.5 text-[11px] font-black uppercase tracking-wider dl-radius-lg border transition-all ${form.category === category ? "border-primary bg-primary/10 text-primary" : "border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground"}`}
                   >
                     {t(category)}
                   </button>
@@ -894,7 +901,7 @@ export default function HisabReportPage() {
                 step="0.01"
                 value={form.amount}
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                className="w-full px-4 h-[44px] rounded-xl bg-card-alt text-sm font-mono tabular-nums outline-none border border-border focus:ring-1 focus:ring-primary/30 transition-all"
+                className="w-full px-4 h-[44px] dl-radius-xl bg-card-alt text-sm font-mono tabular-nums outline-none border border-border focus:ring-1 focus:ring-primary/30 transition-all"
               />
             </div>
             <div>
@@ -903,7 +910,7 @@ export default function HisabReportPage() {
                 type="text"
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                className="w-full px-4 h-[44px] rounded-xl bg-card-alt text-sm outline-none border border-border focus:ring-1 focus:ring-primary/30 transition-all"
+                className="w-full px-4 h-[44px] dl-radius-xl bg-card-alt text-sm outline-none border border-border focus:ring-1 focus:ring-primary/30 transition-all"
               />
             </div>
           </div>

@@ -1585,7 +1585,7 @@ export default function EventWorkspacePage() {
                       <Input value={tripDestination} onChange={(eventChange) => setTripDestination(eventChange.target.value)} placeholder={t("Destination")} />
                       <Input type="number" min="0" value={tripDistance} onChange={(eventChange) => setTripDistance(eventChange.target.value)} placeholder={t("Distance (km)")} />
                       <Input type="number" min="0" value={fuelPrice} onChange={(eventChange) => setFuelPrice(eventChange.target.value)} placeholder={t("Fuel Price")} />
-                      <div className="rounded-lg border border-border bg-card-alt/50 p-3 text-xs font-semibold text-muted">
+                      <div className="border border-border bg-card-alt/50 p-3 text-xs font-semibold text-muted" style={{ borderRadius: "var(--radius-lg)" }}>
                         <div>
                           {t("Fuel cost preview")}: <span className="text-foreground tabular-nums">{formatCurrency(fuelCostPreview.fuelCostEtb)}</span>
                         </div>
@@ -1606,7 +1606,8 @@ export default function EventWorkspacePage() {
                       </div>
                       <Button
                         type="button"
-                        className="w-full h-11 px-5 rounded-xl bg-primary text-on-primary text-xs font-black uppercase tracking-widest md:hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                        className="w-full h-11 px-5 bg-primary text-on-primary text-xs font-black uppercase tracking-widest md:hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-premium"
+                        style={{ borderRadius: "var(--radius-xl)" }}
                         loading={createTripMutation.isPending}
                         onClick={() => {
                           if (!tripVehicleAssignmentId || !tripDestination.trim() || Number(tripDistance) <= 0 || Number(fuelPrice) <= 0 || hasInvalidSelectedFuelRate) {
