@@ -42,6 +42,9 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { slug: "finance:overheads:read", description: "View monthly overhead register and summaries" },
   { slug: "finance:overheads:write", description: "Create and update monthly overhead expenses" },
   { slug: "finance:overheads:approve", description: "Approve, reject, and close monthly overhead expenses" },
+  { slug: "finance:investments:read", description: "View capital investment register and summaries" },
+  { slug: "finance:investments:write", description: "Create and update capital investment entries" },
+  { slug: "finance:investments:approve", description: "Approve, reject, delete, and export capital investment entries" },
 ];
 
 export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
@@ -90,6 +93,9 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
     "finance:overheads:read",
     "finance:overheads:write",
     "finance:overheads:approve",
+    "finance:investments:read",
+    "finance:investments:write",
+    "finance:investments:approve",
   ],
   driver: ["events:read", "trips:create"],
 };

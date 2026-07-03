@@ -28,6 +28,7 @@ describe("Issue #31 final verification hooks", () => {
     expect(rlsScript).toContain("/rest/v1/");
     expect(rlsScript).toContain("SUPABASE_URL");
     expect(rlsScript).toContain("SUPABASE_ANON_KEY");
+    expect(rlsScript).toContain("capital_investments");
     expect(rlsScript).toContain("employees");
     expect(rlsScript).toContain("event_allocations");
     expect(rlsScript).toContain("finance_overhead_expenses");

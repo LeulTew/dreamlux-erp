@@ -9,6 +9,7 @@ const migrationSql = readFileSync(
 
 const protectedTables = [
   "app_settings",
+  "capital_investments",
   "categories",
   "departments",
   "employees",

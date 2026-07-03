@@ -8,6 +8,7 @@ DO $$
 DECLARE
   protected_tables text[] := ARRAY[
     'app_settings',
+    'capital_investments',
     'categories',
     'departments',
     'employees',
