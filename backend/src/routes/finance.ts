@@ -56,6 +56,14 @@ function formatOpexRow(row: Record<string, any>): Record<string, any> {
   return { ...row, amount: roundMoney(row.amount) };
 }
 
+// pg returns DATE columns as Date objects; audit values need plain YYYY-MM-DD.
+function toDateString(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  return String(value).slice(0, 10);
+}
+
 // GET /finance/operational-expenses — paginated non-event operational expense ledger
 router.get(
   "/operational-expenses",
@@ -224,8 +232,8 @@ router.patch(
         entityId: updated.id,
         userId: req.user?.id || null,
         action: "update",
-        oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${String(existing.expense_date).slice(0, 10)} [${existing.status}]`,
-        newValue: `${updated.category} ${roundMoney(updated.amount)} on ${String(updated.expense_date).slice(0, 10)} [Pending]`,
+        oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${toDateString(existing.expense_date)} [${existing.status}]`,
+        newValue: `${updated.category} ${roundMoney(updated.amount)} on ${toDateString(updated.expense_date)} [Pending]`,
         note: updated.description,
       });
       await client.query("COMMIT");
@@ -274,7 +282,7 @@ router.delete(
         entityId: existing.id,
         userId: req.user?.id || null,
         action: "delete",
-        oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${String(existing.expense_date).slice(0, 10)}`,
+        oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${toDateString(existing.expense_date)}`,
         note: existing.description,
       });
       await client.query("COMMIT");

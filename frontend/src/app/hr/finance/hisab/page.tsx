@@ -32,7 +32,7 @@ import {
   api,
   FINANCE_OPEX_CATEGORIES,
   getHisabReport,
-  getHisabExportUrl,
+  downloadHisabExport,
   getFinanceOperationalExpenses,
   createFinanceOperationalExpense,
   updateFinanceOperationalExpense,
@@ -323,12 +323,14 @@ export default function HisabReportPage() {
   const formatCurrency = (value: number) =>
     `ETB ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const handleExport = (format: "csv" | "xlsx") => {
+  const handleExport = async (format: "csv" | "xlsx") => {
     setIsExportOpen(false);
-    window.open(
-      getHisabExportUrl({ period_type: periodType, start_date: startDate, end_date: endDate, format }),
-      "_blank",
-    );
+    try {
+      await downloadHisabExport({ period_type: periodType, start_date: startDate, end_date: endDate, format });
+    } catch (err) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string };
+      toast.error(axiosErr.response?.data?.error || axiosErr.message || t("Workspace unavailable"));
+    }
   };
 
   const handleResetFilters = () => {

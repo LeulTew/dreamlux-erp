@@ -1559,14 +1559,24 @@ export const getHisabReport = (params: {
 }): Promise<HisabReportResponse> =>
   api.get("/finance/hisab", { params }).then((r) => r.data);
 
-export const getHisabExportUrl = (params: Record<string, unknown>) => {
-  const url = new URL("/finance/hisab/export", api.defaults.baseURL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:4000"));
-  Object.entries(params).forEach(([key, val]) => {
-    if (val !== undefined && val !== null) {
-      url.searchParams.append(key, String(val));
-    }
-  });
-  return url.toString();
+// Downloads through the authenticated axios client (window.open cannot send the
+// Authorization header) and triggers a browser save of the returned file.
+export const downloadHisabExport = async (params: {
+  period_type: "week" | "month";
+  start_date: string;
+  end_date: string;
+  format: "csv" | "xlsx";
+}): Promise<void> => {
+  const response = await api.get("/finance/hisab/export", { params, responseType: "blob" });
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const url = window.URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `hisab-report-${dateTag}.${params.format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };
 
 export const getFinanceOperationalExpenses = (

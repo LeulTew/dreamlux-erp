@@ -52,7 +52,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/api", () => ({
   FINANCE_OPEX_CATEGORIES: ["Transport", "Rental", "Labour", "Office Lunch", "Lunch", "Utilities", "Supplies", "Maintenance", "Other"],
   getHisabReport: vi.fn(),
-  getHisabExportUrl: vi.fn().mockReturnValue("http://localhost:4000/finance/hisab/export"),
+  downloadHisabExport: vi.fn().mockResolvedValue(undefined),
   getFinanceOperationalExpenses: vi.fn(),
   createFinanceOperationalExpense: vi.fn(),
   updateFinanceOperationalExpense: vi.fn(),
