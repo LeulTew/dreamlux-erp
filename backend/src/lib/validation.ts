@@ -748,9 +748,21 @@ export const financeOverheadSummaryQuerySchema = z.object({
 
 export const financeOverheadMonthParamSchema = overheadMonthSchema;
 
+export const monthlyNetProfitQuerySchema = z.object({
+  month: overheadMonthSchema,
+  include_investments_in_net: z.coerce.boolean().optional().default(false),
+});
+
+export const monthlyNetProfitExportQuerySchema = monthlyNetProfitQuerySchema.extend({
+  format: z.enum(["csv", "xlsx"]).optional().default("csv"),
+  maxRows: z.coerce.number().int().min(1).max(1000).optional().default(1000),
+});
+
 export type CreateFinanceOverheadInput = z.infer<typeof createFinanceOverheadSchema>;
 export type UpdateFinanceOverheadInput = z.infer<typeof updateFinanceOverheadSchema>;
 export type FinanceOverheadListQueryInput = z.infer<typeof financeOverheadListQuerySchema>;
+export type MonthlyNetProfitQueryInput = z.infer<typeof monthlyNetProfitQuerySchema>;
+export type MonthlyNetProfitExportQueryInput = z.infer<typeof monthlyNetProfitExportQuerySchema>;
 
 // --- Issue #111: Capital investment & asset purchase register ---
 

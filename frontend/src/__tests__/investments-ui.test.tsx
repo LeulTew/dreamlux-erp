@@ -26,11 +26,13 @@ vi.mock("@/components/AuthLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="auth-layout">{children}</div>,
 }));
 
+type MockQueryData = Record<string, unknown> | null;
+
 // Mock react-query
-let mockAuthData: unknown = null;
+let mockAuthData: MockQueryData = null;
 let mockAuthLoading = false;
-let mockSummaryData: unknown = null;
-let mockListData: unknown = null;
+let mockSummaryData: MockQueryData = null;
+let mockListData: MockQueryData = null;
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {

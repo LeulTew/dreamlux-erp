@@ -832,3 +832,106 @@ export interface CapitalInvestmentListResponse {
   limit: number;
   totalPages: number;
 }
+
+export interface MonthlyNetProfitStatement {
+  month: string;
+  period: {
+    start_date: string;
+    end_date: string;
+    closed: boolean;
+    closure: {
+      closed_at: string;
+      closed_by_username: string | null;
+    } | null;
+    snapshot_policy: string;
+  };
+  treatment: {
+    investments: "deducted_below_operating_profit" | "shown_below_operating_profit";
+    payroll: string;
+  };
+  totals: {
+    eventRevenue: number;
+    approvedEventExpenses: number;
+    eventGrossProfit: number;
+    operationalExpenses: number;
+    overheadExpenses: number;
+    payrollExpenses: number;
+    operatingProfit: number;
+    approvedInvestments: number;
+    netAfterInvestments: number;
+    pendingExposure: number;
+    marginPercentage: number;
+  };
+  counts: {
+    events: number;
+    payrollRuns: number;
+    payrollEmployeeLines: number;
+    investmentRows: number;
+  };
+  breakdowns: {
+    eventExpensesByCategory: Array<{
+      category: string;
+      amount: number;
+      count: number;
+    }>;
+    operationalExpensesByCategory: Array<{
+      category: string;
+      amount: number;
+      pendingAmount: number;
+      count: number;
+    }>;
+    overheadByScope: Array<{
+      scope: string;
+      payment_kind: string;
+      amount: number;
+      pendingAmount: number;
+      count: number;
+    }>;
+    investmentsByCategory: Array<{
+      category: string;
+      amount: number;
+      pendingAmount: number;
+      count: number;
+    }>;
+    payroll: {
+      amount: number;
+      finalizedRunCount: number;
+      employeeLineCount: number;
+      staffPaymentOverheadIncluded: number;
+      staffPaymentOverheadExcluded: number;
+      nonPayrollOverhead: number;
+    };
+  };
+  drilldowns: {
+    events: Array<{
+      id: string;
+      name: string;
+      start_date: string;
+      revenue: number;
+      approvedExpenses: number;
+      pendingExpenses: number;
+      netProfit: number;
+    }>;
+    payrollRuns: Array<{
+      id: string;
+      title: string;
+      period_start: string;
+      period_end: string;
+      total: number;
+    }>;
+    investments: Array<{
+      id: string;
+      item_name: string;
+      category: string;
+      purchase_date: string;
+      quantity: number;
+      unit: string;
+      unit_cost: number;
+      total_cost: number;
+      vendor: string | null;
+      capex_classification: string;
+      asset_id: string | null;
+    }>;
+  };
+}
+
