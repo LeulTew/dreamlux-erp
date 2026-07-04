@@ -85,7 +85,8 @@ INSERT INTO permissions (slug, description) VALUES
   ('finance:overheads:approve', 'Approve, reject, and close monthly overhead expenses'),
   ('finance:investments:read', 'View capital investment register and summaries'),
   ('finance:investments:write', 'Create and update capital investment entries'),
-  ('finance:investments:approve', 'Approve, reject, delete, and export capital investment entries')
+  ('finance:investments:approve', 'Approve, reject, delete, and export capital investment entries'),
+  ('finance:imports:write', 'Preview and commit legacy Hisab workbook imports')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Role-to-permission mappings
@@ -148,7 +149,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read', 'finance:hisab:read', 'finance:opex:write', 'finance:opex:approve', 'finance:overheads:read', 'finance:overheads:write', 'finance:overheads:approve', 'finance:investments:read', 'finance:investments:write', 'finance:investments:approve')
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read', 'finance:hisab:read', 'finance:opex:write', 'finance:opex:approve', 'finance:overheads:read', 'finance:overheads:write', 'finance:overheads:approve', 'finance:investments:read', 'finance:investments:write', 'finance:investments:approve', 'finance:imports:write')
 WHERE LOWER(r.name) IN ('accountant')
 ON CONFLICT DO NOTHING;
 
@@ -696,6 +697,24 @@ CREATE TABLE IF NOT EXISTS trips (
 
 CREATE INDEX IF NOT EXISTS idx_trips_assignment ON trips(vehicle_assignment_id);
 
+-- 19. Finance Import Batches (legacy workbook reconciliation trace)
+CREATE TABLE IF NOT EXISTS finance_import_batches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workbook_hash TEXT NOT NULL UNIQUE,
+  source_filename TEXT,
+  layout_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('Committed', 'Failed')) DEFAULT 'Committed',
+  row_counts JSONB NOT NULL DEFAULT '{}'::jsonb,
+  mismatch_count INTEGER NOT NULL DEFAULT 0 CHECK (mismatch_count >= 0),
+  unmatched_count INTEGER NOT NULL DEFAULT 0 CHECK (unmatched_count >= 0),
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  committed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_finance_import_batches_created_at
+  ON finance_import_batches(created_at DESC);
+
 -- 19. Expenses (event expenses logged for Accountant approval)
 CREATE TABLE IF NOT EXISTS expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -708,6 +727,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   rejected_reason TEXT DEFAULT NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  source_import_id UUID REFERENCES finance_import_batches(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   approved_at TIMESTAMP DEFAULT NULL
 );
@@ -715,6 +735,9 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_expenses_event ON expenses(event_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_event_status_category ON expenses(event_id, status, category);
+CREATE INDEX IF NOT EXISTS idx_expenses_source_import
+  ON expenses(source_import_id)
+  WHERE source_import_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_auto_labor_once_per_event
   ON expenses(event_id)
   WHERE category = 'Labor'
@@ -777,6 +800,7 @@ CREATE TABLE IF NOT EXISTS finance_operational_expenses (
   rejected_reason TEXT DEFAULT NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  source_import_id UUID REFERENCES finance_import_batches(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   approved_at TIMESTAMP DEFAULT NULL,
@@ -789,6 +813,9 @@ CREATE INDEX IF NOT EXISTS idx_finance_opex_date
 CREATE INDEX IF NOT EXISTS idx_finance_opex_status_date
   ON finance_operational_expenses(status, expense_date)
   WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_finance_opex_source_import
+  ON finance_operational_expenses(source_import_id)
+  WHERE source_import_id IS NOT NULL;
 
 -- 23. Finance Overhead Expenses (monthly overhead & shared operating register)
 CREATE TABLE IF NOT EXISTS finance_overhead_expenses (
@@ -808,6 +835,7 @@ CREATE TABLE IF NOT EXISTS finance_overhead_expenses (
   rejected_reason TEXT DEFAULT NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  source_import_id UUID REFERENCES finance_import_batches(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   approved_at TIMESTAMP DEFAULT NULL,
@@ -825,6 +853,9 @@ CREATE INDEX IF NOT EXISTS idx_finance_overheads_status_month
 CREATE INDEX IF NOT EXISTS idx_finance_overheads_staff_employee_month
   ON finance_overhead_expenses(employee_id, expense_month)
   WHERE deleted_at IS NULL AND payment_kind = 'staff_payment' AND employee_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_finance_overheads_source_import
+  ON finance_overhead_expenses(source_import_id)
+  WHERE source_import_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS finance_overhead_month_closures (
   month DATE PRIMARY KEY,
@@ -851,6 +882,7 @@ CREATE TABLE IF NOT EXISTS capital_investments (
   rejected_reason TEXT DEFAULT NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  source_import_id UUID REFERENCES finance_import_batches(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   approved_at TIMESTAMP DEFAULT NULL,
@@ -869,3 +901,6 @@ CREATE INDEX IF NOT EXISTS idx_capital_investments_category_date
 CREATE INDEX IF NOT EXISTS idx_capital_investments_asset
   ON capital_investments(asset_id)
   WHERE deleted_at IS NULL AND asset_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_capital_investments_source_import
+  ON capital_investments(source_import_id)
+  WHERE source_import_id IS NOT NULL;
