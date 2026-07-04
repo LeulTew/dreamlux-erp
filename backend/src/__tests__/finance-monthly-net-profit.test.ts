@@ -247,6 +247,15 @@ describe("Monthly net profit statement", () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  test("does not expose complete monthly finance statement to event-profit-only users", async () => {
+    const res = await request(app)
+      .get("/finance/reports/monthly-net-profit?month=2026-05")
+      .set("Authorization", `Bearer ${getToken("MANAGER", ["reports:profit:read"])}`);
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   test("requires authentication", async () => {
     const res = await request(app).get("/finance/reports/monthly-net-profit?month=2026-05");
 
@@ -277,5 +286,15 @@ describe("Monthly net profit export", () => {
     expect(res.status).toBe(413);
     expect(mockConnect).toHaveBeenCalled();
     expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO public.activity_logs"))).toBe(true);
+  });
+
+  test("does not export payroll and investment drilldowns to event-profit-only users", async () => {
+    const res = await request(app)
+      .get("/finance/reports/monthly-net-profit/export?month=2026-05&format=csv")
+      .set("Authorization", `Bearer ${getToken("MANAGER", ["reports:profit:read"])}`);
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockConnect).not.toHaveBeenCalled();
   });
 });

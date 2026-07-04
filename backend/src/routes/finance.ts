@@ -69,7 +69,7 @@ function monthlyNetProfitExportRows(statement: Awaited<ReturnType<typeof buildMo
 // GET /finance/reports/monthly-net-profit — complete month statement read model
 router.get(
   "/reports/monthly-net-profit",
-  requirePermissionSlugs(["finance:hisab:read", "reports:profit:read"]),
+  requirePermissionSlugs(["finance:hisab:read"]),
   async (req: AuthRequest, res: Response) => {
     try {
       const validationResult = monthlyNetProfitQuerySchema.safeParse(req.query);
@@ -90,7 +90,7 @@ router.get(
 // GET /finance/reports/monthly-net-profit/export — bounded statement export
 router.get(
   "/reports/monthly-net-profit/export",
-  requirePermissionSlugs(["finance:hisab:read", "reports:profit:read"]),
+  requirePermissionSlugs(["finance:hisab:read"]),
   async (req: AuthRequest, res: Response) => {
     try {
       const validationResult = monthlyNetProfitExportQuerySchema.safeParse(req.query);
