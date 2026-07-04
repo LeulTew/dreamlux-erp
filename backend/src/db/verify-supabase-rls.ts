@@ -1,6 +1,7 @@
 import { getEnv } from "../lib/env";
 
 const protectedTables = [
+  "capital_investments",
   "employees",
   "payroll_runs",
   "salary_levels",

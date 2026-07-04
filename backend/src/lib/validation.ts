@@ -751,3 +751,90 @@ export const financeOverheadMonthParamSchema = overheadMonthSchema;
 export type CreateFinanceOverheadInput = z.infer<typeof createFinanceOverheadSchema>;
 export type UpdateFinanceOverheadInput = z.infer<typeof updateFinanceOverheadSchema>;
 export type FinanceOverheadListQueryInput = z.infer<typeof financeOverheadListQuerySchema>;
+
+// --- Issue #111: Capital investment & asset purchase register ---
+
+export const CAPITAL_INVESTMENT_CATEGORIES = [
+  "Equipment",
+  "Fabric",
+  "Fixtures",
+  "Hardware",
+  "Vehicle",
+  "Store Buildout",
+  "Office Equipment",
+  "Other",
+] as const;
+
+export const CAPITAL_INVESTMENT_CLASSIFICATIONS = [
+  "Capital Asset",
+  "Inventory Asset",
+  "Leasehold Improvement",
+  "Fixture",
+  "Other Capex",
+] as const;
+
+export const CAPITAL_INVESTMENT_STATUSES = ["Pending", "Approved", "Rejected"] as const;
+
+const investmentCategorySchema = z.enum(CAPITAL_INVESTMENT_CATEGORIES);
+const investmentClassificationSchema = z.enum(CAPITAL_INVESTMENT_CLASSIFICATIONS);
+const investmentStatusSchema = z.enum(CAPITAL_INVESTMENT_STATUSES);
+
+const investmentCoreFields = {
+  purchase_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid purchase date"),
+  item_name: z.string().trim().min(1, "Item name is required").max(300, "Item name too long"),
+  category: investmentCategorySchema,
+  quantity: z.coerce.number().min(0.0001, "Quantity must be greater than zero").max(1_000_000, "Quantity too large"),
+  unit: z.string().trim().min(1, "Unit is required").max(50, "Unit too long"),
+  unit_cost: z.coerce.number().min(0.01, "Unit cost must be greater than zero").max(100_000_000, "Unit cost too large"),
+  vendor: nullableText(300, "Vendor/source too long"),
+  notes: nullableText(1000, "Notes too long"),
+  capex_classification: investmentClassificationSchema,
+  asset_id: nullableUuid("Invalid linked asset ID"),
+  creates_inventory_stock: z.coerce.boolean().optional().default(false),
+};
+
+export const createCapitalInvestmentSchema = z.object(investmentCoreFields);
+
+export const updateCapitalInvestmentSchema = z.object({
+  purchase_date: investmentCoreFields.purchase_date.optional(),
+  item_name: investmentCoreFields.item_name.optional(),
+  category: investmentCategorySchema.optional(),
+  quantity: investmentCoreFields.quantity.optional(),
+  unit: investmentCoreFields.unit.optional(),
+  unit_cost: investmentCoreFields.unit_cost.optional(),
+  vendor: nullableText(300, "Vendor/source too long"),
+  notes: nullableText(1000, "Notes too long"),
+  capex_classification: investmentClassificationSchema.optional(),
+  asset_id: nullableUuid("Invalid linked asset ID"),
+  creates_inventory_stock: z.coerce.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, { message: "At least one field is required" });
+
+export const rejectCapitalInvestmentSchema = z.object({
+  rejected_reason: z.string().trim().min(1, "Rejection reason is required").max(1000, "Rejection reason too long"),
+});
+
+export const capitalInvestmentListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  month: overheadMonthSchema.optional(),
+  status: investmentStatusSchema.optional(),
+  category: investmentCategorySchema.optional(),
+  capex_classification: investmentClassificationSchema.optional(),
+  linked: z.enum(["linked", "unlinked"]).optional(),
+  search: z.string().max(200).optional(),
+});
+
+export const capitalInvestmentSummaryQuerySchema = z.object({
+  month: overheadMonthSchema.optional(),
+  category: investmentCategorySchema.optional(),
+  linked: z.enum(["linked", "unlinked"]).optional(),
+});
+
+export const capitalInvestmentExportQuerySchema = capitalInvestmentListQuerySchema.extend({
+  format: z.enum(["csv", "xlsx"]).optional().default("csv"),
+  maxRows: z.coerce.number().int().min(1).max(1000).optional().default(1000),
+});
+
+export type CreateCapitalInvestmentInput = z.infer<typeof createCapitalInvestmentSchema>;
+export type UpdateCapitalInvestmentInput = z.infer<typeof updateCapitalInvestmentSchema>;
+export type CapitalInvestmentListQueryInput = z.infer<typeof capitalInvestmentListQuerySchema>;

@@ -21,6 +21,9 @@ import {
   FinanceOverhead,
   FinanceOverheadSummary,
   FinanceOverheadListResponse,
+  CapitalInvestment,
+  CapitalInvestmentSummary,
+  CapitalInvestmentListResponse,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1658,3 +1661,65 @@ export const closeOverheadMonth = (month: string) =>
 export const reopenOverheadMonth = (month: string) =>
   api.post<{ month: string; closed: boolean }>(`/finance/overheads/months/${month}/reopen`).then((r) => r.data);
 
+// ====================================================
+// FINANCE — Capital Investments & Asset Purchases (#111)
+// ====================================================
+
+export const INVESTMENT_CATEGORIES = [
+  "Equipment",
+  "Fabric",
+  "Fixtures",
+  "Hardware",
+  "Vehicle",
+  "Store Buildout",
+  "Office Equipment",
+  "Other",
+] as const;
+
+export const CAPEX_CLASSIFICATIONS = [
+  "Capital Asset",
+  "Inventory Asset",
+  "Leasehold Improvement",
+  "Fixture",
+  "Other Capex",
+] as const;
+
+export const getCapitalInvestments = (
+  params: Record<string, unknown> = {}
+): Promise<CapitalInvestmentListResponse> =>
+  api.get("/finance/investments", { params }).then((r) => r.data);
+
+export const getCapitalInvestmentSummary = (
+  params: Record<string, unknown> = {}
+): Promise<CapitalInvestmentSummary> =>
+  api.get("/finance/investments/summary", { params }).then((r) => r.data);
+
+export const createCapitalInvestment = (data: Partial<CapitalInvestment>) =>
+  api.post<{ investment: CapitalInvestment }>("/finance/investments", data).then((r) => r.data);
+
+export const updateCapitalInvestment = (id: string, data: Partial<CapitalInvestment>) =>
+  api.patch<{ investment: CapitalInvestment }>(`/finance/investments/${id}`, data).then((r) => r.data);
+
+export const deleteCapitalInvestment = (id: string) =>
+  api.delete<{ deleted: boolean }>(`/finance/investments/${id}`).then((r) => r.data);
+
+export const approveCapitalInvestment = (id: string) =>
+  api.post<{ investment: CapitalInvestment }>(`/finance/investments/${id}/approve`).then((r) => r.data);
+
+export const rejectCapitalInvestment = (id: string, rejected_reason: string) =>
+  api.post<{ investment: CapitalInvestment }>(`/finance/investments/${id}/reject`, { rejected_reason }).then((r) => r.data);
+
+export const downloadCapitalInvestmentsExport = async (
+  params: Record<string, unknown> & { format: "csv" | "xlsx" }
+): Promise<void> => {
+  const response = await api.get("/finance/investments/export", { params, responseType: "blob" });
+  const dateTag = new Date().toISOString().slice(0, 10);
+  const url = window.URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `capital-investments-${dateTag}.${params.format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};

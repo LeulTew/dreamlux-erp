@@ -774,3 +774,61 @@ export interface FinanceOverheadListResponse {
   totalPages: number;
 }
 
+// ====================================================
+// FINANCE — Capital Investments & Asset Purchases (#111)
+// ====================================================
+
+export interface CapitalInvestment {
+  id: string;
+  purchase_date: string;
+  item_name: string;
+  category: "Equipment" | "Fabric" | "Fixtures" | "Hardware" | "Vehicle" | "Store Buildout" | "Office Equipment" | "Other";
+  quantity: number;
+  unit: string;
+  unit_cost: number;
+  total_cost: number;
+  vendor: string | null;
+  notes: string | null;
+  capex_classification: "Capital Asset" | "Inventory Asset" | "Leasehold Improvement" | "Fixture" | "Other Capex";
+  asset_id: string | null;
+  asset_name?: string | null;
+  asset_quantity?: number | null;
+  asset_unit?: string | null;
+  creates_inventory_stock: boolean;
+  status: "Pending" | "Approved" | "Rejected";
+  rejected_reason: string | null;
+  created_by: string | null;
+  created_by_username?: string | null;
+  approved_by: string | null;
+  approved_by_username?: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface CapitalInvestmentSummary {
+  totals: {
+    approvedTotal: number;
+    pendingTotal: number;
+    pendingCount: number;
+    linkedCount: number;
+    unlinkedCount: number;
+  };
+  byCategory: Array<{
+    category: string;
+    amount: number;
+  }>;
+  byClassification: Array<{
+    capex_classification: string;
+    amount: number;
+  }>;
+}
+
+export interface CapitalInvestmentListResponse {
+  investments: CapitalInvestment[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

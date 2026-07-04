@@ -82,7 +82,10 @@ INSERT INTO permissions (slug, description) VALUES
   ('finance:opex:approve', 'Approve or reject non-event operational expenses'),
   ('finance:overheads:read', 'View monthly overhead register and summaries'),
   ('finance:overheads:write', 'Create and update monthly overhead expenses'),
-  ('finance:overheads:approve', 'Approve, reject, and close monthly overhead expenses')
+  ('finance:overheads:approve', 'Approve, reject, and close monthly overhead expenses'),
+  ('finance:investments:read', 'View capital investment register and summaries'),
+  ('finance:investments:write', 'Create and update capital investment entries'),
+  ('finance:investments:approve', 'Approve, reject, delete, and export capital investment entries')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Role-to-permission mappings
@@ -145,7 +148,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read', 'finance:hisab:read', 'finance:opex:write', 'finance:opex:approve', 'finance:overheads:read', 'finance:overheads:write', 'finance:overheads:approve')
+JOIN permissions p ON p.slug IN ('payroll:read', 'payroll:write', 'exports:read', 'reports:profit:read', 'events:override_completed', 'expenses:write', 'expenses:labor_generate', 'expenses:approve', 'approvals:history:read', 'finance:hisab:read', 'finance:opex:write', 'finance:opex:approve', 'finance:overheads:read', 'finance:overheads:write', 'finance:overheads:approve', 'finance:investments:read', 'finance:investments:write', 'finance:investments:approve')
 WHERE LOWER(r.name) IN ('accountant')
 ON CONFLICT DO NOTHING;
 
@@ -828,3 +831,41 @@ CREATE TABLE IF NOT EXISTS finance_overhead_month_closures (
   closed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   closed_at TIMESTAMP DEFAULT NOW()
 );
+
+-- 24. Capital Investments (capex and asset purchase register)
+CREATE TABLE IF NOT EXISTS capital_investments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  purchase_date DATE NOT NULL,
+  item_name TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('Equipment', 'Fabric', 'Fixtures', 'Hardware', 'Vehicle', 'Store Buildout', 'Office Equipment', 'Other')),
+  quantity NUMERIC(12, 4) NOT NULL CHECK (quantity > 0),
+  unit TEXT NOT NULL,
+  unit_cost NUMERIC(12, 2) NOT NULL CHECK (unit_cost > 0),
+  total_cost NUMERIC(12, 2) GENERATED ALWAYS AS (ROUND((quantity * unit_cost)::numeric, 2)) STORED,
+  vendor TEXT DEFAULT NULL,
+  notes TEXT DEFAULT NULL,
+  capex_classification TEXT NOT NULL CHECK (capex_classification IN ('Capital Asset', 'Inventory Asset', 'Leasehold Improvement', 'Fixture', 'Other Capex')) DEFAULT 'Capital Asset',
+  asset_id UUID REFERENCES items(id) ON DELETE SET NULL,
+  creates_inventory_stock BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL CHECK (status IN ('Pending', 'Approved', 'Rejected')) DEFAULT 'Pending',
+  rejected_reason TEXT DEFAULT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  approved_at TIMESTAMP DEFAULT NULL,
+  deleted_at TIMESTAMP DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_capital_investments_purchase_date
+  ON capital_investments(purchase_date DESC)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_capital_investments_status_date
+  ON capital_investments(status, purchase_date DESC)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_capital_investments_category_date
+  ON capital_investments(category, purchase_date DESC)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_capital_investments_asset
+  ON capital_investments(asset_id)
+  WHERE deleted_at IS NULL AND asset_id IS NOT NULL;
