@@ -43,6 +43,7 @@ import {
   HiServerStack,
   HiShieldCheck,
   HiUsers,
+  HiChevronDown,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
@@ -204,6 +205,18 @@ export default function SettingsPage() {
 
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const canAccessAdmin = hasPermission("users:manage") || hasPermission("settings:write");
+
+  const currentUserRole = useMemo(() => {
+    if (typeof window === "undefined") return "admin";
+    try {
+      const userRaw = localStorage.getItem("user");
+      if (!userRaw) return "admin";
+      const parsed = JSON.parse(userRaw);
+      return parsed.role_name || parsed.role || "admin";
+    } catch {
+      return "admin";
+    }
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userModalTab, setUserModalTab] = useState<UserModalTab>("identity");
@@ -916,6 +929,93 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </section>
+
+                {/* Collapsed Page Permissions KPI/Map for Owner & Admin */}
+                {(currentUserRole === "admin" || currentUserRole === "owner" || currentUserRole === "SUPER_ADMIN") && (
+                  <div className="rounded-xl border border-border bg-card p-5">
+                    <details className="group">
+                      <summary className="flex items-center justify-between cursor-pointer list-none select-none">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-600">
+                            <HiShieldCheck className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">{t("Page Access & Permissions Map")}</h3>
+                            <p className="mt-0.5 text-xs text-muted">
+                              {t("Quick reference matrix mapping user roles to page access limits.")}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-muted-foreground group-open:rotate-180 transition-transform duration-300">
+                          <HiChevronDown className="w-5 h-5" />
+                        </span>
+                      </summary>
+                      
+                      <div className="mt-6 border-t border-border/60 pt-4 overflow-x-auto">
+                        <table className="w-full text-left text-xs font-mono">
+                          <thead className="bg-card-alt text-[10px] uppercase font-bold text-muted-foreground">
+                            <tr>
+                              <th className="px-4 py-2 border-b border-border/40">Page / Route</th>
+                              <th className="px-4 py-2 border-b border-border/40">Required Permission</th>
+                              <th className="px-4 py-2 border-b border-border/40">Owner</th>
+                              <th className="px-4 py-2 border-b border-border/40">Admin</th>
+                              <th className="px-4 py-2 border-b border-border/40">Accountant</th>
+                              <th className="px-4 py-2 border-b border-border/40">Event Manager</th>
+                              <th className="px-4 py-2 border-b border-border/40">Driver</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/40">
+                            <tr>
+                              <td className="px-4 py-2 font-bold text-foreground">/hr/finance/net-profit</td>
+                              <td className="px-4 py-2 text-amber-600">finance:hisab:read</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-bold text-foreground">/hr/finance/investments</td>
+                              <td className="px-4 py-2 text-amber-600">finance:investments:read</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-bold text-foreground">/hr/finance/overheads</td>
+                              <td className="px-4 py-2 text-amber-600">finance:overheads:read</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-bold text-foreground">/hr/finance/hisab</td>
+                              <td className="px-4 py-2 text-amber-600">finance:hisab:read</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-bold text-foreground">/hr/payments</td>
+                              <td className="px-4 py-2 text-amber-600">payroll:read / write</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                              <td className="px-4 py-2 text-rose-500">✗ No</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  </div>
+                )}
 
                 {/* Diagnostics Monitor Console */}
                 <div className="rounded-2xl border border-border bg-card p-6 shadow-premium relative overflow-hidden">
