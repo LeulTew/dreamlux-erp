@@ -306,11 +306,13 @@ body {
 }
 
 .input-premium {
-  @apply bg-card-alt border-none focus:ring-1 focus:ring-muted/30 transition-all rounded-lg px-4 py-3 outline-none;
+  @apply bg-card-alt border-none focus:ring-1 focus:ring-muted/30 transition-all px-4 py-3 outline-none;
+  border-radius: var(--radius-lg);
 }
 
 .button-premium {
-  @apply px-6 py-3 rounded-lg font-bold transition-all active:scale-95;
+  @apply px-6 py-3 font-bold transition-all active:scale-95;
+  border-radius: var(--radius-lg);
 }
 
 .text-on-primary {

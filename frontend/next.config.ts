@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: process.cwd(),
   env: {
     // ISOLATION: Default to the DEMO backend only. Never use the production backend URL here.
     // Production backend is backend-blush-mu-42.vercel.app (project: backend) — DO NOT use that URL here.
