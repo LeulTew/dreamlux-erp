@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import NetProfitPage from "../app/hr/finance/net-profit/page";
+import type { MonthlyNetProfitStatement } from "@/lib/types";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
@@ -26,12 +27,14 @@ vi.mock("@/components/AuthLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="auth-layout">{children}</div>,
 }));
 
+type MockAuthData = { permission_slugs: string[] } | null;
+
 // Mock react-query
-let mockAuthData: any = null;
+let mockAuthData: MockAuthData = null;
 let mockAuthLoading = false;
-let mockStatementData: any = null;
+let mockStatementData: MonthlyNetProfitStatement | null = null;
 let mockReportLoading = false;
-let mockReportError: any = null;
+let mockReportError: Error | null = null;
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {
@@ -56,11 +59,11 @@ const mockDownloadExport = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/api", () => ({
   getMonthlyNetProfitStatement: vi.fn(),
-  downloadMonthlyNetProfitExport: (params: any) => mockDownloadExport(params),
+  downloadMonthlyNetProfitExport: (params: { month: string; include_investments_in_net: boolean; format: "csv" | "xlsx"; maxRows: number }) => mockDownloadExport(params),
   api: { get: vi.fn() },
 }));
 
-const STATEMENT_FIXTURE = {
+const STATEMENT_FIXTURE: MonthlyNetProfitStatement = {
   month: "2026-05",
   period: {
     start_date: "2026-05-01",
@@ -156,15 +159,11 @@ describe("NetProfitPage Unit Tests", () => {
   });
 
   it("renders metrics totals and counts correctly when authorized", () => {
-    render(<NetProfitPage />);
+    const { container } = render(<NetProfitPage />);
     expect(screen.getAllByText("Net Profit Statement")[0]).toBeInTheDocument();
-    // Revenue check
-    expect(screen.getByText("250,000")).toBeInTheDocument();
-    // Operating profit check (matches both operating profit and net profit after investments since no investments are included by default)
-    expect(screen.getAllByText("115,000")[0]).toBeInTheDocument();
-    // Event count
+    expect(container.textContent).toMatch(/250[\s,]000 ETB/);
+    expect(container.textContent).toMatch(/115[\s,]000 ETB/);
     expect(screen.getByText("4 Events")).toBeInTheDocument();
-    // Margin check
     expect(screen.getByText("Margin: 46%")).toBeInTheDocument();
   });
 

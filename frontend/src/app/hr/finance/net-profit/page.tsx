@@ -171,6 +171,8 @@ const MONTHS = [
   { value: "12", label: { en: "December", am: "ታኅሣሥ" } },
 ];
 
+type NetProfitTab = "summary" | "events" | "payroll" | "opex" | "overheads" | "investments";
+
 export default function NetProfitPage() {
   const { lang } = useLanguage();
 
@@ -191,7 +193,7 @@ export default function NetProfitPage() {
   const defaultMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
   const [includeInvestments, setIncludeInvestments] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"summary" | "events" | "payroll" | "opex" | "overheads" | "investments">("summary");
+  const [activeTab, setActiveTab] = useState<NetProfitTab>("summary");
 
   const [yearVal, monthVal] = selectedMonth.split("-");
   const yearOptions = Array.from({ length: 6 }, (_, i) => {
@@ -253,10 +255,12 @@ export default function NetProfitPage() {
         format,
         maxRows: 1000,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
     }
   };
+
+  const reportErrorMessage = reportError instanceof Error ? reportError.message : "Internal server error";
 
   if (permissionsLoading) {
     return (
@@ -404,7 +408,7 @@ export default function NetProfitPage() {
             <HiExclamationCircle className="w-8 h-8 text-red-400 shrink-0" />
             <div>
               <h3 className="font-bold text-lg">Error loading statement</h3>
-              <p className="text-sm text-red-300">{(reportError as any).message || "Internal server error"}</p>
+              <p className="text-sm text-red-300">{reportErrorMessage}</p>
             </div>
           </div>
         ) : !statement ? (
@@ -585,17 +589,17 @@ export default function NetProfitPage() {
             {/* Drilldown Workbooks Tabs */}
             <div className="flex flex-col gap-4">
               <div className="flex border-b border-border/80 gap-6">
-                {[
+                {([
                   { id: "summary", label: t("Overview") },
                   { id: "events", label: `${t("Events")} (${statement.counts.events})` },
                   { id: "payroll", label: `${t("Payroll Runs")} (${statement.counts.payrollRuns})` },
                   { id: "opex", label: t("Operational Expenses") },
                   { id: "overheads", label: t("Overhead Expenses") },
                   { id: "investments", label: `${t("Capital Investments")} (${statement.counts.investmentRows})` },
-                ].map((tab) => (
+                ] satisfies Array<{ id: NetProfitTab; label: string }>).map((tab) => (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                    onClick={() => setActiveTab(tab.id)}
                     className={`pb-3 font-semibold text-sm transition-all focus:outline-none select-none relative ${
                       activeTab === tab.id ? "text-primary border-b-2 border-primary" : "text-neutral-400 hover:text-foreground"
                     }`}

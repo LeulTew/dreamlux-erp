@@ -32,7 +32,7 @@ export async function mockAuth(page: Page, options: PermissionMockOptions = {}) 
   const permissions = options.permissions ?? [];
   const isSuperuser = options.isSuperuser ?? false;
 
-  await page.route("http://localhost:4000/auth/me", (route) =>
+  await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -40,7 +40,7 @@ export async function mockAuth(page: Page, options: PermissionMockOptions = {}) 
     }),
   );
 
-  await page.route("http://localhost:4000/auth/permissions", (route) =>
+  await page.route("**/auth/permissions", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -65,15 +65,15 @@ export async function fulfillJson(route: Route, data: unknown, status = 200) {
 }
 
 export async function mockCommonShellData(page: Page) {
-  await page.route("http://localhost:4000/employees**", (route) =>
+  await page.route("**/employees**", (route) =>
     fulfillJson(route, { employees: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("http://localhost:4000/assets**", (route) =>
+  await page.route("**/assets**", (route) =>
     fulfillJson(route, { items: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("http://localhost:4000/events?**", (route) =>
+  await page.route("**/events?**", (route) =>
     fulfillJson(route, { events: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("http://localhost:4000/salary-levels**", (route) => fulfillJson(route, []));
-  await page.route("http://localhost:4000/payroll/runs**", (route) => fulfillJson(route, []));
+  await page.route("**/salary-levels**", (route) => fulfillJson(route, []));
+  await page.route("**/payroll/runs**", (route) => fulfillJson(route, []));
 }

@@ -124,13 +124,13 @@ test.describe("Issue 112 Net Profit Page Flow", () => {
 
     await page.goto("/hr/finance/net-profit");
 
-    await expect(page.getByText("250,000").first()).toBeVisible();
-    await expect(page.getByText("160,000").first()).toBeVisible();
+    await expect(page.getByText(/250[\s,]000/).first()).toBeVisible();
+    await expect(page.getByText(/160[\s,]000/).first()).toBeVisible();
 
     const toggle = page.locator("#include-investments-toggle");
     await toggle.click();
 
-    await expect(page.getByText("95,000").first()).toBeVisible();
+    await expect(page.getByText(/95[\s,]000/).first()).toBeVisible();
 
     await page.getByRole("button", { name: /events/i }).click();
     await expect(page.getByText("Mock E2E Event")).toBeVisible();
