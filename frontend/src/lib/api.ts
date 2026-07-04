@@ -1743,3 +1743,20 @@ export const downloadMonthlyNetProfitExport = async (
   link.remove();
   window.URL.revokeObjectURL(url);
 };
+
+// ====================================================
+// FINANCE — Hisab Workbook Imports (#113)
+// ====================================================
+
+export const previewHisabImport = (file: File): Promise<any> => {
+  const formData = new FormData();
+  formData.append("workbook", file);
+  return api
+    .post("/finance/imports/hisab/preview", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+};
+
+export const commitHisabImport = (data: any): Promise<any> =>
+  api.post("/finance/imports/hisab/commit", data).then((r) => r.data);

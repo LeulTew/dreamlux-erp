@@ -79,6 +79,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Salary Levels": "Salary Levels",
     Notifications: "Notifications",
     "Net Profit": "Net Profit",
+    "Hisab Import": "Hisab Import",
   },
   am: {
     Employees: "ሰራተኞች",
@@ -121,6 +122,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Offices: "ቢሮዎች",
     "Salary Levels": "የደሞዝ ደረጃዎች",
     "Net Profit": "የተጣራ ትርፍ",
+    "Hisab Import": "የሂሳብ ማስገቢያ",
   },
 };
 
@@ -421,6 +423,7 @@ export function AppSidebar() {
     { href: "/hr/finance/overheads", label: t("Overhead Register"), active: pathname === "/hr/finance/overheads", show: hasPermission("finance:overheads:read") },
     { href: "/hr/finance/investments", label: t("Capital Register"), active: pathname === "/hr/finance/investments", show: hasPermission("finance:investments:read") },
     { href: "/hr/finance/net-profit", label: t("Net Profit"), active: pathname === "/hr/finance/net-profit", show: hasPermission("finance:hisab:read") },
+    { href: "/hr/finance/imports", label: t("Hisab Import"), active: pathname === "/hr/finance/imports", show: hasPermission("finance:imports:write") },
     { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
   ].filter(l => l.show);
 
