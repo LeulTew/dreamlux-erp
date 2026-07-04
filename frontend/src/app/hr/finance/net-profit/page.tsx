@@ -226,7 +226,7 @@ export default function NetProfitPage() {
 
   const permissionList = permissions?.permission_slugs || [];
   const matches = createPermissionMatcher(permissionList);
-  const canRead = matches("reports:profit:read") || matches("finance:hisab:read");
+  const canRead = matches("finance:hisab:read");
 
   // Fetch Report Data
   const {

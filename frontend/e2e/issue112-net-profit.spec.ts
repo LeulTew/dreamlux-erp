@@ -146,4 +146,15 @@ test.describe("Issue 112 Net Profit Page Flow", () => {
     await page.goto("/hr/finance/net-profit");
     await expect(page.getByText(/forbidden/i)).toBeVisible();
   });
+
+  test("Reports Profit Read-only user is denied access", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, {
+      permissions: ["reports:profit:read"], // has reports:profit:read but not finance:hisab:read
+    });
+    await mockCommonShellData(page);
+
+    await page.goto("/hr/finance/net-profit");
+    await expect(page.getByText(/forbidden/i)).toBeVisible();
+  });
 });

@@ -141,15 +141,15 @@ describe("NetProfitPage Unit Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLang = "en";
-    mockAuthData = { permission_slugs: ["reports:profit:read"] };
+    mockAuthData = { permission_slugs: ["finance:hisab:read"] };
     mockAuthLoading = false;
     mockStatementData = STATEMENT_FIXTURE;
     mockReportLoading = false;
     mockReportError = null;
   });
 
-  it("gates access by showing ForbiddenState when permission is missing", () => {
-    mockAuthData = { permission_slugs: ["some:other:permission"] };
+  it("gates access by showing ForbiddenState when permission is missing or is read-only reports:profit:read", () => {
+    mockAuthData = { permission_slugs: ["reports:profit:read"] };
     render(<NetProfitPage />);
     expect(screen.getByText(/Forbidden/i)).toBeInTheDocument();
     expect(screen.queryByText("Net Profit Statement")).not.toBeInTheDocument();
