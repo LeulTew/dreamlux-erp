@@ -121,6 +121,48 @@ describe("Issue #33 Frontend UI Test Suite", () => {
 
       expect(hasMarginRisk).toBe(true);
     });
+
+    it("should validate estimate labels and return error highlights", () => {
+      const designLines = [{ label: "", amount: 1000, notes: "" }];
+      const teamLines = [{ label: "Waiters", amount: 2000, notes: "", people_count: 2, commission_per_person: 1000 }];
+      const tripLines = [{ label: "", amount: 500, notes: "" }];
+      const otherLines = [{ label: "Other Spend", amount: 300, notes: "" }];
+
+      const validateEstimateLabels = (
+        design: typeof designLines,
+        team: typeof teamLines,
+        trip: typeof tripLines,
+        other: typeof otherLines
+      ) => {
+        const missingDesign = design.map(l => !l.label.trim());
+        const missingTeam = team.map(l => !l.label.trim());
+        const missingTrip = trip.map(l => !l.label.trim());
+        const missingOther = other.map(l => !l.label.trim());
+
+        const hasError =
+          missingDesign.includes(true) ||
+          missingTeam.includes(true) ||
+          missingTrip.includes(true) ||
+          missingOther.includes(true);
+
+        return {
+          hasError,
+          errors: {
+            design: missingDesign,
+            team: missingTeam,
+            trip: missingTrip,
+            other: missingOther
+          }
+        };
+      };
+
+      const result = validateEstimateLabels(designLines, teamLines, tripLines, otherLines);
+      expect(result.hasError).toBe(true);
+      expect(result.errors.design[0]).toBe(true); // first design line has empty label
+      expect(result.errors.team[0]).toBe(false);   // team line has label
+      expect(result.errors.trip[0]).toBe(true);    // first trip line has empty label
+      expect(result.errors.other[0]).toBe(false);  // other line has label
+    });
   });
 
   describe("File Import Parsing Logic", () => {

@@ -8,6 +8,9 @@ import { EventType } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
 import Select from "@/components/ui/Select";
+import DatePicker from "@/components/ui/DatePicker";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   HiArrowRight,
   HiArrowLeft,
@@ -237,6 +240,14 @@ function NewProposalContent() {
   const [tripLines, setTripLines] = useState<EstimateLine[]>([]);
   const [otherLines, setOtherLines] = useState<EstimateLine[]>([]);
 
+  const [validationErrors, setValidationErrors] = useState<{
+    design: boolean[];
+    team: boolean[];
+    trip: boolean[];
+    other: boolean[];
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const searchParams = useSearchParams();
   const cloneFromId = searchParams.get("clone_from_id");
 
@@ -328,6 +339,38 @@ function NewProposalContent() {
     return ethioRegex.test(phoneStr.replace(/\s+/g, ""));
   };
 
+  const validateEstimateLabels = (): boolean => {
+    let hasError = false;
+    const missingDesign = designLines.map(l => !l.label.trim());
+    const missingTeam = teamLines.map(l => !l.label.trim());
+    const missingTrip = tripLines.map(l => !l.label.trim());
+    const missingOther = otherLines.map(l => !l.label.trim());
+
+    if (
+      missingDesign.includes(true) ||
+      missingTeam.includes(true) ||
+      missingTrip.includes(true) ||
+      missingOther.includes(true)
+    ) {
+      hasError = true;
+    }
+
+    if (hasError) {
+      setErrorMsg("Estimate label is required. Please check highlighted fields.");
+      setStep(2);
+      setValidationErrors({
+        design: missingDesign,
+        team: missingTeam,
+        trip: missingTrip,
+        other: missingOther
+      });
+      return false;
+    }
+    
+    setValidationErrors(null);
+    return true;
+  };
+
   const handleNextStep = () => {
     setErrorMsg("");
     if (step === 1) {
@@ -345,6 +388,9 @@ function NewProposalContent() {
       }
       setStep(2);
     } else if (step === 2) {
+      if (!validateEstimateLabels()) {
+        return;
+      }
       setStep(3);
     }
   };
@@ -360,6 +406,7 @@ function NewProposalContent() {
   });
 
   const handleSaveDraft = () => {
+    if (!validateEstimateLabels()) return;
     createProposalMutation.mutate({
       name,
       client_name: clientName,
@@ -383,7 +430,9 @@ function NewProposalContent() {
   };
 
   const handleSubmitForApproval = async () => {
+    if (!validateEstimateLabels()) return;
     setErrorMsg("");
+    setIsSubmitting(true);
     try {
       const res = await createEventProposal({
         name,
@@ -411,6 +460,7 @@ function NewProposalContent() {
       console.error(err);
       const error = err as { response?: { data?: { error?: string } }; message?: string };
       setErrorMsg(error.response?.data?.error || error.message || "Failed to submit proposal");
+      setIsSubmitting(false);
     }
   };
 
@@ -551,25 +601,25 @@ function NewProposalContent() {
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Event Name")} *</label>
-                  <input
+                  <Input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Annual Charity Gala"
                     required
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                    className="px-3.5 h-11 bg-card-alt border-border text-sm"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Phone")}</label>
                   <div className="relative">
-                    <input
+                    <Input
                       type="text"
                       value={clientPhone}
                       onChange={(e) => setClientPhone(e.target.value)}
-                      placeholder="e.g. +1 (123) 456-7890"
-                      className="w-full pl-10 pr-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                      placeholder="e.g. 0912345678"
+                      className="w-full pl-10 pr-3.5 h-11 bg-card-alt border-border text-sm font-mono font-bold"
                     />
                     <HiOutlinePhone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted" />
                   </div>
@@ -578,13 +628,13 @@ function NewProposalContent() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Client Name")} *</label>
                   <div className="relative">
-                    <input
+                    <Input
                       type="text"
                       value={clientName}
                       onChange={(e) => setClientName(e.target.value)}
                       placeholder="e.g. Acme Corporation"
                       required
-                      className="w-full pl-10 pr-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                      className="w-full pl-10 pr-3.5 h-11 bg-card-alt border-border text-sm"
                     />
                     <HiOutlineUser className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted" />
                   </div>
@@ -593,13 +643,13 @@ function NewProposalContent() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Requested Budget")} *</label>
                   <div className="relative">
-                    <input
+                    <Input
                       type="number"
                       value={requestedBudget || ""}
                       onChange={(e) => setRequestedBudget(Number(e.target.value))}
                       placeholder="0.00"
                       required
-                      className="w-full pl-3.5 pr-16 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                      className="w-full pl-3.5 pr-16 h-11 bg-card-alt border-border text-sm font-mono font-bold"
                     />
                     <div className="absolute right-0 top-0 bottom-0 px-3 bg-card-alt border-l border-border/80 flex items-center justify-center text-xs font-black text-muted uppercase tracking-wider select-none rounded-r-lg">
                       ETB
@@ -624,38 +674,30 @@ function NewProposalContent() {
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Date")}</label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
-                    />
-                    <HiOutlineCalendar className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
-                  </div>
+                  <DatePicker
+                    value={startDate}
+                    onChange={setStartDate}
+                    placeholder="YYYY-MM-DD"
+                  />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("End Date")}</label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
-                    />
-                    <HiOutlineCalendar className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
-                  </div>
+                  <DatePicker
+                    value={endDate}
+                    onChange={setEndDate}
+                    placeholder="YYYY-MM-DD"
+                  />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Time")}</label>
                   <div className="relative">
-                    <input
+                    <Input
                       type="time"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
-                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                      className="w-full pl-3.5 pr-10 h-11 bg-card-alt border-border text-sm font-mono font-bold"
                     />
                     <HiOutlineClock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
                   </div>
@@ -664,11 +706,11 @@ function NewProposalContent() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("End Time")}</label>
                   <div className="relative">
-                    <input
+                    <Input
                       type="time"
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
-                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 font-mono font-bold"
+                      className="w-full pl-3.5 pr-10 h-11 bg-card-alt border-border text-sm font-mono font-bold"
                     />
                     <HiOutlineClock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
                   </div>
@@ -683,13 +725,13 @@ function NewProposalContent() {
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Venue Location")} *</label>
                   <div className="relative">
-                    <input
+                    <Input
                       type="text"
                       value={venueLocation}
                       onChange={(e) => setVenueLocation(e.target.value)}
                       placeholder="e.g. Grand Hyatt, Addis Ababa"
                       required
-                      className="w-full pl-3.5 pr-10 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                      className="w-full pl-3.5 pr-10 h-11 bg-card-alt border-border text-sm"
                     />
                     <HiOutlineMapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted pointer-events-none" />
                   </div>
@@ -729,35 +771,38 @@ function NewProposalContent() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Design Estimate")}</h4>
-                    <button onClick={() => addLine("design")} className="text-xs font-bold text-primary flex items-center gap-1">
+                    <button onClick={() => addLine("design")} className="text-xs font-bold text-primary flex items-center gap-1 cursor-pointer select-none">
                       <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
                     </button>
                   </div>
                   {designLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
-                      <input
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
+                      <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("design", idx, "label", e.target.value)}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border"
+                        className={cn(
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border",
+                          validationErrors?.design[idx] && "border-rose-500 ring-1 ring-rose-500/30"
+                        )}
                       />
-                      <input
+                      <Input
                         type="number"
                         placeholder={t("Amount")}
                         value={line.amount || ""}
                         onChange={(e) => updateLine("design", idx, "amount", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2">
-                        <input
+                        <Input
                           type="text"
                           placeholder={t("Notes")}
                           value={line.notes}
                           onChange={(e) => updateLine("design", idx, "notes", e.target.value)}
-                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border"
                         />
-                        <button onClick={() => removeLine("design", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("design", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -769,43 +814,46 @@ function NewProposalContent() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Team & Labor Estimate")}</h4>
-                    <button onClick={() => addLine("team")} className="text-xs font-bold text-primary flex items-center gap-1">
+                    <button onClick={() => addLine("team")} className="text-xs font-bold text-primary flex items-center gap-1 cursor-pointer select-none">
                       <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
                     </button>
                   </div>
                   {teamLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
-                      <input
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
+                      <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("team", idx, "label", e.target.value)}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border col-span-1 sm:col-span-2"
+                        className={cn(
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border col-span-1 sm:col-span-2",
+                          validationErrors?.team[idx] && "border-rose-500 ring-1 ring-rose-500/30"
+                        )}
                       />
-                      <input
+                      <Input
                         type="number"
                         placeholder={t("People Count")}
                         value={line.people_count || ""}
                         onChange={(e) => updateLine("team", idx, "people_count", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
-                      <input
+                      <Input
                         type="number"
                         placeholder={t("Commission")}
                         value={line.commission_per_person || ""}
                         onChange={(e) => updateLine("team", idx, "commission_per_person", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2 col-span-1">
-                        <input
+                        <Input
                           type="number"
                           placeholder={t("Amount")}
                           value={line.amount || 0}
                           readOnly
                           title="Calculated: People Count × Commission per Person"
-                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card-alt border border-border/40 text-muted cursor-not-allowed font-mono"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card-alt border border-border/40 text-muted cursor-not-allowed font-mono"
                         />
-                        <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -817,42 +865,45 @@ function NewProposalContent() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Trip & Fuel Estimate")}</h4>
-                    <button onClick={() => addLine("trip")} className="text-xs font-bold text-primary flex items-center gap-1">
+                    <button onClick={() => addLine("trip")} className="text-xs font-bold text-primary flex items-center gap-1 cursor-pointer select-none">
                       <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
                     </button>
                   </div>
                   {tripLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
-                      <input
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
+                      <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("trip", idx, "label", e.target.value)}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border"
+                        className={cn(
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border",
+                          validationErrors?.trip[idx] && "border-rose-500 ring-1 ring-rose-500/30"
+                        )}
                       />
-                      <input
+                      <Input
                         type="number"
                         placeholder={t("KM")}
                         value={line.km || ""}
                         onChange={(e) => updateLine("trip", idx, "km", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
-                      <input
+                      <Input
                         type="number"
                         placeholder={t("Fuel Price")}
                         value={line.fuel_price || ""}
                         onChange={(e) => updateLine("trip", idx, "fuel_price", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2">
-                        <input
+                        <Input
                           type="number"
                           placeholder={t("Amount")}
                           value={line.amount || ""}
                           onChange={(e) => updateLine("trip", idx, "amount", Number(e.target.value))}
-                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                         />
-                        <button onClick={() => removeLine("trip", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("trip", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -864,35 +915,38 @@ function NewProposalContent() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-black uppercase text-primary tracking-wider">{t("Other Expenses")}</h4>
-                    <button onClick={() => addLine("other")} className="text-xs font-bold text-primary flex items-center gap-1">
+                    <button onClick={() => addLine("other")} className="text-xs font-bold text-primary flex items-center gap-1 cursor-pointer select-none">
                       <HiPlus className="w-3.5 h-3.5" /> {t("Add Row")}
                     </button>
                   </div>
                   {otherLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
-                      <input
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
+                      <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("other", idx, "label", e.target.value)}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border"
+                        className={cn(
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border",
+                          validationErrors?.other[idx] && "border-rose-500 ring-1 ring-rose-500/30"
+                        )}
                       />
-                      <input
+                      <Input
                         type="number"
                         placeholder={t("Amount")}
                         value={line.amount || ""}
                         onChange={(e) => updateLine("other", idx, "amount", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2">
-                        <input
+                        <Input
                           type="text"
                           placeholder={t("Notes")}
                           value={line.notes}
                           onChange={(e) => updateLine("other", idx, "notes", e.target.value)}
-                          className="flex-1 px-3 py-1.5 text-xs rounded bg-card border border-border"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border"
                         />
-                        <button onClick={() => removeLine("other", idx)} className="p-1.5 bg-danger/10 text-danger rounded [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0">
+                        <button onClick={() => removeLine("other", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -945,49 +999,61 @@ function NewProposalContent() {
             )}
 
             {/* Step Controls */}
-            <div className="flex items-center justify-between border-t border-border/40 pt-5 mt-6">
-              {step > 1 ? (
-                <button
-                  onClick={() => setStep(step - 1)}
-                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98]"
-                >
-                  <HiArrowLeft className="w-4 h-4" />
-                  {t("Back")}
-                </button>
-              ) : (
-                <button
-                  onClick={() => router.push("/events/proposals")}
-                  className="h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98]"
-                >
-                  {t("Cancel")}
-                </button>
-              )}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border/40 pt-5 mt-6 w-full">
+              <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                {step > 1 ? (
+                  <button
+                    onClick={() => setStep(step - 1)}
+                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
+                  >
+                    <HiArrowLeft className="w-4 h-4" />
+                    <span>{t("Back")}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => router.push("/events/proposals")}
+                    className="flex items-center justify-center h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
+                  >
+                    <span>{t("Cancel")}</span>
+                  </button>
+                )}
+              </div>
 
-              {step < 3 ? (
-                <button
-                  onClick={handleNextStep}
-                  className="flex items-center gap-1.5 h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98]"
-                >
-                  {t("Next")}
-                  <HiArrowRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                {step < 3 ? (
                   <button
-                    onClick={handleSaveDraft}
-                    disabled={createProposalMutation.isPending}
-                    className="h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer"
+                    onClick={handleNextStep}
+                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] w-full cursor-pointer select-none"
                   >
-                    {t("Create Draft")}
+                    <span>{t("Next")}</span>
+                    <HiArrowRight className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={handleSubmitForApproval}
-                    className="h-[44px] px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] cursor-pointer"
-                  >
-                    {t("Submit for Approval")}
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <>
+                    <button
+                      onClick={handleSaveDraft}
+                      disabled={createProposalMutation.isPending || isSubmitting}
+                      className="flex items-center justify-center h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto disabled:opacity-50 select-none"
+                    >
+                      {createProposalMutation.isPending ? "Saving..." : t("Create Draft")}
+                    </button>
+                    <button
+                      onClick={handleSubmitForApproval}
+                      disabled={createProposalMutation.isPending || isSubmitting}
+                      className="flex items-center justify-center gap-2 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto select-none disabled:opacity-50"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <span>{t("Submit for Approval")}</span>
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

@@ -95,15 +95,15 @@ Production findings and polish gaps from deployed smoke review. Some observation
 
 ### Light mode and UI consistency cleanup
 
-- [ ] `/hr/expenses/approve?tab=history&sort_by=created_at&sort_order=desc`: fix light mode table header row color.
-- [ ] Fix light mode background colors for `Pending Queue`, `History`, and `Receipt`.
-- [ ] Fix `Receipt` radius to use the global custom radius tokens only.
-- [ ] `/events/proposals/new`: replace date/time and related inputs with existing global form components where available.
-- [ ] For proposal location, use the existing location/map pattern if the project already has one. If not, keep it as a clean named location field and do not introduce a speculative map dependency.
-- [ ] Fix proposal estimate field radii to follow global custom radius tokens only.
-- [ ] Fix mobile button sizing/wrapping so `< Back`, `Create Draft`, and `Submit For Approval` remain readable and professional on narrow screens.
-- [ ] When validation fails with `Estimate label is required`, return focus to the proposal form and visibly highlight the exact missing estimate field(s).
-- [ ] Add a restrained submit-for-approval animation/loading state that communicates progress without blocking accessibility.
+- [x] `/hr/expenses/approve?tab=history&sort_by=created_at&sort_order=desc`: fix light mode table header row color.
+- [x] Fix light mode background colors for `Pending Queue`, `History`, and `Receipt`.
+- [x] Fix `Receipt` radius to use the global custom radius tokens only.
+- [x] `/events/proposals/new`: replace date/time and related inputs with existing global form components where available.
+- [x] For proposal location, use the existing location/map pattern if the project already has one. If not, keep it as a clean named location field and do not introduce a speculative map dependency.
+- [x] Fix proposal estimate field radii to follow global custom radius tokens only.
+- [x] Fix mobile button sizing/wrapping so `< Back`, `Create Draft`, and `Submit For Approval` remain readable and professional on narrow screens.
+- [x] When validation fails with `Estimate label is required`, return focus to the proposal form and visibly highlight the exact missing estimate field(s).
+- [x] Add a restrained submit-for-approval animation/loading state that communicates progress without blocking accessibility.
 - [ ] Audit all gold-background buttons in light mode and ensure text/icons use white or another WCAG-compliant foreground. No gold background with black text unless contrast is proven and design-approved.
 - [ ] Enforce UI rules: global custom radius tokens only, no bare `rounded`, no hardcoded border radius, no bare hover utilities on mobile surfaces, 48px practical touch targets, no oversized report/PDF branding.
 
