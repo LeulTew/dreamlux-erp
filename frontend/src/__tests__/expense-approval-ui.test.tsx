@@ -182,13 +182,13 @@ describe("Expense Approval Page UI and Logic Test Suite", () => {
     expect(screen.getByText("Expense Approval Queue")).toBeInTheDocument();
     expect(screen.getByText("Fuel for delivery truck")).toBeInTheDocument();
     expect(screen.getByText("ETB 1,500.50")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pending Queue" })).toHaveClass("bg-amber-500");
+    expect(screen.getByRole("button", { name: "Pending Queue" })).toHaveClass("bg-primary");
   });
 
   it("should render the History tab when tab=history search param is active", () => {
     mockSearchParams.set("tab", "history");
     render(<ExpenseApprovalPage />);
-    expect(screen.getByRole("button", { name: "History" })).toHaveClass("bg-amber-500");
+    expect(screen.getByRole("button", { name: "History" })).toHaveClass("bg-primary");
     
     // Check history table data
     expect(screen.getByText("Acme Corp Event")).toBeInTheDocument();

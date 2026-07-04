@@ -282,7 +282,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       }));
                       setIsDuplicateMode(true);
                     }}
-                    className="h-10 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-amber-500/20"
+                    className="h-10 px-4 dl-radius-2xl bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-primary/20"
                   >
                     <HiDocumentDuplicate className="w-4.5 h-4.5" />
                     {t("Duplicate")}
