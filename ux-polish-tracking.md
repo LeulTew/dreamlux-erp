@@ -72,26 +72,26 @@ Production findings and polish gaps from deployed smoke review. Some observation
 
 ### Production symptoms to verify
 
-- [ ] `https://dreamlux-erp.vercel.app/hr/finance/hisab` requests `/_rsc` for `/hr/finance` and returns 404. Confirm whether the parent route needs a route group/page fallback or whether this is a stale deployment artifact.
-- [ ] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/hisab?period_type=week&start_date=2026-01-01&end_date=2026-12-31`.
-- [ ] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/hisab?period_type=month&start_date=2026-01-01&end_date=2026-12-31`.
-- [ ] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/operational-expenses?page=1&limit=20&start_date=2026-01-01&end_date=2026-12-31`.
-- [ ] Compare current `main` source, Vercel deployment commit, backend route mounting, and production health before assuming code is missing.
+- [x] `https://dreamlux-erp.vercel.app/hr/finance/hisab` requests `/_rsc` for `/hr/finance` and returns 404. Confirm whether the parent route needs a route group/page fallback or whether this is a stale deployment artifact. Fixed in `feature/124-system-cleanups` with a `/hr/finance` parent redirect route and verified by frontend production build route output.
+- [x] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/hisab?period_type=week&start_date=2026-01-01&end_date=2026-12-31`. Source route exists; `feature/124-system-cleanups` also adds `/api/finance` parity aliases to match frontend API-client conventions.
+- [x] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/hisab?period_type=month&start_date=2026-01-01&end_date=2026-12-31`. Covered by the same finance router alias and existing Hisab route tests.
+- [x] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/operational-expenses?page=1&limit=20&start_date=2026-01-01&end_date=2026-12-31`. Covered by existing `/finance` route and new `/api/finance/operational-expenses` alias test with recent sorting.
+- [x] Compare current `main` source, Vercel deployment commit, backend route mounting, and production health before assuming code is missing. Current source showed route parity gaps rather than missing finance router code; branch stayed on latest `origin/main` before PR.
 
 ### Persisted per-user record state
 
-- [ ] Add a design for Frappe-like remembered list state per user without making the app feel stale: sort, filters, page size, column density, visible columns, and last selected tab where appropriate.
-- [ ] Do not store sensitive financial filters or cross-user state in browser-only storage as the durable source of truth. Prefer authenticated backend preferences with tenant/user scoping; use local cache only as a fast fallback.
-- [ ] Evaluate whether existing infra is enough or whether a Vercel-friendly external cache is justified. Do not add Redis or a paid dependency unless it materially improves live state and the deployment supports it.
-- [ ] Add `recent` sorting consistently across record pages. `recent` must consider last edited time, not only created time.
+- [x] Add a design for Frappe-like remembered list state per user without making the app feel stale: sort, filters, page size, column density, visible columns, and last selected tab where appropriate. Backend preference API/schema added; frontend adoption remains a separate UI integration task.
+- [x] Do not store sensitive financial filters or cross-user state in browser-only storage as the durable source of truth. Prefer authenticated backend preferences with tenant/user scoping; use local cache only as a fast fallback. Implemented authenticated, user-scoped `record_list_preferences`.
+- [x] Evaluate whether existing infra is enough or whether a Vercel-friendly external cache is justified. Do not add Redis or a paid dependency unless it materially improves live state and the deployment supports it. No Redis or new dependency added; persisted Postgres-backed preferences are enough for this scope.
+- [x] Add `recent` sorting consistently across record pages. `recent` must consider last edited time, not only created time. Added validated `recent` sort support to key event, asset, employee, payroll, operational expense, overhead, and investment list routes.
 - [ ] Ensure every record model that participates in `recent` has a trustworthy `updated_at`/last edited source and that mutations update it reliably.
 - [ ] Preserve live React Query/server-state behavior: preferences should remember UI state, not freeze record data.
 
 ### Activity coverage
 
 - [ ] Add the activity/audit button to more record detail pages, including event workspace, payroll screens, finance records, and other record pages that already have audit/activity data.
-- [ ] Use backend authorization as the source of truth. Frontend-hidden activity buttons are not sufficient.
-- [ ] Ensure activity timelines do not leak financial/payroll details to roles without permission.
+- [x] Use backend authorization as the source of truth. Frontend-hidden activity buttons are not sufficient. Activity entity permission map now covers finance entities server-side.
+- [x] Ensure activity timelines do not leak financial/payroll details to roles without permission. Finance activity fields and notes are redacted unless the caller has finance/report permissions.
 
 ### Light mode and UI consistency cleanup
 
@@ -116,8 +116,8 @@ Production findings and polish gaps from deployed smoke review. Some observation
 ### Required QA and review
 
 - [ ] Follow `RULES.md`, `.claude/rules/ui-design.md`, `.claude/rules/architecture.md`, `.claude/rules/tech-stack.md`, and `docs/SENIOR_ISSUE_REVIEW_PROMPT.md`.
-- [ ] Add unit tests for persisted preference read/write/authorization, recent-sort semantics, updated-at behavior, and proposal validation focus/highlight behavior.
-- [ ] Add backend integration tests for preference BOLA/BFLA, finance route availability, and activity redaction.
+- [x] Add unit tests for persisted preference read/write/authorization, recent-sort semantics, updated-at behavior, and proposal validation focus/highlight behavior. Backend/system portions covered; proposal validation focus remains part of the already-completed Antigravity UI cleanup.
+- [x] Add backend integration tests for preference BOLA/BFLA, finance route availability, and activity redaction.
 - [ ] Add frontend tests for light/dark expense approval styling states, proposal mobile button layout, gold-button foreground contrast classes, and global component usage where practical.
 - [ ] Add Playwright coverage for Hisab production-equivalent route load, expenses approval light mode, proposal validation recovery, mobile proposal actions, and activity button visibility by role.
 - [ ] Run `bun run lint`, `bun run build`, `bun run test`, backend tests/build, frontend tests/build, Playwright smoke, and `git diff --check`.

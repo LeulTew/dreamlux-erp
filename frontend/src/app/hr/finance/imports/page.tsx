@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   HiOutlineDocumentArrowUp,
   HiOutlineExclamationTriangle,
   HiOutlineCheckCircle,
   HiArrowPath,
-  HiArrowLeft,
   HiXMark,
   HiCheck,
 } from "react-icons/hi2";
@@ -23,8 +22,30 @@ import {
   previewHisabImport,
   commitHisabImport,
 } from "@/lib/api";
-import Link from "next/link";
+import {
+  HisabImportCommitPayload,
+  HisabImportCommitResult,
+  HisabImportFormulaMismatch,
+  HisabImportPreview,
+  HisabImportResolution,
+  HisabImportRow,
+} from "@/lib/types";
 import toast from "@/lib/toast";
+
+type ImportEventLookup = {
+  id: string;
+  name: string;
+  event_id_display?: string | null;
+};
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object") {
+    const maybeResponse = err as { response?: { data?: { error?: unknown } }; message?: unknown };
+    if (typeof maybeResponse.response?.data?.error === "string") return maybeResponse.response.data.error;
+    if (typeof maybeResponse.message === "string") return maybeResponse.message;
+  }
+  return fallback;
+}
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -167,7 +188,7 @@ export default function HisabImportPage() {
 
   // States
   const [file, setFile] = useState<File | null>(null);
-  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewData, setPreviewData] = useState<HisabImportPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [acceptMismatches, setAcceptMismatches] = useState(false);
 
@@ -175,7 +196,7 @@ export default function HisabImportPage() {
   const [eventResolutions, setEventResolutions] = useState<Record<string, { eventId: string; eventName: string }>>({});
   const [categoryResolutions, setCategoryResolutions] = useState<Record<string, string>>({});
   const [isCommitPending, setIsCommitPending] = useState(false);
-  const [commitResult, setCommitResult] = useState<any>(null);
+  const [commitResult, setCommitResult] = useState<HisabImportCommitResult | null>(null);
 
   // Fetch active events for lookup dropdown
   const { data: eventsData } = useQuery({
@@ -184,8 +205,8 @@ export default function HisabImportPage() {
     staleTime: 60000,
   });
 
-  const activeEvents = eventsData?.events || [];
-  const eventSelectOptions = activeEvents.map((evt: any) => ({
+  const activeEvents = (eventsData?.events || []) as ImportEventLookup[];
+  const eventSelectOptions = activeEvents.map((evt) => ({
     id: evt.id,
     label: `${evt.name} (${evt.event_id_display || evt.id.slice(0, 8)})`,
   }));
@@ -209,8 +230,8 @@ export default function HisabImportPage() {
       const data = await previewHisabImport(selected);
       setPreviewData(data);
       toast.success("Workbook parsed successfully");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || err.message || "Failed to parse workbook");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to parse workbook"));
       setFile(null);
     } finally {
       setPreviewLoading(false);
@@ -237,7 +258,7 @@ export default function HisabImportPage() {
     if (!previewData) return;
     setIsCommitPending(true);
 
-    const payload = {
+    const payload: HisabImportCommitPayload = {
       workbookHash: previewData.workbookHash,
       sourceFilename: file?.name || null,
       acceptFormulaMismatches: acceptMismatches,
@@ -266,8 +287,8 @@ export default function HisabImportPage() {
       toast.success(t("Commit successful!"));
       setFile(null);
       setPreviewData(null);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || err.message || "Failed to commit import");
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, "Failed to commit import"));
     } finally {
       setIsCommitPending(false);
     }
@@ -306,9 +327,9 @@ export default function HisabImportPage() {
   }
 
   // Calculate resolution completion
-  const unmatchedRows = previewData?.rows.filter((r: any) => r.requiresResolution && r.requiresResolution.length > 0) || [];
-  const unresolvedCount = unmatchedRows.filter((row: any) => {
-    return row.requiresResolution.some((item: any) => {
+  const unmatchedRows = previewData?.rows.filter((r) => r.requiresResolution && r.requiresResolution.length > 0) || [];
+  const unresolvedCount = unmatchedRows.filter((row) => {
+    return row.requiresResolution.some((item) => {
       if (item.kind === "event") return !eventResolutions[row.id]?.eventId;
       if (item.kind.endsWith("category")) return !categoryResolutions[row.id];
       return true;
@@ -538,7 +559,7 @@ export default function HisabImportPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {previewData.formulaMismatches.map((mismatch: any, idx: number) => (
+                      {previewData.formulaMismatches.map((mismatch: HisabImportFormulaMismatch, idx: number) => (
                         <tr key={idx} className="border-b border-amber-500/10 last:border-0 font-mono">
                           <td className="py-2 pr-4">{mismatch.sheet}</td>
                           <td className="py-2 pr-4">{mismatch.rowNumber}</td>
@@ -572,7 +593,7 @@ export default function HisabImportPage() {
                   {t("Resolve Unmatched Items")} ({unresolvedCount} remaining)
                 </h3>
                 <div className="space-y-4">
-                  {unmatchedRows.map((row: any) => (
+                  {unmatchedRows.map((row: HisabImportRow) => (
                     <div key={row.id} className="border border-border/60 rounded-2xl p-4 bg-card-alt flex flex-col md:flex-row gap-6 md:items-center justify-between">
                       <div className="space-y-1.5 flex-1">
                         <div className="flex items-center gap-2">
@@ -586,7 +607,7 @@ export default function HisabImportPage() {
                       </div>
 
                       <div className="w-full md:w-80 space-y-3 shrink-0">
-                        {row.requiresResolution.map((item: any, idx: number) => {
+                        {row.requiresResolution.map((item: HisabImportResolution, idx: number) => {
                           if (item.kind === "event") {
                             const val = eventResolutions[row.id]?.eventId || "";
                             return (
@@ -598,7 +619,7 @@ export default function HisabImportPage() {
                                   options={eventSelectOptions}
                                   value={val}
                                   onChange={(newVal) => {
-                                    const found = activeEvents.find((e: any) => e.id === newVal);
+                                    const found = activeEvents.find((e) => e.id === newVal);
                                     setEventResolutions((prev) => ({
                                       ...prev,
                                       [row.id]: { eventId: newVal, eventName: found?.name || "" },
@@ -696,9 +717,9 @@ export default function HisabImportPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40 font-medium">
-                    {previewData.rows?.map((row: any) => {
+                    {previewData.rows?.map((row: HisabImportRow) => {
                       const hasResolution = row.requiresResolution && row.requiresResolution.length > 0;
-                      let resolvedVal = row.category || row.eventName || "—";
+                      let resolvedVal: ReactNode = row.category || row.eventName || "—";
                       if (hasResolution) {
                         const eventRes = eventResolutions[row.id]?.eventName;
                         const catRes = categoryResolutions[row.id];

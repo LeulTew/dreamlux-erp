@@ -107,6 +107,20 @@ describe("Operational expense ledger", () => {
     expect(res.body.totalPages).toBe(1);
   });
 
+  test("GET /api/finance/operational-expenses alias is mounted and recent sort uses updated_at", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [PENDING_OPEX], rowCount: 1 });
+
+    const res = await request(app)
+      .get("/api/finance/operational-expenses?page=1&limit=20&sortBy=recent&sortOrder=desc")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    const listSql = String(mockQuery.mock.calls[1][0]);
+    expect(listSql).toContain("ORDER BY fe.updated_at DESC");
+    expect(listSql).toContain("fe.created_at DESC");
+  });
+
   test("GET /finance/operational-expenses rejects an over-cap limit", async () => {
     const res = await request(app)
       .get("/finance/operational-expenses?limit=500")

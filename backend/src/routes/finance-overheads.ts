@@ -17,6 +17,16 @@ const router = Router();
 
 const OVERHEAD_ENTITY_TYPE = "finance_overhead_expense";
 const MONTH_CLOSURE_ENTITY_TYPE = "finance_overhead_month";
+const OVERHEAD_SORT_SQL: Record<string, string> = {
+  expense_month: "fo.expense_month",
+  due_date: "fo.due_date",
+  created_at: "fo.created_at",
+  updated_at: "fo.updated_at",
+  amount: "fo.amount",
+  category: "fo.category",
+  status: "fo.status",
+  recent: "fo.updated_at",
+};
 
 function formatOverheadRow(row: Record<string, any>): Record<string, any> {
   return { ...row, amount: roundMoney(row.amount) };
@@ -133,6 +143,8 @@ router.get(
       const total = Number(countResult.rows[0]?.count || 0);
 
       const offset = (query.page - 1) * query.limit;
+      const sortSql = OVERHEAD_SORT_SQL[query.sortBy] || OVERHEAD_SORT_SQL.expense_month;
+      const sortDirection = query.sortOrder === "asc" ? "ASC" : "DESC";
       const listResult = await pool.query(
         `SELECT fo.*, cu.username AS created_by_username, au.username AS approved_by_username,
                 e.full_name AS employee_name
@@ -141,7 +153,7 @@ router.get(
          LEFT JOIN users au ON au.id = fo.approved_by
          LEFT JOIN employees e ON e.id = fo.employee_id
          WHERE ${whereClause}
-         ORDER BY fo.expense_month DESC, fo.scope ASC, fo.created_at DESC
+         ORDER BY ${sortSql} ${sortDirection}, fo.updated_at DESC, fo.created_at DESC
          LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, query.limit, offset],
       );
