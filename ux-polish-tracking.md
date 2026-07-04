@@ -56,16 +56,72 @@ Local continuity note for zero-hallucination agent handoff. This file is intenti
 
 Reminder: before coding any row below, branch from latest `main`, assign/move the issue to in progress, update the GitHub checklist as work proceeds, run Bun tests only, complete `docs/SENIOR_ISSUE_REVIEW_PROMPT.md`, and do not merge without explicit user authorization.
 
+Issues [#106](https://github.com/LeulTew/dreamlux-erp/issues/106)-[#112](https://github.com/LeulTew/dreamlux-erp/issues/112) are complete and compacted into the Completed Issue Ledger above. Do not reopen this table for completed work unless a production regression is found.
+
 | Phase | GitHub issue | Evidence from artifacts/code | Implementation outline | Required QA / review | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| L | [#106 Storekeeper allocation dispatch checklist and departure notifications](https://github.com/LeulTew/dreamlux-erp/issues/106) | User storekeeper story; `event_allocations` exists in `backend/src/db/schema.sql`; allocation create/delete exists in `backend/src/routes/events.ts`; event workspace shows allocations but no dispatch checklist/departure completion. | Add inventory/storekeeper dispatch queue grouped by event, event dispatch detail with per-allocation checkboxes, transaction-backed `departed_at`, activity log, and Event Manager notification. | Backend BOLA/BFLA, inventory integrity, double-submit race tests, frontend disabled-state tests, Playwright storekeeper-to-event-manager flow. | Completed ([PR #114](https://github.com/LeulTew/dreamlux-erp/pull/114) merged). |
-| M | [#107 Clarify proposal commission amount field and derived team totals](https://github.com/LeulTew/dreamlux-erp/issues/107) | Screenshot circles Amount for `4 x 3000`; `backend/src/routes/events/proposals.ts` and `frontend/src/app/events/proposals/new/page.tsx` derive team total but still expose editable Amount. | Decide and implement explicit semantics: calculated read-only total or clearly labeled manual override/additional cost. Keep backend/frontend math identical. | Financial formula tests, proposal unit/integration tests, Playwright proposal creation with `4 x 3000 = 12000`, no approval/conversion regression. | Completed ([PR #115](https://github.com/LeulTew/dreamlux-erp/pull/115) merged; issue closed). |
-| N | [#108 Validate fuel cost preview units and vehicle consumption formula](https://github.com/LeulTew/dreamlux-erp/issues/108) | Screenshot shows `12 km`, `169 ETB/L`, `ETB 446.16`; schema labels `fuel_consumption_rate` as L/km; frontend/backend both multiply distance by rate by fuel price. | Confirmed `fuel_consumption_rate` is liters per kilometer (L/km), centralized frontend/backend formula helpers, added invalid-rate validation and DB check constraint, and clarified event workspace labels/formula preview. | Backend formula and trip expense tests, frontend preview tests, driver ownership and completed-event lock tests, Playwright trip log smoke. | Completed ([PR #116](https://github.com/LeulTew/dreamlux-erp/pull/116) merged; issue closed). |
-| O | [#109 Weekly and monthly Hisab rollup with non-event operational expenses](https://github.com/LeulTew/dreamlux-erp/issues/109) | Workbook `HISAB WEEKLY MONTHLY` has weekly event blocks, transport/rental/other/labour categories, grand total, event income, event profit, and non-event weekly expenses. | Add finance/Hisab periods, weekly/monthly rollups, approved event expense pull-through, non-event operational expense CRUD/approval, export/print. | Finance RBAC, approved-only math, no duplicate counting, server pagination, audit logs, E2E Accountant/Owner flow. | Completed ([PR #117](https://github.com/LeulTew/dreamlux-erp/pull/117), [PR #118](https://github.com/LeulTew/dreamlux-erp/pull/118), and [PR #119](https://github.com/LeulTew/dreamlux-erp/pull/119) merged; issue closed). |
-| P | [#110 Monthly overhead and shared operating expense register](https://github.com/LeulTew/dreamlux-erp/issues/110) | Workbook `MONTHLY WECHI` and `monthly total expense` show demoz, nedaj, bet wechi, car rental, sticker, seasonal/ekub, office/store payments, shared with Koti, rent, wifi, utilities, boost. | Add monthly overhead register with categories, payee/vendor/person, branch/store/office scope, recurrence, status, approval/close behavior, and payroll double-count guard. | Finance RBAC, approval lock, monthly grouping, no payroll double count, activity logs, E2E overhead approve flow. | Completed ([PR #120](https://github.com/LeulTew/dreamlux-erp/pull/120) merged). |
-| Q | [#111 Capital investment and asset purchase register](https://github.com/LeulTew/dreamlux-erp/issues/111) | Workbook `INVESTMENT` lists washing machine, fabric/twill/cherek, fixtures/hardware, and total investment. | Add capital investment register with optional asset link, quantity/unit/unit cost/total/vendor/date, capex classification, export. | Capex vs opex separation, financial redaction, linked asset tests, audit logs, E2E investment entry. | Merged via [PR #121](https://github.com/LeulTew/dreamlux-erp/pull/121) at `88c524d`; CI green before merge. |
-| R | [#112 Complete monthly net profit statement with overhead and investments](https://github.com/LeulTew/dreamlux-erp/issues/112) | Final screenshot flags monthly net profit complete deductions as missing; current event profit reports are event-focused. | Build owner/accountant monthly statement combining event revenue/approved expenses, non-event Hisab, overhead, payroll treatment, shared expenses, and investment treatment with drill-downs. | No double counting, approved-only math, closed-period snapshot decision, export accuracy, BOLA/redaction, performance limits. | Completed ([PR #122](https://github.com/LeulTew/dreamlux-erp/pull/122) merged; issue closed). |
-| S | [#113 Legacy Hisab workbook import and reconciliation mapper](https://github.com/LeulTew/dreamlux-erp/issues/113) | Workbook has four known sheet layouts and formulas; migration from Excel will otherwise require manual re-entry. | Add `.xlsx` import preview/mapping for known Hisab layout, formula-total mismatch detection, unmatched event/category resolution, transactional commit, duplicate import protection. | Parser fixture tests, rollback tests, finance RBAC, no uploaded workbook data in logs/git, Playwright import preview flow. | Open / planned; best after #109-#111 data models exist. |
+| S | [#113 Legacy Hisab workbook import and reconciliation mapper](https://github.com/LeulTew/dreamlux-erp/issues/113) | Workbook has four known sheet layouts and formulas; migration from Excel will otherwise require manual re-entry. | Add `.xlsx` import preview/mapping for known Hisab layout, formula-total mismatch detection, unmatched event/category resolution, transactional commit, duplicate import protection. | Parser fixture tests, rollback tests, finance RBAC, no uploaded workbook data in logs/git, Playwright import preview flow. | Backend PR [#123](https://github.com/LeulTew/dreamlux-erp/pull/123) opened as draft; UI/import preview flow still pending. |
+
+## 2026-07-04 Deployed Cleanup Backlog
+
+GitHub issue: [#124 UX/SYSTEM: deployed finance route, persisted list state, activity coverage, and UI consistency cleanup](https://github.com/LeulTew/dreamlux-erp/issues/124)
+
+**Issue body draft:**
+
+Production findings and polish gaps from deployed smoke review. Some observations may be stale deploy/parity issues, so verify before coding and keep the fixes scoped.
+
+### Production symptoms to verify
+
+- [ ] `https://dreamlux-erp.vercel.app/hr/finance/hisab` requests `/_rsc` for `/hr/finance` and returns 404. Confirm whether the parent route needs a route group/page fallback or whether this is a stale deployment artifact.
+- [ ] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/hisab?period_type=week&start_date=2026-01-01&end_date=2026-12-31`.
+- [ ] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/hisab?period_type=month&start_date=2026-01-01&end_date=2026-12-31`.
+- [ ] Backend production returns 404 for `GET https://dreamlux-backend.vercel.app/finance/operational-expenses?page=1&limit=20&start_date=2026-01-01&end_date=2026-12-31`.
+- [ ] Compare current `main` source, Vercel deployment commit, backend route mounting, and production health before assuming code is missing.
+
+### Persisted per-user record state
+
+- [ ] Add a design for Frappe-like remembered list state per user without making the app feel stale: sort, filters, page size, column density, visible columns, and last selected tab where appropriate.
+- [ ] Do not store sensitive financial filters or cross-user state in browser-only storage as the durable source of truth. Prefer authenticated backend preferences with tenant/user scoping; use local cache only as a fast fallback.
+- [ ] Evaluate whether existing infra is enough or whether a Vercel-friendly external cache is justified. Do not add Redis or a paid dependency unless it materially improves live state and the deployment supports it.
+- [ ] Add `recent` sorting consistently across record pages. `recent` must consider last edited time, not only created time.
+- [ ] Ensure every record model that participates in `recent` has a trustworthy `updated_at`/last edited source and that mutations update it reliably.
+- [ ] Preserve live React Query/server-state behavior: preferences should remember UI state, not freeze record data.
+
+### Activity coverage
+
+- [ ] Add the activity/audit button to more record detail pages, including event workspace, payroll screens, finance records, and other record pages that already have audit/activity data.
+- [ ] Use backend authorization as the source of truth. Frontend-hidden activity buttons are not sufficient.
+- [ ] Ensure activity timelines do not leak financial/payroll details to roles without permission.
+
+### Light mode and UI consistency cleanup
+
+- [ ] `/hr/expenses/approve?tab=history&sort_by=created_at&sort_order=desc`: fix light mode table header row color.
+- [ ] Fix light mode background colors for `Pending Queue`, `History`, and `Receipt`.
+- [ ] Fix `Receipt` radius to use the global custom radius tokens only.
+- [ ] `/events/proposals/new`: replace date/time and related inputs with existing global form components where available.
+- [ ] For proposal location, use the existing location/map pattern if the project already has one. If not, keep it as a clean named location field and do not introduce a speculative map dependency.
+- [ ] Fix proposal estimate field radii to follow global custom radius tokens only.
+- [ ] Fix mobile button sizing/wrapping so `< Back`, `Create Draft`, and `Submit For Approval` remain readable and professional on narrow screens.
+- [ ] When validation fails with `Estimate label is required`, return focus to the proposal form and visibly highlight the exact missing estimate field(s).
+- [ ] Add a restrained submit-for-approval animation/loading state that communicates progress without blocking accessibility.
+- [ ] Audit all gold-background buttons in light mode and ensure text/icons use white or another WCAG-compliant foreground. No gold background with black text unless contrast is proven and design-approved.
+- [ ] Enforce UI rules: global custom radius tokens only, no bare `rounded`, no hardcoded border radius, no bare hover utilities on mobile surfaces, 48px practical touch targets, no oversized report/PDF branding.
+
+### Package and deployment cleanup
+
+- [ ] Create an end-of-project dependency audit plan for production deployment. Keep Playwright/test tooling out of production runtime bundles while preserving CI/E2E capability.
+- [ ] Verify dependencies are correctly split between runtime and dev/test usage. Do not remove tooling that CI or local QA still requires.
+- [ ] Check Vercel build output for accidental test fixtures, uploaded workbook data, screenshots, traces, or large artifacts.
+
+### Required QA and review
+
+- [ ] Follow `RULES.md`, `.claude/rules/ui-design.md`, `.claude/rules/architecture.md`, `.claude/rules/tech-stack.md`, and `docs/SENIOR_ISSUE_REVIEW_PROMPT.md`.
+- [ ] Add unit tests for persisted preference read/write/authorization, recent-sort semantics, updated-at behavior, and proposal validation focus/highlight behavior.
+- [ ] Add backend integration tests for preference BOLA/BFLA, finance route availability, and activity redaction.
+- [ ] Add frontend tests for light/dark expense approval styling states, proposal mobile button layout, gold-button foreground contrast classes, and global component usage where practical.
+- [ ] Add Playwright coverage for Hisab production-equivalent route load, expenses approval light mode, proposal validation recovery, mobile proposal actions, and activity button visibility by role.
+- [ ] Run `bun run lint`, `bun run build`, `bun run test`, backend tests/build, frontend tests/build, Playwright smoke, and `git diff --check`.
+- [ ] Do not merge if GitHub CI is failing.
 
 ## Next-Agent Notes
 
