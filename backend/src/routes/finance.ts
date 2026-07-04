@@ -11,17 +11,181 @@ import {
   financeOpexListQuerySchema,
   hisabQuerySchema,
   hisabExportQuerySchema,
+  monthlyNetProfitQuerySchema,
+  monthlyNetProfitExportQuerySchema,
   HisabQueryInput,
 } from "../lib/validation";
+import { buildMonthlyNetProfitStatement } from "../services/finance-reporting-service";
 
 const router = Router();
 
 const OPEX_ENTITY_TYPE = "finance_operational_expense";
 const HISAB_ENTITY_TYPE = "finance_hisab_report";
+const MONTHLY_NET_PROFIT_ENTITY_TYPE = "finance_monthly_net_profit_report";
 
 function formatOpexRow(row: Record<string, any>): Record<string, any> {
   return { ...row, amount: roundMoney(row.amount) };
 }
+
+function monthlyNetProfitExportRows(statement: Awaited<ReturnType<typeof buildMonthlyNetProfitStatement>>) {
+  const rows: Array<Record<string, unknown>> = [
+    { section: "Summary", name: "Event Revenue", amount: statement.totals.eventRevenue, count: statement.counts.events },
+    { section: "Summary", name: "Approved Event Expenses", amount: statement.totals.approvedEventExpenses, count: "" },
+    { section: "Summary", name: "Event Gross Profit", amount: statement.totals.eventGrossProfit, count: "" },
+    { section: "Summary", name: "Operational Expenses", amount: statement.totals.operationalExpenses, count: "" },
+    { section: "Summary", name: "Overhead Expenses", amount: statement.totals.overheadExpenses, count: "" },
+    { section: "Summary", name: "Payroll Expenses", amount: statement.totals.payrollExpenses, count: statement.counts.payrollRuns },
+    { section: "Summary", name: "Operating Profit", amount: statement.totals.operatingProfit, count: "" },
+    { section: "Summary", name: "Approved Investments", amount: statement.totals.approvedInvestments, count: statement.counts.investmentRows },
+    { section: "Summary", name: "Net After Investments", amount: statement.totals.netAfterInvestments, count: "" },
+    { section: "Summary", name: "Pending Exposure", amount: statement.totals.pendingExposure, count: "" },
+  ];
+
+  for (const row of statement.breakdowns.eventExpensesByCategory) {
+    rows.push({ section: "Event Expense Category", name: row.category, amount: row.amount, count: row.count });
+  }
+  for (const row of statement.breakdowns.operationalExpensesByCategory) {
+    rows.push({ section: "Operational Expense Category", name: row.category, amount: row.amount, pending_amount: row.pendingAmount, count: row.count });
+  }
+  for (const row of statement.breakdowns.overheadByScope) {
+    rows.push({ section: "Overhead Scope", name: `${row.scope} / ${row.payment_kind}`, amount: row.amount, pending_amount: row.pendingAmount, count: row.count });
+  }
+  for (const row of statement.breakdowns.investmentsByCategory) {
+    rows.push({ section: "Investment Category", name: row.category, amount: row.amount, pending_amount: row.pendingAmount, count: row.count });
+  }
+  for (const event of statement.drilldowns.events) {
+    rows.push({ section: "Event Drilldown", source_id: event.id, name: event.name, date: event.start_date, amount: event.netProfit, revenue: event.revenue, approved_expenses: event.approvedExpenses });
+  }
+  for (const run of statement.drilldowns.payrollRuns) {
+    rows.push({ section: "Payroll Drilldown", source_id: run.id, name: run.title, date: `${run.period_start} to ${run.period_end}`, amount: run.total });
+  }
+  for (const investment of statement.drilldowns.investments) {
+    rows.push({ section: "Investment Drilldown", source_id: investment.id, name: investment.item_name, date: investment.purchase_date, amount: investment.total_cost, category: investment.category });
+  }
+
+  return rows;
+}
+
+// GET /finance/reports/monthly-net-profit — complete month statement read model
+router.get(
+  "/reports/monthly-net-profit",
+  requirePermissionSlugs(["finance:hisab:read", "reports:profit:read"]),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const validationResult = monthlyNetProfitQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        res.status(400).json({ error: validationResult.error.errors[0].message });
+        return;
+      }
+
+      const statement = await buildMonthlyNetProfitStatement(validationResult.data);
+      res.json(statement);
+    } catch (error: any) {
+      console.error("[finance-monthly-net-profit] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  },
+);
+
+// GET /finance/reports/monthly-net-profit/export — bounded statement export
+router.get(
+  "/reports/monthly-net-profit/export",
+  requirePermissionSlugs(["finance:hisab:read", "reports:profit:read"]),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const validationResult = monthlyNetProfitExportQuerySchema.safeParse(req.query);
+      if (!validationResult.success) {
+        res.status(400).json({ error: validationResult.error.errors[0].message });
+        return;
+      }
+      const query = validationResult.data;
+      const statement = await buildMonthlyNetProfitStatement(query);
+      const rows = monthlyNetProfitExportRows(statement);
+
+      const actorId = req.user?.id || null;
+      if (rows.length > query.maxRows) {
+        if (actorId) {
+          const client = await pool.connect();
+          try {
+            await insertFinanceAuditLog(client, {
+              entityType: MONTHLY_NET_PROFIT_ENTITY_TYPE,
+              entityId: actorId,
+              userId: actorId,
+              action: "export_blocked",
+              oldValue: `rows=${rows.length}`,
+              newValue: `maxRows=${query.maxRows}; month=${query.month}`,
+            });
+          } finally {
+            client.release();
+          }
+        }
+        res.status(413).json({ error: `Export row count ${rows.length} exceeds maxRows ${query.maxRows}` });
+        return;
+      }
+
+      if (actorId) {
+        const client = await pool.connect();
+        try {
+          await insertFinanceAuditLog(client, {
+            entityType: MONTHLY_NET_PROFIT_ENTITY_TYPE,
+            entityId: actorId,
+            userId: actorId,
+            action: "export",
+            newValue: `format=${query.format}; month=${query.month}; rows=${rows.length}`,
+          });
+        } finally {
+          client.release();
+        }
+      }
+
+      const flattenedRows = rows.map((row) => ({
+        Month: statement.month,
+        Section: row.section || "",
+        "Source ID": row.source_id || "",
+        Name: row.name || "",
+        Date: row.date || "",
+        Amount: row.amount ?? "",
+        Revenue: row.revenue ?? "",
+        "Approved Expenses": row.approved_expenses ?? "",
+        "Pending Amount": row.pending_amount ?? "",
+        Category: row.category || "",
+        Count: row.count ?? "",
+      }));
+
+      if (query.format === "xlsx") {
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet("Monthly Net Profit");
+        sheet.columns = Object.keys(flattenedRows[0] || {
+          Month: "",
+          Section: "",
+          "Source ID": "",
+          Name: "",
+          Date: "",
+          Amount: "",
+          Revenue: "",
+          "Approved Expenses": "",
+          "Pending Amount": "",
+          Category: "",
+          Count: "",
+        }).map((key) => ({ header: key, key, width: Math.max(key.length + 4, 18) }));
+        sheet.addRows(flattenedRows);
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="monthly-net-profit-${query.month}.xlsx"`);
+        await workbook.xlsx.write(res);
+        res.end();
+        return;
+      }
+
+      const csv = stringify(flattenedRows, { header: true });
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="monthly-net-profit-${query.month}.csv"`);
+      res.send(csv);
+    } catch (error: any) {
+      console.error("[finance-monthly-net-profit-export] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  },
+);
 
 // GET /finance/operational-expenses — paginated non-event operational expense ledger
 router.get(
