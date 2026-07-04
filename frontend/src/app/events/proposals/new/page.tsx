@@ -505,7 +505,7 @@ function NewProposalContent() {
     <AuthLayout>
       {authLoading ? (
         <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
-          <div className="h-48 animate-pulse rounded-lg border border-border bg-card" />
+          <div className="h-48 animate-pulse dl-radius-lg border border-border bg-card" />
         </div>
       ) : !isAuthenticated || !canCreateProposals ? (
         <ForbiddenState
@@ -516,7 +516,7 @@ function NewProposalContent() {
         <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
         <header className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 border-b border-border/50 pb-5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-500/10 rounded-xl text-indigo-500 border border-indigo-500/20 shrink-0">
+            <div className="p-2.5 bg-indigo-500/10 dl-radius-xl text-indigo-500 border border-indigo-500/20 shrink-0">
               <HiInboxStack className="w-6 h-6 md:w-7 md:h-7" />
             </div>
             <div className="min-w-0">
@@ -582,7 +582,7 @@ function NewProposalContent() {
         </header>
 
         {errorMsg && (
-          <div className="mb-4 p-4 bg-danger/10 border border-danger/20 rounded-lg text-danger text-sm font-semibold flex items-center gap-2">
+          <div className="mb-4 p-4 bg-danger/10 border border-danger/20 dl-radius-lg text-danger text-sm font-semibold flex items-center gap-2">
             <HiExclamationTriangle className="w-5 h-5 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -590,7 +590,7 @@ function NewProposalContent() {
 
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Main Form Fields */}
-          <div className="flex-1 w-full bg-card border border-border rounded-lg p-5 sm:p-6 space-y-6">
+          <div className="flex-1 w-full bg-card border border-border dl-radius-lg p-5 sm:p-6 space-y-6">
             {step === 1 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Event Details Section Header */}
@@ -651,7 +651,10 @@ function NewProposalContent() {
                       required
                       className="w-full pl-3.5 pr-16 h-11 bg-card-alt border-border text-sm font-mono font-bold"
                     />
-                    <div className="absolute right-0 top-0 bottom-0 px-3 bg-card-alt border-l border-border/80 flex items-center justify-center text-xs font-black text-muted uppercase tracking-wider select-none rounded-r-lg">
+                    <div 
+                      className="absolute right-0 top-0 bottom-0 px-3 bg-card-alt border-l border-border/80 flex items-center justify-center text-xs font-black text-muted uppercase tracking-wider select-none"
+                      style={{ borderTopRightRadius: "var(--radius-lg)", borderBottomRightRadius: "var(--radius-lg)" }}
+                    >
                       ETB
                     </div>
                   </div>
@@ -744,7 +747,7 @@ function NewProposalContent() {
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Add any special requests, requirements, or important notes..."
                     rows={3}
-                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                    className="p-3.5 dl-radius-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
                   />
                 </div>
 
@@ -755,7 +758,7 @@ function NewProposalContent() {
                     onChange={(e) => setDesignNotes(e.target.value)}
                     placeholder="Add design direction, theme ideas, or package details..."
                     rows={3}
-                    className="p-3.5 rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                    className="p-3.5 dl-radius-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
                   />
                 </div>
               </div>
@@ -1059,7 +1062,7 @@ function NewProposalContent() {
 
           {/* Sticky Live Financial Summary Card */}
           <div className="hidden md:block w-full lg:w-80 shrink-0 space-y-4 lg:sticky lg:top-6">
-            <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
+            <div className="bg-card border border-border dl-radius-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
                 <HiOutlinePresentationChartBar className="w-4 h-4 text-primary" />
                 {t("Live Financial Summary")}
@@ -1100,7 +1103,7 @@ function NewProposalContent() {
             </div>
 
             {hasMarginRisk && (
-              <div className="bg-danger/5 border border-danger/20 rounded-lg p-4 text-danger flex items-start gap-2.5 shadow-sm animate-pulse-subtle">
+              <div className="bg-danger/5 border border-danger/20 dl-radius-lg p-4 text-danger flex items-start gap-2.5 shadow-sm animate-pulse-subtle">
                 <HiExclamationTriangle className="w-5 h-5 shrink-0 text-danger" />
                 <div className="space-y-1">
                   <span className="text-xs font-black uppercase tracking-wider block">{t("Margin Risk Warning")}</span>
@@ -1112,7 +1115,7 @@ function NewProposalContent() {
             )}
 
             {/* Need Help Card */}
-            <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-3 shadow-sm">
+            <div className="bg-card border border-border dl-radius-lg p-5 flex flex-col gap-3 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
                 <HiOutlineQuestionMarkCircle className="w-4 h-4 text-primary" />
                 {t("Need help?")}
@@ -1123,7 +1126,7 @@ function NewProposalContent() {
               <button
                 type="button"
                 onClick={() => window.open("/docs/guidelines", "_blank")}
-                className="w-full h-10 mt-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card-alt text-xs font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:bg-border/30 transition-all cursor-pointer active:scale-95"
+                className="w-full h-10 mt-1.5 flex items-center justify-center gap-1.5 dl-radius-lg border border-border bg-card-alt text-xs font-black uppercase tracking-wider text-muted [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:bg-border/30 transition-all cursor-pointer active:scale-95"
               >
                 <span>{t("View Guidelines")}</span>
                 <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
@@ -1131,7 +1134,7 @@ function NewProposalContent() {
             </div>
 
             {/* Form Progress Card */}
-            <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
+            <div className="bg-card border border-border dl-radius-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2">
                 {t("Form Progress")}
               </h3>
@@ -1207,7 +1210,7 @@ function NewProposalContent() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-event-type-title"
-              className="pointer-events-auto bg-card rounded-lg border border-border p-6 w-full max-w-sm flex flex-col shadow-2xl relative animate-scale-in"
+              className="pointer-events-auto bg-card dl-radius-lg border border-border p-6 w-full max-w-sm flex flex-col shadow-2xl relative animate-scale-in"
             >
               <h3 id="add-event-type-title" className="text-sm font-black text-foreground mb-4 uppercase tracking-wider">
                 {t("Add Event Type")}
@@ -1220,7 +1223,7 @@ function NewProposalContent() {
                     value={newEventTypeName}
                     onChange={(e) => setNewEventTypeName(e.target.value)}
                     required
-                    className="px-3.5 h-[44px] rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                    className="px-3.5 h-[44px] dl-radius-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -1229,7 +1232,7 @@ function NewProposalContent() {
                     value={newEventTypeDesc}
                     onChange={(e) => setNewEventTypeDesc(e.target.value)}
                     rows={2}
-                    className="p-3 rounded-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 resize-none"
+                    className="p-3 dl-radius-lg bg-card-alt border border-border text-sm outline-none focus:ring-1 focus:ring-primary/30 resize-none"
                   />
                 </div>
               </div>
@@ -1237,7 +1240,7 @@ function NewProposalContent() {
                 <button
                   type="button"
                   onClick={() => setShowAddEventType(false)}
-                  className="flex-1 py-2.5 rounded-lg bg-card-alt border border-border text-foreground font-bold [@media(hover:hover)]:hover:bg-border transition-all text-xs active:scale-95 cursor-pointer"
+                  className="flex-1 py-2.5 dl-radius-lg bg-card-alt border border-border text-foreground font-bold [@media(hover:hover)]:hover:bg-border transition-all text-xs active:scale-95 cursor-pointer"
                 >
                   {t("Cancel")}
                 </button>
@@ -1260,7 +1263,7 @@ function NewProposalContent() {
                       setErrorMsg("Failed to add event type");
                     }
                   }}
-                  className="flex-1 py-2.5 rounded-lg bg-primary text-white font-bold [@media(hover:hover)]:hover:opacity-90 transition-all text-xs active:scale-95 cursor-pointer"
+                  className="flex-1 py-2.5 dl-radius-lg bg-primary text-primary-foreground font-bold [@media(hover:hover)]:hover:opacity-90 transition-all text-xs active:scale-95 cursor-pointer"
                 >
                   {t("Save")}
                 </button>

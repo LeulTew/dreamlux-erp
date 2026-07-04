@@ -104,8 +104,8 @@ Production findings and polish gaps from deployed smoke review. Some observation
 - [x] Fix mobile button sizing/wrapping so `< Back`, `Create Draft`, and `Submit For Approval` remain readable and professional on narrow screens.
 - [x] When validation fails with `Estimate label is required`, return focus to the proposal form and visibly highlight the exact missing estimate field(s).
 - [x] Add a restrained submit-for-approval animation/loading state that communicates progress without blocking accessibility.
-- [ ] Audit all gold-background buttons in light mode and ensure text/icons use white or another WCAG-compliant foreground. No gold background with black text unless contrast is proven and design-approved.
-- [ ] Enforce UI rules: global custom radius tokens only, no bare `rounded`, no hardcoded border radius, no bare hover utilities on mobile surfaces, 48px practical touch targets, no oversized report/PDF branding.
+- [x] Audit all gold-background buttons in light mode and ensure text/icons use white or another WCAG-compliant foreground. No gold background with black text unless contrast is proven and design-approved.
+- [x] Enforce UI rules: global custom radius tokens only, no bare `rounded`, no hardcoded border radius, no bare hover utilities on mobile surfaces, 48px practical touch targets, no oversized report/PDF branding.
 
 ### Package and deployment cleanup
 

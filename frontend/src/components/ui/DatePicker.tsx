@@ -262,7 +262,7 @@ export default function DatePicker({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "w-full flex items-center justify-between h-[44px] pl-3.5 pr-10 rounded-xl border border-border bg-card-alt text-foreground text-xs font-semibold tracking-wide transition-all duration-200 outline-none hover:bg-border/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 select-none text-left cursor-pointer",
+            "w-full flex items-center justify-between h-[44px] pl-3.5 pr-10 dl-radius-xl border border-border bg-card-alt text-foreground text-xs font-semibold tracking-wide transition-all duration-200 outline-none hover:bg-border/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 select-none text-left cursor-pointer",
             displayValue ? "pr-14" : "pr-10"
           )}
         >
@@ -292,7 +292,7 @@ export default function DatePicker({
       {isOpen && (
         <div
           className={cn(
-            "absolute left-0 mt-2 bg-card border border-border rounded-xl shadow-massive z-50 animate-in fade-in slide-in-from-top-1 duration-150 flex flex-row divide-x divide-border/60 overflow-hidden",
+            "absolute left-0 mt-2 bg-card border border-border dl-radius-xl shadow-massive z-50 animate-in fade-in slide-in-from-top-1 duration-150 flex flex-row divide-x divide-border/60 overflow-hidden",
             showTime ? "w-[440px]" : "w-[280px]"
           )}
         >
@@ -303,7 +303,7 @@ export default function DatePicker({
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="p-1.5 rounded-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
+                className="p-1.5 dl-radius-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
               >
                 <HiChevronLeft className="w-4 h-4" />
               </button>
@@ -313,7 +313,7 @@ export default function DatePicker({
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="p-1.5 rounded-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
+                className="p-1.5 dl-radius-lg border border-border hover:bg-card-alt text-foreground/80 hover:text-foreground transition-all cursor-pointer"
               >
                 <HiChevronRight className="w-4 h-4" />
               </button>
@@ -338,7 +338,7 @@ export default function DatePicker({
                   key={`prev-${day}`}
                   type="button"
                   onClick={() => selectDate(day, -1)}
-                  className="w-8 h-8 rounded-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
+                  className="w-8 h-8 dl-radius-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
                 >
                   {day}
                 </button>
@@ -354,9 +354,9 @@ export default function DatePicker({
                     type="button"
                     onClick={() => selectDate(day)}
                     className={cn(
-                      "w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center relative",
+                      "w-8 h-8 dl-radius-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center relative",
                       active
-                        ? "bg-amber-600 text-white hover:bg-amber-700 shadow-sm"
+                        ? "bg-primary text-primary-foreground hover:bg-primary-dark shadow-sm"
                         : today
                         ? "border border-primary text-primary hover:bg-primary/5"
                         : "text-foreground hover:bg-card-alt"
@@ -376,7 +376,7 @@ export default function DatePicker({
                   key={`next-${day}`}
                   type="button"
                   onClick={() => selectDate(day, 1)}
-                  className="w-8 h-8 rounded-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
+                  className="w-8 h-8 dl-radius-lg text-xs font-medium text-muted-foreground/30 hover:bg-card-alt hover:text-foreground/50 transition-all cursor-pointer"
                 >
                   {day}
                 </button>
@@ -395,7 +395,7 @@ export default function DatePicker({
                     setIsOpen(false);
                   }
                 }}
-                className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer"
+                className="text-[10px] font-black uppercase tracking-wider text-primary-dark dark:text-primary hover:text-primary-dark/85 dark:hover:text-primary-light transition-colors cursor-pointer"
               >
                 Today
               </button>
@@ -434,9 +434,9 @@ export default function DatePicker({
                         data-active={isSel}
                         onClick={() => handleTimeSelect("hour", h)}
                         className={cn(
-                          "py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer block w-full",
+                          "py-1.5 text-xs font-bold dl-radius-lg transition-all shrink-0 cursor-pointer block w-full",
                           isSel
-                            ? "bg-amber-600 text-white shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
                         )}
                       >
@@ -462,9 +462,9 @@ export default function DatePicker({
                         data-active={isSel}
                         onClick={() => handleTimeSelect("minute", m)}
                         className={cn(
-                          "py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer block w-full",
+                          "py-1.5 text-xs font-bold dl-radius-lg transition-all shrink-0 cursor-pointer block w-full",
                           isSel
-                            ? "bg-amber-600 text-white shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
                         )}
                       >
@@ -484,9 +484,9 @@ export default function DatePicker({
                         type="button"
                         onClick={() => handleTimeSelect("ampm", ap)}
                         className={cn(
-                          "py-2 text-xs font-black rounded-lg transition-all cursor-pointer block w-full",
+                          "py-2 text-xs font-black dl-radius-lg transition-all cursor-pointer block w-full",
                           isSel
-                            ? "bg-amber-600 text-white shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-card-alt hover:text-foreground"
                         )}
                       >
@@ -501,7 +501,7 @@ export default function DatePicker({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="w-full h-8 mt-3 rounded-lg text-xs font-semibold uppercase tracking-wider bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20 hover:border-amber-500/35 active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
+                className="w-full h-8 mt-3 dl-radius-lg text-xs font-semibold uppercase tracking-wider bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary border border-primary/20 hover:border-primary/35 active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
               >
                 <HiCheck className="w-3.5 h-3.5 animate-pulse" />
                 Done

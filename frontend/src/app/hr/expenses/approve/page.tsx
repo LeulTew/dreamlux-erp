@@ -323,13 +323,13 @@ function ExpenseApprovalContent() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-5">
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
+            <div className="w-12 h-12 dl-radius-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
               <HiClipboardDocumentList className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-black text-foreground tracking-tight">{t("Expense Approval Queue")}</h1>
-                <span className="px-2.5 py-0.5 text-[10px] font-black bg-primary/10 text-primary rounded-full uppercase tracking-wider animate-pulse">
+                <span className="px-2.5 py-0.5 text-[10px] font-black bg-primary/10 text-primary dl-radius-lg uppercase tracking-wider animate-pulse">
                   {totalRecords} {t(activeTab === "pending" ? "Pending" : "Total")}
                 </span>
               </div>
@@ -345,7 +345,7 @@ function ExpenseApprovalContent() {
               onClick={() => handleTabChange("pending")}
               className={cn(
                 "px-4 py-2 text-xs font-bold dl-radius-lg transition-all duration-200 select-none cursor-pointer",
-                activeTab === "pending" ? "bg-amber-500 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
+                activeTab === "pending" ? "bg-primary text-primary-foreground shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
               )}
             >
               {t("Pending Queue")}
@@ -354,7 +354,7 @@ function ExpenseApprovalContent() {
               onClick={() => handleTabChange("history")}
               className={cn(
                 "px-4 py-2 text-xs font-bold dl-radius-lg transition-all duration-200 select-none cursor-pointer",
-                activeTab === "history" ? "bg-amber-500 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
+                activeTab === "history" ? "bg-primary text-primary-foreground shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
               )}
             >
               {t("History")}
@@ -363,7 +363,7 @@ function ExpenseApprovalContent() {
         </div>
 
         {/* Global Filter Toolbar */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 space-y-4 shadow-sm">
+        <div className="bg-card border border-border/80 dl-radius-2xl p-4 space-y-4 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {/* Search Input */}
             <div className="flex flex-col gap-1">
@@ -371,7 +371,7 @@ function ExpenseApprovalContent() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder={t("Search event, category or submitter...")}
-                className="bg-card-alt border-border text-xs h-[40px] rounded-lg"
+                className="bg-card-alt border-border text-xs h-[40px] dl-radius-lg"
               />
             </div>
 
@@ -380,7 +380,7 @@ function ExpenseApprovalContent() {
               <select
                 value={categoryFilter}
                 onChange={(e) => handleFilterChange(setCategoryFilter, e.target.value)}
-                className="bg-card-alt border border-border text-xs h-[40px] rounded-lg px-3 text-foreground outline-none focus:border-primary/50 cursor-pointer"
+                className="bg-card-alt border border-border text-xs h-[40px] dl-radius-lg px-3 text-foreground outline-none focus:border-primary/50 cursor-pointer"
               >
                 <option value="">{t("All Categories")}</option>
                 <option value="Fuel">{t("Fuel")}</option>
@@ -399,7 +399,7 @@ function ExpenseApprovalContent() {
                 value={dateFrom}
                 onChange={(e) => handleFilterChange(setDateFrom, e.target.value)}
                 placeholder={t("Date From")}
-                className="bg-card-alt border-border text-xs h-[40px] rounded-lg w-full"
+                className="bg-card-alt border-border text-xs h-[40px] dl-radius-lg w-full"
               />
               <span className="text-muted-foreground text-xs">-</span>
               <Input
@@ -407,7 +407,7 @@ function ExpenseApprovalContent() {
                 value={dateTo}
                 onChange={(e) => handleFilterChange(setDateTo, e.target.value)}
                 placeholder={t("Date To")}
-                className="bg-card-alt border-border text-xs h-[40px] rounded-lg w-full"
+                className="bg-card-alt border-border text-xs h-[40px] dl-radius-lg w-full"
               />
             </div>
 
@@ -418,7 +418,7 @@ function ExpenseApprovalContent() {
                 value={amountMin}
                 onChange={(e) => handleFilterChange(setAmountMin, e.target.value)}
                 placeholder={t("Min Amount")}
-                className="bg-card-alt border-border text-xs h-[40px] rounded-lg w-full"
+                className="bg-card-alt border-border text-xs h-[40px] dl-radius-lg w-full"
               />
               <span className="text-muted-foreground text-xs">-</span>
               <Input
@@ -426,7 +426,7 @@ function ExpenseApprovalContent() {
                 value={amountMax}
                 onChange={(e) => handleFilterChange(setAmountMax, e.target.value)}
                 placeholder={t("Max Amount")}
-                className="bg-card-alt border-border text-xs h-[40px] rounded-lg w-full"
+                className="bg-card-alt border-border text-xs h-[40px] dl-radius-lg w-full"
               />
             </div>
           </div>
@@ -439,7 +439,7 @@ function ExpenseApprovalContent() {
                 <select
                   value={statusFilter}
                   onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
-                  className="bg-card-alt border border-border text-xs h-[40px] rounded-lg px-3 text-foreground outline-none focus:border-primary/50 cursor-pointer"
+                  className="bg-card-alt border border-border text-xs h-[40px] dl-radius-lg px-3 text-foreground outline-none focus:border-primary/50 cursor-pointer"
                 >
                   <option value="">{t("All Statuses")}</option>
                   <option value="Approved">{t("Approved")}</option>
@@ -453,7 +453,7 @@ function ExpenseApprovalContent() {
                   value={reviewerInput}
                   onChange={(e) => setReviewerInput(e.target.value)}
                   placeholder={t("Search reviewer...")}
-                  className="bg-card-alt border-border text-xs h-[40px] rounded-lg"
+                  className="bg-card-alt border-border text-xs h-[40px] dl-radius-lg"
                 />
               </div>
             </div>
@@ -462,7 +462,7 @@ function ExpenseApprovalContent() {
 
         {/* Query Loading/Error States */}
         {activeQuery.isError ? (
-          <div className="rounded-2xl border border-rose-500/25 bg-rose-500/5 p-4 text-center text-xs text-rose-500 font-semibold">
+          <div className="dl-radius-2xl border border-rose-500/25 bg-rose-500/5 p-4 text-center text-xs text-rose-500 font-semibold">
             Failed to load data. Please refresh or try again later.
           </div>
         ) : activeQuery.isLoading ? (
@@ -471,7 +471,7 @@ function ExpenseApprovalContent() {
             <Skeleton className="h-20 w-full animate-pulse" />
           </div>
         ) : expensesList.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card p-8 text-center text-xs text-muted-foreground font-semibold">
+          <div className="dl-radius-2xl border border-border bg-card p-8 text-center text-xs text-muted-foreground font-semibold">
             {t(activeTab === "pending" ? "No pending expenses." : "No history records found.")}
           </div>
         ) : (
@@ -487,7 +487,7 @@ function ExpenseApprovalContent() {
                   return (
                     <div
                       key={expense.id}
-                      className="bg-card border border-border/70 rounded-2xl shadow-sm hover:shadow-md hover:border-border/90 transition-all duration-300 relative overflow-hidden group p-5"
+                      className="bg-card border border-border/70 dl-radius-2xl shadow-sm hover:shadow-md hover:border-border/90 transition-all duration-300 relative overflow-hidden group p-5"
                     >
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-500/60 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       
@@ -497,7 +497,7 @@ function ExpenseApprovalContent() {
                             <h2 className="text-base font-extrabold text-foreground tracking-tight group-hover:text-primary transition-colors">
                               {expense.event_name || t("Event")}
                             </h2>
-                            <span className={cn("rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider", categoryClass)}>
+                            <span className={cn("dl-radius-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider", categoryClass)}>
                               {t(expense.category)}
                             </span>
                             <StatusBadge status="Pending" />
@@ -540,7 +540,7 @@ function ExpenseApprovalContent() {
                             type="button"
                             onClick={() => setExpandedExpenseId(isExpanded ? null : expense.id)}
                             className={cn(
-                              "flex items-center gap-1.5 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-250 active:scale-95 group/btn shadow-sm cursor-pointer select-none",
+                              "flex items-center gap-1.5 px-6 py-2.5 dl-radius-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-250 active:scale-95 group/btn shadow-sm cursor-pointer select-none",
                               isExpanded
                                 ? "bg-primary/20 text-primary border border-primary/45"
                                 : "bg-primary/5 hover:bg-primary/15 border border-primary/20 hover:border-primary/40 text-primary"
@@ -563,7 +563,7 @@ function ExpenseApprovalContent() {
                             className="overflow-hidden"
                           >
                             <div className="mt-4 pt-4 border-t border-border/45">
-                              <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end bg-card-alt/45 p-4 rounded-xl border border-border/40">
+                              <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end bg-card-alt/45 p-4 dl-radius-xl border border-border/40">
                                 <div className="flex flex-col gap-1.5">
                                   <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-1">
                                     {t("Review comment")}
@@ -572,7 +572,7 @@ function ExpenseApprovalContent() {
                                     value={comment}
                                     onChange={(eventChange) => setReviewComments((current) => ({ ...current, [expense.id]: eventChange.target.value }))}
                                     placeholder={t("Enter comment or reject reason...")}
-                                    className="bg-card border-border/80 focus:border-primary/50 text-xs h-[40px] rounded-lg"
+                                    className="bg-card border-border/80 focus:border-primary/50 text-xs h-[40px] dl-radius-lg"
                                   />
                                 </div>
                                 
@@ -581,7 +581,7 @@ function ExpenseApprovalContent() {
                                     type="button"
                                     disabled={reviewMutation.isPending}
                                     onClick={() => reviewMutation.mutate({ id: expense.id, status: "Approved" })}
-                                    className="h-10 px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 active:scale-[0.97] transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                                    className="h-10 px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 active:scale-[0.97] transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                                   >
                                     <HiCheck className="h-4.5 w-4.5" />
                                     <span>{t("Approve")}</span>
@@ -596,7 +596,7 @@ function ExpenseApprovalContent() {
                                       }
                                       reviewMutation.mutate({ id: expense.id, status: "Rejected", rejected_reason: comment });
                                     }}
-                                    className="h-10 px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:border-rose-500/40 active:scale-[0.97] transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                                    className="h-10 px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:border-rose-500/40 active:scale-[0.97] transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
                                   >
                                     <HiXMark className="h-4.5 w-4.5" />
                                     <span>{t("Reject")}</span>
@@ -613,7 +613,7 @@ function ExpenseApprovalContent() {
               </div>
             ) : (
               /* HISTORY TAB TABLE LAYOUT */
-              <div className="bg-card border border-border/80 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-card border border-border/80 dl-radius-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -689,7 +689,7 @@ function ExpenseApprovalContent() {
                               {expense.event_name || "-"}
                             </td>
                             <td className="p-4">
-                              <span className={cn("rounded-xl border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", categoryClass)}>
+                              <span className={cn("dl-radius-xl border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", categoryClass)}>
                                 {t(expense.category)}
                               </span>
                             </td>
