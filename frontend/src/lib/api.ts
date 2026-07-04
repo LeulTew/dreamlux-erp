@@ -24,6 +24,7 @@ import {
   CapitalInvestment,
   CapitalInvestmentSummary,
   CapitalInvestmentListResponse,
+  MonthlyNetProfitStatement,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1718,6 +1719,25 @@ export const downloadCapitalInvestmentsExport = async (
   const link = document.createElement("a");
   link.href = url;
   link.download = `capital-investments-${dateTag}.${params.format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const getMonthlyNetProfitStatement = (
+  params: { month: string; include_investments_in_net?: boolean }
+): Promise<MonthlyNetProfitStatement> =>
+  api.get("/finance/reports/monthly-net-profit", { params }).then((r) => r.data);
+
+export const downloadMonthlyNetProfitExport = async (
+  params: { month: string; include_investments_in_net?: boolean; format: "csv" | "xlsx"; maxRows?: number }
+): Promise<void> => {
+  const response = await api.get("/finance/reports/monthly-net-profit/export", { params, responseType: "blob" });
+  const url = window.URL.createObjectURL(response.data as Blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `monthly-net-profit-${params.month}.${params.format}`;
   document.body.appendChild(link);
   link.click();
   link.remove();

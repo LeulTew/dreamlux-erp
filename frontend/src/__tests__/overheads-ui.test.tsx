@@ -27,9 +27,9 @@ vi.mock("@/components/AuthLayout", () => ({
 }));
 
 // Mock react-query
-let mockAuthData: unknown = null;
-let mockSummaryData: unknown = null;
-let mockListData: unknown = null;
+let mockAuthData: any = null;
+let mockSummaryData: any = null;
+let mockListData: any = null;
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {
