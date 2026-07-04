@@ -45,6 +45,7 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { slug: "finance:investments:read", description: "View capital investment register and summaries" },
   { slug: "finance:investments:write", description: "Create and update capital investment entries" },
   { slug: "finance:investments:approve", description: "Approve, reject, delete, and export capital investment entries" },
+  { slug: "finance:imports:write", description: "Preview and commit legacy Hisab workbook imports" },
 ];
 
 export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
@@ -96,6 +97,7 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
     "finance:investments:read",
     "finance:investments:write",
     "finance:investments:approve",
+    "finance:imports:write",
   ],
   driver: ["events:read", "trips:create"],
 };

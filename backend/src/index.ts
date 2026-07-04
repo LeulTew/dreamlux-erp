@@ -18,6 +18,7 @@ import activityRouter from "./routes/activity";
 import financeRouter from "./routes/finance";
 import financeOverheadsRouter from "./routes/finance-overheads";
 import financeInvestmentsRouter from "./routes/finance-investments";
+import financeImportsRouter from "./routes/finance-imports";
 
 import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
@@ -128,6 +129,7 @@ app.use("/payroll", requireAuth, requirePermissionSlugs(["payroll:read", "payrol
 app.use("/events", requireAuth, eventsRouter);
 app.use("/finance/overheads", requireAuth, financeOverheadsRouter);
 app.use("/finance/investments", requireAuth, financeInvestmentsRouter);
+app.use("/finance/imports", requireAuth, financeImportsRouter);
 app.use("/finance", requireAuth, financeRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/activity", activityRouter);

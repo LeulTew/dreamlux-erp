@@ -25,6 +25,7 @@ DECLARE
     'field_permissions',
     'finance_overhead_expenses',
     'finance_overhead_month_closures',
+    'finance_import_batches',
     'inventory_reconciliation_items',
     'inventory_reconciliation_legacy_deleted',
     'inventory_reconciliation_legacy_trash',

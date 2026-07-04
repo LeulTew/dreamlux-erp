@@ -76,4 +76,10 @@ export async function mockCommonShellData(page: Page) {
   );
   await page.route("**/salary-levels**", (route) => fulfillJson(route, []));
   await page.route("**/payroll/runs**", (route) => fulfillJson(route, []));
+  await page.route("**/api/notifications**", (route) =>
+    fulfillJson(route, { notifications: [], total: 0 }),
+  );
+  await page.route("**/api/notifications/unread-count", (route) =>
+    fulfillJson(route, { count: 0 }),
+  );
 }

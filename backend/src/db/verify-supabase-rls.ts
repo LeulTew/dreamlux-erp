@@ -18,6 +18,7 @@ const protectedTables = [
   "event_proposal_logs",
   "finance_overhead_expenses",
   "finance_overhead_month_closures",
+  "finance_import_batches",
 ];
 
 function isDenied(status: number): boolean {
@@ -25,7 +26,7 @@ function isDenied(status: number): boolean {
 }
 
 async function assertProtectedTableDenied(supabaseUrl: string, key: string, table: string) {
-  const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/${table}?select=id&limit=1`, {
+  const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/${table}?select=*&limit=1`, {
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,

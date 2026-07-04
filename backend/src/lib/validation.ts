@@ -850,3 +850,80 @@ export const capitalInvestmentExportQuerySchema = capitalInvestmentListQuerySche
 export type CreateCapitalInvestmentInput = z.infer<typeof createCapitalInvestmentSchema>;
 export type UpdateCapitalInvestmentInput = z.infer<typeof updateCapitalInvestmentSchema>;
 export type CapitalInvestmentListQueryInput = z.infer<typeof capitalInvestmentListQuerySchema>;
+
+// --- Issue #113: Legacy Hisab workbook import and reconciliation mapper ---
+
+const hisabImportResolutionItemSchema = z.object({
+  eventId: z.string().uuid("Invalid event ID"),
+  eventName: z.string().trim().min(1).max(300).optional(),
+});
+
+const hisabImportRowSchema = z.object({
+  id: z.string().trim().min(1).max(200),
+  sheet: z.enum(["HISAB WEEKLY MONTHLY", "MONTHLY WECHI", "INVESTMENT", "monthly total expense"]),
+  rowNumber: z.coerce.number().int().min(1),
+  kind: z.enum(["event_expense", "operational_expense", "overhead", "investment"]),
+  date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid import row date"),
+  month: overheadMonthSchema,
+  description: z.string().trim().min(1).max(1000),
+  amount: z.coerce.number().min(0.01).max(100_000_000),
+  category: z.string().trim().max(100).optional(),
+  eventName: z.string().trim().max(300).optional(),
+  payee: nullableText(300, "Payee too long"),
+  vendor: nullableText(300, "Vendor/source too long"),
+  quantity: z.coerce.number().min(0.0001).max(1_000_000).optional(),
+  unit: z.string().trim().max(50).optional(),
+  unitCost: z.coerce.number().min(0.01).max(100_000_000).optional(),
+  scope: z.string().trim().max(50).optional(),
+  paymentKind: z.string().trim().max(50).optional(),
+  capexClassification: z.string().trim().max(100).optional(),
+  requiresResolution: z.array(z.object({
+    kind: z.enum(["event", "opex_category", "overhead_category", "investment_category"]),
+    value: z.string().trim().max(200),
+  })).default([]),
+});
+
+export const hisabImportCommitSchema = z.object({
+  workbookHash: z.string().regex(/^[a-f0-9]{64}$/i, "Invalid workbook fingerprint"),
+  sourceFilename: nullableText(255, "Source filename too long"),
+  acceptFormulaMismatches: z.coerce.boolean().optional().default(false),
+  preview: z.object({
+    workbookHash: z.string().regex(/^[a-f0-9]{64}$/i, "Invalid preview fingerprint"),
+    sourceFilename: nullableText(255, "Source filename too long"),
+    layoutVersion: z.literal("legacy-hisab-v1"),
+    knownSheets: z.array(z.enum(["HISAB WEEKLY MONTHLY", "MONTHLY WECHI", "INVESTMENT", "monthly total expense"])).max(4),
+    missingSheets: z.array(z.enum(["HISAB WEEKLY MONTHLY", "MONTHLY WECHI", "INVESTMENT", "monthly total expense"])).max(4),
+    rows: z.array(hisabImportRowSchema).min(1).max(5000),
+    unmatched: z.array(z.unknown()).default([]),
+    formulaMismatches: z.array(z.object({
+      sheet: z.enum(["HISAB WEEKLY MONTHLY", "MONTHLY WECHI", "INVESTMENT", "monthly total expense"]),
+      rowNumber: z.coerce.number().int().min(1),
+      label: z.string().trim().max(300),
+      expected: z.coerce.number(),
+      actual: z.coerce.number(),
+      delta: z.coerce.number(),
+    })).default([]),
+    blockingErrors: z.array(z.string().max(500)).default([]),
+    warnings: z.array(z.string().max(500)).default([]),
+    summary: z.object({
+      totalRows: z.coerce.number().int().min(0),
+      eventExpenseRows: z.coerce.number().int().min(0),
+      operationalExpenseRows: z.coerce.number().int().min(0),
+      overheadRows: z.coerce.number().int().min(0),
+      investmentRows: z.coerce.number().int().min(0),
+      totalAmount: z.coerce.number().min(0),
+    }),
+  }),
+  resolutions: z.object({
+    events: z.record(hisabImportResolutionItemSchema).optional(),
+    categories: z.record(z.string().trim().min(1).max(100)).optional(),
+  }).optional().default({}),
+}).refine((data) => data.workbookHash === data.preview.workbookHash, {
+  message: "Workbook fingerprint does not match preview",
+  path: ["workbookHash"],
+}).refine((data) => data.preview.blockingErrors.length === 0, {
+  message: "Preview has blocking errors",
+  path: ["preview", "blockingErrors"],
+});
+
+export type HisabImportCommitInput = z.infer<typeof hisabImportCommitSchema>;
