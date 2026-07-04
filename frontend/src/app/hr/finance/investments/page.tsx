@@ -12,6 +12,7 @@ import {
   HiXMark,
   HiPencilSquare,
   HiTrash,
+  HiOutlineClock,
 } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
@@ -24,6 +25,7 @@ import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
+import ActivityDrawer from "@/components/ActivityDrawer";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import {
   api,
@@ -171,6 +173,8 @@ export default function InvestmentsPage() {
   const [deletingInvestment, setDeletingInvestment] = useState<CapitalInvestment | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
 
   const defaultForm = {
     purchase_date: new Date().toISOString().slice(0, 10),
@@ -696,6 +700,17 @@ export default function InvestmentsPage() {
                               </button>
                             </>
                           )}
+                          <button
+                            onClick={() => {
+                              setSelectedActivityId(item.id);
+                              setIsActivityOpen(true);
+                            }}
+                            aria-label={t("Activity")}
+                            className="flex items-center justify-center h-[32px] w-[32px] dl-radius-md border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all cursor-pointer"
+                            title={t("Activity")}
+                          >
+                            <HiOutlineClock className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -878,6 +893,15 @@ export default function InvestmentsPage() {
           </div>
         </ResponsiveDrawer>
       )}
+      <ActivityDrawer
+        entityType="capital_investment"
+        entityId={selectedActivityId || ""}
+        isOpen={isActivityOpen}
+        onClose={() => {
+          setIsActivityOpen(false);
+          setSelectedActivityId(null);
+        }}
+      />
     </AuthLayout>
   );
 }

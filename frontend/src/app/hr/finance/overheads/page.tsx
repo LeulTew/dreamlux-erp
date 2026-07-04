@@ -13,6 +13,7 @@ import {
   HiTrash,
   HiLockClosed,
   HiLockOpen,
+  HiOutlineClock,
 } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
@@ -25,6 +26,7 @@ import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
+import ActivityDrawer from "@/components/ActivityDrawer";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import {
   api,
@@ -198,6 +200,8 @@ export default function OverheadsPage() {
   const [deletingExpense, setDeletingExpense] = useState<FinanceOverhead | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
 
   const defaultForm = {
     expense_month: selectedMonth,
@@ -741,6 +745,17 @@ export default function OverheadsPage() {
                               </button>
                             </>
                           )}
+                          <button
+                            onClick={() => {
+                              setSelectedActivityId(expense.id);
+                              setIsActivityOpen(true);
+                            }}
+                            aria-label={t("Activity")}
+                            className="flex items-center justify-center h-[32px] w-[32px] dl-radius-md border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all cursor-pointer"
+                            title={t("Activity")}
+                          >
+                            <HiOutlineClock className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -923,6 +938,15 @@ export default function OverheadsPage() {
           </div>
         </ResponsiveDrawer>
       )}
+      <ActivityDrawer
+        entityType="finance_overhead_expense"
+        entityId={selectedActivityId || ""}
+        isOpen={isActivityOpen}
+        onClose={() => {
+          setIsActivityOpen(false);
+          setSelectedActivityId(null);
+        }}
+      />
     </AuthLayout>
   );
 }
