@@ -776,14 +776,14 @@ function NewProposalContent() {
                     </button>
                   </div>
                   {designLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
                       <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("design", idx, "label", e.target.value)}
                         className={cn(
-                          "px-3 py-1.5 text-xs rounded-lg bg-card border border-border",
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border",
                           validationErrors?.design[idx] && "border-rose-500 ring-1 ring-rose-500/30"
                         )}
                       />
@@ -792,7 +792,7 @@ function NewProposalContent() {
                         placeholder={t("Amount")}
                         value={line.amount || ""}
                         onChange={(e) => updateLine("design", idx, "amount", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2">
                         <Input
@@ -800,9 +800,9 @@ function NewProposalContent() {
                           placeholder={t("Notes")}
                           value={line.notes}
                           onChange={(e) => updateLine("design", idx, "notes", e.target.value)}
-                          className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-card border border-border"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border"
                         />
-                        <button onClick={() => removeLine("design", idx)} className="p-1.5 bg-danger/10 text-danger rounded-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
+                        <button onClick={() => removeLine("design", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -819,14 +819,14 @@ function NewProposalContent() {
                     </button>
                   </div>
                   {teamLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
                       <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("team", idx, "label", e.target.value)}
                         className={cn(
-                          "px-3 py-1.5 text-xs rounded-lg bg-card border border-border col-span-1 sm:col-span-2",
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border col-span-1 sm:col-span-2",
                           validationErrors?.team[idx] && "border-rose-500 ring-1 ring-rose-500/30"
                         )}
                       />
@@ -835,14 +835,14 @@ function NewProposalContent() {
                         placeholder={t("People Count")}
                         value={line.people_count || ""}
                         onChange={(e) => updateLine("team", idx, "people_count", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <Input
                         type="number"
                         placeholder={t("Commission")}
                         value={line.commission_per_person || ""}
                         onChange={(e) => updateLine("team", idx, "commission_per_person", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2 col-span-1">
                         <Input
@@ -851,9 +851,9 @@ function NewProposalContent() {
                           value={line.amount || 0}
                           readOnly
                           title="Calculated: People Count × Commission per Person"
-                          className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-card-alt border border-border/40 text-muted cursor-not-allowed font-mono"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card-alt border border-border/40 text-muted cursor-not-allowed font-mono"
                         />
-                        <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger rounded-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
+                        <button onClick={() => removeLine("team", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -870,14 +870,14 @@ function NewProposalContent() {
                     </button>
                   </div>
                   {tripLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
                       <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("trip", idx, "label", e.target.value)}
                         className={cn(
-                          "px-3 py-1.5 text-xs rounded-lg bg-card border border-border",
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border",
                           validationErrors?.trip[idx] && "border-rose-500 ring-1 ring-rose-500/30"
                         )}
                       />
@@ -886,14 +886,14 @@ function NewProposalContent() {
                         placeholder={t("KM")}
                         value={line.km || ""}
                         onChange={(e) => updateLine("trip", idx, "km", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <Input
                         type="number"
                         placeholder={t("Fuel Price")}
                         value={line.fuel_price || ""}
                         onChange={(e) => updateLine("trip", idx, "fuel_price", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2">
                         <Input
@@ -901,9 +901,9 @@ function NewProposalContent() {
                           placeholder={t("Amount")}
                           value={line.amount || ""}
                           onChange={(e) => updateLine("trip", idx, "amount", Number(e.target.value))}
-                          className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-card border border-border font-mono"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                         />
-                        <button onClick={() => removeLine("trip", idx)} className="p-1.5 bg-danger/10 text-danger rounded-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
+                        <button onClick={() => removeLine("trip", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -920,14 +920,14 @@ function NewProposalContent() {
                     </button>
                   </div>
                   {otherLines.map((line, idx) => (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 rounded-lg border border-border/60">
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-card-alt p-3 dl-radius-lg border border-border/60">
                       <Input
                         type="text"
                         placeholder={t("Label")}
                         value={line.label}
                         onChange={(e) => updateLine("other", idx, "label", e.target.value)}
                         className={cn(
-                          "px-3 py-1.5 text-xs rounded-lg bg-card border border-border",
+                          "px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border",
                           validationErrors?.other[idx] && "border-rose-500 ring-1 ring-rose-500/30"
                         )}
                       />
@@ -936,7 +936,7 @@ function NewProposalContent() {
                         placeholder={t("Amount")}
                         value={line.amount || ""}
                         onChange={(e) => updateLine("other", idx, "amount", Number(e.target.value))}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-card border border-border font-mono"
+                        className="px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border font-mono"
                       />
                       <div className="flex gap-2">
                         <Input
@@ -944,9 +944,9 @@ function NewProposalContent() {
                           placeholder={t("Notes")}
                           value={line.notes}
                           onChange={(e) => updateLine("other", idx, "notes", e.target.value)}
-                          className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-card border border-border"
+                          className="flex-1 px-3 py-1.5 text-xs dl-radius-lg bg-card border border-border"
                         />
-                        <button onClick={() => removeLine("other", idx)} className="p-1.5 bg-danger/10 text-danger rounded-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
+                        <button onClick={() => removeLine("other", idx)} className="p-1.5 bg-danger/10 text-danger dl-radius-lg [@media(hover:hover)]:hover:bg-danger [@media(hover:hover)]:hover:text-on-danger shrink-0 cursor-pointer select-none">
                           <HiTrash className="w-4 h-4" />
                         </button>
                       </div>
@@ -1004,7 +1004,7 @@ function NewProposalContent() {
                 {step > 1 ? (
                   <button
                     onClick={() => setStep(step - 1)}
-                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
                   >
                     <HiArrowLeft className="w-4 h-4" />
                     <span>{t("Back")}</span>
@@ -1012,7 +1012,7 @@ function NewProposalContent() {
                 ) : (
                   <button
                     onClick={() => router.push("/events/proposals")}
-                    className="flex items-center justify-center h-11 px-4 sm:px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
+                    className="flex items-center justify-center h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
                   >
                     <span>{t("Cancel")}</span>
                   </button>
@@ -1023,7 +1023,7 @@ function NewProposalContent() {
                 {step < 3 ? (
                   <button
                     onClick={handleNextStep}
-                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] w-full cursor-pointer select-none"
+                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] w-full cursor-pointer select-none"
                   >
                     <span>{t("Next")}</span>
                     <HiArrowRight className="w-4 h-4" />
@@ -1033,14 +1033,14 @@ function NewProposalContent() {
                     <button
                       onClick={handleSaveDraft}
                       disabled={createProposalMutation.isPending || isSubmitting}
-                      className="flex items-center justify-center h-11 px-4 sm:px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto disabled:opacity-50 select-none"
+                      className="flex items-center justify-center h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto disabled:opacity-50 select-none"
                     >
                       {createProposalMutation.isPending ? "Saving..." : t("Create Draft")}
                     </button>
                     <button
                       onClick={handleSubmitForApproval}
                       disabled={createProposalMutation.isPending || isSubmitting}
-                      className="flex items-center justify-center gap-2 h-11 px-4 sm:px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto select-none disabled:opacity-50"
+                      className="flex items-center justify-center gap-2 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto select-none disabled:opacity-50"
                     >
                       {isSubmitting ? (
                         <>

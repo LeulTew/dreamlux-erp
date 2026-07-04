@@ -340,11 +340,11 @@ function ExpenseApprovalContent() {
           </div>
 
           {/* Dual Tabs Trigger */}
-          <div className="flex bg-neutral-100 dark:bg-neutral-900/60 p-1 rounded-xl border border-neutral-200 dark:border-neutral-800 self-start md:self-center">
+          <div className="flex bg-neutral-100 dark:bg-neutral-900/60 p-1 dl-radius-xl border border-neutral-200 dark:border-neutral-800 self-start md:self-center">
             <button
               onClick={() => handleTabChange("pending")}
               className={cn(
-                "px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 select-none cursor-pointer",
+                "px-4 py-2 text-xs font-bold dl-radius-lg transition-all duration-200 select-none cursor-pointer",
                 activeTab === "pending" ? "bg-amber-500 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
               )}
             >
@@ -353,7 +353,7 @@ function ExpenseApprovalContent() {
             <button
               onClick={() => handleTabChange("history")}
               className={cn(
-                "px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 select-none cursor-pointer",
+                "px-4 py-2 text-xs font-bold dl-radius-lg transition-all duration-200 select-none cursor-pointer",
                 activeTab === "history" ? "bg-amber-500 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
               )}
             >
@@ -523,7 +523,7 @@ function ExpenseApprovalContent() {
                               </div>
                             )}
                             {expense.receipt_image_key && (
-                              <div className="flex items-center gap-1 bg-amber-500/10 dark:bg-neutral-800/40 px-2 py-0.5 rounded-lg border border-amber-500/20 dark:border-neutral-700/60">
+                              <div className="flex items-center gap-1 bg-amber-500/10 dark:bg-neutral-800/40 px-2 py-0.5 dl-radius-lg border border-amber-500/20 dark:border-neutral-700/60">
                                 <span className="text-[10px] text-amber-600 dark:text-amber-400 font-extrabold uppercase">{t("Receipt")}</span>
                               </div>
                             )}
