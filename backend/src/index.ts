@@ -19,6 +19,7 @@ import financeRouter from "./routes/finance";
 import financeOverheadsRouter from "./routes/finance-overheads";
 import financeInvestmentsRouter from "./routes/finance-investments";
 import financeImportsRouter from "./routes/finance-imports";
+import recordPreferencesRouter from "./routes/record-preferences";
 
 import { requireAuth, requirePermissionSlugs } from "./middleware/auth";
 import { getEnv, getEnvList } from "./lib/env";
@@ -131,8 +132,13 @@ app.use("/finance/overheads", requireAuth, financeOverheadsRouter);
 app.use("/finance/investments", requireAuth, financeInvestmentsRouter);
 app.use("/finance/imports", requireAuth, financeImportsRouter);
 app.use("/finance", requireAuth, financeRouter);
+app.use("/api/finance/overheads", requireAuth, financeOverheadsRouter);
+app.use("/api/finance/investments", requireAuth, financeInvestmentsRouter);
+app.use("/api/finance/imports", requireAuth, financeImportsRouter);
+app.use("/api/finance", requireAuth, financeRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/activity", activityRouter);
+app.use("/api/preferences", recordPreferencesRouter);
 
 // Error handler
 app.use(

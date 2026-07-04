@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import HisabImportPage from "../app/hr/finance/imports/page";
+import type { HisabImportCommitPayload, HisabImportPreview } from "@/lib/types";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
@@ -35,12 +36,19 @@ vi.mock("@/lib/toast", () => ({
   },
 }));
 
-type MockQueryData = any;
+type MockAuthData = { permission_slugs?: string[] } | null;
+type MockEventsLookup = {
+  events: Array<{
+    id: string;
+    name: string;
+    event_id_display?: string;
+  }>;
+};
 
 // Mock react-query
-let mockAuthData: MockQueryData = null;
+let mockAuthData: MockAuthData = null;
 let mockAuthLoading = false;
-let mockEventsLookup: MockQueryData = {
+const mockEventsLookup: MockEventsLookup = {
   events: [
     { id: "evt-111", name: "Wedding Celebration", event_id_display: "EVT-2026-001" },
     { id: "evt-222", name: "Corporate Launch", event_id_display: "EVT-2026-002" },
@@ -73,10 +81,10 @@ vi.mock("@/lib/api", () => ({
     ],
   }),
   previewHisabImport: (file: File) => mockPreview(file),
-  commitHisabImport: (payload: any) => mockCommit(payload),
+  commitHisabImport: (payload: HisabImportCommitPayload) => mockCommit(payload),
 }));
 
-const PREVIEW_MOCK_DATA = {
+const PREVIEW_MOCK_DATA: HisabImportPreview = {
   workbookHash: "a50f26f0435696e3b8f9ce0b8b1a2f65b2e79ce78a389d6a93626429353f6294",
   sourceFilename: "hisab-june.xlsx",
   layoutVersion: "legacy-hisab-v1",

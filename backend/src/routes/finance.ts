@@ -22,6 +22,15 @@ const router = Router();
 const OPEX_ENTITY_TYPE = "finance_operational_expense";
 const HISAB_ENTITY_TYPE = "finance_hisab_report";
 const MONTHLY_NET_PROFIT_ENTITY_TYPE = "finance_monthly_net_profit_report";
+const OPEX_SORT_SQL: Record<string, string> = {
+  expense_date: "fe.expense_date",
+  created_at: "fe.created_at",
+  updated_at: "fe.updated_at",
+  amount: "fe.amount",
+  category: "fe.category",
+  status: "fe.status",
+  recent: "fe.updated_at",
+};
 
 function formatOpexRow(row: Record<string, any>): Record<string, any> {
   return { ...row, amount: roundMoney(row.amount) };
@@ -231,13 +240,15 @@ router.get(
       const total = Number(countResult.rows[0]?.count || 0);
 
       const offset = (query.page - 1) * query.limit;
+      const sortSql = OPEX_SORT_SQL[query.sortBy] || OPEX_SORT_SQL.expense_date;
+      const sortDirection = query.sortOrder === "asc" ? "ASC" : "DESC";
       const listResult = await pool.query(
         `SELECT fe.*, cu.username AS created_by_username, au.username AS approved_by_username
          FROM finance_operational_expenses fe
          LEFT JOIN users cu ON cu.id = fe.created_by
          LEFT JOIN users au ON au.id = fe.approved_by
          WHERE ${whereClause}
-         ORDER BY fe.expense_date DESC, fe.created_at DESC
+         ORDER BY ${sortSql} ${sortDirection}, fe.updated_at DESC, fe.created_at DESC
          LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, query.limit, offset],
       );

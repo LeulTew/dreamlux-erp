@@ -935,3 +935,75 @@ export interface MonthlyNetProfitStatement {
   };
 }
 
+export type HisabImportKnownSheet = "HISAB WEEKLY MONTHLY" | "MONTHLY WECHI" | "INVESTMENT" | "monthly total expense";
+
+export interface HisabImportResolution {
+  kind: "event" | "opex_category" | "overhead_category" | "investment_category";
+  value: string;
+}
+
+export interface HisabImportRow {
+  id: string;
+  sheet: HisabImportKnownSheet;
+  rowNumber: number;
+  kind: "event_expense" | "operational_expense" | "overhead" | "investment";
+  date: string;
+  month: string;
+  description: string;
+  amount: number;
+  category?: string;
+  eventName?: string;
+  requiresResolution: HisabImportResolution[];
+}
+
+export interface HisabImportFormulaMismatch {
+  sheet: HisabImportKnownSheet;
+  rowNumber: number;
+  label: string;
+  expected: number;
+  actual: number;
+  delta: number;
+}
+
+export interface HisabImportPreview {
+  workbookHash: string;
+  sourceFilename: string | null;
+  layoutVersion: "legacy-hisab-v1";
+  knownSheets: HisabImportKnownSheet[];
+  missingSheets: HisabImportKnownSheet[];
+  rows: HisabImportRow[];
+  unmatched: HisabImportResolution[];
+  formulaMismatches: HisabImportFormulaMismatch[];
+  blockingErrors: string[];
+  warnings: string[];
+  duplicate?: { committedAt: string } | null;
+  summary: {
+    totalRows: number;
+    eventExpenseRows: number;
+    operationalExpenseRows: number;
+    overheadRows: number;
+    investmentRows: number;
+    totalAmount: number;
+  };
+}
+
+export interface HisabImportCommitPayload {
+  workbookHash: string;
+  sourceFilename: string | null;
+  acceptFormulaMismatches: boolean;
+  preview: HisabImportPreview;
+  resolutions: {
+    events: Record<string, { eventId: string; eventName: string }>;
+    categories: Record<string, string>;
+  };
+}
+
+export interface HisabImportCommitResult {
+  inserted?: {
+    eventExpenses?: number;
+    operationalExpenses?: number;
+    overheads?: number;
+    investments?: number;
+  };
+}
+

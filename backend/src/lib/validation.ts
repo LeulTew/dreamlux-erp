@@ -36,7 +36,7 @@ export const paginationSchema = z.object({
 });
 
 export const assetsPaginationSchema = paginationSchema.extend({
-  sortBy: z.enum(["name", "quantity", "created_at", "updated_at", "last_counted_at"]).optional().default("updated_at"),
+  sortBy: z.enum(["name", "quantity", "created_at", "updated_at", "last_counted_at", "recent"]).optional().default("updated_at"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
@@ -93,7 +93,7 @@ export const employeePaginationSchema = z.object({
   status: z.enum(["active", "trash"]).optional().default("active"),
   office_id: z.string().uuid("Invalid office ID").optional().or(z.literal("all")),
   department_id: z.string().uuid("Invalid department ID").optional().or(z.literal("all")),
-  sortBy: z.enum(["name", "full_name", "salary", "date", "employee_id", "commission"]).optional().default("salary"),
+  sortBy: z.enum(["name", "full_name", "salary", "date", "employee_id", "commission", "recent"]).optional().default("salary"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
@@ -299,6 +299,33 @@ export const eventExportQuerySchema = eventListQueryBaseSchema.extend({
 });
 
 export type EventExportQueryInput = z.infer<typeof eventExportQuerySchema>;
+
+const recordPreferenceSortSchema = z.object({
+  sortBy: z.string().trim().min(1).max(80),
+  sortOrder: z.enum(["asc", "desc"]),
+}).strict();
+
+const recordPreferenceFiltersSchema = z.record(z.unknown()).optional().default({});
+
+export const recordListPreferenceParamsSchema = z.object({
+  recordType: z
+    .string()
+    .trim()
+    .min(1, "Record type is required")
+    .max(80, "Record type too long")
+    .regex(/^[a-z0-9:_-]+$/i, "Record type contains invalid characters"),
+});
+
+export const recordListPreferencePayloadSchema = z.object({
+  sort: recordPreferenceSortSchema.optional().nullable(),
+  filters: recordPreferenceFiltersSchema,
+  pageSize: z.coerce.number().int().min(1).max(200).optional().nullable(),
+  visibleColumns: z.array(z.string().trim().min(1).max(80)).max(80).optional().default([]),
+  density: z.enum(["compact", "comfortable", "spacious"]).optional().nullable(),
+  activeTab: z.string().trim().min(1).max(80).optional().nullable(),
+}).strict();
+
+export type RecordListPreferencePayloadInput = z.infer<typeof recordListPreferencePayloadSchema>;
 
 const profitReportQueryBaseSchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
@@ -612,6 +639,8 @@ export const financeOpexListQuerySchema = z.object({
   search: z.string().max(200).optional(),
   start_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid start_date"),
   end_date: z.string().optional().refine((val) => !val || !isNaN(Date.parse(val)), "Invalid end_date"),
+  sortBy: z.enum(["expense_date", "created_at", "updated_at", "amount", "category", "status", "recent"]).optional().default("expense_date"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 }).refine((data) => {
   if (!data.start_date || !data.end_date) return true;
   return new Date(data.start_date) <= new Date(data.end_date);
@@ -740,6 +769,8 @@ export const financeOverheadListQuerySchema = z.object({
   scope: overheadScopeSchema.optional(),
   payment_kind: overheadPaymentKindSchema.optional(),
   search: z.string().max(200).optional(),
+  sortBy: z.enum(["expense_month", "due_date", "created_at", "updated_at", "amount", "category", "status", "recent"]).optional().default("expense_month"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
 export const financeOverheadSummaryQuerySchema = z.object({
@@ -834,6 +865,8 @@ export const capitalInvestmentListQuerySchema = z.object({
   capex_classification: investmentClassificationSchema.optional(),
   linked: z.enum(["linked", "unlinked"]).optional(),
   search: z.string().max(200).optional(),
+  sortBy: z.enum(["purchase_date", "created_at", "updated_at", "total_cost", "item_name", "status", "recent"]).optional().default("purchase_date"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
 export const capitalInvestmentSummaryQuerySchema = z.object({

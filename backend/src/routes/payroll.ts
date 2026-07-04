@@ -11,7 +11,7 @@ import { hasPermissionSlug } from "../lib/permissions";
 import { pool } from "../db/pool";
 
 const router = express.Router();
-const PAYROLL_RUN_SORT_FIELDS = new Set(["period_start", "period_end", "created_at", "updated_at", "finalized_at", "status", "total"]);
+const PAYROLL_RUN_SORT_FIELDS = new Set(["period_start", "period_end", "created_at", "updated_at", "finalized_at", "status", "total", "recent"]);
 const DEFAULT_PAYROLL_RUN_LIMIT = 20;
 const MAX_PAYROLL_RUN_LIMIT = 100;
 
@@ -108,13 +108,14 @@ router.get("/runs", async (req: AuthRequest, res) => {
     const limit = Math.min(requestedLimit, MAX_PAYROLL_RUN_LIMIT);
     const offset = (page - 1) * limit;
     const sortBy = (req.query.sortBy as string) || "period_start";
+    const resolvedSortBy = sortBy === "recent" ? "updated_at" : sortBy;
     const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
 
     if (!PAYROLL_RUN_SORT_FIELDS.has(sortBy)) {
       return res.status(400).json({ error: `Unsupported payroll run sort field: ${sortBy}` });
     }
 
-    if (sortBy === "total") {
+    if (resolvedSortBy === "total") {
       const whereParts: string[] = [];
       const params: Array<string | number> = [];
 
@@ -198,7 +199,7 @@ router.get("/runs", async (req: AuthRequest, res) => {
         count: "exact",
       });
 
-    runsQuery = runsQuery.order(sortBy, { ascending: sortOrder === "asc" });
+    runsQuery = runsQuery.order(resolvedSortBy, { ascending: sortOrder === "asc" });
 
     runsQuery = view === "trash" ? runsQuery.not("deleted_at", "is", null) : runsQuery.is("deleted_at", null);
 

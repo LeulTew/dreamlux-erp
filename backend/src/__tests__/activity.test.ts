@@ -9,6 +9,7 @@ const testUserId = "550e8400-e29b-41d4-a716-446655440000";
 const superAdminToken = getTestToken(testUserId, "super_admin", ["*"]);
 const staffToken = getTestToken(testUserId, "crew", ["events:read"]); // Cannot read payroll/bank details
 const assetOnlyToken = getTestToken(testUserId, "inventory_officer", ["assets:read"]);
+const financeToken = getTestToken(testUserId, "accountant", ["finance:hisab:read"]);
 
 const mockLogs = [
   {
@@ -138,5 +139,17 @@ describe("Activity API & Redaction logs triggers", () => {
     expect(lastSql.toLowerCase()).toContain("limit $2 offset $3");
     expect(lastParams).toEqual(["100e8400-e29b-41d4-a716-446655440000", 100, 200]);
     expect(lastSql).toContain("source_route");
+  });
+
+  test("GET /api/activity allows finance activity only to finance readers", async () => {
+    const denied = await request(app)
+      .get("/api/activity?entity_type=finance_operational_expense&entity_id=5b2e8a54-1111-4dd6-9a51-30c5d4f00001")
+      .set("Authorization", `Bearer ${staffToken}`);
+    expect(denied.status).toBe(403);
+
+    const allowed = await request(app)
+      .get("/api/activity?entity_type=finance_operational_expense&entity_id=5b2e8a54-1111-4dd6-9a51-30c5d4f00001")
+      .set("Authorization", `Bearer ${financeToken}`);
+    expect(allowed.status).toBe(200);
   });
 });

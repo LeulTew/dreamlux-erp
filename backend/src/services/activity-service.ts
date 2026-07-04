@@ -62,15 +62,24 @@ export class ActivityService {
   static redactLogs(logs: ActivityLogEntry[], userPermissionSlugs: string[]): ActivityLogEntry[] {
     const isSuperAdmin = userPermissionSlugs.includes("*") || userPermissionSlugs.some(s => s.toLowerCase().includes("super_admin"));
     const hasPayrollRead = isSuperAdmin || hasPermissionSlug(userPermissionSlugs, "payroll:read");
-    const hasProfitRead = isSuperAdmin || hasPermissionSlug(userPermissionSlugs, "reports:read") || hasPermissionSlug(userPermissionSlugs, "events:profit:read");
+    const hasFinanceRead =
+      isSuperAdmin ||
+      hasPermissionSlug(userPermissionSlugs, "finance:hisab:read") ||
+      hasPermissionSlug(userPermissionSlugs, "finance:overheads:read") ||
+      hasPermissionSlug(userPermissionSlugs, "finance:investments:read");
+    const hasProfitRead =
+      hasFinanceRead ||
+      isSuperAdmin ||
+      hasPermissionSlug(userPermissionSlugs, "reports:read") ||
+      hasPermissionSlug(userPermissionSlugs, "events:profit:read");
     const hasUsersManage = isSuperAdmin || hasPermissionSlug(userPermissionSlugs, "users:manage");
     const hasEmployeesRead = isSuperAdmin || hasPermissionSlug(userPermissionSlugs, "employees:read");
 
     // Sensitive field indicators
     const isSensitivePayrollField = (field: string) => 
       /salary|bank|payout|account|rate|commission/i.test(field);
-    const isSensitiveProfitField = (field: string) => 
-      /profit|margin|budget|cost|price|revenue/i.test(field);
+    const isSensitiveProfitField = (field: string) =>
+      /profit|margin|budget|cost|price|revenue|amount|expense|investment|overhead|opex|payee|vendor/i.test(field);
     const isSensitiveSecurityField = (field: string) => 
       /password|hash|permission|role_ids|role_id|secret/i.test(field);
     const isSensitivePhoneField = (field: string) => 
@@ -89,9 +98,10 @@ export class ActivityService {
       }
 
       // Profit check
-      if (isSensitiveProfitField(field) && !hasProfitRead) {
+      if ((isSensitiveProfitField(field) || /^finance_|^capital_investment/.test(log.entity_type || "")) && !hasProfitRead) {
         redactedOld = redactedOld ? "[REDACTED]" : null;
         redactedNew = redactedNew ? "[REDACTED]" : null;
+        if (redactedNote) redactedNote = "[REDACTED]";
       }
 
       // Security check

@@ -24,6 +24,9 @@ import {
   CapitalInvestment,
   CapitalInvestmentSummary,
   CapitalInvestmentListResponse,
+  HisabImportCommitPayload,
+  HisabImportCommitResult,
+  HisabImportPreview,
   MonthlyNetProfitStatement,
 } from "./types";
 
@@ -1748,7 +1751,7 @@ export const downloadMonthlyNetProfitExport = async (
 // FINANCE — Hisab Workbook Imports (#113)
 // ====================================================
 
-export const previewHisabImport = (file: File): Promise<any> => {
+export const previewHisabImport = (file: File): Promise<HisabImportPreview> => {
   const formData = new FormData();
   formData.append("workbook", file);
   return api
@@ -1758,5 +1761,5 @@ export const previewHisabImport = (file: File): Promise<any> => {
     .then((r) => r.data);
 };
 
-export const commitHisabImport = (data: any): Promise<any> =>
+export const commitHisabImport = (data: HisabImportCommitPayload): Promise<HisabImportCommitResult> =>
   api.post("/finance/imports/hisab/commit", data).then((r) => r.data);

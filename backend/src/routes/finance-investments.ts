@@ -17,6 +17,15 @@ import {
 
 const router = Router();
 const INVESTMENT_ENTITY_TYPE = "capital_investment";
+const INVESTMENT_SORT_SQL: Record<string, string> = {
+  purchase_date: "ci.purchase_date",
+  created_at: "ci.created_at",
+  updated_at: "ci.updated_at",
+  total_cost: "ci.total_cost",
+  item_name: "ci.item_name",
+  status: "ci.status",
+  recent: "ci.updated_at",
+};
 
 function formatInvestmentRow(row: Record<string, any>): Record<string, any> {
   return {
@@ -105,6 +114,8 @@ router.get(
       const countResult = await pool.query(`SELECT COUNT(*) FROM capital_investments ci WHERE ${whereClause}`, params);
       const total = Number(countResult.rows[0]?.count || 0);
       const offset = (query.page - 1) * query.limit;
+      const sortSql = INVESTMENT_SORT_SQL[query.sortBy] || INVESTMENT_SORT_SQL.purchase_date;
+      const sortDirection = query.sortOrder === "asc" ? "ASC" : "DESC";
 
       const listResult = await pool.query(
         `SELECT ci.*, i.name AS asset_name, i.quantity AS asset_quantity, i.unit_of_measurement AS asset_unit,
@@ -114,7 +125,7 @@ router.get(
          LEFT JOIN users cu ON cu.id = ci.created_by
          LEFT JOIN users au ON au.id = ci.approved_by
          WHERE ${whereClause}
-         ORDER BY ci.purchase_date DESC, ci.created_at DESC
+         ORDER BY ${sortSql} ${sortDirection}, ci.updated_at DESC, ci.created_at DESC
          LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
         [...params, query.limit, offset],
       );

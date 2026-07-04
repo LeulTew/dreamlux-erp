@@ -4,7 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { HiOutlineArrowUturnLeft, HiPrinter, HiExclamationTriangle, HiTableCells, HiDocumentArrowDown, HiTrash } from "react-icons/hi2";
+import { HiOutlineArrowUturnLeft, HiPrinter, HiExclamationTriangle, HiTableCells, HiDocumentArrowDown, HiTrash, HiOutlineClock } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRun, exportPayrollExcel, exportPayrollCSV, updatePayrollRunStatus } from "@/lib/api";
 import { useState } from "react";
@@ -15,6 +15,7 @@ import toast from "@/lib/toast";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ActivityDrawer from "@/components/ActivityDrawer";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -91,7 +92,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "unknown": "ያልታወቀ",
     "Period not available": "የክፍያ ጊዜው አልተገኘም",
     "1st-15th": "ከ1ኛ-15ኛ",
-    "16th-End": "ከ16ኛ-መጨረሻ"
+    "16th-End": "ከ16ኛ-መጨረሻ",
+    "Activity": "የእንቅስቃሴ ታሪክ"
   }
 };
 
@@ -125,6 +127,7 @@ export default function PaymentRunDetailPage() {
   const [isFlagModalOpen, setIsFlagModalOpen] = useState(false);
   const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
   const [employeePage, setEmployeePage] = useState(1);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
 
 
 
@@ -209,7 +212,7 @@ export default function PaymentRunDetailPage() {
 
             <button
               onClick={() => setIsPrintModalOpen(true)}
-              className="inline-flex items-center gap-2 h-10 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white rounded-lg text-xs font-black uppercase tracking-widest shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground dl-radius-lg text-xs font-black uppercase tracking-widest shadow-md shadow-primary/10 hover:bg-primary-dark hover:shadow-lg hover:scale-[1.02] active:scale-[0.97] transition-all duration-300 cursor-pointer"
             >
               <HiPrinter className="w-4 h-4" />
               {t("Print PDF")}
@@ -217,7 +220,7 @@ export default function PaymentRunDetailPage() {
 
             <button
               onClick={() => exportPayrollExcel(id)}
-              className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground dl-radius-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
               <HiTableCells className="w-4 h-4 text-emerald-500" />
               {t("Excel")}
@@ -225,24 +228,32 @@ export default function PaymentRunDetailPage() {
 
             <button
               onClick={() => exportPayrollCSV(id)}
-              className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground rounded-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
+              className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground dl-radius-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm"
             >
               <HiDocumentArrowDown className="w-4 h-4 text-amber-500" />
               {t("CSV")}
+            </button>
+
+            <button
+              onClick={() => setIsActivityOpen(true)}
+              className="inline-flex items-center gap-2 h-10 px-4 bg-card border border-border text-foreground dl-radius-lg text-xs font-semibold hover:bg-muted transition-all active:scale-[0.98] shadow-sm cursor-pointer"
+            >
+              <HiOutlineClock className="w-4 h-4 text-primary" />
+              {t("Activity")}
             </button>
 
              {run.status === "FINALIZED" && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsFlagModalOpen(true)}
-                  className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg hover:bg-amber-500/20 transition-all active:scale-[0.98]"
+                  className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 dl-radius-lg hover:bg-amber-500/20 transition-all active:scale-[0.98]"
                   title={t("Flag as Wrong")}
                 >
                   <HiExclamationTriangle className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="p-2.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-all active:scale-[0.98] shadow-md shadow-rose-500/10"
+                  className="p-2.5 bg-rose-600 text-white dl-radius-lg hover:bg-rose-700 transition-all active:scale-[0.98] shadow-md shadow-rose-500/10"
                   title={t("Move to Trash")}
                 >
                   <HiTrash className="w-5 h-5" />
@@ -253,7 +264,7 @@ export default function PaymentRunDetailPage() {
             {run.status === "DRAFT" && (
               <button
                 onClick={() => setIsFinalizeModalOpen(true)}
-                className="inline-flex items-center gap-2 h-10 px-4 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm"
+                className="inline-flex items-center gap-2 h-10 px-4 bg-emerald-600 text-white dl-radius-lg text-xs font-semibold hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm"
               >
                 {t("Finalize Payout")}
               </button>
@@ -364,6 +375,12 @@ export default function PaymentRunDetailPage() {
           </div>
         )}
       </div>
+      <ActivityDrawer
+        entityType="payroll"
+        entityId={id}
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
+      />
     </AuthLayout>
   );
 }

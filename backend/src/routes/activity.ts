@@ -24,6 +24,13 @@ const ENTITY_ACTIVITY_PERMISSIONS: Record<string, string[]> = {
   position: ["positions:manage", "hr:read", "settings:write"],
   office: ["offices:manage", "hr:read", "settings:write"],
   salary_level: ["salary-levels:manage", "hr:read"],
+  finance_operational_expense: ["finance:hisab:read", "finance:opex:write", "finance:opex:approve"],
+  finance_overhead_expense: ["finance:overheads:read"],
+  finance_overhead_month: ["finance:overheads:read"],
+  capital_investment: ["finance:investments:read"],
+  finance_import_batch: ["finance:imports:write", "finance:hisab:read"],
+  finance_monthly_net_profit_report: ["finance:hisab:read"],
+  finance_hisab_report: ["finance:hisab:read"],
 };
 
 function normalizeEntityType(value: unknown): string {

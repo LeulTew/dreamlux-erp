@@ -151,6 +151,7 @@ const EVENT_FILTER_FIELDS: Record<string, EventFilterField> = {
   created_by: { sql: "e.created_by", type: "uuid" },
   created_date: { sql: "e.created_at", type: "date" },
   updated_date: { sql: "e.updated_at", type: "date" },
+  recent: { sql: "e.updated_at", type: "date" },
   contract_price: { sql: "e.contract_price", type: "number", financial: true },
   revenue: { sql: "e.contract_price", type: "number", financial: true },
   approved_expense_total: { sql: "COALESCE(expenses.approved_expense_total, 0)", type: "number", financial: true },

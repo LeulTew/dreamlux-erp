@@ -929,6 +929,7 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
     const from = req.query.from as string | undefined;
     const to = req.query.to as string | undefined;
     const { store, page, limit, sortBy, sortOrder } = pagination;
+    const resolvedSortBy = sortBy === "recent" ? "updated_at" : sortBy;
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
     const trashFlag = req.query.trash;
@@ -984,7 +985,7 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
       }
 
       return filteredQuery
-        .order(sortBy, { ascending: sortOrder === "asc" })
+        .order(resolvedSortBy, { ascending: sortOrder === "asc" })
         .range(offset, offset + limit - 1);
     };
 

@@ -361,6 +361,7 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const pagination = employeePaginationSchema.parse(req.query);
     const { page, limit, search, status, office_id, department_id, sortBy, sortOrder } = pagination;
+    const resolvedSortBy = sortBy === "recent" ? "date" : sortBy;
     const offset = (page - 1) * limit;
 
     let query = supabase
@@ -386,15 +387,15 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
     }
 
     // Default sorting and provided sort
-    if (sortBy === "salary") {
+    if (resolvedSortBy === "salary") {
       query = query.order("amount_etb", { ascending: sortOrder === "asc", referencedTable: "salary_levels", nullsFirst: false });
-    } else if (sortBy === "name" || sortBy === "full_name") {
+    } else if (resolvedSortBy === "name" || resolvedSortBy === "full_name") {
       query = query.order("full_name", { ascending: sortOrder === "asc" });
-    } else if (sortBy === "date") {
+    } else if (resolvedSortBy === "date") {
       query = query.order("updated_at", { ascending: sortOrder === "asc" });
-    } else if (sortBy === "employee_id") {
+    } else if (resolvedSortBy === "employee_id") {
       query = query.order("employee_id", { ascending: sortOrder === "asc" });
-    } else if (sortBy === "commission") {
+    } else if (resolvedSortBy === "commission") {
       query = query.order("commission", { ascending: sortOrder === "asc" });
     } else {
       // Default: Salary High to Low per request
@@ -440,15 +441,15 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
       if (search) fallbackQuery = fallbackQuery.or(`full_name.ilike.%${search}%,employee_id.ilike.%${search}%,department.ilike.%${search}%`);
 
       // Apply safe sorts (Legacy column is base_salary)
-      if (sortBy === "salary") {
+      if (resolvedSortBy === "salary") {
         fallbackQuery = fallbackQuery.order("base_salary", { ascending: sortOrder === "asc" });
-      } else if (sortBy === "name" || sortBy === "full_name") {
+      } else if (resolvedSortBy === "name" || resolvedSortBy === "full_name") {
         fallbackQuery = fallbackQuery.order("full_name", { ascending: sortOrder === "asc" });
-      } else if (sortBy === "employee_id") {
+      } else if (resolvedSortBy === "employee_id") {
         fallbackQuery = fallbackQuery.order("employee_id", { ascending: sortOrder === "asc" });
-      } else if (sortBy === "commission") {
+      } else if (resolvedSortBy === "commission") {
         fallbackQuery = fallbackQuery.order("commission", { ascending: sortOrder === "asc" });
-      } else if (sortBy === "date" || !sortBy) {
+      } else if (resolvedSortBy === "date" || !resolvedSortBy) {
         fallbackQuery = fallbackQuery.order("updated_at", { ascending: sortOrder === "asc" });
       } else {
         fallbackQuery = fallbackQuery.order("base_salary", { ascending: false });
@@ -467,15 +468,15 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
         if (office_id && office_id !== "all") ultraFallback = ultraFallback.eq("office_id", office_id);
         if (search) ultraFallback = ultraFallback.or(`full_name.ilike.%${search}%,employee_id.ilike.%${search}%,department.ilike.%${search}%`);
 
-        if (sortBy === "salary") {
+        if (resolvedSortBy === "salary") {
           ultraFallback = ultraFallback.order("base_salary", { ascending: sortOrder === "asc" });
-        } else if (sortBy === "name" || sortBy === "full_name") {
+        } else if (resolvedSortBy === "name" || resolvedSortBy === "full_name") {
           ultraFallback = ultraFallback.order("full_name", { ascending: sortOrder === "asc" });
-        } else if (sortBy === "employee_id") {
+        } else if (resolvedSortBy === "employee_id") {
           ultraFallback = ultraFallback.order("employee_id", { ascending: sortOrder === "asc" });
-        } else if (sortBy === "commission") {
+        } else if (resolvedSortBy === "commission") {
           ultraFallback = ultraFallback.order("commission", { ascending: sortOrder === "asc" });
-        } else if (sortBy === "date" || !sortBy) {
+        } else if (resolvedSortBy === "date" || !resolvedSortBy) {
           ultraFallback = ultraFallback.order("updated_at", { ascending: sortOrder === "asc" });
         } else {
           ultraFallback = ultraFallback.order("base_salary", { ascending: false });
