@@ -1,0 +1,1690 @@
+[
+  {
+    "type": "paragraph",
+    "index": 0,
+    "text": "DreamLux ERP"
+  },
+  {
+    "type": "paragraph",
+    "index": 1,
+    "text": "Non-Technical QA Blackbox Test Plan"
+  },
+  {
+    "type": "paragraph",
+    "index": 2,
+    "text": "COMPREHENSIVE VERIFICATION PROTOCOL"
+  },
+  {
+    "type": "paragraph",
+    "index": 3,
+    "text": "Welcome to the QA Test Plan. This guide is written for non-technical QA testers to verify the DreamLux ERP application through the user interface. It covers the whole project at a blackbox level: log in, click through the app, and record whether the visible behavior matches the expected result."
+  },
+  {
+    "type": "paragraph",
+    "index": 4,
+    "text": "1. Test Credentials"
+  },
+  {
+    "type": "paragraph",
+    "index": 5,
+    "text": "Use these default credentials to log in and verify permission boundaries:"
+  },
+  {
+    "type": "paragraph",
+    "index": 6,
+    "text": "2. Smoke Test Before Any Release"
+  },
+  {
+    "type": "paragraph",
+    "index": 7,
+    "text": "3. Release / PR Coverage Map"
+  },
+  {
+    "type": "paragraph",
+    "index": 8,
+    "text": "Use this table to decide which blackbox suites matter most after a release. A release can touch more than one area, so run the listed suites plus the smoke test."
+  },
+  {
+    "type": "paragraph",
+    "index": 9,
+    "text": "4. Test Suites (Verification Tables)"
+  },
+  {
+    "type": "paragraph",
+    "index": 10,
+    "text": "Test Suite A: Reference Data & Settings (New)"
+  },
+  {
+    "type": "paragraph",
+    "index": 11,
+    "text": "Verify operational reference data CRUD features."
+  },
+  {
+    "type": "paragraph",
+    "index": 12,
+    "text": "Test Suite B: Event Lifecycle, Proposals & Scheduling"
+  },
+  {
+    "type": "paragraph",
+    "index": 13,
+    "text": "Verify event proposals, creation, workflows, and resource assignments."
+  },
+  {
+    "type": "paragraph",
+    "index": 14,
+    "text": "Test Suite C: Inventory & Assets"
+  },
+  {
+    "type": "paragraph",
+    "index": 15,
+    "text": "Verify assets storage, stock counts, low-stock alerts, and location reconciliation."
+  },
+  {
+    "type": "paragraph",
+    "index": 16,
+    "text": "Test Suite D: Finance & Payroll"
+  },
+  {
+    "type": "paragraph",
+    "index": 17,
+    "text": "Verify salary levels, expense review, auto-labor generation, and profit calculations."
+  },
+  {
+    "type": "paragraph",
+    "index": 18,
+    "text": "Test Suite E: Users, Roles & Permissions"
+  },
+  {
+    "type": "paragraph",
+    "index": 19,
+    "text": "Verify that access control is understandable and cannot be bypassed through the UI."
+  },
+  {
+    "type": "paragraph",
+    "index": 20,
+    "text": "Test Suite F: Reports, Exports & Printing"
+  },
+  {
+    "type": "paragraph",
+    "index": 21,
+    "text": "Verify pages that produce downloadable or printable business records."
+  },
+  {
+    "type": "paragraph",
+    "index": 22,
+    "text": "Test Suite G: Search, Filters & Pagination"
+  },
+  {
+    "type": "paragraph",
+    "index": 23,
+    "text": "Verify list pages work at realistic business scale."
+  },
+  {
+    "type": "paragraph",
+    "index": 24,
+    "text": "Test Suite H: Error Handling & Data Safety"
+  },
+  {
+    "type": "paragraph",
+    "index": 25,
+    "text": "Verify common mistakes are handled clearly."
+  },
+  {
+    "type": "paragraph",
+    "index": 26,
+    "text": "Test Suite I: Live Notifications, Auditing, and Offline Shell"
+  },
+  {
+    "type": "paragraph",
+    "index": 27,
+    "text": "Verify real-time mutations, PWA offline behavior, security postures, and unified trash views."
+  },
+  {
+    "type": "paragraph",
+    "index": 28,
+    "text": "Test Suite J: UI Polish, Aesthetics & Accessibility (New)"
+  },
+  {
+    "type": "paragraph",
+    "index": 29,
+    "text": "Verify gold contrast compliance, custom border radius tokens, light mode readability, and form validation highlights."
+  },
+  {
+    "type": "paragraph",
+    "index": 30,
+    "text": "5. UI Aesthetics & Responsiveness Checklist"
+  },
+  {
+    "type": "paragraph",
+    "index": 31,
+    "text": "Verify these premium design rules on any device or viewport:"
+  },
+  {
+    "type": "paragraph",
+    "index": 32,
+    "text": "High Contrast: Text must be easily readable on dark and light backdrops. Accents use elegant luxury gold (#D4AF37)."
+  },
+  {
+    "type": "paragraph",
+    "index": 33,
+    "text": "Monospace Metrics: Large numbers and financial figures use clean monospace fonts to prevent shifting layout jitter."
+  },
+  {
+    "type": "paragraph",
+    "index": 34,
+    "text": "No Overlaps: Shrink the browser width down to 320px (mobile layout). The layout must collapse cleanly into a single vertical column. The sidebar must hide under a hamburger drawer or float button."
+  },
+  {
+    "type": "paragraph",
+    "index": 35,
+    "text": "Amharic Translation: Toggle language to Amharic. Confirm labels for Reference Data sections update correctly."
+  },
+  {
+    "type": "paragraph",
+    "index": 36,
+    "text": "6. Story-Based End-to-End Walkthroughs (100% Blackbox Coverage)"
+  },
+  {
+    "type": "paragraph",
+    "index": 37,
+    "text": "These roleplay stories guide a QA tester through a continuous user flow, touching multiple features together under realistic business paths."
+  },
+  {
+    "type": "paragraph",
+    "index": 38,
+    "text": "Story 1: The Event Planner & Logistics Run"
+  },
+  {
+    "type": "paragraph",
+    "index": 39,
+    "text": "Target Roles: Operations Manager (ops), Driver (driver), CEO/Owner (ceo)"
+  },
+  {
+    "type": "paragraph",
+    "index": 40,
+    "text": "Intake & Proposal Creation (ops):"
+  },
+  {
+    "type": "paragraph",
+    "index": 41,
+    "text": "Approval & Transition (ceo):"
+  },
+  {
+    "type": "paragraph",
+    "index": 42,
+    "text": "Logistics & Trips Costing (driver / ops):"
+  },
+  {
+    "type": "paragraph",
+    "index": 43,
+    "text": "Story 2: Warehouse Custody & Dispatch Lifecycle"
+  },
+  {
+    "type": "paragraph",
+    "index": 44,
+    "text": "Target Roles: Inventory Officer (inv), Operations Manager (ops), Event Manager (eventmgr), Driver (driver)"
+  },
+  {
+    "type": "paragraph",
+    "index": 45,
+    "text": "Asset Creation & Reconciliation (inv):"
+  },
+  {
+    "type": "paragraph",
+    "index": 46,
+    "text": "Event Inventory Allocation (ops):"
+  },
+  {
+    "type": "paragraph",
+    "index": 47,
+    "text": "Storekeeper Checklist & Departure (inv / inventory_user):"
+  },
+  {
+    "type": "paragraph",
+    "index": 48,
+    "text": "Real-time Notifications (eventmgr):"
+  },
+  {
+    "type": "paragraph",
+    "index": 49,
+    "text": "Activity Log Redaction (driver vs ceo):"
+  },
+  {
+    "type": "paragraph",
+    "index": 50,
+    "text": "Story 3: Financial Workbook Imports & Net Profit Audit"
+  },
+  {
+    "type": "paragraph",
+    "index": 51,
+    "text": "Target Roles: Accountant (acc), CEO/Owner (ceo), Driver (driver)"
+  },
+  {
+    "type": "paragraph",
+    "index": 52,
+    "text": "Legacy Workbook Import (acc):"
+  },
+  {
+    "type": "paragraph",
+    "index": 53,
+    "text": "Overheads & Month-Close Lock (acc):"
+  },
+  {
+    "type": "paragraph",
+    "index": 54,
+    "text": "Net Profit Audit (ceo):"
+  },
+  {
+    "type": "paragraph",
+    "index": 55,
+    "text": "List State Persistence & Access Gates (ceo vs driver):"
+  },
+  {
+    "type": "paragraph",
+    "index": 56,
+    "text": "Story 4: HR Exception Resolution & Payroll Runs"
+  },
+  {
+    "type": "paragraph",
+    "index": 57,
+    "text": "Target Roles: CEO/Owner (ceo), Accountant (acc)"
+  },
+  {
+    "type": "paragraph",
+    "index": 58,
+    "text": "HR Exception Resolution (ceo):"
+  },
+  {
+    "type": "paragraph",
+    "index": 59,
+    "text": "Payroll Concurrency and Audit (acc):"
+  },
+  {
+    "type": "paragraph",
+    "index": 60,
+    "text": "7. QA Sign-Off Table"
+  },
+  {
+    "type": "table",
+    "index": 0,
+    "rows": [
+      [
+        "Role",
+        "Username",
+        "Password",
+        "Access Notes",
+        ""
+      ],
+      [
+        "System Administrator",
+        "admin",
+        "Password123",
+        "Has full system administration and role configuration access in dev/test seed environments.",
+        ""
+      ],
+      [
+        "CEO / Owner",
+        "ceo",
+        "Password123",
+        "Has access to all reports, payroll, and settings.",
+        "Works"
+      ],
+      [
+        "Accountant",
+        "acc",
+        "Password123",
+        "Handles expense reviews and payroll runs.",
+        "Works"
+      ],
+      [
+        "Inventory Manager",
+        "inv",
+        "Password123",
+        "Manages items and location stock.",
+        "Works"
+      ],
+      [
+        "Inventory Controller Alias",
+        "inventory_user",
+        "Password123",
+        "Verifies compatibility access for inventory allocation and recount workflows.",
+        "Error- wrong  username"
+      ],
+      [
+        "Operations Manager",
+        "ops",
+        "Password123",
+        "Coordinates events, proposals, and staff assignments.",
+        "Works"
+      ],
+      [
+        "Event Manager",
+        "eventmgr",
+        "Password123",
+        "Verifies event lifecycle, checklist tasks, and general expense workflows.",
+        "Works"
+      ],
+      [
+        "Driver",
+        "driver",
+        "Password123",
+        "Can only view assigned trips and basic event workspaces.",
+        "Works"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 1,
+    "rows": [
+      [
+        "Step",
+        "Area",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "S1",
+        "Login",
+        "Open the app, log in as ceo, then log out.",
+        "Login succeeds, dashboard/sidebar loads, logout returns to login page.",
+        "DONE"
+      ],
+      [
+        "S2",
+        "Navigation",
+        "Open every visible sidebar section once.",
+        "No blank pages, broken links, or unexpected Forbidden pages for ceo.",
+        "DONE"
+      ],
+      [
+        "S3",
+        "Mobile",
+        "Resize browser to about 390px wide or use a phone. Open dashboard, events, proposals, assets, and HR pages.",
+        "Content stacks cleanly, buttons are tappable, no text overlaps.",
+        "DONE"
+      ],
+      [
+        "S4",
+        "Language",
+        "Toggle Amharic and English. Visit events, assets, HR, and settings.",
+        "Main labels update and layout remains readable.",
+        "DONE"
+      ],
+      [
+        "S5",
+        "Permissions",
+        "Log in as driver. Try events, assets, payroll, settings, and reports.",
+        "Driver sees only allowed pages; blocked pages show a clean Forbidden message.",
+        "When i first log in i can see employees and stuff but when i reload the restriction is applied. Error"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 2,
+    "rows": [
+      [
+        "Release / PR",
+        "Main User-Facing Change",
+        "QA Suites to Run",
+        "Special Things to Watch"
+      ],
+      [
+        "PR #61-#71",
+        "Permission-aware UX polish, route guards, backend access hardening, Playwright portability.",
+        "Smoke, Users/Roles, Events, Finance, Mobile/Amharic.",
+        "Forbidden pages must be clean; hidden buttons must not flash; drivers must not see finance/admin actions."
+      ],
+      [
+        "PR #72",
+        "Core event lifecycle closeout and read-permission reconciliation.",
+        "Events, Scheduling, Finance, Error Handling.",
+        "Event detail/workspace should open for allowed roles; completed/locked event behavior must remain intact."
+      ],
+      [
+        "PR #74-#75",
+        "Frontend RBAC audit across proposals, profit reports, payroll, event types, and trash screens.",
+        "Users/Roles, Finance, Events, Reports.",
+        "Read-only users may view allowed data but must not see write/delete/restore buttons."
+      ],
+      [
+        "PR #88",
+        "Reference Data setup pages and sidebar grouping.",
+        "Reference Data & Settings, Users/Roles, Mobile/Amharic.",
+        "Departments, Positions, and Offices must sit under Reference Data; delete impact warnings must block active-use records."
+      ],
+      [
+        "PR #89",
+        "Proposal creator attribution and test isolation fixes.",
+        "Events/Proposals, Search/Filters, Users/Roles.",
+        "Proposal queue and detail must show Proposed By; deleted/missing users must show Unknown user, not crash."
+      ],
+      [
+        "PR #91",
+        "Seeded admin and user credential parity.",
+        "Smoke, Users/Roles, Events, Inventory, Finance, Driver BOLA.",
+        "admin, driver, eventmgr, and inventory_user must log in with Password123; driver must remain mapped to Selam Bekele and blocked from unrelated driver actions."
+      ],
+      [
+        "PR #90",
+        "Unified trash and restore page.",
+        "Events, Inventory, Reference Data.",
+        "Soft-deleted events/assets must be restorable from the trash pages; restore respects role permissions."
+      ],
+      [
+        "PR #98",
+        "Notification center, permission-safe delivery, live toast notifications.",
+        "Smoke, Users/Roles, Notifications.",
+        "Mutation actions (creation, deletion, updates) must fire beautiful premium toasts; notifications load in real-time."
+      ],
+      [
+        "PR #99",
+        "Record activity timeline drawer and visual audit logs.",
+        "Smoke, Events, Inventory, Finance.",
+        "Actions should be audited and visible in the activity timeline log drawers on relevant pages."
+      ],
+      [
+        "PR #100/103",
+        "HR Dashboard, click-to-edit drawer, exception lists.",
+        "Finance/Payroll, HR Dashboard exception checks.",
+        "Workforce overview shows metric summaries; list exceptions (Missing Bank/ID/Contract) open side drawers to fix."
+      ],
+      [
+        "PR #101",
+        "Security posture page (OWASP/CVE).",
+        "Reference Data & Settings, Security checks.",
+        "Settings / Security shows a plain-language summary of access controls, dynamic safety checks, and SSL/database indicators."
+      ],
+      [
+        "PR #102",
+        "PWA installability, service worker caching, and offline shell.",
+        "Smoke, PWA/Offline support.",
+        "Bottom PWA banner shows on first launch; offline simulated mode loads a clean local fallback shell."
+      ],
+      [
+        "PR #104",
+        "Custom role manager changes preview, warning validation popups.",
+        "Users/Roles, Permission changes.",
+        "Diff pane preview appears for role modification changes; dangerous changes prompt additional alert validations."
+      ],
+      [
+        "PR #105",
+        "Pagination support, unbounded list safety, and scroll indicators.",
+        "Search/Filters, Pagination.",
+        "Virtualized scrolling and paging controls prevent memory leaks and browser locks on large lists."
+      ],
+      [
+        "PR #114 / Issue #106",
+        "Storekeeper allocation dispatch checklist and departure flows.",
+        "Inventory & Assets, Dispatch checklist.",
+        "Dispatch queue allocates items to events; Mark Departed requires all storekeeper checklist items to be checked off; triggers Event Manager notification."
+      ],
+      [
+        "PR #115",
+        "Read-only commission inputs, parity backend/frontend math totals.",
+        "Events/Proposals, Finance.",
+        "Proposal commission fields compute values programmatically; user cannot modify calculated totals manually."
+      ],
+      [
+        "Issue #108",
+        "Fuel cost preview calculations, liters-per-kilometer (L/km) verification.",
+        "Events, Logistics/Trips.",
+        "Trip distance logs show explicit Liters per kilometer (L/km) breakdown preview; invalid rates warn user and block logging."
+      ],
+      [
+        "Issue #113",
+        "Legacy Hisab workbook import, parsing, mapping, and validation.",
+        "Finance, Reports, Error Handling.",
+        "Accountant imports Excel file; parser checks totals against formulas; handles unmatched events/categories."
+      ],
+      [
+        "Issue #111",
+        "Capital Investments tracking.",
+        "Finance, Reports.",
+        "Equipment purchases recorded by month, toggled deduction in Net Profit dashboard."
+      ],
+      [
+        "Issue #124",
+        "Persistent user list state, recent sorting, audit details, light mode & gold-button contrast.",
+        "Smoke, Users/Roles, Search/Filters, UI Polish.",
+        "Filter state persisted per user; sorting by last edited; redaction of financial audits; WCAG gold button contrast."
+      ],
+      [
+        "Whole project regression",
+        "Any deployment to production or release candidate.",
+        "Every suite in this document.",
+        "Record browser/device, user role, and exact page where any issue occurs."
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 3,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "A1",
+        "Sidebar Nav",
+        "Log in as ceo or admin. Locate the Reference Data collapsible section on the sidebar. Expand it.",
+        "You should see sub-links for Departments, Positions, Offices, Salary Levels, and Event Types.",
+        "DONE"
+      ],
+      [
+        "A2",
+        "Departments",
+        "Go to /settings/departments. Enter a new department name (e.g., \"Quality Control\") and click Add Department.",
+        "The department appears in the list. The field is automatically trimmed of stray spaces.",
+        "DONE"
+      ],
+      [
+        "A3",
+        "Positions",
+        "Go to /settings/positions. Edit an existing position. Change its name and save.",
+        "The position updates in the list instantly without reloading the page.",
+        "DONE"
+      ],
+      [
+        "A4",
+        "Offices",
+        "Go to /settings/offices. Add a new office (e.g., \"Adama Branch\"). Try to set it to Inactive.",
+        "The branch renders with a grey \"Inactive\" status badge. Active offices render with green \"Active\" badges.",
+        "DONE"
+      ],
+      [
+        "A5",
+        "Delete Impact",
+        "Go to /settings/departments. Locate a department that is currently assigned to an active employee. Click Delete.",
+        "A pop-up warns you and blocks the deletion, displaying a message listing that active employees are using it.",
+        "ERROR - it deletes"
+      ],
+      [
+        "A6",
+        "RBAC Limits",
+        "Log in as driver. Try to navigate to /settings/departments or check the sidebar.",
+        "The \"Reference Data\" menu is hidden from the sidebar. Navigating directly redirects you to a clean Forbidden page.",
+        "Error"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 4,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "B1",
+        "Create Event",
+        "Go to /events (as ops). Click Create Event. Choose a customer and input event date parameters.",
+        "The event is created in Draft state.",
+        "DONE"
+      ],
+      [
+        "B2",
+        "Proposal Queue",
+        "Go to /events/proposals as ops or ceo. Review the table/cards.",
+        "Each proposal shows its name, client, budget/margin, status, and Proposed By. Missing users show Unknown user.",
+        "DONE"
+      ],
+      [
+        "B3",
+        "Create Proposal",
+        "Click New Proposal, fill client, budget, dates, venue, and estimate costs. Save it.",
+        "Proposal is created and appears in the queue. Detail page shows Proposed By near client/status details.",
+        "DONE"
+      ],
+      [
+        "B4",
+        "Approve Proposal",
+        "Log in as a user with approval access. Open a submitted proposal, approve it.",
+        "Status changes to Approved; detail page shows the approver when available.",
+        "DONE"
+      ],
+      [
+        "B5",
+        "Convert Proposal",
+        "Convert an approved proposal into an event.",
+        "A linked event is created, proposal status becomes Converted, and the linked event button opens the event workspace.",
+        "DONE"
+      ],
+      [
+        "B6",
+        "Staff Assignment",
+        "Open the event workspace. Locate the Employees assignment tab. Assign a staff member to a role.",
+        "Staff member is assigned. Assigning the same employee to an overlapping event date is blocked.",
+        "Error"
+      ],
+      [
+        "B7",
+        "Vehicle/Driver Assignment",
+        "Locate the Vehicles & Trips area. Assign a driver and vehicle.",
+        "Trip/vehicle assignment saves; overlapping vehicle/driver use is blocked.",
+        "Error"
+      ],
+      [
+        "B8",
+        "Checklist",
+        "Add event checklist items and check them off.",
+        "Checklist progress updates and remains saved after refresh.",
+        "DONE"
+      ],
+      [
+        "B9",
+        "Trash/Soft Delete",
+        "Delete an event if the UI allows it, then check trash/recovery area if available.",
+        "Deleted records disappear from normal lists and are only shown in trash/recovery views.",
+        "DONE"
+      ],
+      [
+        "B10",
+        "Proposal Commission Math",
+        "Open /events/proposals/new as ops or ceo. Set crew members and commission rate (e.g. 4 people x 3000 ETB).",
+        "Amount calculates as 12000 programmatically. Total field is read-only (disabled) and user cannot type a manual value.",
+        "DONE"
+      ],
+      [
+        "B11",
+        "Fuel Cost Units",
+        "Log in as driver or ops. Go to event page, select assigned truck, log a trip (12 km, 169 ETB/L).",
+        "Preview displays the calculation 12 km x 0.22 L/km = 2.64 L; 2.64 L x 169 ETB/L = ETB 446.16. Invalid fuel rate displays a warning.",
+        "ERROR - can fine the ASSIGNED TRUCK"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 5,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "C1",
+        "Asset Entry",
+        "Go to /assets. Click Add Item. Fill out asset type, serial, quantity, and assign to a warehouse store location.",
+        "The asset joins the master inventory register.",
+        "ERROR - i cant select office"
+      ],
+      [
+        "C2",
+        "Low-Stock Alert",
+        "Locate the Low-Stock page. Edit an item to drop its quantity below the threshold.",
+        "The item immediately highlights in yellow with a warning badge on the Low-Stock screen.",
+        "DONE"
+      ],
+      [
+        "C3",
+        "Reconciliation",
+        "Go to /assets/reconcile. Select a warehouse store location. Input a manual counted count.",
+        "The system audits physical count discrepancies and generates a log.",
+        "DONE"
+      ],
+      [
+        "C4",
+        "Asset Allocation",
+        "From an event workspace, allocate inventory to the event. Try allocating more than available.",
+        "Valid allocation saves; over-allocation is blocked with a clear message.",
+        "DONE"
+      ],
+      [
+        "C5",
+        "Asset Trash",
+        "Move an asset to trash if allowed by your role.",
+        "Item disappears from active lists; restore/permanent delete actions obey permissions.",
+        "DONE"
+      ],
+      [
+        "C6",
+        "Dispatch Checklist",
+        "Log in as inv (Inventory Officer). Navigate to /assets/dispatch. Find an active event. Check off all allocations.",
+        "The \"Mark Departed\" button remains disabled until every checklist item is checked. Clicking it updates the event dispatch status.",
+        "ERROR - can do that form inv, but from ceo you can"
+      ],
+      [
+        "C7",
+        "Stock Recount Pagination",
+        "View /assets/history with more than 10 recount sessions. Scroll/navigate pages.",
+        "Recount history lists paginate correctly and virtualized views render without lag.",
+        ""
+      ],
+      [
+        "C8",
+        "Dispatch Queue Sorting",
+        "Log in as inv or inventory_user. Navigate to /assets/dispatch. Observe grouped items.",
+        "Active events with active allocations are listed, grouped clearly by event, and sorted by scheduled start date (closest first).",
+        ""
+      ],
+      [
+        "C9",
+        "Mark Departed Notification",
+        "Check all allocated items for an event in the dispatch checklist. Click Mark Departed. Log in as the Event Manager assigned to that event.",
+        "A server-side timestamp (departed_at) is written transactionally. The Event Manager receives an in-app notification immediately containing the event name and exact departure timestamp.",
+        ""
+      ],
+      [
+        "C10",
+        "Dispatch Activity Audit",
+        "Check the event's activity log timeline after completing a dispatch.",
+        "Audit trail indicates who checked off each checklist line item and who completed the final dispatch, with no payroll/finance leakages.",
+        ""
+      ],
+      [
+        "C11",
+        "Completed Event Block",
+        "Try to dispatch or check off items for an event that has already been closed/completed or soft-deleted.",
+        "The UI blocks checking off items, and backend APIs reject dispatch completion for locked/completed events.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 6,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "D1",
+        "Salary Levels",
+        "Go to /hr/salary-levels. Add a base level salary rate.",
+        "The rate is added.",
+        "DONE"
+      ],
+      [
+        "D2",
+        "Generate Labor",
+        "Log in as acc. Open an event that has completed with verified staff attendance checks. Click Generate Labor Expense.",
+        "The system aggregates employee hours and records auto-calculated labor expenses.",
+        "ERROR - can allocate labor in the first place"
+      ],
+      [
+        "D3",
+        "Expense Review",
+        "Go to /hr/expenses/approve. Review pending generated or manual expenses. Approve or Reject.",
+        "Approved expenses are locked. Rejections require a reason and update status.",
+        "DONE -"
+      ],
+      [
+        "D4",
+        "Profit Reports",
+        "Go to /hr/reports/profit. View the event metrics dashboard.",
+        "The page renders financial KPIs, proposal variances, and tracks overall net profit.",
+        "DONE"
+      ],
+      [
+        "D5",
+        "Financial Redaction",
+        "Log in as driver or another non-financial user and open event pages/reports.",
+        "Financial totals, profit, payroll, and sensitive cost data are hidden or Forbidden.",
+        "Partial Error - at first i can see a sensitive data but when it reloads its not available"
+      ],
+      [
+        "D6",
+        "Payroll Run",
+        "Log in as acc or ceo. Create or preview a payroll run.",
+        "Payroll lines show expected employees, attendance/commission data, totals, and status.",
+        "ERROR - payment must be calculated every week"
+      ],
+      [
+        "D7",
+        "Payroll Locking",
+        "Finalize a payroll run if available. Try to edit finalized values.",
+        "Finalized payroll cannot be casually changed; correction flow is required if available.",
+        "DONE"
+      ],
+      [
+        "D8",
+        "HR Dashboard Audit",
+        "Log in as ceo. Go to /hr dashboard. Review workforce metrics and Exception Lists (Missing Bank/Contract/IDs).",
+        "Exceptions show exact flags; clicking an employee opens the quick-edit side drawer to patch data.",
+        "DONE"
+      ],
+      [
+        "D9",
+        "Legacy Hisab Import",
+        "Log in as ceo or acc. Navigate to /hr/finance/imports. Click Import Hisab Workbook and upload a legacy .xlsx file.",
+        "A clear wizard preview loads, mapping the workbook's sheets (weekly totals, monthly expenses, investments, rental payments) to corresponding pending ERP rows.",
+        "DONE - needs explanation"
+      ],
+      [
+        "D10",
+        "Hisab Math",
+        "On the import preview page, inspect sheet formulas and values.",
+        "The parser programmatically compares workbook formula totals against parsed totals, alerting the user to any discrepancy. Duplicate workbook uploads are blocked.",
+        "DONE"
+      ],
+      [
+        "D11",
+        "Entity Mappings",
+        "Look for unmatched event names, categories, or payees on the preview page.",
+        "The wizard shows warning status badges and provides dropdown selectors to map unmatched items to database entities before importing.",
+        ""
+      ],
+      [
+        "D12",
+        "Import Commit",
+        "Click Confirm Commit to run the import.",
+        "The import executes transactionally. On failure (e.g. data validation error), the entire batch rolls back. Imported rows are tagged with source_import_id for rollback capability.",
+        ""
+      ],
+      [
+        "D13",
+        "Overhead Register",
+        "Go to /hr/finance/overheads. Add a new overhead record (e.g., Office Rent, Store Rent, Wifi, Marketing, Boost, Fuel, Ekub).",
+        "The overhead record is registered. Payroll salary lines are kept separate from non-payroll overhead lines to avoid double-counting.",
+        "DONE"
+      ],
+      [
+        "D14",
+        "Month-Close Lock",
+        "Select a month in the overhead register and click Close Month. Try to edit or delete any overhead row in that month.",
+        "Row actions (edit/delete) are disabled. Any direct API updates return a clear error indicating the month is locked.",
+        "DONE"
+      ],
+      [
+        "D15",
+        "Investment Tracker",
+        "Go to /hr/finance/investments. Enter an equipment purchase or asset acquisition.",
+        "The investment is registered and categorized under capital expenditures for that month.",
+        "DONE"
+      ],
+      [
+        "D16",
+        "Net Profit Aggregates",
+        "Go to /hr/finance/net-profit. Check the net profit card summary.",
+        "Net profit is aggregated: Event Income - Event Expenses - Non-event Operational Spend - Monthly Overheads. Toggling \"Include investments in net profit\" deducts Capital Investments.",
+        "DONE"
+      ],
+      [
+        "D17",
+        "Spend Ledger",
+        "Log a non-event operational expense (e.g., office lunch, misc) on the /hr/finance/hisab page.",
+        "The expense is saved and aggregates in the weekly/monthly operational expense totals.",
+        "DONE"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 7,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "E1",
+        "Users",
+        "Log in as ceo. Go to /settings/users. View users and open one user detail/edit screen.",
+        "User list loads with clear active/inactive status and role information.",
+        "DONE"
+      ],
+      [
+        "E2",
+        "Role Permissions",
+        "Go to /settings/permissions. Open a role.",
+        "Permission groups are readable; dangerous/high-access permissions are clearly shown.",
+        "ERROR"
+      ],
+      [
+        "E3",
+        "Read-Only User",
+        "Log in as a lower-permission user such as driver. Try direct URLs: /settings/users, /settings/permissions, /hr/reports/profit.",
+        "Access is denied; no hidden admin content flashes on screen.",
+        "DONE"
+      ],
+      [
+        "E4",
+        "Sidebar Filtering",
+        "Compare sidebar links for ceo, ops, acc, inv, and driver.",
+        "Each role sees only the modules relevant to that role.",
+        "DONE"
+      ],
+      [
+        "E5",
+        "Session Behavior",
+        "Log out, then use the browser back button.",
+        "Protected pages do not remain usable after logout.",
+        "ERROR"
+      ],
+      [
+        "E6",
+        "Credential Parity",
+        "Log out and log in one-by-one as admin, ceo, ops, acc, eventmgr, inv, inventory_user, and driver, all with Password123.",
+        "Every documented dev/test user can log in. Role-specific sidebar and page access still match the user's role.",
+        "ERROR - only for inventory_user"
+      ],
+      [
+        "E7",
+        "Role Change Preview",
+        "Go to /settings/permissions. Edit a role (e.g. check/uncheck permission slugs). Review changes pane.",
+        "Pane shows exact diff comparison of modifications before saving; dangerous changes trigger alert modals.",
+        "DONE"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 8,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "F1",
+        "Event Export",
+        "On /events, apply a search/filter and export if the button is available.",
+        "Export respects filters and does not include financial columns for unauthorized roles.",
+        "DONE"
+      ],
+      [
+        "F2",
+        "Profit Export",
+        "On /hr/reports/profit, export or print a report as ceo / acc.",
+        "File/report contains visible KPIs and event rows matching the screen.",
+        "DONE"
+      ],
+      [
+        "F3",
+        "Proposal Print",
+        "Open a proposal detail and use Print / PDF.",
+        "Printable view is readable and excludes navigation/sidebar clutter.",
+        "DONE"
+      ],
+      [
+        "F4",
+        "Payroll Report",
+        "Open payroll detail/report page.",
+        "Totals are readable and match the displayed payroll run.",
+        "DONE"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 9,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "G1",
+        "Events List",
+        "Search by client/event name. Change page if pagination appears.",
+        "Search results match the term; pagination moves between result pages without losing filters.",
+        "DONE"
+      ],
+      [
+        "G2",
+        "Proposal List",
+        "Filter by status and sort by budget/date/margin.",
+        "Filters and sorting change the visible rows but do not hide Proposed By.",
+        "DONE"
+      ],
+      [
+        "G3",
+        "Assets List",
+        "Search item names and switch pages.",
+        "Results remain stable and page controls are easy to use.",
+        "DONE"
+      ],
+      [
+        "G4",
+        "Expense/Payroll Lists",
+        "Open pending expense, history, and payroll list pages.",
+        "Large lists show page controls or clear limited results; no endless unbounded table freezes the browser.",
+        "DONE"
+      ],
+      [
+        "G5",
+        "Persisted State",
+        "Log in as ceo. Go to /events or /assets. Change the sort order, change page size to 50, filter by a status, select a specific tab. Log out, then log in again. Navigate back to the page.",
+        "The custom sort, filters, column visibility, page size, and selected tab are fully remembered and restored from the database.",
+        "DONE"
+      ],
+      [
+        "G6",
+        "Sorting by Last Edited",
+        "On any major list page, sort by Recent or Last Edited. Edit an old record (e.g. employee details). Go back to list.",
+        "The edited record immediately moves to the top of the list, indicating updated_at (last edited time) is honored.",
+        "DONE"
+      ],
+      [
+        "G7",
+        "User Scoping",
+        "Log in as ops. Change filters and sorting on /events. Log out, then log in as ceo.",
+        "The ceo user's preferences are completely unchanged. Preferences are scoped strictly per-user and per-tenant.",
+        "DONE"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 10,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "H1",
+        "Required Fields",
+        "Try saving forms with required fields empty.",
+        "Form shows clear errors and does not create partial records.",
+        "DONE"
+      ],
+      [
+        "H2",
+        "Invalid Dates",
+        "Try an event/proposal end date before the start date.",
+        "Save is blocked with a clear date error.",
+        "DONE"
+      ],
+      [
+        "H3",
+        "Invalid Phone",
+        "Enter an obviously invalid Ethiopian phone number.",
+        "Save is blocked or phone field shows a clear error.",
+        "DONE"
+      ],
+      [
+        "H4",
+        "Double Click Save",
+        "Double-click a create/approve/convert button quickly.",
+        "Only one record/action is created; no duplicate conversion or duplicate expense appears.",
+        "DONE"
+      ],
+      [
+        "H5",
+        "Missing User Fallback",
+        "Open proposal records created by a deleted/missing user if test data exists.",
+        "UI shows Unknown user, not a crash or blank broken field.",
+        "DONE"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 11,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "I1",
+        "Live Toasts",
+        "Perform any database save or delete operation.",
+        "A premium toast notification pops up indicating success/failure with brand-appropriate design.",
+        "DONE"
+      ],
+      [
+        "I2",
+        "Activity Logs Drawer",
+        "Create or Update an asset, employee, or event. Locate and click the Activity Timeline or Audit button.",
+        "A side drawer opens to reveal user actions, timestamps, and field-level changes.",
+        "DONE"
+      ],
+      [
+        "I3",
+        "Security Posture",
+        "Log in as ceo or admin. Go to /settings/security.",
+        "Shows traffic-light security posture cards, plain language access overview, database indicators, and no raw jargon.",
+        "DONE"
+      ],
+      [
+        "I4",
+        "PWA Offline Mode",
+        "Simulate offline connection using Chrome devtools. Load the site.",
+        "The PWA install bottom sheet prompt displays correctly; offline mode opens the offline fallback shell showing a friendly offline warning.",
+        "DONE"
+      ],
+      [
+        "I5",
+        "Unified Trash Page",
+        "Go to /events/trash or /assets/trash. Trash an active item, then click Restore.",
+        "Soft deleted items appear in the trash queue; clicking restore returns them to active tables; permanent deletion destroys them.",
+        "DONE"
+      ],
+      [
+        "I6",
+        "Record Duplication",
+        "Go to /employees or /assets. Click Clone / Duplicate.",
+        "Cloned record duplicates field data (names, classifications, details) and images dynamically.",
+        "DONE"
+      ],
+      [
+        "I7",
+        "Detail Placement",
+        "Open an event workspace, a payroll run details page, and finance records pages.",
+        "Each page contains a visible Activity / Audit button to launch the history timeline drawer.",
+        "DONE"
+      ],
+      [
+        "I8",
+        "Log Redaction",
+        "Log in as driver or eventmgr (roles without finance permissions). Open the activity log for any shared event or record.",
+        "Financial changes, cost updates, commission rate edits, and payroll values in the timeline notes/fields are redacted or completely hidden.",
+        "DONE"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 12,
+    "rows": [
+      [
+        "Step",
+        "Page / URL",
+        "Actions",
+        "Expected Outcome",
+        "Error / Done"
+      ],
+      [
+        "J1",
+        "Light Mode Expenses",
+        "Log in, toggle system/app to Light Mode. Go to /hr/expenses/approve.",
+        "The table header row has a high-contrast dark text color; background panels for \"Pending Queue\", \"History\", and \"Receipt\" cards are clean and readable.",
+        "DONE"
+      ],
+      [
+        "J2",
+        "Gold Contrast",
+        "View any button or link with a gold background in light/dark modes.",
+        "Text/icons on gold buttons use a compliant high-contrast color (e.g., white or very dark primary foreground). No low-contrast amber text combinations.",
+        "DONE"
+      ],
+      [
+        "J3",
+        "Border Radius Tokens",
+        "Audit date pickers, buttons, input fields, and receipt cards.",
+        "The UI uses unified luxury radius variables (dl-radius-lg / dl-radius-xl representing --radius-## tokens). No default Bootstrap or hardcoded rounded-lg / rounded-xl classes are present in the DOM.",
+        "DONE"
+      ],
+      [
+        "J4",
+        "Validation Highlights",
+        "Go to /events/proposals/new. Leave required fields empty (e.g., Estimate Label) and click Submit.",
+        "Validation fails: focus is automatically returned to the form, and the exact missing inputs are outlined in high-visibility warning red.",
+        "DONE"
+      ],
+      [
+        "J5",
+        "Button Wrapping",
+        "View proposal detail or new proposal screens on a screen resized to 320px wide.",
+        "Action buttons (< Back, Create Draft, Submit For Approval) scale/stack cleanly without overlapping or text clipping. Touch target sizes are at least 48px.",
+        "DONE"
+      ],
+      [
+        "J6",
+        "Loading States",
+        "Submit a proposal or edit a record. Watch the submit button.",
+        "The button shows a clean, non-intrusive loading spinner or state, indicating background work without locking accessibility.",
+        "DONE"
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 13,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as ops. Navigate to /events/proposals/new.",
+        ""
+      ],
+      [
+        "Enter a client name, venue, start/end dates, and description.",
+        ""
+      ],
+      [
+        "Set up commission rates: allocate 4 crew members and set a rate of 3000 ETB. Verify the commission total automatically calculates to 12000 ETB and that the field is read-only (disabled).",
+        ""
+      ],
+      [
+        "Intentionally leave Estimate Label blank and click Submit. Confirm the page blocks submission, shifts focus to the empty field, and highlights it in red.",
+        ""
+      ],
+      [
+        "Correct the estimate, submit for approval, and watch the submit loading spinner.",
+        ""
+      ],
+      [
+        "Click the Duplicate / Clone button on the newly created proposal. Verify the duplicate form initializes with matching data.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 14,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as ceo. Navigate to /events/proposals.",
+        ""
+      ],
+      [
+        "Locate the proposal and open it. Click Approve.",
+        ""
+      ],
+      [
+        "Click Convert to Event. Verify the linked event is successfully created and proposal status switches to Converted.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 15,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Go to /events and open the converted event's workspace.",
+        ""
+      ],
+      [
+        "Select the Vehicles & Trips tab. Assign driver and a truck.",
+        ""
+      ],
+      [
+        "Log a trip of 12 km at 169 ETB/L. Verify the distance log outputs: 12 km x 0.22 L/km = 2.64 L; 2.64 L x 169 ETB/L = ETB 446.16.",
+        ""
+      ],
+      [
+        "Log a trip with a blank or negative fuel rate and verify a warning badge displays.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 16,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as inv. Navigate to /assets.",
+        ""
+      ],
+      [
+        "Click Add Item. Register a new asset (e.g. \"Luxury Chandelier\") with serial, color, unit, and location.",
+        ""
+      ],
+      [
+        "Go to /assets/reconcile, select the store location, and perform a recount.",
+        ""
+      ],
+      [
+        "Check /assets/history with pagination to verify recount records are logged.",
+        ""
+      ],
+      [
+        "Click Clone / Duplicate on the asset to verify the clone workflow works.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 17,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as ops. Go to the event workspace created in Story 1.",
+        ""
+      ],
+      [
+        "Allocate 5 of the new \"Luxury Chandelier\" items to the event. Try allocating 50 (exceeding stock) and verify it shows an \"Insufficient Stock\" error.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 18,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as inv or inventory_user. Go to /assets/dispatch.",
+        ""
+      ],
+      [
+        "Verify the event is listed in the dispatch queue, grouped by event and sorted by date.",
+        ""
+      ],
+      [
+        "Open the event's dispatch detail checklist.",
+        ""
+      ],
+      [
+        "Try clicking Mark Departed before checking any items off. Confirm the button is disabled.",
+        ""
+      ],
+      [
+        "Check off all allocations one by one. The Mark Departed button is now enabled. Click it. Verify the success toast.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 19,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as the eventmgr assigned to the event.",
+        ""
+      ],
+      [
+        "Look at the top navbar notifications count. Open notifications.",
+        ""
+      ],
+      [
+        "Verify a new message: \"Event [Name] has departed at [timestamp]\". Click it to navigate directly to the event page.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 20,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as driver. Open the event's workspace and open the Activity Timeline. Confirm you see dispatch checklist updates, but all financial details are redacted.",
+        ""
+      ],
+      [
+        "Log in as ceo. Open the same timeline and verify you see full, unredacted financial notes.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 21,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as acc. Navigate to /hr/finance/imports.",
+        ""
+      ],
+      [
+        "Click Import Hisab Workbook and upload the sample .xlsx file.",
+        ""
+      ],
+      [
+        "Observe the mapping preview cards matching the four sheets of the workbook.",
+        ""
+      ],
+      [
+        "Look for a red formula mismatch warning. If present, double-check parsed values against totals.",
+        ""
+      ],
+      [
+        "Select the dropdown mappings to resolve any unmatched event names or categories.",
+        ""
+      ],
+      [
+        "Confirm and import. Verify the new rows are labeled with a shared source_import_id.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 22,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Navigate to /hr/finance/overheads. Add a new monthly overhead item (e.g. Office Rent, 25000 ETB, scope: Office, recur: True).",
+        ""
+      ],
+      [
+        "Go to /hr/finance/investments and add a capital asset purchase (e.g. Generator, 120000 ETB).",
+        ""
+      ],
+      [
+        "Go back to /hr/finance/overheads, select the current month, and click Close Month / Approve Month.",
+        ""
+      ],
+      [
+        "Try editing or deleting any overhead row in the closed month. Verify row actions are disabled.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 23,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as ceo. Go to /hr/finance/net-profit.",
+        ""
+      ],
+      [
+        "Verify the net profit dashboard correctly aggregates: Event Income - Event Expenses - Non-event Operational Spend - Overheads.",
+        ""
+      ],
+      [
+        "Toggle the checkbox \"Include investments in net profit\" and check if the Generator investment is subtracted or excluded from the net profit value.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 24,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "As ceo on the overheads page, change sorting, filter by a payee, and change the tab.",
+        ""
+      ],
+      [
+        "Log out, then log in again. Navigate back to the overheads page. Verify the sorting, filter, and tab are restored.",
+        ""
+      ],
+      [
+        "Log in as driver. Navigate to /hr/finance/overheads. Verify you are redirected to a Forbidden page.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 25,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as ceo. Navigate to the /hr dashboard.",
+        ""
+      ],
+      [
+        "Look at the Exception Lists (Missing Bank Accounts, Contracts, etc.).",
+        ""
+      ],
+      [
+        "Click on an employee from the exception list. A quick-edit side drawer opens.",
+        ""
+      ],
+      [
+        "Fill in the missing bank detail fields, and click Save. Check that they are cleared from the exception list.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 26,
+    "rows": [
+      [
+        "Action",
+        "Error / Done"
+      ],
+      [
+        "Log in as acc. Create a payroll run. Verify base salary levels and completed event commissions populate.",
+        ""
+      ],
+      [
+        "Click the activity timeline icon on the payroll run. Verify creation actions are logged.",
+        ""
+      ]
+    ]
+  },
+  {
+    "type": "table",
+    "index": 27,
+    "rows": [
+      [
+        "QA Area",
+        "Tester Name",
+        "Date",
+        "Browser / Device",
+        "Result / Notes"
+      ],
+      [
+        "Smoke test",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Events and proposals",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Inventory and assets",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Finance and payroll",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Users and permissions",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Reports and exports",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Mobile and Amharic",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "UI Polish & Accessibility",
+        "",
+        "",
+        "",
+        ""
+      ],
+      [
+        "Story-Based End-to-End Runs",
+        "",
+        "",
+        "",
+        ""
+      ]
+    ]
+  }
+]
