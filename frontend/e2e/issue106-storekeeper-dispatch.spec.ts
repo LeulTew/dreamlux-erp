@@ -35,6 +35,37 @@ const workspacePayload = {
 };
 
 test.describe("Issue 106 storekeeper dispatch flow", () => {
+  test("inventory role with asset write access can open dispatch queue", async ({ page }) => {
+    await seedAuthenticatedSession(page);
+    await mockAuth(page, { permissions: ["assets:read", "assets:write", "assets:reconcile"] });
+    await mockCommonShellData(page);
+
+    await page.route("http://localhost:4000/events/dispatch/queue", (route) =>
+      fulfillJson(route, {
+        queue: [
+          {
+            event_id: "event-dispatch-e2e",
+            event_name: "Dispatch Gala",
+            client_name: "Dream Lux Client",
+            start_date: "2026-07-10",
+            end_date: "2026-07-10",
+            venue_location: "Sheraton Addis",
+            allocation_count: 1,
+            checked_count: 0,
+            departed_count: 0,
+            departed_at: null,
+          },
+        ],
+      }),
+    );
+
+    await page.goto("/assets/dispatch");
+
+    await expect(page.getByRole("heading", { name: "Dispatch Queue" })).toBeVisible();
+    await expect(page.getByText("Dispatch Gala")).toBeVisible();
+    await expect(page.getByText("Forbidden: Insufficient privileges")).toHaveCount(0);
+  });
+
   test("storekeeper checks allocation, marks departure, and event manager sees notification", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, { permissions: ["events:read", "event_allocations:write"] });
