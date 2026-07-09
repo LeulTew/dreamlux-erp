@@ -5,6 +5,7 @@ import { api, getEffectivePermissions } from "@/lib/api";
 import { User } from "@/lib/types";
 import { useEffect, useState } from "react";
 import { createPermissionMatcher, hasAnyPermission as matchAnyPermission } from "@/lib/permission-matcher";
+import { AUTH_SESSION_CLEARED_EVENT } from "@/lib/auth-session";
 
 interface AuthResponse {
   user: User;
@@ -12,6 +13,7 @@ interface AuthResponse {
 
 export function useAuth() {
   const [token, setToken] = useState<string | null>(null);
+  const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [previewRole, setPreviewRole] = useState<string | null>(null);
   const [previewSlugs, setPreviewSlugs] = useState<string[] | null>(null);
 
@@ -34,6 +36,16 @@ export function useAuth() {
         }
       });
     }
+    Promise.resolve().then(() => setHasBootstrapped(true));
+
+    const clearSessionState = () => {
+      setToken(null);
+      setPreviewRole(null);
+      setPreviewSlugs(null);
+      setHasBootstrapped(true);
+    };
+    window.addEventListener(AUTH_SESSION_CLEARED_EVENT, clearSessionState);
+    return () => window.removeEventListener(AUTH_SESSION_CLEARED_EVENT, clearSessionState);
   }, []);
 
   const { data, isLoading, error } = useQuery<AuthResponse>({
@@ -96,8 +108,10 @@ export function useAuth() {
     user: displayUser,
     permissionSlugs,
     isSuperuser,
-    isLoading: isLoading || permissionsLoading || (!!token && !data && !error),
-    isAuthenticated: !!user,
+    isLoading: !hasBootstrapped || isLoading || permissionsLoading || (!!token && !data && !error),
+    isAuthenticated: !!token && !!user && !error,
+    hasBootstrapped,
+    hasToken: !!token,
     isAdmin,
     isInventoryController,
     hasPermission,

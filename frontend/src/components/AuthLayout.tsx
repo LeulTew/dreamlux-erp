@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getEmployees, getEvents, getItems, getPayrollRuns, getSalaryLevels } from "@/lib/api";
 import type { Employee, Event, Item, PayrollRun, SalaryLevel } from "@/lib/types";
+import { clearBrowserAuthSession } from "@/lib/auth-session";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import PayrollReminder from "@/components/PayrollReminder";
@@ -24,6 +25,7 @@ import {
   HiMagnifyingGlass
 } from "react-icons/hi2";
 import UserAvatar from "@/components/UserAvatar";
+import { useQueryClient } from "@tanstack/react-query";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -419,6 +421,7 @@ function HeaderUserMenu({
   const { lang, toggle: toggleLang } = useLanguage();
   const { dark, toggle: toggleTheme } = useTheme();
   const [showConfirm, setShowConfirm] = useState(false);
+  const queryClient = useQueryClient();
 
   // Sync user details
   const [user] = useState(() => {
@@ -456,9 +459,9 @@ function HeaderUserMenu({
   }, [open]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    router.push("/login");
+    queryClient.clear();
+    clearBrowserAuthSession();
+    router.replace("/login");
   };
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
@@ -467,6 +470,7 @@ function HeaderUserMenu({
     <div className="relative flex items-center" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
+        data-testid="auth-user-menu-trigger"
         className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-card-alt transition-all cursor-pointer select-none"
       >
         <UserAvatar
@@ -592,6 +596,7 @@ function HeaderUserMenu({
                 </button>
                 <button
                   onClick={handleLogout}
+                  data-testid="confirm-sign-out"
                   className="flex-1 py-2.5 rounded-xl bg-danger text-white font-bold hover:opacity-90 transition-all text-xs active:scale-95 cursor-pointer"
                 >
                   {t("Sign Out")}
@@ -611,7 +616,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isPreviewActive, previewRoleName, clearPreview } = useAuth();
+  const { isPreviewActive, previewRoleName, clearPreview, isLoading: authLoading, isAuthenticated } = useAuth();
   const [mounted, setMounted] = useState(false);
   const { lang } = useLanguage();
   const [pageWidth, setPageWidth] = useState<"full" | "contained">("full");
@@ -628,14 +633,26 @@ export default function AuthLayout({
     });
   }, []);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const status = mounted ? (token ? "authenticated" : "unauthenticated") : "checking";
+  const status = mounted && !authLoading
+    ? (isAuthenticated ? "authenticated" : "unauthenticated")
+    : "checking";
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace("/login");
     }
   }, [status, router]);
+
+  useEffect(() => {
+    const handlePageShow = () => {
+      if (!localStorage.getItem("token")) {
+        router.replace("/login");
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, [router]);
 
   // Handle Ctrl+K shortcut globally
   useEffect(() => {

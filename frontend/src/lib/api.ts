@@ -1,4 +1,5 @@
 import axios, { AxiosRequestConfig } from "axios";
+import { clearBrowserAuthSession } from "@/lib/auth-session";
 import {
   User,
   Role,
@@ -400,9 +401,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("token");
+      clearBrowserAuthSession();
       if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+        window.location.replace("/login");
       }
     }
     return Promise.reject(error);
