@@ -123,7 +123,7 @@ describe("AuthLayout session hardening", () => {
     };
   });
 
-  it("does not render protected shell while token verification is unresolved", () => {
+  it("does not render protected shell while token verification is unresolved", async () => {
     window.localStorage.setItem("token", "stale-token");
     window.localStorage.setItem("user", JSON.stringify({ full_name: "Stale Admin", role_name: "ADMIN" }));
     authState = {
@@ -136,8 +136,10 @@ describe("AuthLayout session hardening", () => {
 
     renderAuthLayout();
 
-    expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
-    expect(screen.queryByText("Protected Sidebar")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
+      expect(screen.queryByText("Protected Sidebar")).not.toBeInTheDocument();
+    });
     expect(replaceMock).not.toHaveBeenCalled();
   });
 

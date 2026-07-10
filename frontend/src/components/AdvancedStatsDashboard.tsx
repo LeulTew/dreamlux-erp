@@ -75,6 +75,9 @@ export default function AdvancedStatsDashboard() {
 
   if (error || !data) return null;
 
+  const stockPerLocation = Array.isArray(data.stockPerLocation)
+    ? data.stockPerLocation
+    : [];
   const reconciliationRate =
     data.totalEntries > 0
       ? Math.round((data.reconciledRecently / data.totalEntries) * 100)
@@ -199,7 +202,7 @@ export default function AdvancedStatsDashboard() {
             </h3>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-foreground">
-                {data.stockPerLocation.length}
+                {stockPerLocation.length}
               </span>
               <span className="text-xs font-bold text-muted">Stores</span>
             </div>
@@ -267,7 +270,7 @@ export default function AdvancedStatsDashboard() {
                 >
                   <PieChart>
                     <Pie
-                      data={data.stockPerLocation}
+                      data={stockPerLocation}
                       cx="50%"
                       cy="50%"
                       innerRadius={70}
@@ -276,7 +279,7 @@ export default function AdvancedStatsDashboard() {
                       dataKey="quantity"
                       nameKey="location"
                     >
-                      {data.stockPerLocation.map((_entry, index) => (
+                      {stockPerLocation.map((_entry, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={COLORS[index % COLORS.length]}
@@ -324,7 +327,7 @@ export default function AdvancedStatsDashboard() {
                   minHeight={1}
                   debounce={50}
                 >
-                  <BarChart data={data.stockPerLocation}>
+                  <BarChart data={stockPerLocation}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}

@@ -18,7 +18,8 @@ export function useAuth() {
 
   useEffect(() => {
     // Read from localStorage once mounted
-    const stored = localStorage.getItem("token");
+    const readToken = () => localStorage.getItem("token");
+    const stored = readToken();
     Promise.resolve().then(() => {
       setToken(stored);
       setHasBootstrappedToken(true);
@@ -35,6 +36,26 @@ export function useAuth() {
         }
       });
     }
+
+    const syncToken = () => {
+      setToken(readToken());
+      setHasBootstrappedToken(true);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "token" || event.key === "user") {
+        syncToken();
+      }
+    };
+
+    window.addEventListener("pageshow", syncToken);
+    window.addEventListener("focus", syncToken);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("pageshow", syncToken);
+      window.removeEventListener("focus", syncToken);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const { data, isLoading, error, isError } = useQuery<AuthResponse>({
@@ -99,7 +120,7 @@ export function useAuth() {
     isSuperuser,
     isLoading: !hasBootstrappedToken || isLoading || permissionsLoading || (!!token && !data && !error),
     isSessionResolved: hasBootstrappedToken && (!token || (!!data && !permissionsLoading) || isError),
-    isAuthenticated: !!user,
+    isAuthenticated: !!token && !!user,
     isAdmin,
     isInventoryController,
     hasPermission,
