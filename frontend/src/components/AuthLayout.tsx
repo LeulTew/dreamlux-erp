@@ -13,6 +13,8 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearAuthSessionStorage } from "@/lib/auth-session";
 import {
   HiOutlineSun,
   HiOutlineMoon,
@@ -408,10 +410,12 @@ function HeaderUserMenu({
   pageWidth,
   togglePageWidth,
   setShowAbout,
+  onLogout,
 }: {
   pageWidth: "full" | "contained";
   togglePageWidth: () => void;
   setShowAbout: (show: boolean) => void;
+  onLogout: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -419,30 +423,18 @@ function HeaderUserMenu({
   const { lang, toggle: toggleLang } = useLanguage();
   const { dark, toggle: toggleTheme } = useTheme();
   const [showConfirm, setShowConfirm] = useState(false);
+  const { user: authUser } = useAuth();
 
-  // Sync user details
-  const [user] = useState(() => {
-    if (typeof window !== "undefined") {
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        try {
-          const parsed = JSON.parse(userStr);
-          return {
-            full_name: parsed.full_name || parsed.username || "User",
-            role_name: parsed.role_name || parsed.role || "admin",
-            profile_image_url: parsed.profile_image_url || null,
-          };
-        } catch {
-          // ignore
-        }
-      }
-    }
-    return {
-      full_name: "User",
-      role_name: "admin",
-      profile_image_url: null,
-    };
-  });
+  const user = {
+    full_name: authUser?.full_name || authUser?.username || "User",
+    role_name: authUser?.role_name || authUser?.role_names?.[0] || "User",
+    profile_image_url: authUser?.profile_image_url || null,
+  };
+
+  const handleLogout = () => {
+    onLogout();
+    router.replace("/login");
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -454,12 +446,6 @@ function HeaderUserMenu({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    router.push("/login");
-  };
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
@@ -611,7 +597,8 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isPreviewActive, previewRoleName, clearPreview } = useAuth();
+  const queryClient = useQueryClient();
+  const { isPreviewActive, previewRoleName, clearPreview, isLoading, isAuthenticated, isSessionResolved } = useAuth();
   const [mounted, setMounted] = useState(false);
   const { lang } = useLanguage();
   const [pageWidth, setPageWidth] = useState<"full" | "contained">("full");
@@ -628,14 +615,38 @@ export default function AuthLayout({
     });
   }, []);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const status = mounted ? (token ? "authenticated" : "unauthenticated") : "checking";
+  const status = !mounted || isLoading || !isSessionResolved
+    ? "checking"
+    : isAuthenticated
+      ? "authenticated"
+      : "unauthenticated";
 
   useEffect(() => {
     if (status === "unauthenticated") {
+      clearAuthSessionStorage();
+      queryClient.clear();
       router.replace("/login");
     }
-  }, [status, router]);
+  }, [status, router, queryClient]);
+
+  useEffect(() => {
+    const enforceTokenPresence = () => {
+      if (typeof window === "undefined" || window.localStorage.getItem("token")) {
+        return;
+      }
+
+      clearAuthSessionStorage();
+      queryClient.clear();
+      router.replace("/login");
+    };
+
+    window.addEventListener("pageshow", enforceTokenPresence);
+    window.addEventListener("focus", enforceTokenPresence);
+    return () => {
+      window.removeEventListener("pageshow", enforceTokenPresence);
+      window.removeEventListener("focus", enforceTokenPresence);
+    };
+  }, [router, queryClient]);
 
   // Handle Ctrl+K shortcut globally
   useEffect(() => {
@@ -660,6 +671,11 @@ export default function AuthLayout({
     const next = pageWidth === "full" ? "contained" : "full";
     setPageWidth(next);
     localStorage.setItem("dreamlux_page_width", next);
+  };
+
+  const handleLogout = () => {
+    clearAuthSessionStorage();
+    queryClient.clear();
   };
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
@@ -730,6 +746,7 @@ export default function AuthLayout({
                 pageWidth={pageWidth}
                 togglePageWidth={togglePageWidth}
                 setShowAbout={setShowAbout}
+                onLogout={handleLogout}
               />
             </div>
           </header>

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -346,43 +346,14 @@ export function AppSidebar() {
   const [refDataManuallyOpen, setRefDataManuallyOpen] = useState(false);
   const refDataOpen = isRefDataActive || refDataManuallyOpen;
 
-
-  // Sync user details reactively
-  const userSnapshot = useSyncExternalStore(
-    (callback) => {
-      window.addEventListener("storage", callback);
-      return () => window.removeEventListener("storage", callback);
-    },
-    () => localStorage.getItem("user") || "",
-    () => ""
-  );
-
-  const currentUser = useMemo(() => {
-    const fallback = {
-      role: "admin",
-      role_name: "admin",
-      full_name: "User",
-      profile_image_url: null as string | null,
-    };
-    if (!userSnapshot) return fallback;
-
-    try {
-      const parsed = JSON.parse(userSnapshot);
-      const resolvedRole = parsed.role_name || parsed.role || "admin";
-      return {
-        role: resolvedRole,
-        role_name: resolvedRole,
-        full_name: parsed.full_name || parsed.username || "User",
-        profile_image_url: parsed.profile_image_url || null,
-      };
-    } catch {
-      return fallback;
-    }
-  }, [userSnapshot]);
-
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
-  const { hasPermission, hasAnyPermission } = useAuth();
+  const { hasPermission, hasAnyPermission, user: authUser } = useAuth();
+  const currentUser = useMemo(() => ({
+    role_name: authUser?.role_name || authUser?.role_names?.[0] || "User",
+    full_name: authUser?.full_name || authUser?.username || "User",
+    profile_image_url: authUser?.profile_image_url || null,
+  }), [authUser]);
   const hasAssetsRead = hasPermission("assets:read");
   const canManageDispatch = hasAnyPermission(["event_allocations:write", "assets:write"]);
 

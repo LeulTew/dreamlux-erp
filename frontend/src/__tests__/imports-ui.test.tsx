@@ -45,7 +45,6 @@ type MockEventsLookup = {
   }>;
 };
 
-// Mock react-query
 let mockAuthData: MockAuthData = null;
 let mockAuthLoading = false;
 const mockEventsLookup: MockEventsLookup = {
@@ -55,11 +54,29 @@ const mockEventsLookup: MockEventsLookup = {
   ],
 };
 
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => {
+    const permissionSlugs = mockAuthData?.permission_slugs || [];
+    return {
+      hasPermission: (slug: string) => permissionSlugs.includes(slug),
+      hasAnyPermission: (slugs: string[]) => slugs.some((slug) => permissionSlugs.includes(slug)),
+      isLoading: mockAuthLoading,
+      isAuthenticated: true,
+      isSessionResolved: true,
+      permissionSlugs,
+      user: {
+        id: "user-1",
+        username: "accountant",
+        full_name: "Accountant User",
+        role_name: "ACCOUNTANT",
+      },
+    };
+  },
+}));
+
+// Mock react-query
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {
-    if (options.queryKey[0] === "permissions") {
-      return { data: mockAuthData, isLoading: mockAuthLoading };
-    }
     if (options.queryKey[0] === "import-events-lookup") {
       return { data: mockEventsLookup, isLoading: false };
     }
