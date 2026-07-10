@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { HiPlus, HiPencilSquare, HiOutlineTrash, HiDocumentDuplicate } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from "@/lib/api";
+import { getDepartments, createDepartment, updateDepartment, deleteDepartment, getDepartmentDeleteImpact } from "@/lib/api";
 import toast from "@/lib/toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
@@ -85,6 +85,34 @@ function DepartmentsContent() {
   const [form, setForm] = useState<{ id?: string; name: string }>({ name: "" });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const highlightedId = searchParams.get("highlight");
+
+  const { data: deleteImpact, isLoading: isDeleteImpactLoading } = useQuery<{
+    department_name: string;
+    active_employee_count: number;
+    employees: Array<{ id: string; full_name: string }>;
+  }>({
+    queryKey: ["department-delete-impact", deleteId],
+    queryFn: () => getDepartmentDeleteImpact(deleteId as string),
+    enabled: !!deleteId && isAuthenticated && hasReadAccess,
+    retry: false,
+  });
+
+  const impactedEmployees = deleteImpact?.active_employee_count ?? 0;
+  const employeeNames = deleteImpact?.employees?.map(e => e.full_name).slice(0, 3).join(", ") ?? "";
+  const employeeNamesSuffix = (deleteImpact?.employees?.length ?? 0) > 3 ? ` and ${(deleteImpact?.employees?.length ?? 0) - 3} others` : "";
+  const employeeListStr = employeeNames ? `(${employeeNames}${employeeNamesSuffix})` : "";
+
+  const deleteMessage = isDeleteImpactLoading
+    ? t("Checking employee usage for this department...")
+    : impactedEmployees > 0
+      ? lang === "am"
+        ? `ክፍሉን መሰረዝ አይቻልም፡ ከንቁ ሰራተኛ(ች) ጋር የተያያዘ ነው ${employeeListStr}።`
+        : `Cannot delete department: associated with active employee(s) ${employeeListStr}.`
+      : lang === "am"
+        ? "ይህንን ክፍል ለመሰረዝ እርግጠኛ ነዎት? በአሁኑ ጊዜ ምንም ንቁ ሠራተኞች እየተጠቀሙበት አይደለም።"
+        : "Are you sure you want to remove this department? No active employees are currently using it.";
+
+  const isDeleteBlocked = impactedEmployees > 0;
 
   const [page, setPage] = useState(1);
   const limit = 10;
@@ -317,9 +345,10 @@ function DepartmentsContent() {
         onClose={() => setDeleteId(null)}
         onConfirm={() => deleteId && deleteMut.mutate(deleteId)}
         title={t("Delete Department")}
-        message={t("Are you sure you want to delete this department?")}
+        message={deleteMessage}
         itemName={activeDeleteDept?.name ?? ""}
         isDeleting={deleteMut.isPending}
+        confirmDisabled={isDeleteBlocked}
       />
     </AuthLayout>
   );

@@ -93,6 +93,38 @@ router.put(
   }
 );
 
+// GET department delete impact
+router.get(
+  "/:id/delete-impact",
+  requirePermissionSlugs(["departments:manage"]),
+  async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+
+    const { data: department, error: deptError } = await supabase
+      .from("departments")
+      .select("name")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (deptError) return res.status(500).json({ error: deptError.message });
+    if (!department) return res.status(404).json({ error: "Department not found" });
+
+    const { data: employees, error: empError } = await supabase
+      .from("employees")
+      .select("id, full_name")
+      .eq("department_id", id)
+      .is("deleted_at", null);
+
+    if (empError) return res.status(500).json({ error: empError.message });
+
+    res.json({
+      department_name: department.name,
+      active_employee_count: employees ? employees.length : 0,
+      employees: employees || [],
+    });
+  }
+);
+
 // DELETE department with impact check
 router.delete(
   "/:id",

@@ -12,6 +12,7 @@ interface DeleteConfirmModalProps {
   isDeleting: boolean;
   variant?: "danger" | "primary";
   confirmLabel?: string;
+  confirmDisabled?: boolean;
 }
 
 export default function DeleteConfirmModal({
@@ -23,7 +24,8 @@ export default function DeleteConfirmModal({
   itemName,
   isDeleting,
   variant = "danger",
-  confirmLabel
+  confirmLabel,
+  confirmDisabled = false
 }: DeleteConfirmModalProps) {
   const isDanger = variant === "danger";
 
@@ -69,13 +71,15 @@ export default function DeleteConfirmModal({
               </div>
 
               <div className="w-full flex flex-col gap-3 pt-4">
-                <button
-                  onClick={onConfirm}
-                  disabled={isDeleting}
-                  className={`w-full h-11 text-white rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
-                >
-                  {isDeleting ? (isDanger ? "Deleting..." : "Restoring...") : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
-                </button>
+                {!confirmDisabled && (
+                  <button
+                    onClick={onConfirm}
+                    disabled={isDeleting}
+                    className={`w-full h-11 text-white rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
+                  >
+                    {isDeleting ? (isDanger ? "Deleting..." : "Restoring...") : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   disabled={isDeleting}
