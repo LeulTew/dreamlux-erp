@@ -27,6 +27,8 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       NEXT_PUBLIC_API_URL: "http://localhost:4000",
+      NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "playwright-local-anon-key",
     },
   },
   projects: [

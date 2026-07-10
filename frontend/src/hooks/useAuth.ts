@@ -12,16 +12,18 @@ interface AuthResponse {
 
 export function useAuth() {
   const [token, setToken] = useState<string | null>(null);
+  const [hasBootstrappedToken, setHasBootstrappedToken] = useState(false);
   const [previewRole, setPreviewRole] = useState<string | null>(null);
   const [previewSlugs, setPreviewSlugs] = useState<string[] | null>(null);
 
   useEffect(() => {
     // Read from localStorage once mounted
-    const stored = localStorage.getItem("token");
-    if (stored) {
-      // Defer to avoid "synchronous setState in effect" lint error
-      Promise.resolve().then(() => setToken(stored));
-    }
+    const readToken = () => localStorage.getItem("token");
+    const stored = readToken();
+    Promise.resolve().then(() => {
+      setToken(stored);
+      setHasBootstrappedToken(true);
+    });
     const pRole = localStorage.getItem("previewRole");
     const pSlugs = localStorage.getItem("previewPermissionSlugs");
     if (pRole && pSlugs) {
@@ -34,9 +36,29 @@ export function useAuth() {
         }
       });
     }
+
+    const syncToken = () => {
+      setToken(readToken());
+      setHasBootstrappedToken(true);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "token" || event.key === "user") {
+        syncToken();
+      }
+    };
+
+    window.addEventListener("pageshow", syncToken);
+    window.addEventListener("focus", syncToken);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("pageshow", syncToken);
+      window.removeEventListener("focus", syncToken);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
-  const { data, isLoading, error } = useQuery<AuthResponse>({
+  const { data, isLoading, error, isError } = useQuery<AuthResponse>({
     queryKey: ["me"],
     queryFn: async () => {
       const { data } = await api.get<AuthResponse>("/auth/me");
@@ -96,8 +118,9 @@ export function useAuth() {
     user: displayUser,
     permissionSlugs,
     isSuperuser,
-    isLoading: isLoading || permissionsLoading || (!!token && !data && !error),
-    isAuthenticated: !!user,
+    isLoading: !hasBootstrappedToken || isLoading || permissionsLoading || (!!token && !data && !error),
+    isSessionResolved: hasBootstrappedToken && (!token || (!!data && !permissionsLoading) || isError),
+    isAuthenticated: !!token && !!user,
     isAdmin,
     isInventoryController,
     hasPermission,
