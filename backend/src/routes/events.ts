@@ -1691,6 +1691,52 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       }
     }
 
+    const newStartDate = updateData.start_date !== undefined ? updateData.start_date : currentEvent.start_date;
+    const newEndDate = updateData.end_date !== undefined ? updateData.end_date : currentEvent.end_date;
+
+    const datesChanged =
+      (updateData.start_date !== undefined && updateData.start_date !== currentEvent.start_date) ||
+      (updateData.end_date !== undefined && updateData.end_date !== currentEvent.end_date);
+
+    if (datesChanged) {
+      // Fetch currently assigned employees for this event
+      const employeesQuery = `SELECT employee_id FROM event_assignments WHERE event_id = $1`;
+      const employeesResult = await pool.query(employeesQuery, [id]);
+
+      for (const row of employeesResult.rows) {
+        const conflict = await hasEmployeeConflict(row.employee_id, id, newStartDate, newEndDate);
+        if (conflict) {
+          res.status(400).json({
+            error: "Scheduling Conflict: One or more assigned employees have conflicting assignments on these new dates.",
+          });
+          return;
+        }
+      }
+
+      // Fetch currently assigned vehicles and drivers
+      const vehiclesQuery = `SELECT vehicle_id, driver_id FROM vehicle_assignments WHERE event_id = $1`;
+      const vehiclesResult = await pool.query(vehiclesQuery, [id]);
+
+      for (const row of vehiclesResult.rows) {
+        const vehicleConflict = await hasVehicleConflict(row.vehicle_id, id, newStartDate, newEndDate);
+        if (vehicleConflict) {
+          res.status(400).json({
+            error: "Scheduling Conflict: One or more assigned vehicles have conflicting assignments on these new dates.",
+          });
+          return;
+        }
+        if (row.driver_id) {
+          const driverConflict = await hasEmployeeConflict(row.driver_id, id, newStartDate, newEndDate);
+          if (driverConflict) {
+            res.status(400).json({
+              error: "Scheduling Conflict: One or more assigned drivers have conflicting assignments on these new dates.",
+            });
+            return;
+          }
+        }
+      }
+    }
+
     // Identify changed fields and insert into event_logs
     const fieldsToTrack = [
       "name",
@@ -1937,8 +1983,6 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     const isFinancial = canViewEventFinancials(req);
 
     let expenses: any[] = [];
-    let trips: any[] = [];
-
     if (isFinancial) {
       const expensesQuery = `
         SELECT exp.*, submitter.full_name AS submitted_by_name, approver.full_name AS approved_by_name
@@ -1950,27 +1994,33 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
       `;
       const expensesResult = await pool.query(expensesQuery, [id]);
       expenses = expensesResult.rows;
-
-      const tripsQuery = `
-        SELECT
-          t.*,
-          va.event_id,
-          va.vehicle_id,
-          v.plate_number,
-          v.vehicle_type,
-          v.fuel_type,
-          v.fuel_consumption_rate,
-          emp.full_name AS driver_name
-        FROM trips t
-        JOIN vehicle_assignments va ON t.vehicle_assignment_id = va.id
-        JOIN vehicles v ON va.vehicle_id = v.id
-        LEFT JOIN employees emp ON va.driver_id = emp.id
-        WHERE va.event_id = $1
-        ORDER BY t.created_at DESC
-      `;
-      const tripsResult = await pool.query(tripsQuery, [id]);
-      trips = tripsResult.rows;
     }
+
+    const tripsQuery = `
+      SELECT
+        t.*,
+        va.event_id,
+        va.vehicle_id,
+        v.plate_number,
+        v.vehicle_type,
+        v.fuel_type,
+        v.fuel_consumption_rate,
+        emp.full_name AS driver_name
+      FROM trips t
+      JOIN vehicle_assignments va ON t.vehicle_assignment_id = va.id
+      JOIN vehicles v ON va.vehicle_id = v.id
+      LEFT JOIN employees emp ON va.driver_id = emp.id
+      WHERE va.event_id = $1
+      ORDER BY t.created_at DESC
+    `;
+    const tripsResult = await pool.query(tripsQuery, [id]);
+    const trips = tripsResult.rows.map((t: any) => {
+      const cloned = { ...t };
+      if (!isFinancial) {
+        delete cloned.fuel_cost_etb;
+      }
+      return cloned;
+    });
 
     const isPrivileged = canViewEventOperations(req);
 

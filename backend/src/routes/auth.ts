@@ -161,6 +161,8 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       {
         id: user.id,
         username: user.username,
+        email: user.email,
+        full_name: user.full_name,
         role: roleNames[0] || user.role_name,
         roles: roleNames,
         permissions,
@@ -245,6 +247,8 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
               {
                 id: candidate.id,
                 username: candidate.username,
+                email: candidate.email,
+                full_name: candidate.full_name,
                 role: roleName,
                 roles: roleNames,
                 permissions,
@@ -294,6 +298,8 @@ router.get("/me", requireAuth, (req: AuthRequest, res: Response) => {
     user: {
       id: req.user?.id,
       username: req.user?.username,
+      email: (req.user as any)?.email,
+      full_name: (req.user as any)?.full_name,
       role: req.user?.role,
       roles: req.user?.roles || (req.user?.role ? [req.user.role] : []),
       permissions: req.user?.permissions,

@@ -98,6 +98,8 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
     "finance:investments:write",
     "finance:investments:approve",
     "finance:imports:write",
+    "event_assignments:write",
+    "vehicle_assignments:write",
   ],
   driver: ["events:read", "trips:create"],
 };

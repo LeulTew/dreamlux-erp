@@ -769,13 +769,19 @@ export default function EventWorkspacePage() {
   const expenses = workspaceQuery.data?.expenses || [];
   const trips = workspaceQuery.data?.trips || [];
 
+  const isEventCompleted = event?.status === "Completed";
+  const hasAttendedLabor = assignments.some((asg: any) => asg.attended === true);
+  const totalLaborCost = assignments.reduce((sum: number, asg: any) => sum + (asg.attended ? Number(asg.commission_amount || 0) : 0), 0);
+
   const isDriverRole =
     user?.role_name?.toUpperCase() === "DRIVER" ||
     user?.role_names?.some((r) => r.toUpperCase() === "DRIVER") ||
     (user as { role?: string })?.role?.toUpperCase() === "DRIVER";
   const filteredVehicleAssignments = vehicleAssignments.filter((va: VehicleAssignment) => {
     if (!isDriverRole) return true;
-    return va.driver_name === user?.full_name;
+    const driverName = (va.driver_name || "").trim().toLowerCase();
+    const currentUserName = (user?.full_name || "").trim().toLowerCase();
+    return driverName === currentUserName && driverName.length > 0;
   });
 
   const selectedTripVehicle = vehicleAssignments.find((vehicleAssignment) => vehicleAssignment.id === tripVehicleAssignmentId);
@@ -1558,9 +1564,23 @@ export default function EventWorkspacePage() {
                           className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
                           loading={generateLaborMutation.isPending}
                           onClick={() => generateLaborMutation.mutate()}
+                          disabled={!isEventCompleted || !hasAttendedLabor}
                         >
                           {t("Generate Labor Expense")}
                         </Button>
+                        {!isEventCompleted ? (
+                          <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
+                            {t("Prerequisite: Event status must be Completed to generate labor expense.")}
+                          </div>
+                        ) : !hasAttendedLabor ? (
+                          <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
+                            {t("Prerequisite: No employee is marked as Attended. Mark attendance in the Scheduling tab first.")}
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-success/80 bg-success/5 border border-success/20 p-2.5 rounded-lg leading-snug">
+                            {t("Ready to generate labor expense for attended employees (Total: ")}{formatCurrency(totalLaborCost)})
+                          </div>
+                        )}
                       </div>
                     </section>
                   ) : (
@@ -1658,7 +1678,7 @@ export default function EventWorkspacePage() {
                           <div key={trip.id} className="p-4">
                             <div className="font-semibold text-foreground">{trip.destination}</div>
                             <div className="mt-1 text-xs text-muted tabular-nums">
-                              {trip.plate_number || "-"} | {trip.distance_km} km | {trip.fuel_liters_used} L | {formatCurrency(trip.fuel_cost_etb)}
+                              {trip.plate_number || "-"} | {trip.distance_km} km | {trip.fuel_liters_used} L {trip.fuel_cost_etb !== undefined && trip.fuel_cost_etb !== null ? `| ${formatCurrency(trip.fuel_cost_etb)}` : ""}
                             </div>
                           </div>
                         ))}
