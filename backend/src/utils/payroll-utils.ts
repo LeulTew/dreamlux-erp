@@ -24,3 +24,18 @@ export function getHalfMonthBounds(year: number, month: number, isSecondHalf: bo
     };
   }
 }
+
+export function getWeeklyBounds(periodStart: string): { start: string; end: string } {
+  const startDate = new Date(`${periodStart}T00:00:00.000Z`);
+  if (Number.isNaN(startDate.getTime())) {
+    throw new Error("Invalid weekly payroll start date");
+  }
+
+  const endDate = new Date(startDate);
+  endDate.setUTCDate(startDate.getUTCDate() + 6);
+
+  return {
+    start: startDate.toISOString().slice(0, 10),
+    end: endDate.toISOString().slice(0, 10),
+  };
+}

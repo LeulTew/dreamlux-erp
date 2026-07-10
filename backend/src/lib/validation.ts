@@ -129,7 +129,7 @@ export type UpdateEventTypeInput = z.infer<typeof updateEventTypeSchema>;
 export const generatePayrollPreviewSchema = z.object({
   month: z.coerce.number().int().min(1).max(12).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
-  period_kind: z.enum(["month", "range", "half_month"]).default("month"),
+  period_kind: z.enum(["month", "range", "half_month", "weekly"]).default("month"),
   period_start: z.string().optional(),
   period_end: z.string().optional(),
   employeeLineEvents: z.array(z.object({

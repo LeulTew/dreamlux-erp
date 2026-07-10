@@ -1,7 +1,7 @@
 import express from "express";
 import { supabase } from "../db/supabase";
 import { generatePayrollPreviewSchema, finalizePayrollRunSchema, savePayrollDraftSchema } from "../lib/validation";
-import { getMonthlyBounds, getHalfMonthBounds } from "../utils/payroll-utils";
+import { getMonthlyBounds, getHalfMonthBounds, getWeeklyBounds } from "../utils/payroll-utils";
 import { getPublicUrl } from "../storage/storage";
 import { buildPayrollLines, toPayrollEventPayloads, toPayrollLinePayloads } from "../lib/payroll-generation";
 import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
@@ -65,6 +65,41 @@ function parsePositiveInt(value: unknown, fallback: number): number {
     return fallback;
   }
   return parsed;
+}
+
+function resolvePersistedPayrollPeriod(input: {
+  month?: number;
+  year?: number;
+  periodKind?: "month" | "range" | "half_month" | "weekly";
+  periodStart?: string;
+}) {
+  const finalMonth = input.month || new Date().getUTCMonth() + 1;
+  const finalYear = input.year || new Date().getUTCFullYear();
+
+  if (input.periodKind === "weekly") {
+    if (!input.periodStart) {
+      throw new Error("Weekly payroll periods require period_start.");
+    }
+
+    const bounds = getWeeklyBounds(input.periodStart);
+    return {
+      bounds,
+      title: `Payroll ${bounds.start} to ${bounds.end}`,
+      periodKind: "weekly" as const,
+    };
+  }
+
+  if (input.periodKind && input.periodKind !== "half_month") {
+    throw new Error("Only half-month and weekly payroll periods are supported for saved payroll runs.");
+  }
+
+  const isSecondHalf = input.periodStart ? new Date(input.periodStart).getUTCDate() > 15 : false;
+  const bounds = getHalfMonthBounds(finalYear, finalMonth, isSecondHalf);
+  return {
+    bounds,
+    title: `Payroll ${finalYear}-${String(finalMonth).padStart(2, "0")} ${isSecondHalf ? "H2" : "H1"}`,
+    periodKind: "half_month" as const,
+  };
 }
 
 async function insertPayrollAuditLog(input: {
@@ -582,16 +617,19 @@ router.post("/drafts", async (req: AuthRequest, res) => {
 
     const { month, year, period_kind, period_start, employeeLineEvents, created_by_user_id } = result.data;
 
-    const finalMonth = month || new Date().getUTCMonth() + 1;
-    const finalYear = year || new Date().getUTCFullYear();
-
-    if (period_kind !== "half_month") {
-      return res.status(400).json({ error: "Only half-month payroll periods (1-15, 16-end) are supported." });
+    let period;
+    try {
+      period = resolvePersistedPayrollPeriod({
+        month,
+        year,
+        periodKind: period_kind,
+        periodStart: period_start,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
     }
 
-    const isSecondHalf = period_start ? new Date(period_start).getUTCDate() > 15 : false;
-    const bounds = getHalfMonthBounds(finalYear, finalMonth, isSecondHalf);
-    const title = `Payroll ${finalYear}-${String(finalMonth).padStart(2, "0")} ${isSecondHalf ? "H2" : "H1"}`;
+    const { bounds, title } = period;
 
     const { data: existingDraft, error: draftLookupError } = await supabase
       .from("payroll_runs")
@@ -632,7 +670,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
 
     const insertPayload = {
       title,
-      period_kind: period_kind || "half_month",
+      period_kind: period.periodKind,
       period_start: bounds.start,
       period_end: bounds.end,
       status: "draft",
@@ -641,7 +679,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
 
     const updatePayload: Record<string, unknown> = {
       title,
-      period_kind: period_kind || "half_month",
+      period_kind: period.periodKind,
       period_start: bounds.start,
       period_end: bounds.end,
       status: "draft",
@@ -744,16 +782,19 @@ router.post("/runs", async (req: AuthRequest, res) => {
 
     const { month, year, period_kind, period_start, employeeLineEvents, created_by_user_id } = result.data;
 
-    const finalMonth = month || new Date().getUTCMonth() + 1;
-    const finalYear = year || new Date().getUTCFullYear();
-
-    if (period_kind !== "half_month") {
-      return res.status(400).json({ error: "Only half-month payroll periods (1-15, 16-end) are supported." });
+    let period;
+    try {
+      period = resolvePersistedPayrollPeriod({
+        month,
+        year,
+        periodKind: period_kind,
+        periodStart: period_start,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
     }
 
-    const isSecondHalf = period_start ? new Date(period_start).getUTCDate() > 15 : false;
-    const bounds = getHalfMonthBounds(finalYear, finalMonth, isSecondHalf);
-    const title = `Payroll ${finalYear}-${String(finalMonth).padStart(2, "0")} ${isSecondHalf ? "H2" : "H1"}`;
+    const { bounds, title } = period;
 
     // 1. Duplicate Run Guard: Check if a finalized run already exists for this exact period
     const { data: existingRun, error: checkError } = await supabase
@@ -802,7 +843,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
       .from("payroll_runs")
       .insert({
         title,
-        period_kind: period_kind || "month",
+        period_kind: period.periodKind,
         period_start: bounds.start,
         period_end: bounds.end,
         status: "finalized",

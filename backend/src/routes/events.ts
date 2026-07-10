@@ -2689,7 +2689,7 @@ router.get("/:id/assignments/available-vehicles", requireAuth, async (req: AuthR
 router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!hasPermission(req, "vehicle_assignments:write")) {
+    if (!hasPermission(req, "event_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -2838,7 +2838,7 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
 router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!hasPermission(req, "event_assignments:write")) {
+    if (!hasPermission(req, "vehicle_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }

@@ -920,7 +920,42 @@ describe("Payroll API > POST /payroll/drafts", () => {
     expect(res.body.id).toBe(RUN_ID);
   });
 
-  test("rejects non-half-month drafts", async () => {
+  test("creates a weekly draft using period_start plus six days", async () => {
+    mockDraftCreateSequence();
+
+    const res = await request(app)
+      .post("/payroll/drafts")
+      .set("Authorization", AUTH())
+      .send({
+        period_kind: "weekly",
+        period_start: "2026-04-06",
+        employeeLineEvents: [
+          {
+            employee_id: EMPLOYEE_ID,
+            events: [{ event_type_id: EVENT_TYPE_ID, quantity: 1 }],
+          },
+        ],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe(RUN_ID);
+    expect(insertPayloads).toContainEqual(expect.objectContaining({
+      title: "Payroll 2026-04-06 to 2026-04-12",
+      period_kind: "weekly",
+      period_start: "2026-04-06",
+      period_end: "2026-04-12",
+      status: "draft",
+    }));
+    expect(insertPayloads).toContainEqual(expect.objectContaining({
+      payroll_run_id: RUN_ID,
+      action: "draft_saved",
+      period_start: "2026-04-06",
+      period_end: "2026-04-12",
+      status_snapshot: "draft",
+    }));
+  });
+
+  test("rejects persisted month drafts", async () => {
     const res = await request(app)
       .post("/payroll/drafts")
       .set("Authorization", AUTH())
@@ -932,6 +967,7 @@ describe("Payroll API > POST /payroll/drafts", () => {
       });
 
     expect(res.status).toBe(400);
+    expect(res.body.error).toContain("half-month and weekly");
   });
 });
 
@@ -1007,6 +1043,55 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
       period_start: "2026-04-01",
       period_end: "2026-04-15",
     }));
+  });
+
+  test("creates a finalized weekly run and guards duplicates by weekly bounds", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    mockFinalizeSequence();
+
+    const res = await request(app)
+      .post("/payroll/runs")
+      .set("Authorization", AUTH())
+      .send({
+        period_kind: "weekly",
+        period_start: "2026-04-06",
+        employeeLineEvents: [
+          {
+            employee_id: EMPLOYEE_ID,
+            events: [{ event_type_id: EVENT_TYPE_ID, quantity: 1 }],
+          },
+        ],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe(RUN_ID);
+    expect(insertPayloads).toContainEqual(expect.objectContaining({
+      title: "Payroll 2026-04-06 to 2026-04-12",
+      period_kind: "weekly",
+      period_start: "2026-04-06",
+      period_end: "2026-04-12",
+      status: "finalized",
+    }));
+    expect(insertPayloads).toContainEqual(expect.objectContaining({
+      payroll_run_id: RUN_ID,
+      action: "finalized",
+      period_start: "2026-04-06",
+      period_end: "2026-04-12",
+      status_snapshot: "finalized",
+    }));
+  });
+
+  test("rejects finalized weekly runs without a period_start", async () => {
+    const res = await request(app)
+      .post("/payroll/runs")
+      .set("Authorization", AUTH())
+      .send({
+        period_kind: "weekly",
+        employeeLineEvents: [],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("period_start");
   });
 
   test("handles employee with price override (no reason required)", async () => {
