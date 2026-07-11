@@ -33,24 +33,24 @@ export default function DeleteConfirmModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-100 bg-black/40 backdrop-blur-sm"
             onClick={onClose}
           />
-          <motion.div 
+          <motion.div
             initial={{ y: "100%", x: "-50%" }}
-            animate={{ 
+            animate={{
               y: (typeof window !== 'undefined' && window.innerWidth >= 768) ? "-50%" : 0,
-              x: "-50%" 
+              x: "-50%"
             }}
             exit={{ y: "100%", x: "-50%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed z-110 bottom-0 left-1/2 right-auto md:top-1/2 md:bottom-auto w-full md:max-w-sm bg-card border-none rounded-t-xl md:rounded-xl shadow-premium p-8"
           >
-            <button 
+            <button
               onClick={onClose}
               className="absolute right-6 top-6 md:right-4 md:top-4 p-2 hover:bg-card-alt rounded-full text-muted transition-colors"
             >

@@ -46,6 +46,8 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { slug: "finance:investments:write", description: "Create and update capital investment entries" },
   { slug: "finance:investments:approve", description: "Approve, reject, delete, and export capital investment entries" },
   { slug: "finance:imports:write", description: "Preview and commit legacy Hisab workbook imports" },
+  { slug: "offices:read", description: "View offices and store locations" },
+  { slug: "offices:manage", description: "Manage offices and store locations" },
 ];
 
 export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
@@ -53,8 +55,8 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
   admin: ["*"],
   owner: ["*"],
   system_manager: ["*"],
-  inventory_controller: ["assets:read", "assets:write", "assets:reconcile", "assets:delete", "event_allocations:write", "exports:read"],
-  inventory_officer: ["assets:read", "assets:write", "assets:reconcile", "event_allocations:write", "exports:read"],
+  inventory_controller: ["assets:read", "assets:write", "assets:reconcile", "assets:delete", "event_allocations:write", "exports:read", "offices:read"],
+  inventory_officer: ["assets:read", "assets:write", "assets:reconcile", "event_allocations:write", "exports:read", "offices:read"],
   ops_manager: [
     "assets:read",
     "events:read",

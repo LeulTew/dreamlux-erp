@@ -112,7 +112,7 @@ function DepartmentsContent() {
         ? "ይህንን ክፍል ለመሰረዝ እርግጠኛ ነዎት? በአሁኑ ጊዜ ምንም ንቁ ሠራተኞች እየተጠቀሙበት አይደለም።"
         : "Are you sure you want to remove this department? No active employees are currently using it.";
 
-  const isDeleteBlocked = impactedEmployees > 0;
+  const isDeleteBlocked = isDeleteImpactLoading || impactedEmployees > 0;
 
   const [page, setPage] = useState(1);
   const limit = 10;
