@@ -362,6 +362,8 @@ export function AppSidebar() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
+  const isEmployeesActive = pathname === "/" || pathname === "/insert" || (pathname.startsWith("/hr") && !pathname.startsWith("/hr/finance") && !pathname.startsWith("/hr/payments") && !pathname.startsWith("/hr/event-types") && !pathname.startsWith("/hr/salary-levels") && !pathname.startsWith("/hr/reports") && !pathname.startsWith("/hr/expenses"));
+
   const showHRGroup = hasAnyPermission([
     "hr:read",
     "hr:write",
@@ -468,7 +470,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiUsers}
                         label={t("Employees")}
-                        isActive={isActive("/") || isActive("/insert") || isActive("/hr")}
+                        isActive={isEmployeesActive}
                         links={[
                           { href: "/hr", label: t("HR Dashboard"), active: pathname === "/hr" },
                           { href: "/", label: t("List Employees"), active: pathname === "/" },
@@ -480,20 +482,20 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setEmployeesOpen(!employeesOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/") || isActive("/insert") || isActive("/hr")
+                            isEmployeesActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiUsers className={`w-[18px] h-[18px] shrink-0 ${isActive("/") || isActive("/insert") || isActive("/hr") ? "text-primary" : ""}`} />
+                            <HiUsers className={`w-[18px] h-[18px] shrink-0 ${isEmployeesActive ? "text-primary" : ""}`} />
                             <span>{t("Employees")}</span>
                           </span>
                           <span className="shrink-0">
                             {employeesOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") || isActive("/hr") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isEmployeesActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/") || isActive("/insert") || isActive("/hr") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isEmployeesActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
@@ -921,45 +923,23 @@ export function AppSidebar() {
         )}
 
 
-        {/* Admin Settings Section */}
-        {hasAnyPermission(["users:manage", "settings:write"]) && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
-                <SidebarMenuItem className="w-full flex justify-center">
-                  <SidebarLink
-                    href="/settings"
-                    icon={HiCog6Tooth}
-                    label={t("Admin")}
-                    active={isActive("/settings")}
-                    isCollapsed={isCollapsed}
-                  />
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
       </SidebarContent>
 
-      {/* Footer - User Profile */}
-      <SidebarFooter className="border-t border-border/50 p-3 shrink-0 space-y-2">
-        <div className="w-full flex items-center gap-3 p-2 group-data-[collapsible=icon]:justify-center">
-          <UserAvatar
-            fullName={currentUser.full_name}
-            imageUrl={currentUser.profile_image_url}
-            sizeClassName="w-9 h-9"
-            className="shadow-none border border-border shrink-0"
-            textClassName="text-[10px] font-semibold text-muted-foreground"
-          />
-          <div className="flex flex-col truncate text-left group-data-[collapsible=icon]:hidden animate-fade-in">
-            <span className="font-semibold text-foreground text-xs leading-tight">
-              {currentUser.full_name}
-            </span>
-            <span className="text-[9px] text-muted font-medium uppercase tracking-wider mt-0.5">
-              {currentUser.role_name}
-            </span>
-          </div>
-        </div>
+      {/* Footer - Admin Settings */}
+      <SidebarFooter className="border-t border-border/50 p-3 shrink-0">
+        {hasAnyPermission(["users:manage", "settings:write"]) && (
+          <SidebarMenu className={`${isCollapsed ? "items-center" : ""}`}>
+            <SidebarMenuItem className="w-full flex justify-center">
+              <SidebarLink
+                href="/settings"
+                icon={HiCog6Tooth}
+                label={t("Admin")}
+                active={isActive("/settings")}
+                isCollapsed={isCollapsed}
+              />
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
