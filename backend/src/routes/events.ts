@@ -1691,6 +1691,31 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       }
     }
 
+    const newStartDate = updateData.start_date !== undefined ? updateData.start_date : currentEvent.start_date;
+    const newEndDate = updateData.end_date !== undefined ? updateData.end_date : currentEvent.end_date;
+
+    const datesChanged =
+      (updateData.start_date !== undefined && updateData.start_date !== currentEvent.start_date) ||
+      (updateData.end_date !== undefined && updateData.end_date !== currentEvent.end_date);
+
+    if (datesChanged) {
+      const employeeConflict = await hasBulkEmployeeConflict(id, newStartDate, newEndDate);
+      if (employeeConflict) {
+        res.status(400).json({
+          error: "Scheduling Conflict: One or more assigned employees or drivers have conflicting assignments on these new dates.",
+        });
+        return;
+      }
+
+      const vehicleConflict = await hasBulkVehicleConflict(id, newStartDate, newEndDate);
+      if (vehicleConflict) {
+        res.status(400).json({
+          error: "Scheduling Conflict: One or more assigned vehicles have conflicting assignments on these new dates.",
+        });
+        return;
+      }
+    }
+
     // Identify changed fields and insert into event_logs
     const fieldsToTrack = [
       "name",
@@ -1937,8 +1962,6 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     const isFinancial = canViewEventFinancials(req);
 
     let expenses: any[] = [];
-    let trips: any[] = [];
-
     if (isFinancial) {
       const expensesQuery = `
         SELECT exp.*, submitter.full_name AS submitted_by_name, approver.full_name AS approved_by_name
@@ -1950,27 +1973,33 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
       `;
       const expensesResult = await pool.query(expensesQuery, [id]);
       expenses = expensesResult.rows;
-
-      const tripsQuery = `
-        SELECT
-          t.*,
-          va.event_id,
-          va.vehicle_id,
-          v.plate_number,
-          v.vehicle_type,
-          v.fuel_type,
-          v.fuel_consumption_rate,
-          emp.full_name AS driver_name
-        FROM trips t
-        JOIN vehicle_assignments va ON t.vehicle_assignment_id = va.id
-        JOIN vehicles v ON va.vehicle_id = v.id
-        LEFT JOIN employees emp ON va.driver_id = emp.id
-        WHERE va.event_id = $1
-        ORDER BY t.created_at DESC
-      `;
-      const tripsResult = await pool.query(tripsQuery, [id]);
-      trips = tripsResult.rows;
     }
+
+    const tripsQuery = `
+      SELECT
+        t.*,
+        va.event_id,
+        va.vehicle_id,
+        v.plate_number,
+        v.vehicle_type,
+        v.fuel_type,
+        v.fuel_consumption_rate,
+        emp.full_name AS driver_name
+      FROM trips t
+      JOIN vehicle_assignments va ON t.vehicle_assignment_id = va.id
+      JOIN vehicles v ON va.vehicle_id = v.id
+      LEFT JOIN employees emp ON va.driver_id = emp.id
+      WHERE va.event_id = $1
+      ORDER BY t.created_at DESC
+    `;
+    const tripsResult = await pool.query(tripsQuery, [id]);
+    const trips = tripsResult.rows.map((t: any) => {
+      const cloned = { ...t };
+      if (!isFinancial) {
+        delete cloned.fuel_cost_etb;
+      }
+      return cloned;
+    });
 
     const isPrivileged = canViewEventOperations(req);
 
@@ -2614,6 +2643,53 @@ async function hasVehicleConflict(vehicleId: string, eventId: string, startDate:
   return parseInt(result.rows[0].count, 10) > 0;
 }
 
+async function hasBulkEmployeeConflict(eventId: string, startDate: string, endDate: string, dbClient: Pool | PoolClient = pool): Promise<boolean> {
+  const query = `
+    WITH current_event_employees AS (
+      SELECT employee_id FROM event_assignments WHERE event_id = $1
+      UNION
+      SELECT driver_id FROM vehicle_assignments WHERE event_id = $1 AND driver_id IS NOT NULL
+    )
+    SELECT 1 FROM (
+      SELECT ea.employee_id FROM event_assignments ea
+      JOIN events e ON ea.event_id = e.id
+      WHERE e.id != $1
+        AND e.deleted_at IS NULL
+        AND e.start_date <= $3
+        AND e.end_date >= $2
+        AND ea.employee_id IN (SELECT employee_id FROM current_event_employees)
+      UNION
+      SELECT va.driver_id FROM vehicle_assignments va
+      JOIN events e ON va.event_id = e.id
+      WHERE e.id != $1
+        AND e.deleted_at IS NULL
+        AND e.start_date <= $3
+        AND e.end_date >= $2
+        AND va.driver_id IN (SELECT employee_id FROM current_event_employees)
+    ) AS conflicts
+    LIMIT 1;
+  `;
+  const result = await dbClient.query(query, [eventId, endDate, startDate]);
+  return result.rows.length > 0;
+}
+
+async function hasBulkVehicleConflict(eventId: string, startDate: string, endDate: string, dbClient: Pool | PoolClient = pool): Promise<boolean> {
+  const query = `
+    SELECT 1 FROM vehicle_assignments va
+    JOIN events e ON va.event_id = e.id
+    WHERE e.id != $1
+      AND e.deleted_at IS NULL
+      AND e.start_date <= $3
+      AND e.end_date >= $2
+      AND va.vehicle_id IN (
+        SELECT vehicle_id FROM vehicle_assignments WHERE event_id = $1
+      )
+    LIMIT 1;
+  `;
+  const result = await dbClient.query(query, [eventId, endDate, startDate]);
+  return result.rows.length > 0;
+}
+
 // GET /events/:id/assignments/available-employees - List employees available for this event's dates
 router.get("/:id/assignments/available-employees", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
@@ -2689,7 +2765,7 @@ router.get("/:id/assignments/available-vehicles", requireAuth, async (req: AuthR
 router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!hasPermission(req, "vehicle_assignments:write")) {
+    if (!hasPermission(req, "event_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
@@ -2838,7 +2914,7 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
 router.post("/:id/assignments/vehicles", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!hasPermission(req, "event_assignments:write")) {
+    if (!hasPermission(req, "vehicle_assignments:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }

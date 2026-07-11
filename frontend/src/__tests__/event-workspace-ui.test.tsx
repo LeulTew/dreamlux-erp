@@ -260,7 +260,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
   });
 
   it("shows L/km fuel preview formula and submits trip data unchanged", () => {
-    mockPermissions = ["events:read", "trips:create"];
+    mockPermissions = ["events:read", "trips:create", "reports:profit:read"];
     render(<EventWorkspacePage />);
 
     fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));

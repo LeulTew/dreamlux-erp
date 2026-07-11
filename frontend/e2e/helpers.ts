@@ -2,7 +2,9 @@ import type { Page, Route } from "@playwright/test";
 
 type PermissionMockOptions = {
   permissions?: string[];
+  permission_slugs?: string[];
   isSuperuser?: boolean;
+  user?: Partial<typeof defaultUser> & { email?: string; role_name?: string; profile_image_url?: string | null };
 };
 
 const defaultUser = {
@@ -29,14 +31,15 @@ export async function seedAuthenticatedSession(page: Page) {
 }
 
 export async function mockAuth(page: Page, options: PermissionMockOptions = {}) {
-  const permissions = options.permissions ?? [];
+  const permissions = options.permissions ?? options.permission_slugs ?? [];
   const isSuperuser = options.isSuperuser ?? false;
+  const user = { ...defaultUser, ...options.user };
 
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ user: defaultUser }),
+      body: JSON.stringify({ user }),
     }),
   );
 
@@ -45,9 +48,9 @@ export async function mockAuth(page: Page, options: PermissionMockOptions = {}) 
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        user_id: defaultUser.id,
-        role: "Reviewer",
-        roles: ["Reviewer"],
+        user_id: user.id,
+        role: user.role_name || user.role,
+        roles: user.roles,
         permission_slugs: permissions,
         is_superuser: isSuperuser,
         catalog: [],

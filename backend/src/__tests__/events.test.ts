@@ -1686,6 +1686,50 @@ describe("Events API", () => {
     expect(res.body[0].plate_number).toBe("AA-3-A12345");
   });
 
+  test("POST /events/:id/assignments/employees accepts event assignment permission and rejects vehicle-only permission", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "emp-1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ event_id: "event-1", employee_id: "emp-1", role: "Team Leader" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const allowed = await request(app)
+      .post("/events/event-1/assignments/employees")
+      .set("Authorization", `Bearer ${getToken("viewer", { id: "event-assignment-only", permission_slugs: ["event_assignments:write"] })}`)
+      .send({
+        employee_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        role: "Team Leader",
+        commission_amount: 1500,
+      });
+
+    expect(allowed.status).toBe(201);
+    expect(allowed.body.role).toBe("Team Leader");
+
+    mockQuery.mockReset();
+    mockConnect.mockClear();
+
+    const denied = await request(app)
+      .post("/events/event-1/assignments/employees")
+      .set("Authorization", `Bearer ${getToken("viewer", { id: "vehicle-assignment-only-denied", permission_slugs: ["vehicle_assignments:write"] })}`)
+      .send({
+        employee_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        role: "Team Leader",
+        commission_amount: 1500,
+      });
+
+    expect(denied.status).toBe(403);
+    expect(denied.body.error).toContain("Insufficient assignment privileges");
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
   // Scheduling - POST Employee Assignment success
   test("POST /events/:id/assignments/employees creates assignment", async () => {
     // BEGIN
@@ -1819,6 +1863,47 @@ describe("Events API", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.vehicle_id).toBe("veh-1");
+  });
+
+  test("POST /events/:id/assignments/vehicles accepts vehicle assignment permission and rejects employee-only permission", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "veh-1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ event_id: "event-1", vehicle_id: "veh-1", driver_id: null }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+    const allowed = await request(app)
+      .post("/events/event-1/assignments/vehicles")
+      .set("Authorization", `Bearer ${getToken("viewer", { id: "vehicle-assignment-only", permission_slugs: ["vehicle_assignments:write"] })}`)
+      .send({
+        vehicle_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        is_night_shift: false,
+      });
+
+    expect(allowed.status).toBe(201);
+    expect(allowed.body.vehicle_id).toBe("veh-1");
+
+    mockQuery.mockReset();
+    mockConnect.mockClear();
+
+    const denied = await request(app)
+      .post("/events/event-1/assignments/vehicles")
+      .set("Authorization", `Bearer ${getToken("viewer", { id: "event-assignment-only-denied", permission_slugs: ["event_assignments:write"] })}`)
+      .send({
+        vehicle_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+        is_night_shift: false,
+      });
+
+    expect(denied.status).toBe(403);
+    expect(denied.body.error).toContain("Insufficient assignment privileges");
+    expect(mockConnect).not.toHaveBeenCalled();
   });
 
   // Scheduling - DELETE Employee Assignment
