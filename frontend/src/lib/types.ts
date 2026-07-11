@@ -706,6 +706,10 @@ export interface HisabReportResponse {
     pendingOperationalExposure: number;
     net: number;
   };
+  page?: number;
+  limit?: number;
+  total?: number;
+  totalPages?: number;
 }
 
 // ====================================================
