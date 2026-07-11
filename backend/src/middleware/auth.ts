@@ -49,6 +49,19 @@ function requestHasPermission(req: AuthRequest, requiredSlug: string): boolean {
   return hasPermissionSlug(getEffectivePermissionSlugs(req), requiredSlug);
 }
 
+function parseCookies(cookieHeader?: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  if (!cookieHeader) return cookies;
+  const pairs = cookieHeader.split(";");
+  for (const pair of pairs) {
+    const [key, ...valueParts] = pair.split("=");
+    if (key) {
+      cookies[key.trim()] = valueParts.join("=").trim();
+    }
+  }
+  return cookies;
+}
+
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   // Allow OPTIONS (preflight) requests
   if (req.method === "OPTIONS") {
@@ -59,12 +72,19 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   const authHeader = req.headers.authorization;
   const secret = getEnv("JWT_SECRET", "dev-secret");
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  } else {
+    const cookies = parseCookies(req.headers.cookie);
+    token = cookies.token;
+  }
+
+  if (!token) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-
-  const token = authHeader.split(" ")[1];
 
   try {
     const payload = jwt.verify(token, secret) as any;

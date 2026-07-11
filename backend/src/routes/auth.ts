@@ -34,6 +34,15 @@ import {
   resolveEffectivePermissionSlugs,
 } from "../lib/permissions-db";
 
+function setTokenCookie(res: Response, token: string) {
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+}
+
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body;
   const jwtSecret = getEnv("JWT_SECRET", "dev-secret");
@@ -115,6 +124,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
             jwtSecret,
             { expiresIn: '7d' },
           );
+          setTokenCookie(res, token);
           res.json({
             token,
             user: {
@@ -127,6 +137,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
           });
         } catch {
           const token = jwt.sign({ username: 'admin', role: 'SUPER_ADMIN', permissions: { all: true }, permission_slugs: ['*'] }, jwtSecret, { expiresIn: '7d' });
+          setTokenCookie(res, token);
           res.json({ token, user: { username: 'admin', role: 'SUPER_ADMIN', profile_image_url: null } });
         }
         return;
@@ -174,6 +185,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       { expiresIn: "7d" }
     );
 
+    setTokenCookie(res, token);
     res.json({
       token,
       user: {
@@ -261,6 +273,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
               { expiresIn: "7d" }
             );
 
+            setTokenCookie(res, token);
             res.json({
               token,
               user: {
@@ -284,6 +297,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
     const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
     if (queryUsername === 'admin' && queryPassword === adminPassword) {
       const token = jwt.sign({ username: 'admin', role: 'SUPER_ADMIN', permissions: { all: true }, permission_slugs: ['*'] }, jwtSecret, { expiresIn: '7d' });
+      setTokenCookie(res, token);
       res.json({ token, user: { username: 'admin', role: 'SUPER_ADMIN', profile_image_url: null } });
       return;
     }
@@ -340,6 +354,15 @@ router.get("/permissions", requireAuth, async (req: AuthRequest, res: Response) 
     is_superuser: permissionSlugs.includes("*") || roleNames.some((role) => ["super_admin", "admin", "owner"].includes(normalizeRoleName(role))),
     catalog: PERMISSION_DEFINITIONS,
   });
+});
+
+router.post("/logout", (req: Request, res: Response) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+  res.json({ message: "Successfully logged out" });
 });
 
 export default router;

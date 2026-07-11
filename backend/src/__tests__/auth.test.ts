@@ -171,6 +171,37 @@ describe("Auth", () => {
 
     expect(res.status).toBe(401);
   });
+
+  test("POST /auth/login — sets token cookie in headers", async () => {
+    const poolQuery = pool.query as unknown as ReturnType<typeof mock>;
+    poolQuery.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(app)
+      .post("/auth/login")
+      .send({ password: "test-password" });
+
+    expect(res.status).toBe(200);
+    expect(res.headers["set-cookie"]).toBeDefined();
+    expect(res.headers["set-cookie"][0]).toContain("token=");
+  });
+
+  test("Protected route — valid cookie token succeeds", async () => {
+    const token = getToken();
+    const res = await request(app)
+      .get("/assets")
+      .set("Cookie", `token=${token}`);
+
+    expect(res.status).not.toBe(401);
+  });
+
+  test("POST /auth/logout — clears token cookie", async () => {
+    const res = await request(app).post("/auth/logout");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["set-cookie"]).toBeDefined();
+    expect(res.headers["set-cookie"][0]).toContain("token=;");
+    expect(res.body).toHaveProperty("message", "Successfully logged out");
+  });
 });
 
 describe("Health Check", () => {

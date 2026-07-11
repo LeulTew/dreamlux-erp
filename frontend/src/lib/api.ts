@@ -63,6 +63,7 @@ const API_URL =
 export const api = axios.create({
   baseURL: API_URL,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true
 });
 
 const LOCAL_HISTORY_TRASH_IDS_KEY = "inventory_history_local_trash_ids";
