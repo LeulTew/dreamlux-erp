@@ -378,8 +378,13 @@ export default function ImportWizard({ isOpen, onClose, onSuccess }: ImportWizar
     try {
       // Security: never put bearer tokens in URL query strings (browser history, logs, referrer leaks).
       // Use Authorization header with fetch and create a temporary blob URL instead.
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       const response = await fetch(`${baseUrl}/events/export/template?format=csv`, {
-        headers: { Authorization: `Bearer ${token || ""}` }
+        headers,
+        credentials: "include"
       });
       if (!response.ok) throw new Error(`Download failed: ${response.status}`);
       const blob = await response.blob();

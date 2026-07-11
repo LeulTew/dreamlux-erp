@@ -18,7 +18,7 @@ export function useAuth() {
 
   useEffect(() => {
     // Read from localStorage once mounted
-    const readToken = () => localStorage.getItem("token");
+    const readToken = () => localStorage.getItem("token") || (localStorage.getItem("user") ? "cookie-active" : null);
     const stored = readToken();
     Promise.resolve().then(() => {
       setToken(stored);

@@ -41,7 +41,6 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const response = await login(username, password);
-      localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       toast.success(`${t("Welcome back")}, ${response.user.full_name || response.user.username}!`);
       router.push("/");

@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getEmployees, getEvents, getItems, getPayrollRuns, getSalaryLevels } from "@/lib/api";
+import { getEmployees, getEvents, getItems, getPayrollRuns, getSalaryLevels, api } from "@/lib/api";
 import type { Employee, Event, Item, PayrollRun, SalaryLevel } from "@/lib/types";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
@@ -631,7 +631,7 @@ export default function AuthLayout({
 
   useEffect(() => {
     const enforceTokenPresence = () => {
-      if (typeof window === "undefined" || window.localStorage.getItem("token")) {
+      if (typeof window === "undefined" || window.localStorage.getItem("user")) {
         return;
       }
 
@@ -673,7 +673,12 @@ export default function AuthLayout({
     localStorage.setItem("dreamlux_page_width", next);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // ignore
+    }
     clearAuthSessionStorage();
     queryClient.clear();
   };
