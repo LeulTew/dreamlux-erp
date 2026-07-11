@@ -1699,41 +1699,20 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       (updateData.end_date !== undefined && updateData.end_date !== currentEvent.end_date);
 
     if (datesChanged) {
-      // Fetch currently assigned employees for this event
-      const employeesQuery = `SELECT employee_id FROM event_assignments WHERE event_id = $1`;
-      const employeesResult = await pool.query(employeesQuery, [id]);
-
-      for (const row of employeesResult.rows) {
-        const conflict = await hasEmployeeConflict(row.employee_id, id, newStartDate, newEndDate);
-        if (conflict) {
-          res.status(400).json({
-            error: "Scheduling Conflict: One or more assigned employees have conflicting assignments on these new dates.",
-          });
-          return;
-        }
+      const employeeConflict = await hasBulkEmployeeConflict(id, newStartDate, newEndDate);
+      if (employeeConflict) {
+        res.status(400).json({
+          error: "Scheduling Conflict: One or more assigned employees or drivers have conflicting assignments on these new dates.",
+        });
+        return;
       }
 
-      // Fetch currently assigned vehicles and drivers
-      const vehiclesQuery = `SELECT vehicle_id, driver_id FROM vehicle_assignments WHERE event_id = $1`;
-      const vehiclesResult = await pool.query(vehiclesQuery, [id]);
-
-      for (const row of vehiclesResult.rows) {
-        const vehicleConflict = await hasVehicleConflict(row.vehicle_id, id, newStartDate, newEndDate);
-        if (vehicleConflict) {
-          res.status(400).json({
-            error: "Scheduling Conflict: One or more assigned vehicles have conflicting assignments on these new dates.",
-          });
-          return;
-        }
-        if (row.driver_id) {
-          const driverConflict = await hasEmployeeConflict(row.driver_id, id, newStartDate, newEndDate);
-          if (driverConflict) {
-            res.status(400).json({
-              error: "Scheduling Conflict: One or more assigned drivers have conflicting assignments on these new dates.",
-            });
-            return;
-          }
-        }
+      const vehicleConflict = await hasBulkVehicleConflict(id, newStartDate, newEndDate);
+      if (vehicleConflict) {
+        res.status(400).json({
+          error: "Scheduling Conflict: One or more assigned vehicles have conflicting assignments on these new dates.",
+        });
+        return;
       }
     }
 
@@ -2662,6 +2641,53 @@ async function hasVehicleConflict(vehicleId: string, eventId: string, startDate:
   `;
   const result = await dbClient.query(vehicleConflictQuery, [vehicleId, eventId, endDate, startDate]);
   return parseInt(result.rows[0].count, 10) > 0;
+}
+
+async function hasBulkEmployeeConflict(eventId: string, startDate: string, endDate: string, dbClient: Pool | PoolClient = pool): Promise<boolean> {
+  const query = `
+    WITH current_event_employees AS (
+      SELECT employee_id FROM event_assignments WHERE event_id = $1
+      UNION
+      SELECT driver_id FROM vehicle_assignments WHERE event_id = $1 AND driver_id IS NOT NULL
+    )
+    SELECT 1 FROM (
+      SELECT ea.employee_id FROM event_assignments ea
+      JOIN events e ON ea.event_id = e.id
+      WHERE e.id != $1
+        AND e.deleted_at IS NULL
+        AND e.start_date <= $3
+        AND e.end_date >= $2
+        AND ea.employee_id IN (SELECT employee_id FROM current_event_employees)
+      UNION
+      SELECT va.driver_id FROM vehicle_assignments va
+      JOIN events e ON va.event_id = e.id
+      WHERE e.id != $1
+        AND e.deleted_at IS NULL
+        AND e.start_date <= $3
+        AND e.end_date >= $2
+        AND va.driver_id IN (SELECT employee_id FROM current_event_employees)
+    ) AS conflicts
+    LIMIT 1;
+  `;
+  const result = await dbClient.query(query, [eventId, endDate, startDate]);
+  return result.rows.length > 0;
+}
+
+async function hasBulkVehicleConflict(eventId: string, startDate: string, endDate: string, dbClient: Pool | PoolClient = pool): Promise<boolean> {
+  const query = `
+    SELECT 1 FROM vehicle_assignments va
+    JOIN events e ON va.event_id = e.id
+    WHERE e.id != $1
+      AND e.deleted_at IS NULL
+      AND e.start_date <= $3
+      AND e.end_date >= $2
+      AND va.vehicle_id IN (
+        SELECT vehicle_id FROM vehicle_assignments WHERE event_id = $1
+      )
+    LIMIT 1;
+  `;
+  const result = await dbClient.query(query, [eventId, endDate, startDate]);
+  return result.rows.length > 0;
 }
 
 // GET /events/:id/assignments/available-employees - List employees available for this event's dates

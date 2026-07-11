@@ -51,6 +51,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
     let rows: Array<{
       id: string;
       username: string;
+      email?: string | null;
       full_name: string;
       is_active: boolean;
       role_name: string;
@@ -64,6 +65,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         `SELECT
           u.id,
           u.username,
+          u.email,
           u.full_name,
           u.profile_image_url,
           u.is_active,
@@ -76,7 +78,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
          LEFT JOIN role_permissions rp ON rp.role_id = r.id
          LEFT JOIN permissions p ON p.id = rp.permission_id
          WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)
-         GROUP BY u.id, u.username, u.full_name, u.profile_image_url, u.is_active, u.role_id, r.name, r.permissions`,
+         GROUP BY u.id, u.username, u.email, u.full_name, u.profile_image_url, u.is_active, u.role_id, r.name, r.permissions`,
         [queryUsername, queryPassword]
       );
       rows = queryResult?.rows || [];
@@ -86,7 +88,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       }
 
       const queryResult = await pool.query(
-        `SELECT u.id, u.username, u.full_name, NULL::text as profile_image_url, u.is_active, u.role_id, r.name as role_name, r.permissions
+        `SELECT u.id, u.username, u.email, u.full_name, NULL::text as profile_image_url, u.is_active, u.role_id, r.name as role_name, r.permissions
          FROM users u
          JOIN roles r ON u.role_id = r.id
          WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)`,
@@ -193,6 +195,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         let userRows: Array<{
           id: string;
           username: string;
+          email?: string | null;
           full_name: string;
           profile_image_url?: string | null;
           is_active: boolean;
@@ -203,7 +206,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 
         const extended = await supabase
           .from("users")
-          .select("id, username, full_name, profile_image_url, is_active, role_id, password_hash")
+          .select("id, username, email, full_name, profile_image_url, is_active, role_id, password_hash")
           .eq("username", queryUsername)
           .limit(1);
 
@@ -212,7 +215,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         } else if (isMissingColumnError(extended.error)) {
           const basic = await supabase
             .from("users")
-            .select("id, username, full_name, is_active, role_id, password_hash")
+            .select("id, username, email, full_name, is_active, role_id, password_hash")
             .eq("username", queryUsername)
             .limit(1);
           userError = basic.error;

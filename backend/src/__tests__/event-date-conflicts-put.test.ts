@@ -55,16 +55,9 @@ describe("Events Date Conflict API validation", () => {
       rowCount: 1,
     });
 
-    // 2. Fetch currently assigned employees for this event
+    // 2. hasBulkEmployeeConflict check query (returns conflict)
     mockQuery.mockResolvedValueOnce({
-      rows: [{ employee_id: "emp-conflict-1" }],
-      rowCount: 1,
-    });
-
-    // 3. hasEmployeeConflict check queries:
-    // first query checks employee assignments count on conflicting dates
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ count: "1" }], // Conflict found!
+      rows: [{ '1': 1 }],
       rowCount: 1,
     });
 
@@ -77,7 +70,7 @@ describe("Events Date Conflict API validation", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain("Scheduling Conflict: One or more assigned employees have conflicting assignments on these new dates.");
+    expect(res.body.error).toContain("Scheduling Conflict: One or more assigned employees or drivers have conflicting assignments on these new dates.");
   });
 
   test("PUT /events/:id returns 400 when new dates conflict with currently assigned vehicles", async () => {
@@ -95,21 +88,15 @@ describe("Events Date Conflict API validation", () => {
       rowCount: 1,
     });
 
-    // 2. Fetch currently assigned employees for this event (returns empty)
+    // 2. hasBulkEmployeeConflict check query (returns no conflict)
     mockQuery.mockResolvedValueOnce({
       rows: [],
       rowCount: 0,
     });
 
-    // 3. Fetch currently assigned vehicles
+    // 3. hasBulkVehicleConflict check query (returns conflict)
     mockQuery.mockResolvedValueOnce({
-      rows: [{ vehicle_id: "vehicle-conflict-1", driver_id: null }],
-      rowCount: 1,
-    });
-
-    // 4. hasVehicleConflict check query:
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ count: "1" }], // Vehicle Conflict found!
+      rows: [{ '1': 1 }],
       rowCount: 1,
     });
 
