@@ -223,6 +223,9 @@ export default function HisabReportPage() {
   const [activeTab, setActiveTab] = useState<"rollup" | "ledger">("rollup");
   const [isExportOpen, setIsExportOpen] = useState(false);
 
+  // Rollup state
+  const [rollupPage, setRollupPage] = useState(1);
+
   // Ledger state
   const [ledgerPage, setLedgerPage] = useState(1);
   const [ledgerStatus, setLedgerStatus] = useState("");
@@ -248,9 +251,10 @@ export default function HisabReportPage() {
   const canWrite = hasPermission("finance:opex:write");
   const canApprove = hasPermission("finance:opex:approve");
 
+  const rollupLimit = 10;
   const { data: rollup, isLoading: rollupLoading, isError: rollupError } = useQuery({
-    queryKey: ["hisab-report", periodType, startDate, endDate],
-    queryFn: () => getHisabReport({ period_type: periodType, start_date: startDate, end_date: endDate }),
+    queryKey: ["hisab-report", periodType, startDate, endDate, rollupPage],
+    queryFn: () => getHisabReport({ period_type: periodType, start_date: startDate, end_date: endDate, page: rollupPage, limit: rollupLimit }),
     enabled: !!hasHisabRead,
   });
 
@@ -340,6 +344,7 @@ export default function HisabReportPage() {
     setLedgerCategory("");
     setLedgerSearch("");
     setLedgerPage(1);
+    setRollupPage(1);
   };
 
   const openCreateForm = () => {
@@ -466,7 +471,7 @@ export default function HisabReportPage() {
                 {(["week", "month"] as const).map((option) => (
                   <button
                     key={option}
-                    onClick={() => setPeriodType(option)}
+                    onClick={() => { setPeriodType(option); setRollupPage(1); }}
                     className={`h-full px-4 text-xs font-black uppercase tracking-wider dl-radius-lg transition-all ${periodType === option ? "bg-primary text-primary-foreground" : "text-muted [@media(hover:hover)]:hover:text-foreground"}`}
                   >
                     {option === "week" ? t("Weekly") : t("Monthly")}
@@ -476,11 +481,11 @@ export default function HisabReportPage() {
 
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("Start Date")}</span>
-                <DatePicker value={startDate} onChange={(val) => setStartDate(val)} className="w-36 h-[44px]" />
+                <DatePicker value={startDate} onChange={(val) => { setStartDate(val); setRollupPage(1); }} className="w-36 h-[44px]" />
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">{t("End Date")}</span>
-                <DatePicker value={endDate} onChange={(val) => setEndDate(val)} className="w-36 h-[44px]" />
+                <DatePicker value={endDate} onChange={(val) => { setEndDate(val); setRollupPage(1); }} className="w-36 h-[44px]" />
               </div>
 
               <button
@@ -671,6 +676,11 @@ export default function HisabReportPage() {
                   )}
                 </section>
               ))}
+              {(rollup?.totalPages || 1) > 1 && (
+                <div className="mt-4">
+                  <PaginationControls page={rollupPage} totalPages={rollup?.totalPages || 1} onPageChange={setRollupPage} />
+                </div>
+              )}
             </div>
           )
         )}

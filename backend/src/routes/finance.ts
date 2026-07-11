@@ -749,11 +749,31 @@ router.get(
       const { eventRows, operationalRows } = await fetchHisabRows(query);
       const rollup = buildHisabRollup(eventRows, operationalRows, query.period_type);
 
+      let periods = rollup.periods;
+      let paginationProps = {};
+
+      if (query.page !== undefined && query.limit !== undefined) {
+        const page = query.page;
+        const limit = query.limit;
+        const total = periods.length;
+        const totalPages = Math.ceil(total / limit);
+        const startIndex = (page - 1) * limit;
+        periods = periods.slice(startIndex, startIndex + limit);
+        paginationProps = {
+          page,
+          limit,
+          total,
+          totalPages,
+        };
+      }
+
       res.json({
         period_type: query.period_type,
         start_date: query.start_date,
         end_date: query.end_date,
-        ...rollup,
+        summary: rollup.summary,
+        periods,
+        ...paginationProps,
       });
     } catch (error: any) {
       console.error("[finance-hisab] Error:", error);

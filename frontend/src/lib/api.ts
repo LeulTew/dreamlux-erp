@@ -1574,6 +1574,8 @@ export const getHisabReport = (params: {
   period_type: "week" | "month";
   start_date: string;
   end_date: string;
+  page?: number;
+  limit?: number;
 }): Promise<HisabReportResponse> =>
   api.get("/finance/hisab", { params }).then((r) => r.data);
 

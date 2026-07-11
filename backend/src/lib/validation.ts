@@ -655,6 +655,8 @@ const hisabQueryBaseSchema = z.object({
   period_type: z.enum(["week", "month"]).optional().default("week"),
   start_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid start_date"),
   end_date: z.string().refine((val) => !isNaN(Date.parse(val)), "Invalid end_date"),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 const hisabRangeRefinement = [
