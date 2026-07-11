@@ -13,7 +13,7 @@ import {
 } from "@/lib/api";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
-import { createClient } from "@/utils/supabase/client";
+import { canCreateSupabaseClient, createClient } from "@/utils/supabase/client";
 import { notify } from "@/lib/toast";
 import {
   HiOutlineBell,
@@ -94,6 +94,7 @@ export default function NotificationInbox() {
   // Supabase Realtime Websocket Listener for instant notification updates
   useEffect(() => {
     if (!user?.id) return;
+    if (!canCreateSupabaseClient()) return;
 
     const supabase = createClient();
     const channel = supabase

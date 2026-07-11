@@ -28,6 +28,13 @@ async function runRbacMigration() {
     await client.query(migrationSql);
     console.log("RBAC migrations completed successfully!");
 
+    const officesPath = path.join(__dirname, "migrations", "20260711_offices_permissions.sql");
+    const officesSql = fs.readFileSync(officesPath, "utf-8");
+
+    console.log("Running offices permissions migrations...");
+    await client.query(officesSql);
+    console.log("Offices permissions migrations completed successfully!");
+
   } catch (error) {
     console.error("Migration failed:", error);
     process.exit(1);

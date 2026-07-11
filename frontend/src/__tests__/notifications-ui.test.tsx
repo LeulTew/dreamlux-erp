@@ -15,6 +15,7 @@ const mockSupabase = {
 };
 vi.mock("@/utils/supabase/client", () => ({
   createClient: () => mockSupabase,
+  canCreateSupabaseClient: () => true,
 }));
 
 // Mock AuthLayout

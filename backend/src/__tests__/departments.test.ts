@@ -131,4 +131,26 @@ describe("Departments API", () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toContain("deleted successfully");
   });
+
+  test("GET /departments/:id/delete-impact returns employee usage details", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ name: "Logistics" }],
+    }); // Department name check query
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { id: "emp-1", full_name: "Daniel Kebede" },
+        { id: "emp-2", full_name: "Hana Kebede" },
+      ],
+    }); // Employee reference check query
+
+    const res = await request(app)
+      .get("/departments/dept-1/delete-impact")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.department_name).toBe("Logistics");
+    expect(res.body.active_employee_count).toBe(2);
+    expect(res.body.employees).toHaveLength(2);
+    expect(res.body.employees[0].full_name).toBe("Daniel Kebede");
+  });
 });

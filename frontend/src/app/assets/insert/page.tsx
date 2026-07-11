@@ -3,7 +3,7 @@ import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { createItem, getStores } from "@/lib/api";
+import { createItem, getAllOffices } from "@/lib/api";
 import { Store } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import { useAuth } from "@/hooks/useAuth";
@@ -85,7 +85,7 @@ export default function InsertAssetPage() {
 
   const { data: offices = [] } = useQuery<Store[]>({
     queryKey: ["offices"],
-    queryFn: getStores,
+    queryFn: getAllOffices,
     enabled: isAuthenticated && hasAssetsWrite,
   });
 

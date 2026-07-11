@@ -4,6 +4,10 @@ import { join } from "node:path";
 
 const seedSql = readFileSync(join(process.cwd(), "src/db/seeds_dreamlux.sql"), "utf8");
 const schemaSql = readFileSync(join(process.cwd(), "src/db/schema.sql"), "utf8");
+const inventoryDispatchMigrationSql = readFileSync(
+  join(process.cwd(), "src/db/migrations/20260710_inventory_dispatch_permissions.sql"),
+  "utf8",
+);
 
 describe("DreamLux SRD seed parity", () => {
   test("seeds exact SRD salary and commission anchors", () => {
@@ -37,9 +41,29 @@ describe("DreamLux SRD seed parity", () => {
     expect(seedSql).toContain("password_hash = EXCLUDED.password_hash");
     expect(seedSql).toContain("('assets:delete', 'Soft-delete inventory items')");
     expect(seedSql).toContain("('trips:create', 'Create event trip logs and generated fuel expenses')");
+    expect(seedSql).toContain("('event_allocations:write', 'Create and release event inventory allocations')");
     expect(seedSql).toContain("WHERE r.name = 'DRIVER' ON CONFLICT DO NOTHING");
     expect(seedSql).toContain("p.slug IN ('events:read', 'trips:create')");
     expect(seedSql).not.toMatch(/\$2[aby]\$\d{2}\$/);
+  });
+
+  test("grants dispatch allocation permission to inventory storekeeper roles", () => {
+    expect(seedSql).toContain("WHERE r.name = 'INVENTORY_OFFICER' ON CONFLICT DO NOTHING");
+    expect(seedSql).toContain("WHERE r.name = 'INVENTORY_CONTROLLER' ON CONFLICT DO NOTHING");
+    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write')");
+    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write')");
+    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read')");
+    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read')");
+    expect(inventoryDispatchMigrationSql).toContain("WHERE LOWER(r.name) IN ('inventory_officer', 'inventory_controller')");
+  });
+
+  test("repairs documented inventory_user deployment alias when only migrations run", () => {
+    expect(inventoryDispatchMigrationSql).toContain("INSERT INTO users (username, password_hash, full_name, email, role_id, is_active)");
+    expect(inventoryDispatchMigrationSql).toContain("'inventory_user'");
+    expect(inventoryDispatchMigrationSql).toContain("'Inventory Controller'");
+    expect(inventoryDispatchMigrationSql).toContain("'inventory.controller@dreamlux.com'");
+    expect(inventoryDispatchMigrationSql).toContain("WHERE r.name = 'INVENTORY_CONTROLLER'");
+    expect(inventoryDispatchMigrationSql).toContain("ON CONFLICT (username) DO UPDATE SET");
   });
 
   test("seeds driver account email to match the real Selam Bekele employee record", () => {

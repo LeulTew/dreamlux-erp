@@ -100,7 +100,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'exports:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read')
 WHERE LOWER(r.name) IN ('inventory_controller')
 ON CONFLICT DO NOTHING;
 
@@ -128,7 +128,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'exports:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read')
 WHERE LOWER(r.name) IN ('inventory_officer')
 ON CONFLICT DO NOTHING;
 

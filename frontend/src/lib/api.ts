@@ -966,6 +966,13 @@ export const updateDepartment = (id: string, name: string) =>
 export const deleteDepartment = (id: string) =>
   api.delete(`/departments/${id}`).then((r) => r.data);
 
+export const getDepartmentDeleteImpact = (id: string) =>
+  api.get(`/departments/${id}/delete-impact`).then((r) => r.data as {
+    department_name: string;
+    active_employee_count: number;
+    employees: Array<{ id: string; full_name: string }>;
+  });
+
 // Positions
 export const getPositions = () =>
   api.get("/positions").then((r) => r.data);

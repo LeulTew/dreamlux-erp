@@ -65,21 +65,21 @@ export async function fulfillJson(route: Route, data: unknown, status = 200) {
 }
 
 export async function mockCommonShellData(page: Page) {
-  await page.route("**/employees**", (route) =>
+  await page.route("http://localhost:4000/employees**", (route) =>
     fulfillJson(route, { employees: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("**/assets**", (route) =>
+  await page.route("http://localhost:4000/assets**", (route) =>
     fulfillJson(route, { items: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("**/events?**", (route) =>
+  await page.route("http://localhost:4000/events?**", (route) =>
     fulfillJson(route, { events: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("**/salary-levels**", (route) => fulfillJson(route, []));
-  await page.route("**/payroll/runs**", (route) => fulfillJson(route, []));
-  await page.route("**/api/notifications**", (route) =>
+  await page.route("http://localhost:4000/salary-levels**", (route) => fulfillJson(route, []));
+  await page.route("http://localhost:4000/payroll/runs**", (route) => fulfillJson(route, []));
+  await page.route("http://localhost:4000/api/notifications**", (route) =>
     fulfillJson(route, { notifications: [], total: 0 }),
   );
-  await page.route("**/api/notifications/unread-count", (route) =>
+  await page.route("http://localhost:4000/api/notifications/unread-count", (route) =>
     fulfillJson(route, { count: 0 }),
   );
 }

@@ -12,6 +12,7 @@ interface DeleteConfirmModalProps {
   isDeleting: boolean;
   variant?: "danger" | "primary";
   confirmLabel?: string;
+  confirmDisabled?: boolean;
 }
 
 export default function DeleteConfirmModal({
@@ -23,7 +24,8 @@ export default function DeleteConfirmModal({
   itemName,
   isDeleting,
   variant = "danger",
-  confirmLabel
+  confirmLabel,
+  confirmDisabled = false
 }: DeleteConfirmModalProps) {
   const isDanger = variant === "danger";
 
@@ -31,24 +33,24 @@ export default function DeleteConfirmModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-100 bg-black/40 backdrop-blur-sm"
             onClick={onClose}
           />
-          <motion.div 
+          <motion.div
             initial={{ y: "100%", x: "-50%" }}
-            animate={{ 
+            animate={{
               y: (typeof window !== 'undefined' && window.innerWidth >= 768) ? "-50%" : 0,
-              x: "-50%" 
+              x: "-50%"
             }}
             exit={{ y: "100%", x: "-50%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed z-110 bottom-0 left-1/2 right-auto md:top-1/2 md:bottom-auto w-full md:max-w-sm bg-card border-none rounded-t-xl md:rounded-xl shadow-premium p-8"
           >
-            <button 
+            <button
               onClick={onClose}
               className="absolute right-6 top-6 md:right-4 md:top-4 p-2 hover:bg-card-alt rounded-full text-muted transition-colors"
             >
@@ -69,13 +71,15 @@ export default function DeleteConfirmModal({
               </div>
 
               <div className="w-full flex flex-col gap-3 pt-4">
-                <button
-                  onClick={onConfirm}
-                  disabled={isDeleting}
-                  className={`w-full h-11 text-white rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
-                >
-                  {isDeleting ? (isDanger ? "Deleting..." : "Restoring...") : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
-                </button>
+                {!confirmDisabled && (
+                  <button
+                    onClick={onConfirm}
+                    disabled={isDeleting}
+                    className={`w-full h-11 text-white rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
+                  >
+                    {isDeleting ? (isDanger ? "Deleting..." : "Restoring...") : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   disabled={isDeleting}
