@@ -1606,17 +1606,24 @@ export default function EventWorkspacePage() {
                       <Input type="number" min="0" value={tripDistance} onChange={(eventChange) => setTripDistance(eventChange.target.value)} placeholder={t("Distance (km)")} />
                       <Input type="number" min="0" value={fuelPrice} onChange={(eventChange) => setFuelPrice(eventChange.target.value)} placeholder={t("Fuel Price")} />
                       <div className="border border-border bg-card-alt/50 p-3 text-xs font-semibold text-muted" style={{ borderRadius: "var(--radius-lg)" }}>
-                        <div>
-                          {t("Fuel cost preview")}: <span className="text-foreground tabular-nums">{formatCurrency(fuelCostPreview.fuelCostEtb)}</span>
-                        </div>
+                        {hasProfitAccess && (
+                          <div>
+                            {t("Fuel cost preview")}: <span className="text-foreground tabular-nums">{formatCurrency(fuelCostPreview.fuelCostEtb)}</span>
+                          </div>
+                        )}
                         {selectedFuelConsumptionRate !== null && (
                           <div className="mt-1 text-[11px] leading-tight">
                             {t("Vehicle consumption")}: <span className="text-foreground tabular-nums">{selectedFuelConsumptionRate} {FUEL_CONSUMPTION_UNIT}</span>
                           </div>
                         )}
-                        {fuelCostPreview.fuelLitersUsed > 0 && selectedFuelConsumptionRate !== null && (
+                        {hasProfitAccess && fuelCostPreview.fuelLitersUsed > 0 && selectedFuelConsumptionRate !== null && (
                           <div className="mt-1 text-[11px] leading-tight tabular-nums">
                             {Number(tripDistance)} km x {selectedFuelConsumptionRate} {FUEL_CONSUMPTION_UNIT} = {fuelCostPreview.fuelLitersUsed} L; {fuelCostPreview.fuelLitersUsed} L x {Number(fuelPrice)} ETB/L = {formatCurrency(fuelCostPreview.fuelCostEtb)}
+                          </div>
+                        )}
+                        {!hasProfitAccess && fuelCostPreview.fuelLitersUsed > 0 && selectedFuelConsumptionRate !== null && (
+                          <div className="mt-1 text-[11px] leading-tight tabular-nums">
+                            {Number(tripDistance)} km x {selectedFuelConsumptionRate} {FUEL_CONSUMPTION_UNIT} = {fuelCostPreview.fuelLitersUsed} L
                           </div>
                         )}
                         <div className="mt-1 text-[11px] leading-tight">{FUEL_CONSUMPTION_UNIT_LABEL}</div>
