@@ -974,7 +974,7 @@ function AssetsContent() {
         onChange={(s: string) => { setOfficeFilter(s); setPage(1); }}
       />
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4 shadow-sm">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4 shadow-sm">
         <div className="lg:col-span-3">
           <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Filter Method")}</label>
           <div className="flex flex-wrap gap-2">
@@ -983,7 +983,7 @@ function AssetsContent() {
                 setStockFilter("all");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${
+              className={`min-h-11 inline-flex items-center px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${
                 stockFilter === "all"
                   ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.97]"
                   : "bg-card-alt text-foreground border border-border hover:bg-border/50"
@@ -996,7 +996,7 @@ function AssetsContent() {
                 setStockFilter("low-stock");
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
+              className={`min-h-11 inline-flex items-center px-4 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
                 stockFilter === "low-stock"
                   ? "bg-danger text-white shadow-sm"
                   : "bg-card-alt text-foreground border border-border hover:bg-border/50"
@@ -1010,7 +1010,7 @@ function AssetsContent() {
                 setSelectedIds(new Set());
                 router.push("/assets/trash");
               }}
-              className="px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all bg-card-alt text-foreground border border-border hover:bg-border/50"
+              className="min-h-11 inline-flex items-center px-4 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all bg-card-alt text-foreground border border-border hover:bg-border/50"
             >
               {t("Trash")}
             </button>
