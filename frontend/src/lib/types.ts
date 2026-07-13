@@ -230,7 +230,7 @@ export interface PayrollPreviewPayload {
 export interface PayrollGenerateRequest {
   month?: number;
   year?: number;
-  period_kind?: "month" | "half_month" | "range";
+  period_kind?: "month" | "half_month" | "range" | "weekly";
   period_start?: string;
   period_end?: string;
   employeeLineEvents: {
