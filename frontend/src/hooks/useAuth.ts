@@ -29,7 +29,7 @@ export function useAuth() {
     }
   }, []);
 
-  const { data, isLoading, error, isError } = useQuery<AuthResponse>({
+  const { data, isLoading, isFetching, error, isError } = useQuery<AuthResponse>({
     queryKey: ["me"],
     queryFn: async () => {
       const { data } = await api.get<AuthResponse>("/auth/me");
@@ -96,8 +96,8 @@ export function useAuth() {
     user: displayUser,
     permissionSlugs,
     isSuperuser,
-    isLoading: !hasMounted || isLoading || (!!data?.user && permissionsLoading),
-    isSessionResolved: hasMounted && (!isLoading && (!data?.user || !permissionsLoading)),
+    isLoading: !hasMounted || isLoading || isFetching || (!!data?.user && permissionsLoading),
+    isSessionResolved: hasMounted && (!isLoading && !isFetching && (!data?.user || !permissionsLoading)),
     isAuthenticated: !!user,
     isAdmin,
     isInventoryController,
