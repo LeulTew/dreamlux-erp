@@ -13,6 +13,7 @@ import eventTypesRouter from "./routes/event-types";
 import payrollRouter from "./routes/payroll";
 import eventsRouter from "./routes/events";
 import positionsRouter from "./routes/positions";
+import vehiclesRouter from "./routes/vehicles";
 import { notificationsRouter } from "./routes/notifications";
 import activityRouter from "./routes/activity";
 import financeRouter from "./routes/finance";
@@ -117,6 +118,7 @@ app.use("/assets", requireAuth, assetsRouter);
 app.use("/items", requireAuth, assetsRouter); // Compatibility for old inventory-pro app
 app.use("/api/inventory", requireAuth, assetsRouter); // Contract alias (e.g. /api/inventory/stats)
 app.use("/offices", requireAuth, officeRoutes);
+app.use("/vehicles", requireAuth, vehiclesRouter);
 app.use("/stores", requireAuth, officeRoutes); // Compatibility for old inventory-pro app
 app.use("/employees", requireAuth, employeesRouter);
 app.use("/export", requireAuth, exportRoutes);

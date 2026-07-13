@@ -988,6 +988,39 @@ export const updateOffice = (id: string, name: string, isActive: boolean) =>
 export const deleteOffice = (id: string) =>
   api.delete(`/offices/${id}`).then((r) => r.data);
 
+// Fleet / Vehicles (issue #147)
+export type VehiclePayload = {
+  plate_number: string;
+  vehicle_type: string;
+  fuel_type: string;
+  fuel_consumption_rate: number;
+  driver_license_details?: string | null;
+  is_active?: boolean;
+};
+
+export const getVehicles = (params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  fuel_type?: string;
+  status?: "active" | "archived" | "all";
+} = {}) => api.get("/vehicles", { params }).then((r) => r.data);
+
+export const createVehicle = (payload: VehiclePayload) =>
+  api.post("/vehicles", payload).then((r) => r.data);
+
+export const updateVehicle = (id: string, payload: VehiclePayload) =>
+  api.put(`/vehicles/${id}`, payload).then((r) => r.data);
+
+export const archiveVehicle = (id: string) =>
+  api.patch(`/vehicles/${id}/archive`).then((r) => r.data);
+
+export const restoreVehicle = (id: string) =>
+  api.patch(`/vehicles/${id}/restore`).then((r) => r.data);
+
+export const deleteVehicle = (id: string) =>
+  api.delete(`/vehicles/${id}`).then((r) => r.data);
+
 // Settings
 export const getAppSettings = () =>
   api.get("/settings").then((r) => r.data);
