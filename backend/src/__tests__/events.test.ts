@@ -2616,11 +2616,28 @@ describe("Events API", () => {
     test("GET /events/dispatch/queue blocks users without allocation privileges before DB access", async () => {
       const res = await request(app)
         .get("/events/dispatch/queue")
-        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+        .set("Authorization", `Bearer ${getToken("VIEWER")}`); // lacks event_allocations:write / assets:write
 
       expect(res.status).toBe(403);
       expect(res.body.error).toContain("Forbidden");
       expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    // Issue #145: EVENT_MANAGER is granted event_allocations:write and must reach the
+    // dispatch queue (allocation-to-departure workflow).
+    test("GET /events/dispatch/queue allows EVENT_MANAGER (issue #145)", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ event_id: "event-1", event_name: "Wedding", allocation_count: 1, checked_count: 0, departed_count: 0 }],
+        rowCount: 1,
+      });
+
+      const res = await request(app)
+        .get("/events/dispatch/queue")
+        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.queue)).toBe(true);
+      expect(mockQuery).toHaveBeenCalled();
     });
 
     test("GET /events/dispatch/queue only returns non-completed dispatch work", async () => {

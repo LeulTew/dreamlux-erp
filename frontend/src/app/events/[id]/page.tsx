@@ -55,6 +55,8 @@ import type { EventChecklistItem, Item, EventAssignment, VehicleAssignment, Empl
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import StatusBadge from "@/components/ui/StatusBadge";
+import Select from "@/components/ui/Select";
+import { EVENT_ROLE_VALUES, isDriverEligible, suggestEventRole } from "@/lib/event-crew";
 import { calculateFuelCostPreviewLitersPerKm, FUEL_CONSUMPTION_UNIT, FUEL_CONSUMPTION_UNIT_LABEL, validateFuelConsumptionRateLitersPerKm } from "@/lib/fuel";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
@@ -124,6 +126,15 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Choose staff": "Choose staff",
     "Choose vehicle": "Choose vehicle",
     "Choose driver": "Choose driver",
+    "Search staff": "Search staff",
+    "Search vehicles": "Search vehicles",
+    "Search driver": "Search driver",
+    "Retry": "Retry",
+    "Failed to load staff.": "Failed to load staff.",
+    "Failed to load vehicles.": "Failed to load vehicles.",
+    "No eligible staff available.": "No eligible staff available.",
+    "No available vehicles.": "No available vehicles.",
+    "No eligible drivers available.": "No eligible drivers available.",
     "Assign": "Assign",
     "No staff assigned yet.": "No staff assigned yet.",
     "No vehicles assigned yet.": "No vehicles assigned yet.",
@@ -252,6 +263,15 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Choose staff": "ሠራተኛ ምረጥ",
     "Choose vehicle": "ተሽከርካሪ ምረጥ",
     "Choose driver": "ሾፌር ምረጥ",
+    "Search staff": "ሠራተኛ ፈልግ",
+    "Search vehicles": "ተሽከርካሪ ፈልግ",
+    "Search driver": "ሾፌር ፈልግ",
+    "Retry": "እንደገና ሞክር",
+    "Failed to load staff.": "ሠራተኞችን መጫን አልተሳካም።",
+    "Failed to load vehicles.": "ተሽከርካሪዎችን መጫን አልተሳካም።",
+    "No eligible staff available.": "ተስማሚ ሠራተኛ የለም።",
+    "No available vehicles.": "ነፃ ተሽከርካሪ የለም።",
+    "No eligible drivers available.": "ተስማሚ ሾፌር የለም።",
     "Assign": "መድብ",
     "No staff assigned yet.": "እስካሁን ምንም ሠራተኛ አልተመደበም።",
     "No vehicles assigned yet.": "እስካሁን ምንም ተሽከርካሪ አልተመደበም።",
@@ -770,8 +790,8 @@ export default function EventWorkspacePage() {
   const trips = workspaceQuery.data?.trips || [];
 
   const isEventCompleted = event?.status === "Completed";
-  const hasAttendedLabor = assignments.some((asg: any) => asg.attended === true);
-  const totalLaborCost = assignments.reduce((sum: number, asg: any) => sum + (asg.attended ? Number(asg.commission_amount || 0) : 0), 0);
+  const hasAttendedLabor = assignments.some((asg: EventAssignment) => asg.attended === true);
+  const totalLaborCost = assignments.reduce((sum: number, asg: EventAssignment) => sum + (asg.attended ? Number(asg.commission_amount || 0) : 0), 0);
 
   const isDriverRole =
     user?.role_name?.toUpperCase() === "DRIVER" ||
@@ -806,6 +826,16 @@ export default function EventWorkspacePage() {
     queryFn: () => getAvailableVehicles(eventId),
     enabled: activeTab === "scheduling" && canWriteVehicles,
   });
+
+  // Employees eligible for assignment to this event (backend already excludes
+  // date-overlapping bookings). Employees already on THIS event are marked disabled
+  // in the staff picker rather than hidden, so the "already assigned" state is clear.
+  const staffOptionsSource: Employee[] = availableEmployeesQuery.data || [];
+  const assignedEmployeeIds = new Set<string>(assignments.map((a: EventAssignment) => a.employee_id));
+  // Driver picker prefers durably-eligible drivers; if none match we fall back to the
+  // full eligible pool so a driver can always be selected (issue #146).
+  const eligibleDrivers = staffOptionsSource.filter(isDriverEligible);
+  const driverOptionsSource: Employee[] = eligibleDrivers.length > 0 ? eligibleDrivers : staffOptionsSource;
 
   const assignEmployeeMutation = useMutation({
     mutationFn: (data: { employee_id: string; role: string; commission_amount: number }) =>
@@ -1293,36 +1323,45 @@ export default function EventWorkspacePage() {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-semibold text-muted mb-1">{t("Staff Member")}</label>
-                          <select
-                            value={selectedEmpId}
-                            onChange={(e) => setSelectedEmpId(e.target.value)}
-                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                          >
-                            <option value="">{t("Choose staff")}</option>
-                            {(availableEmployeesQuery.data || []).map((emp: Employee) => (
-                              <option key={emp.id} value={emp.id}>
-                                {emp.full_name} ({emp.position || "Staff"})
-                              </option>
-                            ))}
-                          </select>
+                          {availableEmployeesQuery.isLoading ? (
+                            <Skeleton className="h-11 w-full rounded-xl" />
+                          ) : availableEmployeesQuery.isError ? (
+                            <div className="flex items-center justify-between gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs font-semibold text-destructive">
+                              <span>{t("Failed to load staff.")}</span>
+                              <button type="button" onClick={() => availableEmployeesQuery.refetch()} className="underline underline-offset-2 hover:opacity-80">
+                                {t("Retry")}
+                              </button>
+                            </div>
+                          ) : (
+                            <Select
+                              searchable
+                              value={selectedEmpId}
+                              onChange={(v) => {
+                                setSelectedEmpId(v);
+                                const emp = staffOptionsSource.find((e) => e.id === v);
+                                setAssignRole(suggestEventRole(emp));
+                              }}
+                              placeholder={t("Choose staff")}
+                              searchPlaceholder={t("Search staff")}
+                              emptyMessage={t("No eligible staff available.")}
+                              options={staffOptionsSource.map((emp) => ({
+                                id: emp.id,
+                                label: emp.full_name,
+                                hint: emp.position || undefined,
+                                disabled: assignedEmployeeIds.has(emp.id),
+                              }))}
+                            />
+                          )}
                         </div>
 
                         <div>
                           <label className="block text-xs font-semibold text-muted mb-1">{t("Role")}</label>
-                          <select
+                          <Select
                             value={assignRole}
-                            onChange={(e) => setAssignRole(e.target.value)}
-                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                          >
-                            <option value="">{t("Role")}</option>
-                            <option value="Event Manager">{t("Event Manager")}</option>
-                            <option value="Supervisor">{t("Supervisor")}</option>
-                            <option value="Team Leader">{t("Team Leader")}</option>
-                            <option value="Décor Professional">{t("Décor Professional")}</option>
-                            <option value="Assistant">{t("Assistant")}</option>
-                            <option value="Driver">{t("Driver")}</option>
-                            <option value="Store Keeper">{t("Store Keeper")}</option>
-                          </select>
+                            onChange={(v) => setAssignRole(v)}
+                            placeholder={t("Role")}
+                            options={EVENT_ROLE_VALUES.map((role) => ({ id: role, label: t(role) }))}
+                          />
                         </div>
 
                         <div>
@@ -1414,36 +1453,58 @@ export default function EventWorkspacePage() {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-semibold text-muted mb-1">{t("Vehicle")}</label>
-                          <select
-                            value={selectedVehId}
-                            onChange={(e) => setSelectedVehId(e.target.value)}
-                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                          >
-                            <option value="">{t("Choose vehicle")}</option>
-                            {(availableVehiclesQuery.data || []).map((veh: Vehicle) => (
-                              <option key={veh.id} value={veh.id}>
-                                {veh.plate_number} - {veh.vehicle_type}
-                              </option>
-                            ))}
-                          </select>
+                          {availableVehiclesQuery.isLoading ? (
+                            <Skeleton className="h-11 w-full rounded-xl" />
+                          ) : availableVehiclesQuery.isError ? (
+                            <div className="flex items-center justify-between gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs font-semibold text-destructive">
+                              <span>{t("Failed to load vehicles.")}</span>
+                              <button type="button" onClick={() => availableVehiclesQuery.refetch()} className="underline underline-offset-2 hover:opacity-80">
+                                {t("Retry")}
+                              </button>
+                            </div>
+                          ) : (
+                            <Select
+                              searchable
+                              value={selectedVehId}
+                              onChange={(v) => setSelectedVehId(v)}
+                              placeholder={t("Choose vehicle")}
+                              searchPlaceholder={t("Search vehicles")}
+                              emptyMessage={t("No available vehicles.")}
+                              options={(availableVehiclesQuery.data || []).map((veh: Vehicle) => ({
+                                id: veh.id,
+                                label: veh.plate_number,
+                                hint: veh.vehicle_type,
+                              }))}
+                            />
+                          )}
                         </div>
 
                         <div>
                           <label className="block text-xs font-semibold text-muted mb-1">{t("Driver")}</label>
-                          <select
-                            value={selectedDrvId}
-                            onChange={(e) => setSelectedDrvId(e.target.value)}
-                            className="h-9 w-full rounded-lg border border-input bg-card-alt px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/30"
-                          >
-                            <option value="">{t("Choose driver")}</option>
-                            {(availableEmployeesQuery.data || [])
-                              .filter((emp: Employee) => (emp.position || "").toLowerCase() === "driver" || (emp.department || "").toLowerCase() === "logistics")
-                              .map((emp: Employee) => (
-                                <option key={emp.id} value={emp.id}>
-                                  {emp.full_name}
-                                </option>
-                              ))}
-                          </select>
+                          {availableEmployeesQuery.isLoading ? (
+                            <Skeleton className="h-11 w-full rounded-xl" />
+                          ) : availableEmployeesQuery.isError ? (
+                            <div className="flex items-center justify-between gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs font-semibold text-destructive">
+                              <span>{t("Failed to load staff.")}</span>
+                              <button type="button" onClick={() => availableEmployeesQuery.refetch()} className="underline underline-offset-2 hover:opacity-80">
+                                {t("Retry")}
+                              </button>
+                            </div>
+                          ) : (
+                            <Select
+                              searchable
+                              value={selectedDrvId}
+                              onChange={(v) => setSelectedDrvId(v)}
+                              placeholder={t("Choose driver")}
+                              searchPlaceholder={t("Search driver")}
+                              emptyMessage={t("No eligible drivers available.")}
+                              options={driverOptionsSource.map((emp) => ({
+                                id: emp.id,
+                                label: emp.full_name,
+                                hint: emp.position || emp.department || undefined,
+                              }))}
+                            />
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2 py-1">

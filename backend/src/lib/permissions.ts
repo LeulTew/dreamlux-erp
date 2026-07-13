@@ -76,7 +76,7 @@ export const ROLE_PERMISSION_SEEDS: Record<string, string[]> = {
     "exports:read",
     "approvals:history:read",
   ],
-  event_manager: ["assets:read", "events:read", "events:write", "events:proposals:write", "event_checklist:write", "event_assignments:write", "vehicle_assignments:write", "trips:create", "expenses:write"],
+  event_manager: ["assets:read", "events:read", "events:write", "events:proposals:write", "event_allocations:write", "event_checklist:write", "event_assignments:write", "vehicle_assignments:write", "trips:create", "expenses:write"],
   viewer: ["assets:read", "events:read"],
   sales_rep: ["assets:read", "events:read"],
   hr_manager: ["hr:read", "hr:write", "departments:manage", "salary-levels:manage", "exports:read"],
