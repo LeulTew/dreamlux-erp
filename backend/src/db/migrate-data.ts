@@ -33,8 +33,8 @@ async function copyData() {
     for (const table of tables) {
       try {
         await dest.query(`TRUNCATE TABLE "public"."${table}" CASCADE`);
-      } catch (err) {
-        // ignore
+      } catch {
+        // ignore truncate ordering/cascade issues; retried across passes
       }
     }
 
@@ -119,10 +119,12 @@ async function copyData() {
         } catch (tableError) {
           try {
             await dest.query("ROLLBACK;");
-          } catch (rbErr) {}
+          } catch {
+            // no active transaction to roll back
+          }
           // Log only on final pass to keep output clean
           if (pass === maxPasses) {
-            console.warn(`❌ Final pass failed for table "${table}":`, tableError.message || tableError);
+            console.warn(`❌ Final pass failed for table "${table}":`, (tableError as Error)?.message || tableError);
           }
         }
       }
@@ -147,7 +149,7 @@ async function copyData() {
         console.log("✅ events.event_proposal_id resolved.");
       }
     } catch (err) {
-      console.warn("⚠️ Failed to resolve events.event_proposal_id:", err.message || err);
+      console.warn("⚠️ Failed to resolve events.event_proposal_id:", (err as Error)?.message || err);
     }
 
     // Update event_proposals.converted_event_id
@@ -161,7 +163,7 @@ async function copyData() {
         console.log("✅ event_proposals.converted_event_id resolved.");
       }
     } catch (err) {
-      console.warn("⚠️ Failed to resolve event_proposals.converted_event_id:", err.message || err);
+      console.warn("⚠️ Failed to resolve event_proposals.converted_event_id:", (err as Error)?.message || err);
     }
 
     console.log(`\n🎉 Data copy finished! Copied ${completedTables.size}/${tables.length} tables.`);
