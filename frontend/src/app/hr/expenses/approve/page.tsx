@@ -18,6 +18,19 @@ import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ForbiddenState from "@/components/ForbiddenState";
+
+// Distinguish HTTP failure classes so the queue can render the right state
+// (issue #148: authentication vs authorization vs schema/validation vs network).
+function classifyLoadError(error: unknown): { kind: "auth" | "forbidden" | "network" | "server"; status?: number; reference?: string } {
+  const e = error as { response?: { status?: number; data?: { error?: string; reference?: string } }; message?: string; code?: string };
+  const status = e?.response?.status;
+  const reference = e?.response?.data?.reference;
+  if (status === 401) return { kind: "auth", status, reference };
+  if (status === 403) return { kind: "forbidden", status, reference };
+  if (status === undefined) return { kind: "network", reference };
+  return { kind: "server", status, reference };
+}
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -63,7 +76,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Rejected: "Rejected",
     Pending: "Pending",
     Receipt: "Receipt",
-    "View Receipt": "View Receipt"
+    "View Receipt": "View Receipt",
+    "You do not have permission to review expense approvals.": "You do not have permission to review expense approvals.",
+    "Your session has expired. Please sign in again.": "Your session has expired. Please sign in again.",
+    "Network problem — could not reach the server.": "Network problem — could not reach the server.",
+    "Something went wrong loading the queue.": "Something went wrong loading the queue.",
+    "Reference": "Reference",
+    "Retry": "Retry"
   },
   am: {
     "Expense Approval Queue": "የወጪ ማጽደቂያ ዝርዝር",
@@ -108,7 +127,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Rejected: "ውድቅ ተደርጓል",
     Pending: "በመጠባበቅ ላይ",
     Receipt: "ደረሰኝ",
-    "View Receipt": "ደረሰኝ ይመልከቱ"
+    "View Receipt": "ደረሰኝ ይመልከቱ",
+    "You do not have permission to review expense approvals.": "የወጪ ማጽደቆችን ለመገምገም ፍቃድ የለዎትም።",
+    "Your session has expired. Please sign in again.": "ክፍለ ጊዜዎ አብቅቷል። እባክዎ እንደገና ይግቡ።",
+    "Network problem — could not reach the server.": "የኔትወርክ ችግር — ሰርቨሩን ማግኘት አልተቻለም።",
+    "Something went wrong loading the queue.": "ዝርዝሩን በመጫን ላይ ችግር ተፈጥሯል።",
+    "Reference": "ማጣቀሻ",
+    "Retry": "እንደገና ሞክር"
   },
 };
 
@@ -159,16 +184,14 @@ function ExpenseApprovalContent() {
 
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
 
-  // Redirect unauthorized
+  // Redirect only truly unauthenticated users to login. Authenticated users who
+  // lack the approval permission get an explicit forbidden state instead of a
+  // silent bounce (issue #148).
   useEffect(() => {
-    if (!authLoading) {
-      if (!isAuthenticated) {
-        router.replace("/login");
-      } else if (!hasPermission("expenses:approve")) {
-        router.replace("/");
-      }
+    if (!authLoading && !isAuthenticated) {
+      router.replace("/login");
     }
-  }, [authLoading, isAuthenticated, hasPermission, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   // Sync Search Debounce
   useEffect(() => {
@@ -307,12 +330,20 @@ function ExpenseApprovalContent() {
     setPage(1);
   };
 
-  if (authLoading || !isAuthenticated || !hasPermission("expenses:approve")) {
+  if (authLoading || !isAuthenticated) {
     return (
       <AuthLayout>
         <div className="flex h-[50vh] items-center justify-center">
           <span className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
         </div>
+      </AuthLayout>
+    );
+  }
+
+  if (!hasPermission("expenses:approve")) {
+    return (
+      <AuthLayout>
+        <ForbiddenState description={t("You do not have permission to review expense approvals.")} />
       </AuthLayout>
     );
   }
@@ -462,9 +493,31 @@ function ExpenseApprovalContent() {
 
         {/* Query Loading/Error States */}
         {activeQuery.isError ? (
-          <div className="dl-radius-2xl border border-rose-500/25 bg-rose-500/5 p-4 text-center text-xs text-rose-500 font-semibold">
-            Failed to load data. Please refresh or try again later.
-          </div>
+          (() => {
+            const info = classifyLoadError(activeQuery.error);
+            const message =
+              info.kind === "forbidden" ? t("You do not have permission to review expense approvals.")
+              : info.kind === "auth" ? t("Your session has expired. Please sign in again.")
+              : info.kind === "network" ? t("Network problem — could not reach the server.")
+              : t("Something went wrong loading the queue.");
+            return (
+              <div className="dl-radius-2xl border border-rose-500/25 bg-rose-500/5 p-6 text-center space-y-3">
+                <p className="text-sm text-rose-600 dark:text-rose-400 font-bold">{message}</p>
+                {info.reference && (
+                  <p className="text-[11px] text-muted-foreground font-mono">{t("Reference")}: {info.reference}</p>
+                )}
+                {info.kind !== "forbidden" && (
+                  <button
+                    type="button"
+                    onClick={() => activeQuery.refetch()}
+                    className="inline-flex items-center justify-center h-9 px-4 dl-radius-lg bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider active:scale-[0.98] transition-transform"
+                  >
+                    {t("Retry")}
+                  </button>
+                )}
+              </div>
+            );
+          })()
         ) : activeQuery.isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-20 w-full animate-pulse" />

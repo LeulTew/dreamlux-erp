@@ -1177,8 +1177,12 @@ router.get("/expenses/pending", requireAuth, async (req: AuthRequest, res: Respo
       totalPages: Math.ceil(total / limit)
     });
   } catch (error: any) {
-    console.error("[get-pending-expenses] Error:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    const reference = `exp-pending-${Date.now().toString(36)}`;
+    console.error(
+      `[get-pending-expenses] ref=${reference} user=${req.user?.id ?? "?"} sort_by=${req.query.sort_by ?? ""} sort_order=${req.query.sort_order ?? ""} page=${req.query.page ?? ""}:`,
+      error?.message || error,
+    );
+    res.status(500).json({ error: "Failed to load pending expenses", reference });
   }
 });
 
@@ -1234,8 +1238,12 @@ router.get("/expenses/history", requireAuth, async (req: AuthRequest, res: Respo
       totalPages: Math.ceil(total / limit)
     });
   } catch (error: any) {
-    console.error("[get-expense-history] Error:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    const reference = `exp-history-${Date.now().toString(36)}`;
+    console.error(
+      `[get-expense-history] ref=${reference} user=${req.user?.id ?? "?"} sort_by=${req.query.sort_by ?? ""} sort_order=${req.query.sort_order ?? ""} page=${req.query.page ?? ""}:`,
+      error?.message || error,
+    );
+    res.status(500).json({ error: "Failed to load expense history", reference });
   }
 });
 
