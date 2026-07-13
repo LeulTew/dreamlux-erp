@@ -1,0 +1,21 @@
+{
+  "services": {
+    "frontend": {
+      "root": "frontend"
+    },
+    "backend": {
+      "root": "backend",
+      "entrypoint": "src/index.ts"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/_/backend/(.*)",
+      "destination": { "service": "backend" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "frontend" }
+    }
+  ]
+}

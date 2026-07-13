@@ -13,11 +13,18 @@ export type SidebarNavState = {
   showEmployeesMenu: boolean;
   showInventoryGroup: boolean;
   showAdminGroup: boolean;
+  employeesLinks: SidebarNavLink[];
   eventLinks: SidebarNavLink[];
   financeLinks: SidebarNavLink[];
   refDataLinks: SidebarNavLink[];
+  inventoryLinks: SidebarNavLink[];
+  dispatchLink: SidebarNavLink | null;
+  reconcileLink: SidebarNavLink | null;
+  auditLogLink: SidebarNavLink | null;
+  reportsLink: SidebarNavLink | null;
+  inventoryDashboardLink: SidebarNavLink | null;
+  adminLink: SidebarNavLink | null;
 };
-
 
 const HR_GROUP_PERMISSIONS = [
   "hr:read",
@@ -32,6 +39,9 @@ const HR_GROUP_PERMISSIONS = [
   "reports:profit:read",
   "salary-levels:manage",
   "departments:manage",
+  "finance:hisab:read",
+  "finance:overheads:read",
+  "finance:investments:read",
 ];
 
 const EVENT_PROPOSAL_PERMISSIONS = [
@@ -50,6 +60,33 @@ export function buildSidebarNavState(params: {
 }): SidebarNavState {
   const { pathname, t, hasPermission } = params;
 
+  const hasAny = (slugs: string[]) => hasAnyPermission(hasPermission, slugs);
+
+  // Employees group sub-links
+  const employeesLinks = [
+    {
+      href: "/hr",
+      label: t("HR Dashboard"),
+      active: pathname === "/hr",
+      show: hasPermission("hr:read") || hasPermission("payroll:read"),
+    },
+    {
+      href: "/",
+      label: t("List Employees"),
+      active: pathname === "/",
+      show: hasPermission("hr:read") || hasPermission("hr:write"),
+    },
+    {
+      href: "/insert",
+      label: t("Add Employee"),
+      active: pathname === "/insert",
+      show: hasPermission("hr:write"),
+    },
+  ]
+    .filter((link) => link.show)
+    .map(({ href, label, active }) => ({ href, label, active }));
+
+  // Events group sub-links
   const eventLinks = [
     {
       href: "/events",
@@ -61,7 +98,7 @@ export function buildSidebarNavState(params: {
       href: "/events/proposals",
       label: t("Event Proposals"),
       active: pathname === "/events/proposals" || pathname.startsWith("/events/proposals/"),
-      show: hasAnyPermission(hasPermission, EVENT_PROPOSAL_PERMISSIONS),
+      show: hasAny(EVENT_PROPOSAL_PERMISSIONS),
     },
     {
       href: "/hr/event-types",
@@ -73,12 +110,13 @@ export function buildSidebarNavState(params: {
     .filter((link) => link.show)
     .map(({ href, label, active }) => ({ href, label, active }));
 
+  // Finance group sub-links
   const financeLinks = [
     {
       href: "/hr/payments",
       label: t("Payroll"),
       active: pathname === "/hr/payments",
-      show: hasAnyPermission(hasPermission, PAYROLL_PERMISSIONS),
+      show: hasAny(PAYROLL_PERMISSIONS),
     },
     {
       href: "/hr/expenses/approve",
@@ -93,6 +131,36 @@ export function buildSidebarNavState(params: {
       show: hasPermission("reports:profit:read"),
     },
     {
+      href: "/hr/finance/hisab",
+      label: t("Hisab Reports"),
+      active: pathname === "/hr/finance/hisab",
+      show: hasPermission("finance:hisab:read"),
+    },
+    {
+      href: "/hr/finance/overheads",
+      label: t("Overhead Register"),
+      active: pathname === "/hr/finance/overheads",
+      show: hasPermission("finance:overheads:read"),
+    },
+    {
+      href: "/hr/finance/investments",
+      label: t("Capital Register"),
+      active: pathname === "/hr/finance/investments",
+      show: hasPermission("finance:investments:read"),
+    },
+    {
+      href: "/hr/finance/net-profit",
+      label: t("Net Profit"),
+      active: pathname === "/hr/finance/net-profit",
+      show: hasPermission("finance:hisab:read"),
+    },
+    {
+      href: "/hr/finance/imports",
+      label: t("Hisab Import"),
+      active: pathname === "/hr/finance/imports",
+      show: hasPermission("finance:imports:write"),
+    },
+    {
       href: "/hr/salary-levels",
       label: t("Salary"),
       active: pathname === "/hr/salary-levels",
@@ -102,6 +170,7 @@ export function buildSidebarNavState(params: {
     .filter((link) => link.show)
     .map(({ href, label, active }) => ({ href, label, active }));
 
+  // Reference Data sub-links
   const refDataLinks = [
     {
       href: "/settings/departments",
@@ -121,30 +190,72 @@ export function buildSidebarNavState(params: {
       active: pathname === "/settings/offices",
       show: hasPermission("offices:manage") || hasPermission("hr:read") || hasPermission("offices:read"),
     },
+  ]
+    .filter((link) => link.show)
+    .map(({ href, label, active }) => ({ href, label, active }));
+
+  // Inventory list and dashboard
+  const inventoryDashboardLink = hasPermission("assets:read")
+    ? { href: "/assets/dashboard", label: t("Dashboard"), active: pathname === "/assets/dashboard" }
+    : null;
+
+  const inventoryLinks = [
     {
-      href: "/hr/salary-levels",
-      label: t("Salary Levels"),
-      active: pathname === "/hr/salary-levels",
-      show: hasPermission("salary-levels:manage"),
+      href: "/assets",
+      label: t("List Items"),
+      active: pathname === "/assets",
+      show: hasPermission("assets:read"),
     },
     {
-      href: "/hr/event-types",
-      label: t("Event Types"),
-      active: pathname === "/hr/event-types",
-      show: hasPermission("events:write"),
+      href: "/assets/insert",
+      label: t("Add Item"),
+      active: pathname === "/assets/insert",
+      show: hasPermission("assets:write"),
     },
   ]
     .filter((link) => link.show)
     .map(({ href, label, active }) => ({ href, label, active }));
 
+  // Other Inventory modules
+  const dispatchLink = hasAny(["event_allocations:write", "assets:write"])
+    ? { href: "/assets/dispatch", label: t("Dispatch"), active: pathname === "/assets/dispatch" }
+    : null;
+
+  const reconcileLink = hasPermission("assets:reconcile")
+    ? { href: "/assets/reconcile", label: t("Reconcile"), active: pathname === "/assets/reconcile" }
+    : null;
+
+  const auditLogLink = hasPermission("assets:read")
+    ? { href: "/assets/history", label: t("Audit Log"), active: pathname === "/assets/history" }
+    : null;
+
+  const reportsLink = hasPermission("assets:read")
+    ? { href: "/assets/reports", label: t("Reports"), active: pathname === "/assets/reports" }
+    : null;
+
+  // Admin settings Footer link — active only on core settings pages, not Reference Data sub-routes
+  // which have their own nav section (/settings/departments, /settings/positions, /settings/offices)
+  const REFDATA_PATHS = ["/settings/departments", "/settings/positions", "/settings/offices"];
+  const adminLinkActive = pathname.startsWith("/settings") && !REFDATA_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const adminLink = hasAny(ADMIN_PERMISSIONS)
+    ? { href: "/settings", label: t("Admin"), active: adminLinkActive }
+    : null;
+
   return {
-    showHRGroup: hasAnyPermission(hasPermission, HR_GROUP_PERMISSIONS),
-    showEmployeesMenu: hasAnyPermission(hasPermission, ["hr:read", "hr:write"]),
-    showInventoryGroup: hasPermission("assets:read"),
-    showAdminGroup: hasAnyPermission(hasPermission, [...ADMIN_PERMISSIONS, "departments:manage", "positions:manage", "offices:manage"]),
+    showHRGroup: hasAny(HR_GROUP_PERMISSIONS),
+    showEmployeesMenu: employeesLinks.length > 0,
+    showInventoryGroup: hasPermission("assets:read") || dispatchLink !== null,
+    showAdminGroup: hasAny([...ADMIN_PERMISSIONS, "departments:manage", "positions:manage", "offices:manage"]),
+    employeesLinks,
     eventLinks,
     financeLinks,
     refDataLinks,
+    inventoryLinks,
+    inventoryDashboardLink,
+    dispatchLink,
+    reconcileLink,
+    auditLogLink,
+    reportsLink,
+    adminLink,
   };
 }
-

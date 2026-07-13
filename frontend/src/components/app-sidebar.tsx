@@ -19,6 +19,8 @@ import {
 import { useLanguage } from "@/hooks/use-language";
 import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
+import { buildSidebarNavState } from "@/lib/sidebar-nav";
+
 
 import {
   Sidebar,
@@ -340,72 +342,30 @@ export function AppSidebar() {
   const [eventsOpen, setEventsOpen] = useState(true);
   const [financeOpen, setFinanceOpen] = useState(true);
 
-  const isRefDataActive = pathname.startsWith("/settings/departments") || 
-                          pathname.startsWith("/settings/positions") || 
-                          pathname.startsWith("/settings/offices");
-  const [refDataManuallyOpen, setRefDataManuallyOpen] = useState(false);
-  const refDataOpen = isRefDataActive || refDataManuallyOpen;
+  const t = useMemo(() => (key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
 
-  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
-
-  const { hasPermission, hasAnyPermission, user: authUser } = useAuth();
+  const { hasPermission, user: authUser } = useAuth();
   const currentUser = useMemo(() => ({
     role_name: authUser?.role_name || authUser?.role_names?.[0] || "User",
     full_name: authUser?.full_name || authUser?.username || "User",
     profile_image_url: authUser?.profile_image_url || null,
   }), [authUser]);
-  const hasAssetsRead = hasPermission("assets:read");
-  const canManageDispatch = hasAnyPermission(["event_allocations:write", "assets:write"]);
 
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
+  const navState = useMemo(() => {
+    return buildSidebarNavState({
+      pathname,
+      t,
+      hasPermission,
+    });
+  }, [pathname, t, hasPermission]);
 
-  const isEmployeesActive = pathname === "/" || pathname === "/insert" || (pathname.startsWith("/hr") && !pathname.startsWith("/hr/finance") && !pathname.startsWith("/hr/payments") && !pathname.startsWith("/hr/event-types") && !pathname.startsWith("/hr/salary-levels") && !pathname.startsWith("/hr/reports") && !pathname.startsWith("/hr/expenses"));
-
-  const showHRGroup = hasAnyPermission([
-    "hr:read",
-    "hr:write",
-    "events:read",
-    "events:write",
-    "events:proposals:write",
-    "events:proposals:approve",
-    "payroll:read",
-    "payroll:write",
-    "expenses:approve",
-    "reports:profit:read",
-    "salary-levels:manage",
-    "departments:manage",
-    "finance:hisab:read",
-    "finance:overheads:read",
-    "finance:investments:read"
-  ]);
-
-  const eventLinks = [
-    { href: "/events", label: t("List Events"), active: pathname === "/events", show: hasPermission("events:read") },
-    { href: "/events/proposals", label: t("Event Proposals"), active: pathname === "/events/proposals" || pathname.startsWith("/events/proposals/"), show: hasAnyPermission(["events:proposals:write", "events:write", "events:proposals:approve"]) },
-    { href: "/hr/event-types", label: t("Event Types"), active: pathname === "/hr/event-types", show: hasPermission("events:write") },
-  ].filter(l => l.show);
-
-  const financeLinks = [
-    { href: "/hr/payments", label: t("Payroll"), active: pathname === "/hr/payments", show: hasAnyPermission(["payroll:read", "payroll:write"]) },
-    { href: "/hr/expenses/approve", label: t("Expense Approvals"), active: pathname === "/hr/expenses/approve", show: hasPermission("expenses:approve") },
-    { href: "/hr/reports/profit", label: t("Profit Reports"), active: pathname === "/hr/reports/profit", show: hasPermission("reports:profit:read") },
-    { href: "/hr/finance/hisab", label: t("Hisab Reports"), active: pathname === "/hr/finance/hisab", show: hasPermission("finance:hisab:read") },
-    { href: "/hr/finance/overheads", label: t("Overhead Register"), active: pathname === "/hr/finance/overheads", show: hasPermission("finance:overheads:read") },
-    { href: "/hr/finance/investments", label: t("Capital Register"), active: pathname === "/hr/finance/investments", show: hasPermission("finance:investments:read") },
-    { href: "/hr/finance/net-profit", label: t("Net Profit"), active: pathname === "/hr/finance/net-profit", show: hasPermission("finance:hisab:read") },
-    { href: "/hr/finance/imports", label: t("Hisab Import"), active: pathname === "/hr/finance/imports", show: hasPermission("finance:imports:write") },
-    { href: "/hr/salary-levels", label: t("Salary"), active: pathname === "/hr/salary-levels", show: hasPermission("salary-levels:manage") },
-  ].filter(l => l.show);
-
-  const refDataLinks = [
-    { href: "/settings/departments", label: t("Departments"), active: pathname === "/settings/departments", show: hasPermission("departments:manage") || hasPermission("hr:read") || hasPermission("departments:read") },
-    { href: "/settings/positions", label: t("Positions"), active: pathname === "/settings/positions", show: hasPermission("positions:manage") || hasPermission("hr:read") || hasPermission("positions:read") },
-    { href: "/settings/offices", label: t("Offices"), active: pathname === "/settings/offices", show: hasPermission("offices:manage") || hasPermission("hr:read") || hasPermission("offices:read") },
-  ].filter(l => l.show);
-
+  const isEmployeesActive = navState.employeesLinks.some(l => l.active);
+  const isEventsActive = navState.eventLinks.some(l => l.active);
+  const isFinanceActive = navState.financeLinks.some(l => l.active);
+  const isRefDataActive = navState.refDataLinks.some(l => l.active);
+  const isInventoryActive = navState.inventoryLinks.some(l => l.active);
+  const [refDataManuallyOpen, setRefDataManuallyOpen] = useState(false);
+  const refDataOpen = isRefDataActive || refDataManuallyOpen;
 
   return (
     <Sidebar
@@ -456,7 +416,7 @@ export function AppSidebar() {
       {/* Content Groupings */}
       <SidebarContent className="py-2">
         {/* HR Management Section */}
-        {showHRGroup && (
+        {navState.showHRGroup && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
               {t("HR Management")}
@@ -464,18 +424,14 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
                 {/* Employees (Nested) — expanded vs collapsed */}
-                {hasAnyPermission(["hr:read", "hr:write"]) && (
+                {navState.showEmployeesMenu && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     {isCollapsed ? (
                       <CollapsedPopout
                         icon={HiUsers}
                         label={t("Employees")}
                         isActive={isEmployeesActive}
-                        links={[
-                          { href: "/hr", label: t("HR Dashboard"), active: pathname === "/hr" },
-                          { href: "/", label: t("List Employees"), active: pathname === "/" },
-                          { href: "/insert", label: t("Add Employee"), active: pathname === "/insert" },
-                        ]}
+                        links={navState.employeesLinks}
                       />
                     ) : (
                       <div className="w-full">
@@ -501,66 +457,28 @@ export function AppSidebar() {
                         </SidebarMenuButton>
                         {employeesOpen && (
                           <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
-                            <SidebarMenuSubItem className="relative">
-                              <SubItemBranchLine isLast={false} />
-                              <SidebarMenuSubButton asChild isActive={pathname === "/hr"} className="rounded-xl">
-                                <Link
-                                  href="/hr"
-                                  className={
-                                    pathname === "/hr"
-                                      ? "text-primary font-bold flex items-center gap-1.5"
-                                      : "text-muted flex items-center gap-1.5"
-                                  }
-                                >
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                      pathname === "/hr" ? "bg-primary scale-100" : "bg-transparent scale-0"
-                                    }`}
-                                  />
-                                  <span>{t("HR Dashboard")}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                            <SidebarMenuSubItem className="relative">
-                              <SubItemBranchLine isLast={false} />
-                              <SidebarMenuSubButton asChild isActive={pathname === "/"} className="rounded-xl">
-                                <Link
-                                  href="/"
-                                  className={
-                                    pathname === "/"
-                                      ? "text-primary font-bold flex items-center gap-1.5"
-                                      : "text-muted flex items-center gap-1.5"
-                                  }
-                                >
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                      pathname === "/" ? "bg-primary scale-100" : "bg-transparent scale-0"
-                                    }`}
-                                  />
-                                  <span>{t("List Employees")}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                            <SidebarMenuSubItem className="relative">
-                              <SubItemBranchLine isLast={true} />
-                              <SidebarMenuSubButton asChild isActive={pathname === "/insert"} className="rounded-xl">
-                                <Link
-                                  href="/insert"
-                                  className={
-                                    pathname === "/insert"
-                                      ? "text-primary font-bold flex items-center gap-1.5"
-                                      : "text-muted flex items-center gap-1.5"
-                                  }
-                                >
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                      pathname === "/insert" ? "bg-primary scale-100" : "bg-transparent scale-0"
-                                    }`}
-                                  />
-                                  <span>{t("Add Employee")}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
+                            {navState.employeesLinks.map((link, idx) => (
+                              <SidebarMenuSubItem key={link.href} className="relative">
+                                <SubItemBranchLine isLast={idx === navState.employeesLinks.length - 1} />
+                                <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
+                                  <Link
+                                    href={link.href}
+                                    className={
+                                      link.active
+                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        : "text-muted flex items-center gap-1.5"
+                                    }
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                        link.active ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                      }`}
+                                    />
+                                    <span>{link.label}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
                           </SidebarMenuSub>
                         )}
                       </div>
@@ -569,42 +487,42 @@ export function AppSidebar() {
                 )}
 
                 {/* Events dropdown */}
-                {eventLinks.length > 0 && (
+                {navState.eventLinks.length > 0 && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     {isCollapsed ? (
                       <CollapsedPopout
                         icon={HiOutlineCalendar}
                         label={t("Events")}
-                        isActive={isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")}
-                        links={eventLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
+                        isActive={isEventsActive}
+                        links={navState.eventLinks}
                       />
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setEventsOpen(!eventsOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")
+                            isEventsActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineCalendar className={`w-[18px] h-[18px] shrink-0 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : ""}`} />
+                            <HiOutlineCalendar className={`w-[18px] h-[18px] shrink-0 ${isEventsActive ? "text-primary" : ""}`} />
                             <span>{t("Events")}</span>
                           </span>
                           <span className="shrink-0">
                             {eventsOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isEventsActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isEventsActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
                         {eventsOpen && (
                           <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
-                            {eventLinks.map((link, idx) => (
+                            {navState.eventLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
-                                <SubItemBranchLine isLast={idx === eventLinks.length - 1} />
+                                <SubItemBranchLine isLast={idx === navState.eventLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
                                   <Link
                                     href={link.href}
@@ -632,42 +550,42 @@ export function AppSidebar() {
                 )}
 
                 {/* Finance dropdown */}
-                {financeLinks.length > 0 && (
+                {navState.financeLinks.length > 0 && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     {isCollapsed ? (
                       <CollapsedPopout
                         icon={HiOutlineBanknotes}
                         label={t("Finance")}
-                        isActive={isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses")}
-                        links={financeLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
+                        isActive={isFinanceActive}
+                        links={navState.financeLinks}
                       />
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setFinanceOpen(!financeOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses")
+                            isFinanceActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineBanknotes className={`w-[18px] h-[18px] shrink-0 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary" : ""}`} />
+                            <HiOutlineBanknotes className={`w-[18px] h-[18px] shrink-0 ${isFinanceActive ? "text-primary" : ""}`} />
                             <span>{t("Finance")}</span>
                           </span>
                           <span className="shrink-0">
                             {financeOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isFinanceActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isFinanceActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
                         {financeOpen && (
                           <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
-                            {financeLinks.map((link, idx) => (
+                            {navState.financeLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
-                                <SubItemBranchLine isLast={idx === financeLinks.length - 1} />
+                                <SubItemBranchLine isLast={idx === navState.financeLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
                                   <Link
                                     href={link.href}
@@ -695,42 +613,42 @@ export function AppSidebar() {
                 )}
 
                 {/* Reference Data dropdown */}
-                {refDataLinks.length > 0 && (
+                {navState.refDataLinks.length > 0 && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     {isCollapsed ? (
                       <CollapsedPopout
                         icon={HiOutlineClipboardDocumentCheck}
                         label={t("Reference Data")}
-                        isActive={isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices")}
-                        links={refDataLinks.map(l => ({ href: l.href, label: l.label, active: l.active }))}
+                        isActive={isRefDataActive}
+                        links={navState.refDataLinks}
                       />
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setRefDataManuallyOpen((open) => !open)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices")
+                            isRefDataActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineClipboardDocumentCheck className={`w-[18px] h-[18px] shrink-0 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : ""}`} />
+                            <HiOutlineClipboardDocumentCheck className={`w-[18px] h-[18px] shrink-0 ${isRefDataActive ? "text-primary" : ""}`} />
                             <span>{t("Reference Data")}</span>
                           </span>
                           <span className="shrink-0">
                             {refDataOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isRefDataActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isRefDataActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
                         {refDataOpen && (
                           <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
-                            {refDataLinks.map((link, idx) => (
+                            {navState.refDataLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
-                                <SubItemBranchLine isLast={idx === refDataLinks.length - 1} />
+                                <SubItemBranchLine isLast={idx === navState.refDataLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
                                   <Link
                                     href={link.href}
@@ -757,13 +675,12 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 )}
               </SidebarMenu>
-
             </SidebarGroupContent>
           </SidebarGroup>
         )}
 
         {/* Inventory Management Section */}
-        {(hasAssetsRead || canManageDispatch) && (
+        {navState.showInventoryGroup && (
           <SidebarGroup>
             <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
               {t("Inventory Management")}
@@ -771,95 +688,74 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
                 {/* Dashboard */}
-                {hasAssetsRead && (
+                {navState.inventoryDashboardLink && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     <SidebarLink
-                      href="/assets/dashboard"
+                      href={navState.inventoryDashboardLink.href}
                       icon={HiBuildingOffice}
-                      label={t("Dashboard")}
-                      active={isActive("/assets/dashboard")}
+                      label={navState.inventoryDashboardLink.label}
+                      active={navState.inventoryDashboardLink.active}
                       isCollapsed={isCollapsed}
                     />
                   </SidebarMenuItem>
                 )}
 
                 {/* Items (Nested) */}
-                {hasAssetsRead && (
+                {navState.inventoryLinks.length > 0 && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     {isCollapsed ? (
                       <CollapsedPopout
                         icon={HiTableCells}
                         label={t("Inventory")}
-                        isActive={isActive("/assets") || isActive("/assets/insert")}
-                        links={[
-                          { href: "/assets", label: t("List Items"), active: pathname === "/assets" },
-                          { href: "/assets/insert", label: t("Add Item"), active: pathname === "/assets/insert" },
-                        ]}
+                        isActive={isInventoryActive}
+                        links={navState.inventoryLinks}
                       />
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
                           onClick={() => setItemsOpen(!itemsOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/assets") || isActive("/assets/insert")
+                            isInventoryActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-md dark:border-transparent dark:rounded-md"
                               : "rounded-md"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiTableCells className={`w-[18px] h-[18px] shrink-0 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : ""}`} />
+                            <HiTableCells className={`w-[18px] h-[18px] shrink-0 ${isInventoryActive ? "text-primary" : ""}`} />
                             <span>{t("Inventory")}</span>
                           </span>
                           <span className="shrink-0">
                             {itemsOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isInventoryActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isInventoryActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
                         {itemsOpen && (
                           <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
-                            <SidebarMenuSubItem className="relative">
-                              <SubItemBranchLine isLast={false} />
-                              <SidebarMenuSubButton asChild isActive={pathname === "/assets"} className="rounded-md">
-                                <Link
-                                  href="/assets"
-                                  className={
-                                    pathname === "/assets"
-                                      ? "text-primary font-bold flex items-center gap-1.5"
-                                      : "text-muted flex items-center gap-1.5"
-                                  }
-                                >
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                      pathname === "/assets" ? "bg-primary scale-100" : "bg-transparent scale-0"
-                                    }`}
-                                  />
-                                  <span>{t("List Items")}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                            <SidebarMenuSubItem className="relative">
-                              <SubItemBranchLine isLast={true} />
-                              <SidebarMenuSubButton asChild isActive={pathname === "/assets/insert"} className="rounded-md">
-                                <Link
-                                  href="/assets/insert"
-                                  className={
-                                    pathname === "/assets/insert"
-                                      ? "text-primary font-bold flex items-center gap-1.5"
-                                      : "text-muted flex items-center gap-1.5"
-                                  }
-                                >
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                                      pathname === "/assets/insert" ? "bg-primary scale-100" : "bg-transparent scale-0"
-                                    }`}
-                                  />
-                                  <span>{t("Add Item")}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
+                            {navState.inventoryLinks.map((link, idx) => (
+                              <SidebarMenuSubItem key={link.href} className="relative">
+                                <SubItemBranchLine isLast={idx === navState.inventoryLinks.length - 1} />
+                                <SidebarMenuSubButton asChild isActive={link.active} className="rounded-md">
+                                  <Link
+                                    href={link.href}
+                                    className={
+                                      link.active
+                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        : "text-muted flex items-center gap-1.5"
+                                    }
+                                  >
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                                        link.active ? "bg-primary scale-100" : "bg-transparent scale-0"
+                                      }`}
+                                    />
+                                    <span>{link.label}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
                           </SidebarMenuSub>
                         )}
                       </div>
@@ -867,52 +763,52 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 )}
 
-                {canManageDispatch && (
+                {navState.dispatchLink && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     <SidebarLink
-                      href="/assets/dispatch"
+                      href={navState.dispatchLink.href}
                       icon={HiTruck}
-                      label={t("Dispatch")}
-                      active={isActive("/assets/dispatch")}
+                      label={navState.dispatchLink.label}
+                      active={navState.dispatchLink.active}
                       isCollapsed={isCollapsed}
                     />
                   </SidebarMenuItem>
                 )}
 
                 {/* Reconcile */}
-                {hasAssetsRead && (
+                {navState.reconcileLink && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     <SidebarLink
-                      href="/assets/reconcile"
+                      href={navState.reconcileLink.href}
                       icon={HiOutlineClipboardDocumentCheck}
-                      label={t("Reconcile")}
-                      active={isActive("/assets/reconcile")}
+                      label={navState.reconcileLink.label}
+                      active={navState.reconcileLink.active}
                       isCollapsed={isCollapsed}
                     />
                   </SidebarMenuItem>
                 )}
 
                 {/* Audit Log */}
-                {hasAssetsRead && (
+                {navState.auditLogLink && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     <SidebarLink
-                      href="/assets/history"
+                      href={navState.auditLogLink.href}
                       icon={HiOutlineClipboardDocumentCheck}
-                      label={t("Audit Log")}
-                      active={isActive("/assets/history")}
+                      label={navState.auditLogLink.label}
+                      active={navState.auditLogLink.active}
                       isCollapsed={isCollapsed}
                     />
                   </SidebarMenuItem>
                 )}
 
                 {/* Reports */}
-                {hasAssetsRead && (
+                {navState.reportsLink && (
                   <SidebarMenuItem className="w-full flex justify-center">
                     <SidebarLink
-                      href="/assets/reports"
+                      href={navState.reportsLink.href}
                       icon={HiOutlineDocumentChartBar}
-                      label={t("Reports")}
-                      active={isActive("/assets/reports")}
+                      label={navState.reportsLink.label}
+                      active={navState.reportsLink.active}
                       isCollapsed={isCollapsed}
                     />
                   </SidebarMenuItem>
@@ -921,20 +817,18 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
-
-
       </SidebarContent>
 
       {/* Footer - Admin Settings */}
       <SidebarFooter className="border-t border-border/50 p-3 shrink-0">
-        {hasAnyPermission(["users:manage", "settings:write"]) && (
+        {navState.adminLink && (
           <SidebarMenu className={`${isCollapsed ? "items-center" : ""}`}>
             <SidebarMenuItem className="w-full flex justify-center">
               <SidebarLink
-                href="/settings"
+                href={navState.adminLink.href}
                 icon={HiCog6Tooth}
-                label={t("Admin")}
-                active={isActive("/settings")}
+                label={navState.adminLink.label}
+                active={navState.adminLink.active}
                 isCollapsed={isCollapsed}
               />
             </SidebarMenuItem>

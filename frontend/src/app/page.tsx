@@ -23,6 +23,8 @@ import {
 } from "@/lib/api";
 import { Employee, EmployeesResponse } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
+import ForbiddenState from "@/components/ForbiddenState";
+import { useAuth } from "@/hooks/useAuth";
 import ImageCell from "@/components/ImageCell";
 import MobileEmployeeCard from "@/components/MobileEmployeeCard";
 import { HiMagnifyingGlass, HiTrash, HiPencilSquare, HiUsers, HiExclamationTriangle, HiPlus, HiArrowUturnLeft } from "react-icons/hi2";
@@ -343,13 +345,32 @@ function buildColumns(
 }
 
 
+// Wrapper that enforces page-level RBAC before mounting the hook-heavy inner component
 function EmployeesPageContent() {
+  const { hasPermission } = useAuth();
+
+  if (!hasPermission("hr:read") && !hasPermission("hr:write")) {
+    return (
+      <AuthLayout>
+        <ForbiddenState
+          description="You do not have the required permissions to view this content."
+        />
+      </AuthLayout>
+    );
+  }
+
+  return <EmployeesPageInner />;
+}
+
+function EmployeesPageInner() {
   const { lang } = useLanguage();
   const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
+  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -939,3 +960,4 @@ export default function EmployeesPage() {
     </Suspense>
   );
 }
+

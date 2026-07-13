@@ -223,17 +223,7 @@ export default function SettingsPage() {
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const canAccessAdmin = hasPermission("users:manage") || hasPermission("settings:write");
 
-  const currentUserRole = useMemo(() => {
-    if (typeof window === "undefined") return "admin";
-    try {
-      const userRaw = localStorage.getItem("user");
-      if (!userRaw) return "admin";
-      const parsed = JSON.parse(userRaw);
-      return parsed.role_name || parsed.role || "admin";
-    } catch {
-      return "admin";
-    }
-  }, []);
+
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userModalTab, setUserModalTab] = useState<UserModalTab>("identity");
@@ -975,7 +965,7 @@ export default function SettingsPage() {
                 </section>
 
                 {/* Collapsed Page Permissions KPI/Map for Owner & Admin */}
-                {(currentUserRole === "admin" || currentUserRole === "owner" || currentUserRole === "SUPER_ADMIN") && (
+                {hasPermission("users:manage") && (
                   <div className="rounded-xl border border-border bg-card p-5">
                     <details className="group">
                       <summary className="flex items-center justify-between cursor-pointer list-none select-none">
@@ -1058,6 +1048,28 @@ export default function SettingsPage() {
                         </table>
                       </div>
                     </details>
+                  </div>
+                )}
+
+                {/* Quick link to Role Permissions Manager */}
+                {hasPermission("users:manage") && (
+                  <div className="rounded-xl border border-border bg-card p-5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                        <HiLockClosed className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">Role Permissions Manager</h3>
+                        <p className="mt-0.5 text-xs text-muted">Configure per-role permission slugs and access grants for each module.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => router.push("/settings/permissions")}
+                      className="shrink-0 inline-flex min-h-10 items-center justify-center rounded-xl border border-border bg-card-alt px-4 py-2 text-sm font-semibold text-foreground transition-colors [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:text-primary"
+                    >
+                      Open Permissions
+                    </button>
                   </div>
                 )}
 

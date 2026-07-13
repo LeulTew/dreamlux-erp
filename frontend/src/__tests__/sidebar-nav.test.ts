@@ -21,6 +21,14 @@ describe("sidebar permission navigation", () => {
     expect(nav.showAdminGroup).toBe(false);
     expect(nav.eventLinks).toEqual([]);
     expect(nav.financeLinks).toEqual([]);
+    expect(nav.employeesLinks).toEqual([]);
+    expect(nav.inventoryLinks).toEqual([]);
+    expect(nav.adminLink).toBeNull();
+    expect(nav.dispatchLink).toBeNull();
+    expect(nav.reconcileLink).toBeNull();
+    expect(nav.auditLogLink).toBeNull();
+    expect(nav.reportsLink).toBeNull();
+    expect(nav.inventoryDashboardLink).toBeNull();
   });
 
   it("does not expose profit reports or expense approvals to event-only users", () => {
@@ -74,7 +82,99 @@ describe("sidebar permission navigation", () => {
       expect(nav.showInventoryGroup).toBe(true);
       expect(nav.showAdminGroup).toBe(true);
       expect(nav.eventLinks).toHaveLength(3);
-      expect(nav.financeLinks).toHaveLength(4);
+      // 9 finance links: Payroll, Expense Approvals, Profit Reports,
+      // Hisab Reports, Overhead Register, Capital Register, Net Profit,
+      // Hisab Import, Salary
+      expect(nav.financeLinks).toHaveLength(9);
+      expect(nav.employeesLinks).toHaveLength(3); // HR Dashboard, List Employees, Add Employee
+      expect(nav.adminLink).not.toBeNull();
     }
   });
+
+  // --- New fields: employeesLinks ---
+  it("shows HR Dashboard and List Employees for hr:read, but not Add Employee", () => {
+    const nav = navFor("/", ["hr:read"]);
+    expect(nav.employeesLinks.map((l) => l.href)).toEqual(["/hr", "/"]);
+  });
+
+  it("shows Add Employee only with hr:write", () => {
+    const nav = navFor("/", ["hr:write"]);
+    expect(nav.employeesLinks.some((l) => l.href === "/insert")).toBe(true);
+  });
+
+  it("marks the current employee link as active", () => {
+    const nav = navFor("/insert", ["hr:write"]);
+    const insertLink = nav.employeesLinks.find((l) => l.href === "/insert");
+    expect(insertLink?.active).toBe(true);
+  });
+
+  // --- Inventory group ---
+  it("shows inventory dashboard and list for assets:read, not Add Item", () => {
+    const nav = navFor("/assets", ["assets:read"]);
+    expect(nav.inventoryDashboardLink).not.toBeNull();
+    expect(nav.inventoryLinks.some((l) => l.href === "/assets")).toBe(true);
+    expect(nav.inventoryLinks.some((l) => l.href === "/assets/insert")).toBe(false);
+    expect(nav.auditLogLink).not.toBeNull();
+    expect(nav.reportsLink).not.toBeNull();
+    expect(nav.reconcileLink).toBeNull();
+  });
+
+  it("shows Add Item and dispatch for assets:write", () => {
+    const nav = navFor("/assets", ["assets:write"]);
+    expect(nav.inventoryLinks.some((l) => l.href === "/assets/insert")).toBe(true);
+    expect(nav.dispatchLink).not.toBeNull();
+    expect(nav.showInventoryGroup).toBe(true);
+  });
+
+  it("shows reconcile only for assets:reconcile", () => {
+    const nav = navFor("/assets/reconcile", ["assets:reconcile"]);
+    expect(nav.reconcileLink).not.toBeNull();
+  });
+
+  it("shows dispatch for event_allocations:write even without assets:read", () => {
+    const nav = navFor("/assets/dispatch", ["event_allocations:write"]);
+    expect(nav.dispatchLink).not.toBeNull();
+    expect(nav.showInventoryGroup).toBe(true);
+    expect(nav.inventoryDashboardLink).toBeNull(); // no assets:read
+  });
+
+  // --- Admin link ---
+  it("hides admin link for non-admin users", () => {
+    expect(navFor("/", ["hr:read"]).adminLink).toBeNull();
+    expect(navFor("/", ["assets:read"]).adminLink).toBeNull();
+  });
+
+  it("shows admin link for users:manage", () => {
+    const nav = navFor("/settings", ["users:manage"]);
+    expect(nav.adminLink?.href).toBe("/settings");
+    expect(nav.adminLink?.active).toBe(true);
+  });
+
+  it("shows admin link for settings:write", () => {
+    expect(navFor("/", ["settings:write"]).adminLink).not.toBeNull();
+  });
+
+  // --- Finance: hisab-related entries ---
+  it("shows hisab and net-profit links together for finance:hisab:read", () => {
+    const nav = navFor("/hr/finance/hisab", ["finance:hisab:read"]);
+    const hrefs = nav.financeLinks.map((l) => l.href);
+    expect(hrefs).toContain("/hr/finance/hisab");
+    expect(hrefs).toContain("/hr/finance/net-profit");
+  });
+
+  it("shows overhead register for finance:overheads:read", () => {
+    const nav = navFor("/", ["finance:overheads:read"]);
+    expect(nav.financeLinks.some((l) => l.href === "/hr/finance/overheads")).toBe(true);
+  });
+
+  it("shows capital register for finance:investments:read", () => {
+    const nav = navFor("/", ["finance:investments:read"]);
+    expect(nav.financeLinks.some((l) => l.href === "/hr/finance/investments")).toBe(true);
+  });
+
+  it("shows hisab import for finance:imports:write", () => {
+    const nav = navFor("/", ["finance:imports:write"]);
+    expect(nav.financeLinks.some((l) => l.href === "/hr/finance/imports")).toBe(true);
+  });
 });
+

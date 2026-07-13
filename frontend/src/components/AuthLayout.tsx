@@ -71,20 +71,25 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 const SEARCH_ITEMS = [
-  { label: "Employees List", amLabel: "የሰራተኞች ዝርዝር", href: "/", category: "HR" },
-  { label: "Add Employee", amLabel: "ሰራተኛ መዝግብ", href: "/insert", category: "HR" },
-  { label: "Events Calendar", amLabel: "ዝግጅቶች", href: "/events", category: "Events" },
-  { label: "Payroll Dashboard", amLabel: "ደመወዝ", href: "/hr/payments", category: "HR" },
-  { label: "Expense Approval Queue", amLabel: "የወጪ ማጽደቂያ", href: "/hr/expenses/approve", category: "Finance" },
-  { label: "Salary Levels", amLabel: "የደመወዝ ደረጃዎች", href: "/hr/salary-levels", category: "HR" },
-  { label: "Event Types Settings", amLabel: "የዝግጅት አይነቶች", href: "/hr/event-types", category: "Events" },
-  { label: "Inventory Dashboard", amLabel: "የዕቃዎች ዋና ገጽ", href: "/assets/dashboard", category: "Inventory" },
-  { label: "Inventory Items List", amLabel: "የዕቃዎች ዝርዝር", href: "/assets", category: "Inventory" },
-  { label: "Add Inventory Item", amLabel: "ዕቃ መዝግብ", href: "/assets/insert", category: "Inventory" },
-  { label: "Stock Reconciliation", amLabel: "ቆጠራ ማመሳከሪያ", href: "/assets/reconcile", category: "Inventory" },
-  { label: "Audit Log History", amLabel: "የቆጠራ ታሪክ", href: "/assets/history", category: "Inventory" },
-  { label: "Inventory Reports", amLabel: "ዕቃዎች ሪፖርቶች", href: "/assets/reports", category: "Inventory" },
-  { label: "Admin Settings", amLabel: "አስተዳዳሪ ቅንብሮች", href: "/settings", category: "Admin" },
+  { label: "Employees List", amLabel: "የሰራተኞች ዝርዝር", href: "/", category: "HR", permissions: ["hr:read", "hr:write"] },
+  { label: "Add Employee", amLabel: "ሰራተኛ መዝግብ", href: "/insert", category: "HR", permissions: ["hr:write"] },
+  { label: "Events Calendar", amLabel: "ዝግጅቶች", href: "/events", category: "Events", permissions: ["events:read"] },
+  { label: "Payroll Dashboard", amLabel: "ደመወዝ", href: "/hr/payments", category: "HR", permissions: ["payroll:read", "payroll:write"] },
+  { label: "Expense Approval Queue", amLabel: "የወጪ ማጽደቂያ", href: "/hr/expenses/approve", category: "Finance", permissions: ["expenses:approve"] },
+  { label: "Salary Levels", amLabel: "የደመወዝ ደረጃዎች", href: "/hr/salary-levels", category: "HR", permissions: ["salary-levels:manage"] },
+  { label: "Event Types Settings", amLabel: "የዝግጅት አይነቶች", href: "/hr/event-types", category: "Events", permissions: ["events:write"] },
+  { label: "Inventory Dashboard", amLabel: "የዕቃዎች ዋና ገጽ", href: "/assets/dashboard", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Inventory Items List", amLabel: "የዕቃዎች ዝርዝር", href: "/assets", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Add Inventory Item", amLabel: "ዕቃ መዝግብ", href: "/assets/insert", category: "Inventory", permissions: ["assets:write"] },
+  { label: "Stock Reconciliation", amLabel: "ቆጠራ ማመሳከሪያ", href: "/assets/reconcile", category: "Inventory", permissions: ["assets:reconcile"] },
+  { label: "Audit Log History", amLabel: "የቆጠራ ታሪክ", href: "/assets/history", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Inventory Reports", amLabel: "ዕቃዎች ሪፖርቶች", href: "/assets/reports", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Hisab Reports", amLabel: "የሂሳብ ሪፖርቶች", href: "/hr/finance/hisab", category: "Finance", permissions: ["finance:hisab:read"] },
+  { label: "Overhead Register", amLabel: "የወጪ መዝገብ", href: "/hr/finance/overheads", category: "Finance", permissions: ["finance:overheads:read"] },
+  { label: "Capital Register", amLabel: "የካፒታል መዝገብ", href: "/hr/finance/investments", category: "Finance", permissions: ["finance:investments:read"] },
+  { label: "Net Profit", amLabel: "የተጣራ ትርፍ", href: "/hr/finance/net-profit", category: "Finance", permissions: ["finance:hisab:read"] },
+  { label: "Hisab Import", amLabel: "የሂሳብ ማስገቢያ", href: "/hr/finance/imports", category: "Finance", permissions: ["finance:imports:write"] },
+  { label: "Admin Settings", amLabel: "አስተዳዳሪ ቅንብሮች", href: "/settings", category: "Admin", permissions: ["users:manage", "settings:write"] },
 ];
 
 type StaticSearchItem = (typeof SEARCH_ITEMS)[number];
@@ -99,7 +104,10 @@ type SearchResult = {
 };
 
 const toPageResult = (item: StaticSearchItem): SearchResult => ({
-  ...item,
+  label: item.label,
+  amLabel: item.amLabel,
+  href: item.href,
+  category: item.category,
   key: `page:${item.href}`,
 });
 
@@ -123,8 +131,14 @@ function SearchDialog({
   const [recordSearchError, setRecordSearchError] = useState(false);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { hasPermission } = useAuth();
 
   const pageResults = SEARCH_ITEMS.filter((item) => {
+    // Unified permission check
+    if (item.permissions && !item.permissions.some((p) => hasPermission(p))) {
+      return false;
+    }
+
     const term = query.trim().toLowerCase();
     return (
       !term ||
@@ -172,21 +186,35 @@ function SearchDialog({
 
     let active = true;
 
-    Promise.allSettled([
-      getEmployees(1, 5, debouncedQuery, "active"),
-      getItems(1, 5, debouncedQuery),
-      getEvents(1, 5, debouncedQuery),
-      getSalaryLevels(),
-      getPayrollRuns({ view: "active", limit: 20 }),
-    ])
-      .then(([employeesResult, assetsResult, eventsResult, salaryLevelsResult, payrollRunsResult]) => {
+    const promises = [
+      hasPermission("hr:read") || hasPermission("hr:write")
+        ? getEmployees(1, 5, debouncedQuery, "active").then((res) => ({ type: "employees", value: res }))
+        : Promise.resolve({ type: "employees", value: null }),
+      hasPermission("assets:read")
+        ? getItems(1, 5, debouncedQuery).then((res) => ({ type: "assets", value: res }))
+        : Promise.resolve({ type: "assets", value: null }),
+      hasPermission("events:read")
+        ? getEvents(1, 5, debouncedQuery).then((res) => ({ type: "events", value: res }))
+        : Promise.resolve({ type: "events", value: null }),
+      hasPermission("salary-levels:manage")
+        ? getSalaryLevels().then((res) => ({ type: "salaryLevels", value: res }))
+        : Promise.resolve({ type: "salaryLevels", value: null }),
+      hasPermission("payroll:read") || hasPermission("payroll:write")
+        ? getPayrollRuns({ view: "active", limit: 20 }).then((res) => ({ type: "payroll", value: res }))
+        : Promise.resolve({ type: "payroll", value: null }),
+    ];
+
+    Promise.allSettled(promises)
+      .then((results) => {
         if (!active) return;
 
         const nextResults: SearchResult[] = [];
         const normalizedQuery = debouncedQuery.toLowerCase();
 
-        if (employeesResult.status === "fulfilled") {
-          const employees = (employeesResult.value?.employees || []) as Employee[];
+        const [employeesRes, assetsRes, eventsRes, salaryLevelsRes, payrollRunsRes] = results;
+
+        if (employeesRes.status === "fulfilled" && employeesRes.value && employeesRes.value.value) {
+          const employees = (employeesRes.value.value?.employees || []) as Employee[];
           nextResults.push(
             ...employees.map((employee) => ({
               key: `employee:${employee.id}`,
@@ -199,8 +227,8 @@ function SearchDialog({
           );
         }
 
-        if (assetsResult.status === "fulfilled") {
-          const assets = (assetsResult.value?.items || []) as Item[];
+        if (assetsRes.status === "fulfilled" && assetsRes.value && assetsRes.value.value) {
+          const assets = (assetsRes.value.value?.items || []) as Item[];
           nextResults.push(
             ...assets.map((item) => ({
               key: `asset:${item.id}`,
@@ -213,8 +241,8 @@ function SearchDialog({
           );
         }
 
-        if (eventsResult.status === "fulfilled") {
-          const events = (eventsResult.value?.events || []) as Event[];
+        if (eventsRes.status === "fulfilled" && eventsRes.value && eventsRes.value.value) {
+          const events = (eventsRes.value.value?.events || []) as Event[];
           nextResults.push(
             ...events.map((event) => ({
               key: `event:${event.id}`,
@@ -227,8 +255,8 @@ function SearchDialog({
           );
         }
 
-        if (salaryLevelsResult.status === "fulfilled") {
-          const salaryLevels = ((salaryLevelsResult.value || []) as SalaryLevel[])
+        if (salaryLevelsRes.status === "fulfilled" && salaryLevelsRes.value && salaryLevelsRes.value.value) {
+          const salaryLevels = ((salaryLevelsRes.value.value || []) as SalaryLevel[])
             .filter((level) =>
               compactDetail([level.level_name, level.base_salary]).toLowerCase().includes(normalizedQuery)
             )
@@ -245,8 +273,8 @@ function SearchDialog({
           );
         }
 
-        if (payrollRunsResult.status === "fulfilled") {
-          const payrollRuns = ((payrollRunsResult.value?.runs || []) as PayrollRun[])
+        if (payrollRunsRes.status === "fulfilled" && payrollRunsRes.value && payrollRunsRes.value.value) {
+          const payrollRuns = ((payrollRunsRes.value.value?.runs || []) as PayrollRun[])
             .filter((run) =>
               compactDetail([
                 run.status,
@@ -272,11 +300,11 @@ function SearchDialog({
 
         setRecordResults(nextResults.slice(0, 8));
         setRecordSearchError(
-          employeesResult.status === "rejected" &&
-            assetsResult.status === "rejected" &&
-            eventsResult.status === "rejected" &&
-            salaryLevelsResult.status === "rejected" &&
-            payrollRunsResult.status === "rejected"
+          ((hasPermission("hr:read") || hasPermission("hr:write")) ? employeesRes.status === "rejected" : false) &&
+            (hasPermission("assets:read") ? assetsRes.status === "rejected" : false) &&
+            (hasPermission("events:read") ? eventsRes.status === "rejected" : false) &&
+            (hasPermission("salary-levels:manage") ? salaryLevelsRes.status === "rejected" : false) &&
+            ((hasPermission("payroll:read") || hasPermission("payroll:write")) ? payrollRunsRes.status === "rejected" : false)
         );
       })
       .catch(() => {
@@ -294,7 +322,7 @@ function SearchDialog({
     return () => {
       active = false;
     };
-  }, [debouncedQuery, isOpen]);
+  }, [debouncedQuery, isOpen, hasPermission]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -423,7 +451,7 @@ function HeaderUserMenu({
   const { lang, toggle: toggleLang } = useLanguage();
   const { dark, toggle: toggleTheme } = useTheme();
   const [showConfirm, setShowConfirm] = useState(false);
-  const { user: authUser } = useAuth();
+  const { user: authUser, hasPermission } = useAuth();
 
   const user = {
     full_name: authUser?.full_name || authUser?.username || "User",
@@ -472,14 +500,17 @@ function HeaderUserMenu({
             <p className="text-[9px] font-medium text-muted uppercase tracking-wider mt-0.5">{user.role_name}</p>
           </div>
 
-          <Link
-            href="/settings"
-            onClick={() => setOpen(false)}
-            className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
-          >
-            <HiOutlineUser className="w-4 h-4 shrink-0 text-muted" />
-            <span>{t("Profile Settings")}</span>
-          </Link>
+          {(hasPermission("users:manage") || hasPermission("settings:write")) && (
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
+            >
+              <HiOutlineUser className="w-4 h-4 shrink-0 text-muted" />
+              <span>{t("Profile Settings")}</span>
+            </Link>
+          )}
+
 
           <button
             onClick={toggleLang}
