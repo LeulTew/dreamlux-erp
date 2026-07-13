@@ -360,14 +360,12 @@ export function AppSidebar() {
   }, [pathname, t, hasPermission]);
 
   const isEmployeesActive = navState.employeesLinks.some(l => l.active);
+  const isEventsActive = navState.eventLinks.some(l => l.active);
+  const isFinanceActive = navState.financeLinks.some(l => l.active);
   const isRefDataActive = navState.refDataLinks.some(l => l.active);
+  const isInventoryActive = navState.inventoryLinks.some(l => l.active);
   const [refDataManuallyOpen, setRefDataManuallyOpen] = useState(false);
   const refDataOpen = isRefDataActive || refDataManuallyOpen;
-
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
 
   return (
     <Sidebar
@@ -495,7 +493,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiOutlineCalendar}
                         label={t("Events")}
-                        isActive={isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")}
+                        isActive={isEventsActive}
                         links={navState.eventLinks}
                       />
                     ) : (
@@ -503,20 +501,20 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setEventsOpen(!eventsOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals")
+                            isEventsActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineCalendar className={`w-[18px] h-[18px] shrink-0 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : ""}`} />
+                            <HiOutlineCalendar className={`w-[18px] h-[18px] shrink-0 ${isEventsActive ? "text-primary" : ""}`} />
                             <span>{t("Events")}</span>
                           </span>
                           <span className="shrink-0">
                             {eventsOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isEventsActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/events") || isActive("/hr/event-types") || isActive("/events/proposals") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isEventsActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
@@ -558,7 +556,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiOutlineBanknotes}
                         label={t("Finance")}
-                        isActive={isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") || isActive("/hr/finance")}
+                        isActive={isFinanceActive}
                         links={navState.financeLinks}
                       />
                     ) : (
@@ -566,20 +564,20 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setFinanceOpen(!financeOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") || isActive("/hr/finance")
+                            isFinanceActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineBanknotes className={`w-[18px] h-[18px] shrink-0 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") || isActive("/hr/finance") ? "text-primary" : ""}`} />
+                            <HiOutlineBanknotes className={`w-[18px] h-[18px] shrink-0 ${isFinanceActive ? "text-primary" : ""}`} />
                             <span>{t("Finance")}</span>
                           </span>
                           <span className="shrink-0">
                             {financeOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") || isActive("/hr/finance") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isFinanceActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/hr/payments") || isActive("/hr/salary-levels") || isActive("/hr/reports/profit") || isActive("/hr/expenses") || isActive("/hr/finance") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isFinanceActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
@@ -621,7 +619,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiOutlineClipboardDocumentCheck}
                         label={t("Reference Data")}
-                        isActive={isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices")}
+                        isActive={isRefDataActive}
                         links={navState.refDataLinks}
                       />
                     ) : (
@@ -629,20 +627,20 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setRefDataManuallyOpen((open) => !open)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices")
+                            isRefDataActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiOutlineClipboardDocumentCheck className={`w-[18px] h-[18px] shrink-0 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : ""}`} />
+                            <HiOutlineClipboardDocumentCheck className={`w-[18px] h-[18px] shrink-0 ${isRefDataActive ? "text-primary" : ""}`} />
                             <span>{t("Reference Data")}</span>
                           </span>
                           <span className="shrink-0">
                             {refDataOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isRefDataActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/settings/departments") || isActive("/settings/positions") || isActive("/settings/offices") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isRefDataActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>
@@ -709,7 +707,7 @@ export function AppSidebar() {
                       <CollapsedPopout
                         icon={HiTableCells}
                         label={t("Inventory")}
-                        isActive={isActive("/assets") || isActive("/assets/insert")}
+                        isActive={isInventoryActive}
                         links={navState.inventoryLinks}
                       />
                     ) : (
@@ -717,20 +715,20 @@ export function AppSidebar() {
                         <SidebarMenuButton
                           onClick={() => setItemsOpen(!itemsOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
-                            isActive("/assets") || isActive("/assets/insert")
+                            isInventoryActive
                               ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-md dark:border-transparent dark:rounded-md"
                               : "rounded-md"
                           }`}
                         >
                           <span className="flex items-center gap-3">
-                            <HiTableCells className={`w-[18px] h-[18px] shrink-0 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : ""}`} />
+                            <HiTableCells className={`w-[18px] h-[18px] shrink-0 ${isInventoryActive ? "text-primary" : ""}`} />
                             <span>{t("Inventory")}</span>
                           </span>
                           <span className="shrink-0">
                             {itemsOpen ? (
-                              <HiChevronUp className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronUp className={`w-3.5 h-3.5 ${isInventoryActive ? "text-primary" : "text-muted/60"}`} />
                             ) : (
-                              <HiChevronDown className={`w-3.5 h-3.5 ${isActive("/assets") || isActive("/assets/insert") ? "text-primary" : "text-muted/60"}`} />
+                              <HiChevronDown className={`w-3.5 h-3.5 ${isInventoryActive ? "text-primary" : "text-muted/60"}`} />
                             )}
                           </span>
                         </SidebarMenuButton>

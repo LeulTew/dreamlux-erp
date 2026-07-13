@@ -71,20 +71,25 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 const SEARCH_ITEMS = [
-  { label: "Employees List", amLabel: "የሰራተኞች ዝርዝር", href: "/", category: "HR" },
-  { label: "Add Employee", amLabel: "ሰራተኛ መዝግብ", href: "/insert", category: "HR" },
-  { label: "Events Calendar", amLabel: "ዝግጅቶች", href: "/events", category: "Events" },
-  { label: "Payroll Dashboard", amLabel: "ደመወዝ", href: "/hr/payments", category: "HR" },
-  { label: "Expense Approval Queue", amLabel: "የወጪ ማጽደቂያ", href: "/hr/expenses/approve", category: "Finance" },
-  { label: "Salary Levels", amLabel: "የደመወዝ ደረጃዎች", href: "/hr/salary-levels", category: "HR" },
-  { label: "Event Types Settings", amLabel: "የዝግጅት አይነቶች", href: "/hr/event-types", category: "Events" },
-  { label: "Inventory Dashboard", amLabel: "የዕቃዎች ዋና ገጽ", href: "/assets/dashboard", category: "Inventory" },
-  { label: "Inventory Items List", amLabel: "የዕቃዎች ዝርዝር", href: "/assets", category: "Inventory" },
-  { label: "Add Inventory Item", amLabel: "ዕቃ መዝግብ", href: "/assets/insert", category: "Inventory" },
-  { label: "Stock Reconciliation", amLabel: "ቆጠራ ማመሳከሪያ", href: "/assets/reconcile", category: "Inventory" },
-  { label: "Audit Log History", amLabel: "የቆጠራ ታሪክ", href: "/assets/history", category: "Inventory" },
-  { label: "Inventory Reports", amLabel: "ዕቃዎች ሪፖርቶች", href: "/assets/reports", category: "Inventory" },
-  { label: "Admin Settings", amLabel: "አስተዳዳሪ ቅንብሮች", href: "/settings", category: "Admin" },
+  { label: "Employees List", amLabel: "የሰራተኞች ዝርዝር", href: "/", category: "HR", permissions: ["hr:read", "hr:write"] },
+  { label: "Add Employee", amLabel: "ሰራተኛ መዝግብ", href: "/insert", category: "HR", permissions: ["hr:write"] },
+  { label: "Events Calendar", amLabel: "ዝግጅቶች", href: "/events", category: "Events", permissions: ["events:read"] },
+  { label: "Payroll Dashboard", amLabel: "ደመወዝ", href: "/hr/payments", category: "HR", permissions: ["payroll:read", "payroll:write"] },
+  { label: "Expense Approval Queue", amLabel: "የወጪ ማጽደቂያ", href: "/hr/expenses/approve", category: "Finance", permissions: ["expenses:approve"] },
+  { label: "Salary Levels", amLabel: "የደመወዝ ደረጃዎች", href: "/hr/salary-levels", category: "HR", permissions: ["salary-levels:manage"] },
+  { label: "Event Types Settings", amLabel: "የዝግጅት አይነቶች", href: "/hr/event-types", category: "Events", permissions: ["events:write"] },
+  { label: "Inventory Dashboard", amLabel: "የዕቃዎች ዋና ገጽ", href: "/assets/dashboard", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Inventory Items List", amLabel: "የዕቃዎች ዝርዝር", href: "/assets", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Add Inventory Item", amLabel: "ዕቃ መዝግብ", href: "/assets/insert", category: "Inventory", permissions: ["assets:write"] },
+  { label: "Stock Reconciliation", amLabel: "ቆጠራ ማመሳከሪያ", href: "/assets/reconcile", category: "Inventory", permissions: ["assets:reconcile"] },
+  { label: "Audit Log History", amLabel: "የቆጠራ ታሪክ", href: "/assets/history", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Inventory Reports", amLabel: "ዕቃዎች ሪፖርቶች", href: "/assets/reports", category: "Inventory", permissions: ["assets:read"] },
+  { label: "Hisab Reports", amLabel: "የሂሳብ ሪፖርቶች", href: "/hr/finance/hisab", category: "Finance", permissions: ["finance:hisab:read"] },
+  { label: "Overhead Register", amLabel: "የወጪ መዝገብ", href: "/hr/finance/overheads", category: "Finance", permissions: ["finance:overheads:read"] },
+  { label: "Capital Register", amLabel: "የካፒታል መዝገብ", href: "/hr/finance/investments", category: "Finance", permissions: ["finance:investments:read"] },
+  { label: "Net Profit", amLabel: "የተጣራ ትርፍ", href: "/hr/finance/net-profit", category: "Finance", permissions: ["finance:hisab:read"] },
+  { label: "Hisab Import", amLabel: "የሂሳብ ማስገቢያ", href: "/hr/finance/imports", category: "Finance", permissions: ["finance:imports:write"] },
+  { label: "Admin Settings", amLabel: "አስተዳዳሪ ቅንብሮች", href: "/settings", category: "Admin", permissions: ["users:manage", "settings:write"] },
 ];
 
 type StaticSearchItem = (typeof SEARCH_ITEMS)[number];
@@ -99,7 +104,10 @@ type SearchResult = {
 };
 
 const toPageResult = (item: StaticSearchItem): SearchResult => ({
-  ...item,
+  label: item.label,
+  amLabel: item.amLabel,
+  href: item.href,
+  category: item.category,
   key: `page:${item.href}`,
 });
 
@@ -126,21 +134,10 @@ function SearchDialog({
   const { hasPermission } = useAuth();
 
   const pageResults = SEARCH_ITEMS.filter((item) => {
-    // Permission check for search items
-    if (item.href === "/" && !hasPermission("hr:read") && !hasPermission("hr:write")) return false;
-    if (item.href === "/insert" && !hasPermission("hr:write")) return false;
-    if (item.href === "/events" && !hasPermission("events:read")) return false;
-    if (item.href === "/hr/payments" && !hasPermission("payroll:read") && !hasPermission("payroll:write")) return false;
-    if (item.href === "/hr/expenses/approve" && !hasPermission("expenses:approve")) return false;
-    if (item.href === "/hr/salary-levels" && !hasPermission("salary-levels:manage")) return false;
-    if (item.href === "/hr/event-types" && !hasPermission("events:write")) return false;
-    if (item.href === "/assets/dashboard" && !hasPermission("assets:read")) return false;
-    if (item.href === "/assets" && !hasPermission("assets:read")) return false;
-    if (item.href === "/assets/insert" && !hasPermission("assets:write")) return false;
-    if (item.href === "/assets/reconcile" && !hasPermission("assets:reconcile")) return false;
-    if (item.href === "/assets/history" && !hasPermission("assets:read")) return false;
-    if (item.href === "/assets/reports" && !hasPermission("assets:read")) return false;
-    if (item.href === "/settings" && !hasPermission("users:manage") && !hasPermission("settings:write")) return false;
+    // Unified permission check
+    if (item.permissions && !item.permissions.some((p) => hasPermission(p))) {
+      return false;
+    }
 
     const term = query.trim().toLowerCase();
     return (
