@@ -138,6 +138,18 @@ describe("sidebar permission navigation", () => {
     expect(nav.inventoryDashboardLink).toBeNull(); // no assets:read
   });
 
+  // --- Fleet (issue #147) ---
+  it("shows Fleet link for vehicles:read and reveals the inventory group", () => {
+    const nav = navFor("/fleet", ["vehicles:read"]);
+    expect(nav.inventoryLinks.some((l) => l.href === "/fleet")).toBe(true);
+    expect(nav.showInventoryGroup).toBe(true);
+  });
+
+  it("hides Fleet link without vehicles:read", () => {
+    const nav = navFor("/assets", ["assets:read"]);
+    expect(nav.inventoryLinks.some((l) => l.href === "/fleet")).toBe(false);
+  });
+
   // --- Admin link ---
   it("hides admin link for non-admin users", () => {
     expect(navFor("/", ["hr:read"]).adminLink).toBeNull();

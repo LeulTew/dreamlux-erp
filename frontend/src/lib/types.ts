@@ -348,6 +348,14 @@ export interface Vehicle {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+}
+
+export interface VehiclesResponse {
+  vehicles: Vehicle[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface VehicleAssignment {
