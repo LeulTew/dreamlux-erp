@@ -1481,20 +1481,30 @@ export default function EventWorkspacePage() {
 
                         <div>
                           <label className="block text-xs font-semibold text-muted mb-1">{t("Driver")}</label>
-                          <Select
-                            searchable
-                            disabled={availableEmployeesQuery.isLoading || availableEmployeesQuery.isError}
-                            value={selectedDrvId}
-                            onChange={(v) => setSelectedDrvId(v)}
-                            placeholder={t("Choose driver")}
-                            searchPlaceholder={t("Search driver")}
-                            emptyMessage={t("No eligible drivers available.")}
-                            options={driverOptionsSource.map((emp) => ({
-                              id: emp.id,
-                              label: emp.full_name,
-                              hint: emp.position || emp.department || undefined,
-                            }))}
-                          />
+                          {availableEmployeesQuery.isLoading ? (
+                            <Skeleton className="h-11 w-full rounded-xl" />
+                          ) : availableEmployeesQuery.isError ? (
+                            <div className="flex items-center justify-between gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs font-semibold text-destructive">
+                              <span>{t("Failed to load staff.")}</span>
+                              <button type="button" onClick={() => availableEmployeesQuery.refetch()} className="underline underline-offset-2 hover:opacity-80">
+                                {t("Retry")}
+                              </button>
+                            </div>
+                          ) : (
+                            <Select
+                              searchable
+                              value={selectedDrvId}
+                              onChange={(v) => setSelectedDrvId(v)}
+                              placeholder={t("Choose driver")}
+                              searchPlaceholder={t("Search driver")}
+                              emptyMessage={t("No eligible drivers available.")}
+                              options={driverOptionsSource.map((emp) => ({
+                                id: emp.id,
+                                label: emp.full_name,
+                                hint: emp.position || emp.department || undefined,
+                              }))}
+                            />
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2 py-1">
