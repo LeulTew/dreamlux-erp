@@ -66,6 +66,16 @@ describe("Vehicles / Fleet API (issue #147)", () => {
     expect(res.body.total).toBe(1);
   });
 
+  test("GET /vehicles with punctuation in search does not error (sanitized filter)", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const res = await request(app)
+      .get("/vehicles")
+      .query({ search: "AA,3(x)%_*" })
+      .set("Authorization", `Bearer ${token()}`);
+    expect(res.status).toBe(200);
+    expect(res.body.vehicles).toEqual([]);
+  });
+
   test("GET /vehicles is forbidden for a role without vehicles perms (DRIVER)", async () => {
     const res = await request(app).get("/vehicles").set("Authorization", `Bearer ${token("DRIVER")}`);
     expect(res.status).toBe(403);

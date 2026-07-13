@@ -35,7 +35,14 @@ router.get(
     try {
       const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
       const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "25"), 10) || 25));
-      const search = String(req.query.search ?? "").trim();
+      // Strip characters that are significant in the PostgREST `or()` filter grammar
+      // (comma, parens, asterisk, backslash) and the SQL LIKE wildcards so a raw search
+      // string cannot corrupt the query or act as an unbounded wildcard.
+      const search = String(req.query.search ?? "")
+        .trim()
+        .replace(/[,()*\\%_]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
       const fuelType = String(req.query.fuel_type ?? "").trim();
       // status: active (default) | archived | all
       const status = String(req.query.status ?? "active").trim().toLowerCase();
