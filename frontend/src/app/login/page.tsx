@@ -5,6 +5,7 @@ import { login } from "@/lib/api";
 import toast from "@/lib/toast";
 import { HiLockClosed, HiUser, HiEye, HiEyeSlash } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
+import { useQueryClient } from "@tanstack/react-query";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -26,6 +27,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 export default function LoginPage() {
+  const queryClient = useQueryClient();
   const { lang, toggle: toggleLanguage } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const [username, setUsername] = useState("");
@@ -41,6 +43,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const response = await login(username, password);
+      queryClient.clear();
       localStorage.setItem("user", JSON.stringify(response.user));
       toast.success(`${t("Welcome back")}, ${response.user.full_name || response.user.username}!`);
       router.push("/");
