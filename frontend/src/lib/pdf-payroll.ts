@@ -1,12 +1,5 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
-
-// Add type for jspdf-autotable
-declare module "jspdf" {
-  interface jsPDF {
-    autoTable: (options: Record<string, unknown>) => jsPDF;
-  }
-}
+import autoTable from "jspdf-autotable";
 
 interface PayrollRun {
   id: string;
@@ -50,7 +43,7 @@ export const generatePayrollPDF = async (run: PayrollRun) => {
     `ETB ${Number(line.total_line_pay).toLocaleString()}`,
   ]);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: 50,
     head: [["Employee", "Base Salary", "Events Total", "Total Payout"]],
     body: tableData,

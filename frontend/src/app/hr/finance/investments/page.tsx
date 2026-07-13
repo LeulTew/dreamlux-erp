@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Select from "@/components/ui/Select";
 import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
+import { generateReportPdf } from "@/lib/pdf-report";
 import StatusBadge from "@/components/ui/StatusBadge";
 import PaginationControls from "@/components/PaginationControls";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
@@ -325,6 +326,37 @@ export default function InvestmentsPage() {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "ETB" }).format(val);
   };
 
+  const handleGeneratePdf = () => {
+    const investments = listResponse?.investments ?? [];
+    const rows = investments.map((inv) => {
+      const total = Number(inv.quantity || 0) * Number(inv.unit_cost || 0);
+      return [
+        inv.purchase_date ? inv.purchase_date.slice(0, 10) : "-",
+        inv.item_name || "-",
+        t(inv.category),
+        String(inv.quantity ?? "-"),
+        formatCurrency(Number(inv.unit_cost || 0)),
+        formatCurrency(total),
+        inv.vendor || "-",
+        t(inv.status),
+      ];
+    });
+    const grandTotal = investments.reduce((sum, inv) => sum + Number(inv.quantity || 0) * Number(inv.unit_cost || 0), 0);
+    generateReportPdf({
+      title: "Capital Investment Register",
+      subtitle: selectedMonth ? `${t("Month")}: ${selectedMonth}` : undefined,
+      meta: [`${t("Generated")}: ${new Date().toLocaleString()}`, `${t("Records")}: ${investments.length}`],
+      sections: [{
+        columns: [t("Date"), t("Item"), t("Category"), t("Qty"), t("Unit Cost"), t("Total"), t("Vendor"), t("Status")],
+        rows,
+        foot: [["", "", "", "", t("Total"), formatCurrency(grandTotal), "", ""]],
+        columnStyles: { 4: { halign: "right" }, 5: { halign: "right" } },
+      }],
+      fileName: `investments-${selectedMonth || "report"}.pdf`,
+      orientation: "l",
+    });
+  };
+
   const handleOpenAddForm = () => {
     setEditingInvestment(null);
     setForm(defaultForm);
@@ -431,8 +463,8 @@ export default function InvestmentsPage() {
               </div>
             )}
             <button
-              onClick={() => window.print()}
-              aria-label={t("Print Report")}
+              onClick={handleGeneratePdf}
+              aria-label={t("Download PDF")}
               className="flex items-center justify-center w-[40px] h-[40px] dl-radius-lg border border-border text-muted bg-card [@media(hover:hover)]:hover:text-foreground transition-all"
             >
               <HiPrinter className="w-4 h-4" />

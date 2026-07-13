@@ -25,6 +25,7 @@ import PaginationControls from "@/components/PaginationControls";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
+import { generateReportPdf } from "@/lib/pdf-report";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
@@ -352,6 +353,33 @@ export default function OverheadsPage() {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "ETB" }).format(val);
   };
 
+  const handleGeneratePdf = () => {
+    const overheads = ledgerResponse?.overheads ?? [];
+    const rows = overheads.map((exp) => [
+      t(exp.category),
+      t(exp.scope),
+      t(exp.payment_kind === "staff_payment" ? "Staff Payment" : "Overhead"),
+      (exp.payment_kind === "staff_payment" ? exp.employee_name : exp.payee) || "-",
+      exp.notes || "-",
+      formatCurrency(Number(exp.amount || 0)),
+      t(exp.status),
+    ]);
+    const total = overheads.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    generateReportPdf({
+      title: "Monthly Overhead Register",
+      subtitle: `${t("Month")}: ${selectedMonth}`,
+      meta: [`${t("Generated")}: ${new Date().toLocaleString()}`, `${t("Records")}: ${overheads.length}`],
+      sections: [{
+        columns: [t("Category"), t("Scope"), t("Type"), t("Payee"), t("Notes"), t("Amount"), t("Status")],
+        rows,
+        foot: [["", "", "", "", t("Total"), formatCurrency(total), ""]],
+        columnStyles: { 5: { halign: "right" } },
+      }],
+      fileName: `overheads-${selectedMonth || "report"}.pdf`,
+      orientation: "l",
+    });
+  };
+
   const handleMonthChange = (direction: "prev" | "next") => {
     const date = new Date(`${selectedMonth}-02`);
     date.setMonth(date.getMonth() + (direction === "prev" ? -1 : 1));
@@ -451,8 +479,8 @@ export default function OverheadsPage() {
               </button>
             )}
             <button
-              onClick={() => window.print()}
-              aria-label={t("Print Report")}
+              onClick={handleGeneratePdf}
+              aria-label={t("Download PDF")}
               className="flex items-center justify-center w-[40px] h-[40px] dl-radius-lg border border-border text-muted bg-card [@media(hover:hover)]:hover:text-foreground transition-all"
             >
               <HiPrinter className="w-4 h-4" />
