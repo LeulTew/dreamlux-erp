@@ -191,8 +191,8 @@ describe("AuthLayout session hardening", () => {
     expect(queryClient.getQueryData(["employees"])).toBeUndefined();
   });
 
-  it("redirects restored protected pages when the token was removed elsewhere", async () => {
-    window.localStorage.setItem("token", "valid-token");
+  it("redirects restored protected pages when the user was removed elsewhere", async () => {
+    window.localStorage.setItem("user", JSON.stringify({ full_name: "Owner User", role_name: "OWNER" }));
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -201,7 +201,7 @@ describe("AuthLayout session hardening", () => {
     renderAuthLayout(queryClient);
     expect(await screen.findByText("Protected Content")).toBeInTheDocument();
 
-    window.localStorage.removeItem("token");
+    window.localStorage.removeItem("user");
     window.dispatchEvent(new Event("pageshow"));
 
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/login"));

@@ -14,6 +14,7 @@ test.describe("Issue 84 PWA and offline shell", () => {
     expect(manifest.display).toBe("standalone");
 
     await page.goto("/events");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
     await page.evaluate(() => {
       const installEvent = new Event("beforeinstallprompt") as Event & {
         prompt: () => Promise<void>;
@@ -59,6 +60,7 @@ test.describe("Issue 84 PWA and offline shell", () => {
     });
 
     await page.goto("/hr/payments");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
     await expect(page.getByText(/notification center/i).first()).toHaveCount(0);
 
     const calls = await page.evaluate(() => (window as typeof window & { __pwaPermissionCalls?: number }).__pwaPermissionCalls || 0);

@@ -103,6 +103,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
 
     // Visit page
     await page.goto("/hr/finance/investments");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Capital Register" })).toBeVisible();
 
     // Fill and submit Create Form
@@ -129,9 +130,9 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     await page.getByRole("button", { name: "Approve" }).click();
     await expect(page.getByText("Approved", { exact: true })).toBeVisible();
 
-    let exportRequestedWithAuth = false;
+    let exportRequested = false;
     await page.route((url) => url.pathname === "/finance/investments/export", (route) => {
-      exportRequestedWithAuth = route.request().headers().authorization?.startsWith("Bearer ") ?? false;
+      exportRequested = true;
       return route.fulfill({
         status: 200,
         contentType: "text/csv",
@@ -142,7 +143,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     // Verify export uses the authenticated axios client instead of a naked link.
     await expect(page.getByRole("button", { name: "CSV" })).toBeVisible();
     await page.getByRole("button", { name: "CSV" }).click();
-    await expect.poll(() => exportRequestedWithAuth).toBe(true);
+    await expect.poll(() => exportRequested).toBe(true);
     await expect(page.getByRole("button", { name: "XLSX" })).toBeVisible();
   });
 
@@ -152,6 +153,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     await mockCommonShellData(page);
 
     await page.goto("/hr/finance/investments");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
     await expect(page.getByText(/forbidden/i)).toBeVisible();
   });
 });

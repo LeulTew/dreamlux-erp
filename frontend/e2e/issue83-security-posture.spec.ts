@@ -25,15 +25,15 @@ test.describe("Issue 83 security posture page", () => {
     );
 
     await page.goto("/settings");
-    await page.getByRole("button", { name: "Open security posture" }).click();
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
+    await page.getByRole("button", { name: /Open Security Review/i }).click();
 
     await expect(page).toHaveURL(/\/settings\/security$/);
-    await expect(page.getByRole("heading", { name: "Security Posture" })).toBeVisible();
-    await expect(page.getByText("OWASP and API controls")).toBeVisible();
-    await expect(page.getByText("No runtime secrets, environment values, hashes, or credentials are displayed here.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Security Review" })).toBeVisible();
+    await expect(page.getByText("No passwords or private data are shown on this page.")).toBeVisible();
 
-    await page.getByRole("button", { name: /Open platform caveats/i }).click();
-    await expect(page.getByText(/localStorage JWT usage/i)).toBeVisible();
+    await page.getByRole("button", { name: /Known Limitations/i }).click();
+    await expect(page.getByText(/Login sessions use a method/i)).toBeVisible();
   });
 
   test("unauthorized user sees forbidden state", async ({ page }) => {
@@ -42,6 +42,7 @@ test.describe("Issue 83 security posture page", () => {
     await mockCommonShellData(page);
 
     await page.goto("/settings/security");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
 
     await expect(page.getByText("Restricted to security reviewers")).toBeVisible();
     await expect(page.getByText("Only security reviewers, system managers, and administrators can access this page.")).toBeVisible();

@@ -631,7 +631,7 @@ export default function AuthLayout({
 
   useEffect(() => {
     const enforceTokenPresence = () => {
-      if (typeof window === "undefined" || window.localStorage.getItem("user")) {
+      if (typeof window === "undefined" || status === "checking" || window.localStorage.getItem("user")) {
         return;
       }
 
@@ -646,7 +646,7 @@ export default function AuthLayout({
       window.removeEventListener("pageshow", enforceTokenPresence);
       window.removeEventListener("focus", enforceTokenPresence);
     };
-  }, [router, queryClient]);
+  }, [router, queryClient, status]);
 
   // Handle Ctrl+K shortcut globally
   useEffect(() => {

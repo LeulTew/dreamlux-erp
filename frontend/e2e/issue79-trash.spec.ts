@@ -3,6 +3,7 @@ import { fulfillJson, mockAuth, mockCommonShellData, seedAuthenticatedSession } 
 
 test.describe("Issue 79 event and proposal trash", () => {
   test("event trash is readable without mutation controls for read-only event users", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
     await seedAuthenticatedSession(page);
     await mockAuth(page, { permissions: ["events:read"] });
     await mockCommonShellData(page);
@@ -26,6 +27,7 @@ test.describe("Issue 79 event and proposal trash", () => {
     );
 
     await page.goto("/events/trash");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
 
     await expect(page.getByRole("heading", { name: "Deleted Events" })).toBeVisible();
     await expect(page.getByText("Archived Wedding Gala")).toBeVisible();
@@ -34,7 +36,7 @@ test.describe("Issue 79 event and proposal trash", () => {
   });
 
   test("proposal trash shows proposer metadata and delete controls for event deleters", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 1280, height: 800 });
     await seedAuthenticatedSession(page);
     await mockAuth(page, { permissions: ["events:proposals:approve", "events:delete"] });
     await mockCommonShellData(page);
@@ -61,6 +63,7 @@ test.describe("Issue 79 event and proposal trash", () => {
     );
 
     await page.goto("/events/proposals/trash");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
 
     await expect(page.getByRole("heading", { name: "Deleted Proposals" })).toBeVisible();
     await expect(page.getByText("Archived Proposal")).toBeVisible();

@@ -5,8 +5,11 @@ const eventId = "event-fuel-e2e";
 
 test.describe("Issue 108 fuel cost unit flow", () => {
   test("logs a trip with 12 km, 0.22 L/km, and 169 ETB/L as ETB 446.16", async ({ page }) => {
+    page.on("console", (msg) => console.log("BROWSER CONSOLE:", msg.text()));
+    page.on("requestfailed", (request) => console.log("REQUEST FAILED:", request.url(), request.failure()?.errorText));
+
     await seedAuthenticatedSession(page);
-    await mockAuth(page, { permissions: ["events:read", "trips:create", "expenses:approve"] });
+    await mockAuth(page, { permissions: ["events:read", "trips:create", "expenses:approve", "reports:profit:read"] });
     await mockCommonShellData(page);
 
     let tripLogged = false;
@@ -99,6 +102,7 @@ test.describe("Issue 108 fuel cost unit flow", () => {
     );
 
     await page.goto(`/events/${eventId}`);
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
     await page.getByRole("button", { name: /Expenses & Trips/i }).click();
     await page.getByRole("combobox").selectOption("va-fuel");
     await page.getByPlaceholder("Destination").fill("Friendship Hotel");

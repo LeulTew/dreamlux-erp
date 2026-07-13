@@ -19,7 +19,6 @@ const defaultUser = {
 
 export async function seedAuthenticatedSession(page: Page) {
   await page.addInitScript(() => {
-    window.localStorage.setItem("token", "e2e-token");
     window.localStorage.setItem(
       "user",
       JSON.stringify({

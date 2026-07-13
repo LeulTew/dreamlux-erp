@@ -140,13 +140,12 @@ test.describe("Issue 128 auth session hardening", () => {
     expect(financeRequests).toEqual([]);
   });
 
-  test("browser back after logout token removal returns to login without protected shell", async ({ page }) => {
+  test("browser back after logout user removal returns to login without protected shell", async ({ page }) => {
     await mockAuth(page, { permissions: ["assets:read"] });
     await mockBackendShellData(page);
 
     await page.goto("/login");
     await page.evaluate(() => {
-      window.localStorage.setItem("token", "e2e-token");
       window.localStorage.setItem(
         "user",
         JSON.stringify({
@@ -159,8 +158,16 @@ test.describe("Issue 128 auth session hardening", () => {
     await page.goto("/assets");
     await expect(page.getByRole("heading", { name: "Assets", exact: true })).toBeVisible();
 
+    // Mock auth/me to fail to simulate server-side cookie clearance on logout
+    await page.route("**/auth/me", (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Unauthorized" }),
+      })
+    );
+
     await page.evaluate(() => {
-      window.localStorage.removeItem("token");
       window.localStorage.removeItem("user");
     });
     await page.goto("/login");

@@ -386,17 +386,6 @@ function applyLocalLifecycleView(
 
 export default api;
 
-// Attach JWT token to every request
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
-
 // Redirect to login on 401
 api.interceptors.response.use(
   (response) => response,

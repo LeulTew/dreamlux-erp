@@ -11,51 +11,22 @@ interface AuthResponse {
 }
 
 export function useAuth() {
-  const [token, setToken] = useState<string | null>(null);
-  const [hasBootstrappedToken, setHasBootstrappedToken] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const [previewRole, setPreviewRole] = useState<string | null>(null);
   const [previewSlugs, setPreviewSlugs] = useState<string[] | null>(null);
 
   useEffect(() => {
-    // Read from localStorage once mounted
-    const readToken = () => localStorage.getItem("token") || (localStorage.getItem("user") ? "cookie-active" : null);
-    const stored = readToken();
-    Promise.resolve().then(() => {
-      setToken(stored);
-      setHasBootstrappedToken(true);
-    });
+    setHasMounted(true);
     const pRole = localStorage.getItem("previewRole");
     const pSlugs = localStorage.getItem("previewPermissionSlugs");
     if (pRole && pSlugs) {
-      Promise.resolve().then(() => {
-        setPreviewRole(pRole);
-        try {
-          setPreviewSlugs(JSON.parse(pSlugs));
-        } catch {
-          // ignore
-        }
-      });
-    }
-
-    const syncToken = () => {
-      setToken(readToken());
-      setHasBootstrappedToken(true);
-    };
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === "token" || event.key === "user") {
-        syncToken();
+      setPreviewRole(pRole);
+      try {
+        setPreviewSlugs(JSON.parse(pSlugs));
+      } catch {
+        // ignore
       }
-    };
-
-    window.addEventListener("pageshow", syncToken);
-    window.addEventListener("focus", syncToken);
-    window.addEventListener("storage", handleStorage);
-    return () => {
-      window.removeEventListener("pageshow", syncToken);
-      window.removeEventListener("focus", syncToken);
-      window.removeEventListener("storage", handleStorage);
-    };
+    }
   }, []);
 
   const { data, isLoading, error, isError } = useQuery<AuthResponse>({
@@ -64,7 +35,7 @@ export function useAuth() {
       const { data } = await api.get<AuthResponse>("/auth/me");
       return data;
     },
-    enabled: !!token,
+    enabled: hasMounted,
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -72,12 +43,19 @@ export function useAuth() {
   const { data: permissionsData, isLoading: permissionsLoading } = useQuery({
     queryKey: ["permissions"],
     queryFn: getEffectivePermissions,
-    enabled: !!token,
+    enabled: hasMounted && !!data?.user,
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const user = data?.user;
+
+  useEffect(() => {
+    if (user && typeof window !== "undefined") {
+      localStorage.setItem("user", JSON.stringify(user));
+    }
+  }, [user]);
+
   const rawPermissionSlugs = permissionsData?.permission_slugs || [];
 
   const isPreviewActive = !!previewRole && !!previewSlugs;
@@ -118,9 +96,9 @@ export function useAuth() {
     user: displayUser,
     permissionSlugs,
     isSuperuser,
-    isLoading: !hasBootstrappedToken || isLoading || permissionsLoading || (!!token && !data && !error),
-    isSessionResolved: hasBootstrappedToken && (!token || (!!data && !permissionsLoading) || isError),
-    isAuthenticated: !!token && !!user,
+    isLoading: !hasMounted || isLoading || (!!data?.user && permissionsLoading),
+    isSessionResolved: hasMounted && (!isLoading && (!data?.user || !permissionsLoading)),
+    isAuthenticated: !!user,
     isAdmin,
     isInventoryController,
     hasPermission,

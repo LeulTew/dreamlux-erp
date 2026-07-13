@@ -81,6 +81,7 @@ test.describe("Issue 107 proposal commission and team totals flow", () => {
 
     // Go to proposal intake page
     await page.goto("/events/proposals/new");
+    await expect(page.locator(".animate-spin")).toHaveCount(0);
 
     // Fill Step 1: Basics
     await page.getByPlaceholder("e.g. Annual Charity Gala").fill("E2E Proposal 107");
