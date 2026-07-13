@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
   HiArrowDownTray,
-  HiMagnifyingGlass,
   HiArrowPath,
   HiPlus,
   HiCheck,
@@ -19,6 +18,7 @@ import ForbiddenState from "@/components/ForbiddenState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Select from "@/components/ui/Select";
+import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import PaginationControls from "@/components/PaginationControls";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
@@ -479,17 +479,12 @@ export default function InvestmentsPage() {
         ) : null}
 
         {/* Filters Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 border border-border/60 bg-card p-3 dl-radius-xl no-print">
-          <div className="relative flex-1 min-w-[200px]">
-            <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-              placeholder={t("Search") + "..."}
-              className="w-full pl-10 pr-4 h-[38px] text-xs font-semibold dl-radius-lg bg-card-alt border border-border/80 outline-none focus:ring-1 focus:ring-primary/20"
-            />
-          </div>
+        <FilterToolbar>
+          <ToolbarSearch
+            value={searchQuery}
+            onChange={(v) => { setSearchQuery(v); setPage(1); }}
+            placeholder={t("Search") + "..."}
+          />
 
           <div className="w-[120px]">
             <input
@@ -566,7 +561,7 @@ export default function InvestmentsPage() {
           >
             <HiArrowPath className="w-4 h-4" />
           </button>
-        </div>
+        </FilterToolbar>
 
         {/* Ledger Table */}
         {listLoading ? (
