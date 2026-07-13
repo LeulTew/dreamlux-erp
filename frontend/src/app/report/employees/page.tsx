@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getEmployees, getEventTypes, getSalaryLevels } from "@/lib/api";
 import { Employee } from "@/lib/types";
+import { generateReportPdf } from "@/lib/pdf-report";
 import { HiPhone, HiEnvelope, HiIdentification, HiUsers } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
@@ -231,11 +232,33 @@ function ReportContent() {
     if (authLoading || !isAuthenticated || !hasHRRead) return;
     if (!loading && employees.length > 0) {
       const timer = setTimeout(() => {
-        window.print();
-      }, 1000);
+        const rows = employees.map((emp) => {
+          const base = Number(emp.base_salary ?? (emp.salary_level ? salaryByLevelName[emp.salary_level] : 0) ?? 0);
+          return [
+            emp.full_name || "-",
+            emp.position || "-",
+            emp.department || "-",
+            emp.office || "-",
+            emp.phone || "-",
+            base ? `ETB ${base.toLocaleString("en-US")}` : "-",
+          ];
+        });
+        generateReportPdf({
+          title: "Personnel Directory",
+          subtitle: officeName ? `Office: ${officeName}` : undefined,
+          meta: [`Generated: ${new Date().toLocaleString()}`, `Employees: ${employees.length}`],
+          sections: [{
+            columns: ["Name", "Position", "Department", "Office", "Phone", "Base Salary"],
+            rows,
+            columnStyles: { 5: { halign: "right" } },
+          }],
+          fileName: "personnel-directory.pdf",
+          orientation: "l",
+        });
+      }, 400);
       return () => clearTimeout(timer);
     }
-  }, [loading, employees.length, authLoading, isAuthenticated, hasHRRead]);
+  }, [loading, employees, salaryByLevelName, officeName, authLoading, isAuthenticated, hasHRRead]);
 
   if (authLoading || (loading && isAuthenticated && hasHRRead)) {
     return (
