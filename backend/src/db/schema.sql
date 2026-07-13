@@ -364,11 +364,15 @@ CREATE TABLE IF NOT EXISTS employees (
 CREATE TABLE IF NOT EXISTS app_settings (
   id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   employee_id_prefix TEXT NOT NULL DEFAULT 'EMP',
+  payroll_cycle TEXT NOT NULL DEFAULT 'weekly',
+  payroll_cycle_days INTEGER,
+  payroll_calendar_type TEXT NOT NULL DEFAULT 'gregorian',
+  payroll_manual_start_date DATE,
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Seed default settings
-INSERT INTO app_settings (id, employee_id_prefix) VALUES (1, 'EMP')
+INSERT INTO app_settings (id, employee_id_prefix, payroll_cycle, payroll_calendar_type) VALUES (1, 'EMP', 'weekly', 'gregorian')
 ON CONFLICT DO NOTHING;
 
 -- 11. Event Types

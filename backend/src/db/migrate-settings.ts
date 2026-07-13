@@ -23,6 +23,22 @@ async function run() {
   `);
 
   await client.query(`
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payroll_cycle TEXT NOT NULL DEFAULT 'weekly';
+  `);
+
+  await client.query(`
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payroll_cycle_days INTEGER;
+  `);
+
+  await client.query(`
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payroll_calendar_type TEXT NOT NULL DEFAULT 'gregorian';
+  `);
+
+  await client.query(`
+    ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payroll_manual_start_date DATE;
+  `);
+
+  await client.query(`
     INSERT INTO app_settings (id, employee_id_prefix, inventory_id_prefix, event_id_prefix)
     VALUES (1, 'EMP', 'INV', 'EVT')
     ON CONFLICT (id) DO UPDATE SET
