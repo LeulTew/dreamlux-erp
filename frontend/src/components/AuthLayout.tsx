@@ -123,8 +123,25 @@ function SearchDialog({
   const [recordSearchError, setRecordSearchError] = useState(false);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const { hasPermission } = useAuth();
 
   const pageResults = SEARCH_ITEMS.filter((item) => {
+    // Permission check for search items
+    if (item.href === "/" && !hasPermission("hr:read") && !hasPermission("hr:write")) return false;
+    if (item.href === "/insert" && !hasPermission("hr:write")) return false;
+    if (item.href === "/events" && !hasPermission("events:read")) return false;
+    if (item.href === "/hr/payments" && !hasPermission("payroll:read") && !hasPermission("payroll:write")) return false;
+    if (item.href === "/hr/expenses/approve" && !hasPermission("expenses:approve")) return false;
+    if (item.href === "/hr/salary-levels" && !hasPermission("salary-levels:manage")) return false;
+    if (item.href === "/hr/event-types" && !hasPermission("events:write")) return false;
+    if (item.href === "/assets/dashboard" && !hasPermission("assets:read")) return false;
+    if (item.href === "/assets" && !hasPermission("assets:read")) return false;
+    if (item.href === "/assets/insert" && !hasPermission("assets:write")) return false;
+    if (item.href === "/assets/reconcile" && !hasPermission("assets:reconcile")) return false;
+    if (item.href === "/assets/history" && !hasPermission("assets:read")) return false;
+    if (item.href === "/assets/reports" && !hasPermission("assets:read")) return false;
+    if (item.href === "/settings" && !hasPermission("users:manage") && !hasPermission("settings:write")) return false;
+
     const term = query.trim().toLowerCase();
     return (
       !term ||
@@ -172,21 +189,35 @@ function SearchDialog({
 
     let active = true;
 
-    Promise.allSettled([
-      getEmployees(1, 5, debouncedQuery, "active"),
-      getItems(1, 5, debouncedQuery),
-      getEvents(1, 5, debouncedQuery),
-      getSalaryLevels(),
-      getPayrollRuns({ view: "active", limit: 20 }),
-    ])
-      .then(([employeesResult, assetsResult, eventsResult, salaryLevelsResult, payrollRunsResult]) => {
+    const promises = [
+      hasPermission("hr:read") || hasPermission("hr:write")
+        ? getEmployees(1, 5, debouncedQuery, "active").then((res) => ({ type: "employees", value: res }))
+        : Promise.resolve({ type: "employees", value: null }),
+      hasPermission("assets:read")
+        ? getItems(1, 5, debouncedQuery).then((res) => ({ type: "assets", value: res }))
+        : Promise.resolve({ type: "assets", value: null }),
+      hasPermission("events:read")
+        ? getEvents(1, 5, debouncedQuery).then((res) => ({ type: "events", value: res }))
+        : Promise.resolve({ type: "events", value: null }),
+      hasPermission("salary-levels:manage")
+        ? getSalaryLevels().then((res) => ({ type: "salaryLevels", value: res }))
+        : Promise.resolve({ type: "salaryLevels", value: null }),
+      hasPermission("payroll:read") || hasPermission("payroll:write")
+        ? getPayrollRuns({ view: "active", limit: 20 }).then((res) => ({ type: "payroll", value: res }))
+        : Promise.resolve({ type: "payroll", value: null }),
+    ];
+
+    Promise.allSettled(promises)
+      .then((results) => {
         if (!active) return;
 
         const nextResults: SearchResult[] = [];
         const normalizedQuery = debouncedQuery.toLowerCase();
 
-        if (employeesResult.status === "fulfilled") {
-          const employees = (employeesResult.value?.employees || []) as Employee[];
+        const [employeesRes, assetsRes, eventsRes, salaryLevelsRes, payrollRunsRes] = results;
+
+        if (employeesRes.status === "fulfilled" && employeesRes.value && employeesRes.value.value) {
+          const employees = (employeesRes.value.value?.employees || []) as Employee[];
           nextResults.push(
             ...employees.map((employee) => ({
               key: `employee:${employee.id}`,
@@ -199,8 +230,8 @@ function SearchDialog({
           );
         }
 
-        if (assetsResult.status === "fulfilled") {
-          const assets = (assetsResult.value?.items || []) as Item[];
+        if (assetsRes.status === "fulfilled" && assetsRes.value && assetsRes.value.value) {
+          const assets = (assetsRes.value.value?.items || []) as Item[];
           nextResults.push(
             ...assets.map((item) => ({
               key: `asset:${item.id}`,
@@ -213,8 +244,8 @@ function SearchDialog({
           );
         }
 
-        if (eventsResult.status === "fulfilled") {
-          const events = (eventsResult.value?.events || []) as Event[];
+        if (eventsRes.status === "fulfilled" && eventsRes.value && eventsRes.value.value) {
+          const events = (eventsRes.value.value?.events || []) as Event[];
           nextResults.push(
             ...events.map((event) => ({
               key: `event:${event.id}`,
@@ -227,8 +258,8 @@ function SearchDialog({
           );
         }
 
-        if (salaryLevelsResult.status === "fulfilled") {
-          const salaryLevels = ((salaryLevelsResult.value || []) as SalaryLevel[])
+        if (salaryLevelsRes.status === "fulfilled" && salaryLevelsRes.value && salaryLevelsRes.value.value) {
+          const salaryLevels = ((salaryLevelsRes.value.value || []) as SalaryLevel[])
             .filter((level) =>
               compactDetail([level.level_name, level.base_salary]).toLowerCase().includes(normalizedQuery)
             )
@@ -245,8 +276,8 @@ function SearchDialog({
           );
         }
 
-        if (payrollRunsResult.status === "fulfilled") {
-          const payrollRuns = ((payrollRunsResult.value?.runs || []) as PayrollRun[])
+        if (payrollRunsRes.status === "fulfilled" && payrollRunsRes.value && payrollRunsRes.value.value) {
+          const payrollRuns = ((payrollRunsRes.value.value?.runs || []) as PayrollRun[])
             .filter((run) =>
               compactDetail([
                 run.status,
@@ -272,11 +303,11 @@ function SearchDialog({
 
         setRecordResults(nextResults.slice(0, 8));
         setRecordSearchError(
-          employeesResult.status === "rejected" &&
-            assetsResult.status === "rejected" &&
-            eventsResult.status === "rejected" &&
-            salaryLevelsResult.status === "rejected" &&
-            payrollRunsResult.status === "rejected"
+          ((hasPermission("hr:read") || hasPermission("hr:write")) ? employeesRes.status === "rejected" : false) &&
+            (hasPermission("assets:read") ? assetsRes.status === "rejected" : false) &&
+            (hasPermission("events:read") ? eventsRes.status === "rejected" : false) &&
+            (hasPermission("salary-levels:manage") ? salaryLevelsRes.status === "rejected" : false) &&
+            ((hasPermission("payroll:read") || hasPermission("payroll:write")) ? payrollRunsRes.status === "rejected" : false)
         );
       })
       .catch(() => {
@@ -294,7 +325,7 @@ function SearchDialog({
     return () => {
       active = false;
     };
-  }, [debouncedQuery, isOpen]);
+  }, [debouncedQuery, isOpen, hasPermission]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -423,7 +454,7 @@ function HeaderUserMenu({
   const { lang, toggle: toggleLang } = useLanguage();
   const { dark, toggle: toggleTheme } = useTheme();
   const [showConfirm, setShowConfirm] = useState(false);
-  const { user: authUser } = useAuth();
+  const { user: authUser, hasPermission } = useAuth();
 
   const user = {
     full_name: authUser?.full_name || authUser?.username || "User",
@@ -472,14 +503,17 @@ function HeaderUserMenu({
             <p className="text-[9px] font-medium text-muted uppercase tracking-wider mt-0.5">{user.role_name}</p>
           </div>
 
-          <Link
-            href="/settings"
-            onClick={() => setOpen(false)}
-            className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
-          >
-            <HiOutlineUser className="w-4 h-4 shrink-0 text-muted" />
-            <span>{t("Profile Settings")}</span>
-          </Link>
+          {(hasPermission("users:manage") || hasPermission("settings:write")) && (
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
+            >
+              <HiOutlineUser className="w-4 h-4 shrink-0 text-muted" />
+              <span>{t("Profile Settings")}</span>
+            </Link>
+          )}
+
 
           <button
             onClick={toggleLang}
