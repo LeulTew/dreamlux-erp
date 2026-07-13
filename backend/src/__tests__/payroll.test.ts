@@ -955,7 +955,9 @@ describe("Payroll API > POST /payroll/drafts", () => {
     }));
   });
 
-  test("rejects persisted month drafts", async () => {
+  test("accepts monthly drafts", async () => {
+    mockDraftCreateSequence();
+
     const res = await request(app)
       .post("/payroll/drafts")
       .set("Authorization", AUTH())
@@ -963,11 +965,16 @@ describe("Payroll API > POST /payroll/drafts", () => {
         month: 4,
         year: 2026,
         period_kind: "month",
-        employeeLineEvents: [],
+        employeeLineEvents: [
+          {
+            employee_id: EMPLOYEE_ID,
+            events: [],
+          },
+        ],
       });
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toContain("half-month and weekly");
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe(RUN_ID);
   });
 });
 

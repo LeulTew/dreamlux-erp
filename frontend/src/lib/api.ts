@@ -1008,6 +1008,10 @@ export const updateAppSettings = (data: {
   employee_id_prefix: string;
   inventory_id_prefix?: string;
   event_id_prefix?: string;
+  payroll_cycle?: string;
+  payroll_cycle_days?: number | null;
+  payroll_calendar_type?: string;
+  payroll_manual_start_date?: string | null;
 }) =>
   api.patch("/settings", data).then((r) => r.data);
 

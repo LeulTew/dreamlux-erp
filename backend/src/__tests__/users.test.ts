@@ -139,6 +139,10 @@ describe("Users API", () => {
         employee_id_prefix: "DLX-EMP",
         inventory_id_prefix: "DLX-INV",
         event_id_prefix: "DLX-EVT",
+        payroll_cycle: "weekly",
+        payroll_cycle_days: null,
+        payroll_calendar_type: "gregorian",
+        payroll_manual_start_date: null,
       }],
     });
 
@@ -156,6 +160,10 @@ describe("Users API", () => {
       employee_id_prefix: "DLX-EMP",
       inventory_id_prefix: "DLX-INV",
       event_id_prefix: "DLX-EVT",
+      payroll_cycle: "weekly",
+      payroll_cycle_days: null,
+      payroll_calendar_type: "gregorian",
+      payroll_manual_start_date: null,
     });
   });
 

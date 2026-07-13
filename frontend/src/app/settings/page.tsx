@@ -171,7 +171,20 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
       "ስርዓቱ ምን ያህል ተጠብቆ እንዳለ ይመልከቱ። ማጠቃለያው በቴክኒካዊ ቡድኑ የተዘጋጀ ነው።",
     "Open security posture": "የደህንነት ሁኔታን ክፈት",
     "Light Mode": "ብርሃናማ ሁነታ",
-    "Dark Mode": "ጨለማማ ሁነታ"
+    "Dark Mode": "ጨለማማ ሁነታ",
+    "Payroll Configuration": "የደመወዝ ውቅረት",
+    "Configure default payroll cycle and calendar settings.": "ነባሪ የደመወዝ ዑደት እና የቀን መቁጠሪያ ቅንጅቶችን ያዋቅሩ።",
+    "Payroll Cycle *": "የደመወዝ ዑደት *",
+    "Weekly": "ሳምንታዊ",
+    "15 Days (Bi-weekly)": "15 ቀናት (በየ15 ቀኑ)",
+    "Monthly": "ወርሃዊ",
+    "Manual Day Count": "በእጅ የቀን ብዛት",
+    "Number of Days *": "የቀናት ብዛት *",
+    "Calendar Type *": "የቀን መቁጠሪያ ዓይነት *",
+    "Gregorian": "ግሪጎሪያን",
+    "Ethiopian": "ኢትዮጵያዊ",
+    "Manual Start Date": "በእጅ የመነሻ ቀን",
+    "Start Date *": "የመነሻ ቀን *"
   }
 };
 
@@ -202,6 +215,10 @@ export default function SettingsPage() {
   const [prefix, setPrefix] = useState("");
   const [inventoryPrefix, setInventoryPrefix] = useState("");
   const [eventPrefix, setEventPrefix] = useState("");
+  const [payrollCycle, setPayrollCycle] = useState("weekly");
+  const [payrollCycleDays, setPayrollCycleDays] = useState<number | null>(null);
+  const [payrollCalendarType, setPayrollCalendarType] = useState("gregorian");
+  const [payrollManualStartDate, setPayrollManualStartDate] = useState<string | null>(null);
 
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const canAccessAdmin = hasPermission("users:manage") || hasPermission("settings:write");
@@ -293,12 +310,24 @@ export default function SettingsPage() {
         setPrefix(settings.employee_id_prefix || "EMP");
         setInventoryPrefix(settings.inventory_id_prefix || "INV");
         setEventPrefix(settings.event_id_prefix || "EVT");
+        setPayrollCycle(settings.payroll_cycle || "weekly");
+        setPayrollCycleDays(settings.payroll_cycle_days ?? null);
+        setPayrollCalendarType(settings.payroll_calendar_type || "gregorian");
+        setPayrollManualStartDate(settings.payroll_manual_start_date ?? null);
       });
     }
   }, [settings]);
 
   const updateMutation = useMutation({
-    mutationFn: (data: { employee_id_prefix: string; inventory_id_prefix?: string; event_id_prefix?: string }) => updateAppSettings(data),
+    mutationFn: (data: { 
+      employee_id_prefix: string; 
+      inventory_id_prefix?: string; 
+      event_id_prefix?: string;
+      payroll_cycle?: string;
+      payroll_cycle_days?: number | null;
+      payroll_calendar_type?: string;
+      payroll_manual_start_date?: string | null;
+    }) => updateAppSettings(data),
     onSuccess: () => {
       toast.success("Settings updated successfully");
       queryClient.invalidateQueries({ queryKey: ["appSettings"] });
@@ -462,7 +491,15 @@ export default function SettingsPage() {
       toast.error("Prefix cannot be empty");
       return;
     }
-    updateMutation.mutate({ employee_id_prefix: prefix, inventory_id_prefix: inventoryPrefix || "INV", event_id_prefix: eventPrefix || "EVT" });
+    updateMutation.mutate({ 
+      employee_id_prefix: prefix, 
+      inventory_id_prefix: inventoryPrefix || "INV", 
+      event_id_prefix: eventPrefix || "EVT",
+      payroll_cycle: payrollCycle,
+      payroll_cycle_days: payrollCycleDays,
+      payroll_calendar_type: payrollCalendarType,
+      payroll_manual_start_date: payrollManualStartDate
+    });
   };
 
   const handleAdd = () => {
@@ -681,7 +718,14 @@ export default function SettingsPage() {
   ];
 
   const isSystemSavePending = updateMutation.isPending;
-  const isSystemSaveDisabled = !isSystemSavePending && prefix === settings?.employee_id_prefix && inventoryPrefix === (settings?.inventory_id_prefix || "INV") && eventPrefix === (settings?.event_id_prefix || "EVT");
+  const isSystemSaveDisabled = !isSystemSavePending && 
+    prefix === settings?.employee_id_prefix && 
+    inventoryPrefix === (settings?.inventory_id_prefix || "INV") && 
+    eventPrefix === (settings?.event_id_prefix || "EVT") &&
+    payrollCycle === (settings?.payroll_cycle || "weekly") &&
+    payrollCycleDays === (settings?.payroll_cycle_days ?? null) &&
+    payrollCalendarType === (settings?.payroll_calendar_type || "gregorian") &&
+    payrollManualStartDate === (settings?.payroll_manual_start_date ?? null);
   const isUserSavePending = createMutation.isPending || updateUserMutation.isPending;
 
   if (authLoading) {
@@ -1350,7 +1394,93 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-4 border-t border-border/30">
+                  <div className="pt-6 mt-6 border-t border-border/30">
+                    <h2 className="text-sm font-bold text-foreground mb-1">{t("Payroll Configuration")}</h2>
+                    <p className="text-xs text-muted-foreground mb-6">
+                      {t("Configure default payroll cycle and calendar settings.")}
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Payroll Cycle */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            {t("Payroll Cycle *")}
+                          </span>
+                        </label>
+                        <select
+                          value={payrollCycle}
+                          onChange={(e) => setPayrollCycle(e.target.value)}
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all shadow-sm"
+                        >
+                          <option value="weekly">{t("Weekly")}</option>
+                          <option value="bi-weekly">{t("15 Days (Bi-weekly)")}</option>
+                          <option value="monthly">{t("Monthly")}</option>
+                          <option value="manual">{t("Manual Day Count")}</option>
+                        </select>
+                      </div>
+
+                      {/* Manual Cycle Days */}
+                      {payrollCycle === "manual" && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                              {t("Number of Days *")}
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={payrollCycleDays || ""}
+                            onChange={(e) => { const v = parseInt(e.target.value, 10); setPayrollCycleDays(Number.isNaN(v) ? null : v); }}
+                            placeholder="e.g. 10"
+                            className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all shadow-sm"
+                          />
+                        </div>
+                      )}
+
+                      {/* Calendar Type */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                            {t("Calendar Type *")}
+                          </span>
+                        </label>
+                        <select
+                          value={payrollCalendarType}
+                          onChange={(e) => setPayrollCalendarType(e.target.value)}
+                          className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all shadow-sm"
+                        >
+                          <option value="gregorian">{t("Gregorian")}</option>
+                          <option value="ethiopian">{t("Ethiopian")}</option>
+                          <option value="manual_start_date">{t("Manual Start Date")}</option>
+                        </select>
+                      </div>
+
+                      {/* Manual Start Date */}
+                      {payrollCalendarType === "manual_start_date" && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-muted-foreground mb-1.5 block px-1">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                              {t("Start Date *")}
+                            </span>
+                          </label>
+                          <input
+                            type="date"
+                            value={payrollManualStartDate || ""}
+                            onChange={(e) => setPayrollManualStartDate(e.target.value)}
+                            className="w-full h-11 px-4 rounded-xl border border-border/50 bg-card-alt text-foreground focus:ring-1 focus:ring-muted/30 outline-none transition-all shadow-sm [color-scheme:dark]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4 mt-6 border-t border-border/30">
                     <button
                       type="submit"
                       disabled={isSystemSavePending || isSystemSaveDisabled}

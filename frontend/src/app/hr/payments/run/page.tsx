@@ -32,6 +32,7 @@ import {
   finalizePayrollRun,
   getPayrollRuns,
   getPayrollRun,
+  getAppSettings,
 } from "@/lib/api";
 import { 
   Employee, 
@@ -101,7 +102,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Open the existing run instead of creating a duplicate.": "Open the existing run instead of creating a duplicate.",
     "1st-15th": "1st-15th",
     "16th-End": "16th-End",
-    "NO LEVEL": "NO LEVEL"
+    "NO LEVEL": "NO LEVEL",
+    "Week 1 (01 - 07)": "Week 1 (01 - 07)",
+    "Week 2 (08 - 14)": "Week 2 (08 - 14)",
+    "Week 3 (15 - 21)": "Week 3 (15 - 21)",
+    "Week 4 (22 - 28)": "Week 4 (22 - 28)",
+    "Week 5 (29 - End)": "Week 5 (29 - End)",
+    "Full Month": "Full Month",
+    "Manual Period": "Manual Period"
   },
   am: {
     "Salary & Event Disbursement": "የደመወዝ እና ክስተት ክፍያ ማስተላለፊያ",
@@ -154,7 +162,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Open the existing run instead of creating a duplicate.": "የተባዛ ከመፍጠር ይልቅ ያለውን መዝገብ ይክፈቱ።",
     "1st-15th": "ከ1ኛ-15ኛ",
     "16th-End": "ከ16ኛ-መጨረሻ",
-    "NO LEVEL": "ደረጃ የለውም"
+    "NO LEVEL": "ደረጃ የለውም",
+    "Week 1 (01 - 07)": "ሳምንት 1 (ከ01 - 07)",
+    "Week 2 (08 - 14)": "ሳምንት 2 (ከ08 - 14)",
+    "Week 3 (15 - 21)": "ሳምንት 3 (ከ15 - 21)",
+    "Week 4 (22 - 28)": "ሳምንት 4 (ከ22 - 28)",
+    "Week 5 (29 - End)": "ሳምንት 5 (ከ29 - መጨረሻ)",
+    "Full Month": "ሙሉ ወር",
+    "Manual Period": "በእጅ የተመረጠ ጊዜ"
   }
 };
 
@@ -238,9 +253,9 @@ function PaymentRunProcessPageContent() {
     return format(new Date(), "yyyy-MM");
   });
 
-  const [periodType, setPeriodType] = useState<"h1" | "h2">(() => {
+  const [periodType, setPeriodType] = useState<string>(() => {
     const fromQuery = searchParams.get("period_type");
-    if (fromQuery === "h1" || fromQuery === "h2") return fromQuery;
+    if (fromQuery) return fromQuery;
     const day = new Date().getUTCDate();
     return day <= 15 ? "h1" : "h2";
   });
@@ -254,8 +269,8 @@ function PaymentRunProcessPageContent() {
       if (d && /^\d{4}-\d{2}$/.test(d) && d !== selectedMonth) {
         setSelectedMonth(d);
       }
-      if (p && (p === "h1" || p === "h2") && p !== periodType) {
-        setPeriodType(p as "h1" | "h2");
+      if (p && p !== periodType) {
+        setPeriodType(p);
       }
     }, 0);
 
@@ -323,15 +338,118 @@ function PaymentRunProcessPageContent() {
 
   const runsHistory = useMemo(() => runsHistoryPayload?.runs ?? [], [runsHistoryPayload]);
 
+  const { data: settings } = useQuery({
+    queryKey: ["appSettings"],
+    queryFn: getAppSettings,
+    enabled: hasPayrollWrite,
+  });
+
+  // Synchronize periodType with settings
+  useEffect(() => {
+    if (!settings) return;
+    const cycle = settings.payroll_cycle || "weekly";
+    const fromQuery = searchParams.get("period_type");
+
+    if (cycle === "weekly") {
+      if (!fromQuery || !fromQuery.startsWith("w")) {
+        setPeriodType("w1");
+      }
+    } else if (cycle === "monthly") {
+      setPeriodType("monthly");
+    } else if (cycle === "manual") {
+      setPeriodType("manual");
+    } else {
+      if (!fromQuery || !fromQuery.startsWith("h")) {
+        const day = new Date().getUTCDate();
+        setPeriodType(day <= 15 ? "h1" : "h2");
+      }
+    }
+  }, [settings, searchParams]);
+
+  const activeDates = useMemo(() => {
+    const parsed = parseMonth(selectedMonth);
+    const cycle = settings?.payroll_cycle || "weekly";
+    
+    let start = "";
+    let end = "";
+    let kind: "weekly" | "half_month" | "month" | "range" = "weekly";
+
+    if (cycle === "weekly") {
+      kind = "weekly";
+      let dayStart = 1;
+      if (periodType === "w2") dayStart = 8;
+      else if (periodType === "w3") dayStart = 15;
+      else if (periodType === "w4") dayStart = 22;
+      else if (periodType === "w5") dayStart = 29;
+
+      const startDateStr = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-${String(dayStart).padStart(2, "0")}`;
+      start = startDateStr;
+      
+      const startDate = new Date(`${startDateStr}T00:00:00.000Z`);
+      const endDate = new Date(startDate);
+      endDate.setUTCDate(startDate.getUTCDate() + 6);
+      end = endDate.toISOString().slice(0, 10);
+    } else if (cycle === "monthly") {
+      kind = "month";
+      start = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-01`;
+      const lastDay = new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate();
+      end = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else if (cycle === "manual") {
+      kind = "range";
+      const startBase = settings?.payroll_manual_start_date || `${parsed.year}-${String(parsed.month).padStart(2, "0")}-01`;
+      const days = settings?.payroll_cycle_days || 15;
+      start = startBase;
+      const startDate = new Date(`${startBase}T00:00:00.000Z`);
+      const endDate = new Date(startDate);
+      endDate.setUTCDate(startDate.getUTCDate() + (days - 1));
+      end = endDate.toISOString().slice(0, 10);
+    } else {
+      kind = "half_month";
+      if (periodType === "h1") {
+        start = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-01`;
+        end = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-15`;
+      } else {
+        start = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-16`;
+        const lastDay = new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate();
+        end = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      }
+    }
+
+    return { start, end, kind };
+  }, [selectedMonth, periodType, settings]);
+
   const existingDraft = useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    return findRunForPeriod(runsHistory, "DRAFT", y, m, periodType);
-  }, [runsHistory, selectedMonth, periodType]);
+    return findRunForPeriod(runsHistory, "DRAFT", 0, 0, periodType, activeDates.start, activeDates.end);
+  }, [runsHistory, periodType, activeDates]);
 
   const existingFinalized = useMemo(() => {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    return findRunForPeriod(runsHistory, "FINALIZED", y, m, periodType);
-  }, [runsHistory, selectedMonth, periodType]);
+    return findRunForPeriod(runsHistory, "FINALIZED", 0, 0, periodType, activeDates.start, activeDates.end);
+  }, [runsHistory, periodType, activeDates]);
+
+  const periodOptions = useMemo(() => {
+    const cycle = settings?.payroll_cycle || "weekly";
+    if (cycle === "weekly") {
+      return [
+        { id: "w1", label: t("Week 1 (01 - 07)") },
+        { id: "w2", label: t("Week 2 (08 - 14)") },
+        { id: "w3", label: t("Week 3 (15 - 21)") },
+        { id: "w4", label: t("Week 4 (22 - 28)") },
+        { id: "w5", label: t("Week 5 (29 - End)") },
+      ];
+    } else if (cycle === "monthly") {
+      return [
+        { id: "monthly", label: t("Full Month") }
+      ];
+    } else if (cycle === "manual") {
+      return [
+        { id: "manual", label: t("Manual Period") }
+      ];
+    }
+    return [
+      { id: "h1", label: t("1st-15th") },
+      { id: "h2", label: t("16th-End") }
+    ];
+  }, [settings, t]);
 
   const loadDraftMutation = useMutation({
     mutationFn: (id: string) => getPayrollRun(id),
@@ -572,14 +690,9 @@ function PaymentRunProcessPageContent() {
       employeeLineEvents,
     };
 
-    if (periodType === "h1") {
-      payload.period_kind = "half_month";
-      payload.period_start = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-01`;
-      payload.period_end = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-15`;
-    } else if (periodType === "h2") {
-      payload.period_kind = "half_month";
-      payload.period_start = `${parsed.year}-${String(parsed.month).padStart(2, "0")}-16`;
-    }
+    payload.period_kind = activeDates.kind;
+    payload.period_start = activeDates.start;
+    payload.period_end = activeDates.end;
 
     return payload;
   }, [employees, eventLinesByEmployee, getEmployeeEventPrice, periodType, selectedMonth]);
@@ -814,15 +927,11 @@ function PaymentRunProcessPageContent() {
                 />
               </div>
               <Select 
-                options={[
-                  { id: "h1", label: t("1st-15th") },
-                  { id: "h2", label: t("16th-End") }
-                ]}
+                options={periodOptions}
                 value={periodType}
                 onChange={(val) => {
-                  const type = val as "h1" | "h2";
-                  setPeriodType(type);
-                  router.replace(`/hr/payments/run?date=${selectedMonth}&period_type=${type}`);
+                  setPeriodType(val);
+                  router.replace(`/hr/payments/run?date=${selectedMonth}&period_type=${val}`);
                 }}
                 className="w-40"
               />

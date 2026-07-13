@@ -72,6 +72,7 @@ function resolvePersistedPayrollPeriod(input: {
   year?: number;
   periodKind?: "month" | "range" | "half_month" | "weekly";
   periodStart?: string;
+  periodEnd?: string;
 }) {
   const finalMonth = input.month || new Date().getUTCMonth() + 1;
   const finalYear = input.year || new Date().getUTCFullYear();
@@ -89,8 +90,28 @@ function resolvePersistedPayrollPeriod(input: {
     };
   }
 
-  if (input.periodKind && input.periodKind !== "half_month") {
-    throw new Error("Only half-month and weekly payroll periods are supported for saved payroll runs.");
+  if (input.periodKind === "month") {
+    const bounds = getMonthlyBounds(finalYear, finalMonth);
+    return {
+      bounds,
+      title: `Payroll ${finalYear}-${String(finalMonth).padStart(2, "0")} Full Month`,
+      periodKind: "month" as const,
+    };
+  }
+
+  if (input.periodKind === "range") {
+    if (!input.periodStart || !input.periodEnd) {
+      throw new Error("Custom range payroll periods require period_start and period_end.");
+    }
+    const bounds = {
+      start: input.periodStart,
+      end: input.periodEnd,
+    };
+    return {
+      bounds,
+      title: `Payroll ${bounds.start} to ${bounds.end}`,
+      periodKind: "range" as const,
+    };
   }
 
   const isSecondHalf = input.periodStart ? new Date(input.periodStart).getUTCDate() > 15 : false;
@@ -615,7 +636,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, employeeLineEvents, created_by_user_id } = result.data;
+    const { month, year, period_kind, period_start, period_end, employeeLineEvents, created_by_user_id } = result.data;
 
     let period;
     try {
@@ -624,6 +645,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
         year,
         periodKind: period_kind,
         periodStart: period_start,
+        periodEnd: period_end,
       });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
@@ -780,7 +802,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, employeeLineEvents, created_by_user_id } = result.data;
+    const { month, year, period_kind, period_start, period_end, employeeLineEvents, created_by_user_id } = result.data;
 
     let period;
     try {
@@ -789,6 +811,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
         year,
         periodKind: period_kind,
         periodStart: period_start,
+        periodEnd: period_end,
       });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });

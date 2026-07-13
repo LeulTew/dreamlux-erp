@@ -18,6 +18,7 @@
     "cors": "^2.8.5",
     "csv-stringify": "^6.5.0",
     "dotenv": "^16.4.5",
+    "ethiopian-calendar-date-converter": "^2.1.6",
     "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "file-type": "^16.5.4",
