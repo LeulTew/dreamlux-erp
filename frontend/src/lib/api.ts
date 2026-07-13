@@ -55,10 +55,9 @@ export type UpdateUserPayload = {
 };
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.trim() ||
-  (typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "http://localhost:4000"
-    : "");
+  typeof window !== "undefined"
+    ? "/api"
+    : (process.env.NEXT_PUBLIC_API_URL?.trim() || "https://el-erp-demo-backend.vercel.app");
 
 export const api = axios.create({
   baseURL: API_URL,
