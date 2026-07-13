@@ -2069,6 +2069,22 @@ describe("Events API", () => {
     expect(res.body.error).toContain("Forbidden: Missing expense approval permission");
   });
 
+  // Issue #148: DB failures return a sanitized message + correlation reference,
+  // never the raw error text.
+  test("GET /events/expenses/pending returns 500 with a reference and no raw error leak on DB failure", async () => {
+    mockQuery.mockRejectedValueOnce(new Error("column exp.secret does not exist"));
+
+    const res = await request(app)
+      .get("/events/expenses/pending?sort_by=created_at&sort_order=desc")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe("Failed to load pending expenses");
+    expect(typeof res.body.reference).toBe("string");
+    expect(res.body.reference).toContain("exp-pending-");
+    expect(JSON.stringify(res.body)).not.toContain("secret");
+  });
+
   test("GET /events/expenses/history returns accountant approval history (paginated)", async () => {
     // 1. COUNT query mock
     mockQuery.mockResolvedValueOnce({
