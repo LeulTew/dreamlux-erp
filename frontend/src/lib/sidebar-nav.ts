@@ -233,9 +233,12 @@ export function buildSidebarNavState(params: {
     ? { href: "/assets/reports", label: t("Reports"), active: pathname === "/assets/reports" }
     : null;
 
-  // Admin settings Footer link
+  // Admin settings Footer link — active only on core settings pages, not Reference Data sub-routes
+  // which have their own nav section (/settings/departments, /settings/positions, /settings/offices)
+  const REFDATA_PATHS = ["/settings/departments", "/settings/positions", "/settings/offices"];
+  const adminLinkActive = pathname.startsWith("/settings") && !REFDATA_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const adminLink = hasAny(ADMIN_PERMISSIONS)
-    ? { href: "/settings", label: t("Admin"), active: pathname.startsWith("/settings") }
+    ? { href: "/settings", label: t("Admin"), active: adminLinkActive }
     : null;
 
   return {
@@ -256,5 +259,3 @@ export function buildSidebarNavState(params: {
     adminLink,
   };
 }
-
-
