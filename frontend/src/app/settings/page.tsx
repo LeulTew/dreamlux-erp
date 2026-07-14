@@ -44,6 +44,7 @@ import {
   HiShieldCheck,
   HiUsers,
   HiChevronDown,
+  HiArrowRight,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +59,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "System": "System",
     "Database": "Database",
     "Roles": "Roles",
+    "Manage Roles & Access": "Manage Roles & Access",
     "Backend": "Backend",
     "enabled /": "enabled /",
     "disabled": "disabled",
@@ -120,6 +122,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "System": "ስርዓት",
     "Database": "የመረጃ ቋት",
     "Roles": "ሚናዎች",
+    "Manage Roles & Access": "ሚናዎችና መዳረሻ አስተዳድር",
     "Backend": "የጀርባ አገልግሎት",
     "enabled /": "ገባሪ /",
     "disabled": "ያልነቃ",
@@ -882,9 +885,13 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Card 2: Roles Catalog Card */}
-                  <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full -mr-8 -mt-8 transition-transform duration-500 group-hover:scale-110" />
+                  {/* Card 2: Roles Catalog Card — opens the role & access editor */}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/settings/permissions")}
+                    aria-label={t("Manage Roles & Access")}
+                    className="relative overflow-hidden rounded-2xl bg-card border border-border p-6 shadow-premium group transition-colors duration-300 text-left w-full [@media(hover:hover)]:hover:border-emerald-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="space-y-2">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase tracking-wider">
@@ -903,12 +910,17 @@ export default function SettingsPage() {
 
                     <div className="mt-5 flex flex-wrap gap-1.5 max-h-[44px] overflow-hidden">
                       {roles.map((role) => (
-                        <span key={role.id} className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-card-alt border border-border rounded-lg text-muted-foreground transition-all hover:border-emerald-500/30 hover:text-emerald-600">
+                        <span key={role.id} className="text-[9px] font-black uppercase tracking-wider px-2 py-1 bg-card-alt border border-border rounded-lg text-muted-foreground">
                           {role.name}
                         </span>
                       ))}
                     </div>
-                  </div>
+
+                    <div className="mt-4 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                      {t("Manage Roles & Access")}
+                      <HiArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </button>
 
                   {/* Card 3: Backend Health Diagnostics */}
                   <div className="relative overflow-hidden rounded-2xl bg-card border border-border p-6 shadow-premium group transition-all duration-300 hover:shadow-2xl">

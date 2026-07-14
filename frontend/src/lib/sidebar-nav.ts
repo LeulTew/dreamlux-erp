@@ -190,6 +190,12 @@ export function buildSidebarNavState(params: {
       active: pathname === "/settings/offices",
       show: hasPermission("offices:manage") || hasPermission("hr:read") || hasPermission("offices:read"),
     },
+    {
+      href: "/settings/permissions",
+      label: t("Roles & Access"),
+      active: pathname === "/settings/permissions",
+      show: hasPermission("users:manage") || hasPermission("settings:write"),
+    },
   ]
     .filter((link) => link.show)
     .map(({ href, label, active }) => ({ href, label, active }));
