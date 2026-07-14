@@ -838,7 +838,31 @@ const investmentCoreFields = {
   creates_inventory_stock: z.coerce.boolean().optional().default(false),
 };
 
-export const createCapitalInvestmentSchema = z.object(investmentCoreFields);
+// Issue #172: stock-creating purchases feed items.quantity (an INTEGER count),
+// so they must carry a linked item and a whole-number quantity. Fractional
+// quantities are rejected up front rather than truncated or rounded later.
+export function validateStockCreationRules(
+  data: { creates_inventory_stock?: boolean; asset_id?: string | null; quantity?: number },
+  ctx: z.RefinementCtx,
+): void {
+  if (!data.creates_inventory_stock) return;
+  if (!data.asset_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["asset_id"],
+      message: "A linked inventory item is required when the purchase creates stock",
+    });
+  }
+  if (data.quantity !== undefined && !Number.isInteger(data.quantity)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["quantity"],
+      message: "Stock-creating purchases must use a whole-number quantity",
+    });
+  }
+}
+
+export const createCapitalInvestmentSchema = z.object(investmentCoreFields).superRefine(validateStockCreationRules);
 
 export const updateCapitalInvestmentSchema = z.object({
   purchase_date: investmentCoreFields.purchase_date.optional(),
@@ -852,7 +876,9 @@ export const updateCapitalInvestmentSchema = z.object({
   capex_classification: investmentClassificationSchema.optional(),
   asset_id: nullableUuid("Invalid linked asset ID"),
   creates_inventory_stock: z.coerce.boolean().optional(),
-}).refine((data) => Object.keys(data).length > 0, { message: "At least one field is required" });
+})
+  .refine((data) => Object.keys(data).length > 0, { message: "At least one field is required" })
+  .superRefine(validateStockCreationRules);
 
 export const rejectCapitalInvestmentSchema = z.object({
   rejected_reason: z.string().trim().min(1, "Rejection reason is required").max(1000, "Rejection reason too long"),

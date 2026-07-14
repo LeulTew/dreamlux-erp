@@ -23,6 +23,7 @@ import {
   FinanceOverheadSummary,
   FinanceOverheadListResponse,
   CapitalInvestment,
+  InvestmentStockApplication,
   CapitalInvestmentSummary,
   CapitalInvestmentListResponse,
   HisabImportCommitPayload,
@@ -1744,10 +1745,19 @@ export const deleteCapitalInvestment = (id: string) =>
   api.delete<{ deleted: boolean }>(`/finance/investments/${id}`).then((r) => r.data);
 
 export const approveCapitalInvestment = (id: string) =>
-  api.post<{ investment: CapitalInvestment }>(`/finance/investments/${id}/approve`).then((r) => r.data);
+  api
+    .post<{ investment: CapitalInvestment; stock_application: InvestmentStockApplication | null }>(
+      `/finance/investments/${id}/approve`,
+    )
+    .then((r) => r.data);
 
 export const rejectCapitalInvestment = (id: string, rejected_reason: string) =>
-  api.post<{ investment: CapitalInvestment }>(`/finance/investments/${id}/reject`, { rejected_reason }).then((r) => r.data);
+  api
+    .post<{ investment: CapitalInvestment; stock_application: InvestmentStockApplication | null }>(
+      `/finance/investments/${id}/reject`,
+      { rejected_reason },
+    )
+    .then((r) => r.data);
 
 export const downloadCapitalInvestmentsExport = async (
   params: Record<string, unknown> & { format: "csv" | "xlsx" }

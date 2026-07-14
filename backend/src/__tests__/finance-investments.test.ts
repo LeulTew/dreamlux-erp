@@ -52,13 +52,33 @@ const PENDING_INVESTMENT = {
   approved_by: null,
 };
 
-function mockInvestmentQueries(options: { existing?: Record<string, unknown> | null; assetExists?: boolean; onSql?: (sql: string) => any }) {
+const LINKED_ITEM = {
+  id: "7c3f9b65-3333-4ee7-8b62-41d6e5f11199",
+  name: "White Fabric",
+  quantity: 24,
+  unit_of_measurement: "pcs",
+};
+
+function mockInvestmentQueries(options: {
+  existing?: Record<string, unknown> | null;
+  assetExists?: boolean;
+  item?: Record<string, unknown> | null;
+  onSql?: (sql: string) => any;
+}) {
   mockQuery.mockImplementation((sql: string) => {
     const text = String(sql);
     const custom = options.onSql?.(text);
     if (custom) return custom;
+    if (text.includes("unit_of_measurement FROM items")) {
+      // Issue #172 approval item lock.
+      const item = options.item === undefined ? LINKED_ITEM : options.item;
+      return Promise.resolve({ rows: item ? [item] : [], rowCount: item ? 1 : 0 });
+    }
     if (text.includes("FROM items WHERE id =")) {
       return Promise.resolve({ rows: options.assetExists === false ? [] : [{ "?column?": 1 }], rowCount: options.assetExists === false ? 0 : 1 });
+    }
+    if (text.includes("INSERT INTO inventory_movements")) {
+      return Promise.resolve({ rows: [{ id: "movement-1" }], rowCount: 1 });
     }
     if (text.includes("FOR UPDATE")) {
       const existing = options.existing === undefined ? PENDING_INVESTMENT : options.existing;
@@ -264,6 +284,199 @@ describe("Capital investment register", () => {
       .delete(`/finance/investments/${PENDING_INVESTMENT.id}`)
       .set("Authorization", `Bearer ${getToken()}`);
     expect(locked.status).toBe(409);
+  });
+});
+
+describe("Investment stock application (issue #172)", () => {
+  test("approving a stock-creating investment applies stock once and returns movement metadata", async () => {
+    const executed: string[] = [];
+    mockInvestmentQueries({
+      onSql: (sql) => {
+        executed.push(sql);
+        if (sql.includes("UPDATE capital_investments") && sql.includes("RETURNING")) {
+          return Promise.resolve({
+            rows: [{ ...PENDING_INVESTMENT, status: "Approved", approved_by: "user-1", stock_applied_at: "2026-07-14T00:00:00Z" }],
+            rowCount: 1,
+          });
+        }
+        return undefined;
+      },
+    });
+
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.investment.status).toBe("Approved");
+    expect(res.body.stock_application).toEqual({
+      movement_id: "movement-1",
+      item_id: LINKED_ITEM.id,
+      item_name: "White Fabric",
+      quantity_delta: 18,
+      quantity_before: 24,
+      quantity_after: 42,
+    });
+    expect(executed.some((sql) => sql.includes("INSERT INTO inventory_movements"))).toBe(true);
+    expect(executed.some((sql) => sql.includes("UPDATE items SET quantity"))).toBe(true);
+    expect(executed.some((sql) => sql.includes("COMMIT"))).toBe(true);
+  });
+
+  test("approving a non-stock investment never touches inventory", async () => {
+    const executed: string[] = [];
+    mockInvestmentQueries({
+      existing: { ...PENDING_INVESTMENT, creates_inventory_stock: false },
+      onSql: (sql) => {
+        executed.push(sql);
+        if (sql.includes("UPDATE capital_investments") && sql.includes("RETURNING")) {
+          return Promise.resolve({ rows: [{ ...PENDING_INVESTMENT, creates_inventory_stock: false, status: "Approved" }], rowCount: 1 });
+        }
+        return undefined;
+      },
+    });
+
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.stock_application).toBeNull();
+    expect(executed.some((sql) => sql.includes("UPDATE items"))).toBe(false);
+    expect(executed.some((sql) => sql.includes("INSERT INTO inventory_movements"))).toBe(false);
+  });
+
+  test("rejecting a stock-creating investment never touches inventory", async () => {
+    const executed: string[] = [];
+    mockInvestmentQueries({
+      onSql: (sql) => {
+        executed.push(sql);
+        if (sql.includes("UPDATE capital_investments") && sql.includes("RETURNING")) {
+          return Promise.resolve({ rows: [{ ...PENDING_INVESTMENT, status: "Rejected", rejected_reason: "duplicate" }], rowCount: 1 });
+        }
+        return undefined;
+      },
+    });
+
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/reject`)
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({ rejected_reason: "duplicate" });
+
+    expect(res.status).toBe(200);
+    expect(executed.some((sql) => sql.includes("UPDATE items"))).toBe(false);
+    expect(executed.some((sql) => sql.includes("INSERT INTO inventory_movements"))).toBe(false);
+  });
+
+  test("unit mismatch rolls back approval with no status change or movement", async () => {
+    const executed: string[] = [];
+    mockInvestmentQueries({
+      item: { ...LINKED_ITEM, unit_of_measurement: "meters" },
+      onSql: (sql) => { executed.push(sql); return undefined; },
+    });
+
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("Unit mismatch");
+    expect(executed.some((sql) => sql.includes("ROLLBACK"))).toBe(true);
+    expect(executed.some((sql) => sql.includes("UPDATE capital_investments"))).toBe(false);
+    expect(executed.some((sql) => sql.includes("INSERT INTO inventory_movements"))).toBe(false);
+  });
+
+  test("missing or deleted linked item rolls back approval", async () => {
+    mockInvestmentQueries({ item: null });
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("no longer exists");
+  });
+
+  test("missing asset link on a stock-creating investment is a conflict", async () => {
+    mockInvestmentQueries({ existing: { ...PENDING_INVESTMENT, asset_id: null } });
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("no linked inventory item");
+  });
+
+  test("fractional quantity on a stock-creating investment is rejected at approval", async () => {
+    mockInvestmentQueries({ existing: { ...PENDING_INVESTMENT, quantity: "18.5000" } });
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("whole-number");
+  });
+
+  test("duplicate movement (unique constraint) maps to an explicit conflict", async () => {
+    mockInvestmentQueries({
+      onSql: (sql) => {
+        if (sql.includes("INSERT INTO inventory_movements")) {
+          const err = Object.assign(new Error("duplicate key value violates unique constraint"), {
+            code: "23505",
+            constraint: "uq_inventory_movements_source",
+          });
+          return Promise.reject(err);
+        }
+        return undefined;
+      },
+    });
+
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("already been applied");
+  });
+
+  test("create validation requires a linked item and whole quantity when creating stock", async () => {
+    const missingLink = await request(app)
+      .post("/finance/investments")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        purchase_date: "2026-05-04",
+        item_name: "white fabric",
+        category: "Fabric",
+        quantity: 18,
+        unit: "pcs",
+        unit_cost: 1950,
+        capex_classification: "Inventory Asset",
+        creates_inventory_stock: true,
+      });
+    expect(missingLink.status).toBe(400);
+    expect(missingLink.body.error).toContain("linked inventory item");
+
+    const fractional = await request(app)
+      .post("/finance/investments")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({
+        purchase_date: "2026-05-04",
+        item_name: "white fabric",
+        category: "Fabric",
+        quantity: 18.5,
+        unit: "pcs",
+        unit_cost: 1950,
+        capex_classification: "Inventory Asset",
+        asset_id: LINKED_ITEM.id,
+        creates_inventory_stock: true,
+      });
+    expect(fractional.status).toBe(400);
+    expect(fractional.body.error).toContain("whole-number");
+  });
+
+  test("PATCH cannot strip the asset link from a stock-creating investment", async () => {
+    mockInvestmentQueries({});
+    const res = await request(app)
+      .patch(`/finance/investments/${PENDING_INVESTMENT.id}`)
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({ asset_id: null });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("linked inventory item");
   });
 });
 

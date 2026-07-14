@@ -10,6 +10,7 @@ export interface Item {
   quantity: number;
   allocated_quantity?: number;
   available_quantity?: number;
+  unit_of_measurement?: string | null;
   description: string | null;
   store: {
     id: string;
@@ -817,6 +818,18 @@ export interface CapitalInvestment {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  stock_applied_at?: string | null;
+  stock_applied_by?: string | null;
+}
+
+/** Metadata returned when approving a stock-creating investment (issue #172). */
+export interface InvestmentStockApplication {
+  movement_id: string;
+  item_id: string;
+  item_name: string;
+  quantity_delta: number;
+  quantity_before: number;
+  quantity_after: number;
 }
 
 export interface CapitalInvestmentSummary {
