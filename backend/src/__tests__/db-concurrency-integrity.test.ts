@@ -37,14 +37,18 @@ describe("DB concurrency integrity assertions", () => {
     expect(assignmentMigrationSql).toContain("e.id <> NEW.event_id");
   });
 
-  test("inventory allocation stock check locks the item row before summing active allocations", () => {
+  test("inventory allocation stock check locks the item row before summing outstanding allocations", () => {
     const lockIndex = eventsRouteSource.indexOf("SELECT * FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE");
-    const sumIndex = eventsRouteSource.indexOf("SELECT COALESCE(SUM(quantity_allocated), 0) as total_allocated");
+    // Issue #173: the sum is now the OUTSTANDING quantity (allocated minus
+    // already-accounted return quantities), not the raw allocated quantity.
+    const sumIndex = eventsRouteSource.indexOf("as total_allocated");
     const insertIndex = eventsRouteSource.indexOf("INSERT INTO event_allocations");
 
     expect(lockIndex).toBeGreaterThan(-1);
     expect(sumIndex).toBeGreaterThan(lockIndex);
     expect(insertIndex).toBeGreaterThan(sumIndex);
+    expect(eventsRouteSource).toContain("SELECT COALESCE(SUM(quantity_allocated");
+    expect(eventsRouteSource).toContain("- returned_good_quantity - returned_damaged_quantity");
     expect(eventsRouteSource).toContain("WHERE item_id = $1 AND status != 'Returned'");
     expect(eventsRouteSource).toContain("Requested quantity exceeds available stock");
   });

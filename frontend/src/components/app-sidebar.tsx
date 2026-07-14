@@ -12,6 +12,7 @@ import {
   HiCog6Tooth,
   HiOutlineDocumentChartBar,
   HiTruck,
+  HiArchiveBoxArrowDown,
   HiChevronDown,
   HiChevronUp,
   HiChevronLeft,
@@ -53,6 +54,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Inventory: "Inventory",
     Reconcile: "Reconcile",
     Dispatch: "Dispatch",
+    Returns: "Returns",
     "Audit Log": "Audit Log",
     Reports: "Reports",
     "Add Item": "Add Item",
@@ -99,6 +101,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Inventory: "ዕቃዎች",
     Reconcile: "ቆጠራ ማመሳከሪያ",
     Dispatch: "መላኪያ",
+    Returns: "መመለሻ",
     "Audit Log": "የቆጠራ ታሪክ",
     Reports: "ሪፖርቶች",
     "Add Item": "ዕቃ መዝግብ",
@@ -774,6 +777,19 @@ export function AppSidebar() {
                       icon={HiTruck}
                       label={navState.dispatchLink.label}
                       active={navState.dispatchLink.active}
+                      isCollapsed={isCollapsed}
+                    />
+                  </SidebarMenuItem>
+                )}
+
+                {/* Returns (issue #173) */}
+                {navState.returnsLink && (
+                  <SidebarMenuItem className="w-full flex justify-center">
+                    <SidebarLink
+                      href={navState.returnsLink.href}
+                      icon={HiArchiveBoxArrowDown}
+                      label={navState.returnsLink.label}
+                      active={navState.returnsLink.active}
                       isCollapsed={isCollapsed}
                     />
                   </SidebarMenuItem>

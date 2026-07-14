@@ -762,8 +762,56 @@ CREATE TABLE IF NOT EXISTS event_allocations (
   departed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  -- Issue #173: running return accounting. outstanding = quantity_allocated -
+  -- (good + damaged + lost + repair); 'Returned' only when outstanding is zero.
+  returned_good_quantity INTEGER NOT NULL DEFAULT 0,
+  returned_damaged_quantity INTEGER NOT NULL DEFAULT 0,
+  returned_lost_quantity INTEGER NOT NULL DEFAULT 0,
+  returned_repair_quantity INTEGER NOT NULL DEFAULT 0,
+  returned_at TIMESTAMP DEFAULT NULL,
+  returned_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT chk_event_allocations_return_totals CHECK (
+    returned_good_quantity >= 0
+    AND returned_damaged_quantity >= 0
+    AND returned_lost_quantity >= 0
+    AND returned_repair_quantity >= 0
+    AND (returned_good_quantity + returned_damaged_quantity
+         + returned_lost_quantity + returned_repair_quantity) <= quantity_allocated
+  )
 );
+
+-- Immutable per-allocation return receipt lines (issue #173). Good quantities
+-- restore availability by shrinking outstanding; damaged/lost/repair reduce
+-- items.quantity through the inventory_movements ledger. Never edited/deleted.
+CREATE TABLE IF NOT EXISTS event_return_receipts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  allocation_id UUID NOT NULL REFERENCES event_allocations(id) ON DELETE CASCADE,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES items(id) ON DELETE RESTRICT,
+  good_quantity INTEGER NOT NULL DEFAULT 0 CHECK (good_quantity >= 0),
+  damaged_quantity INTEGER NOT NULL DEFAULT 0 CHECK (damaged_quantity >= 0),
+  lost_quantity INTEGER NOT NULL DEFAULT 0 CHECK (lost_quantity >= 0),
+  repair_quantity INTEGER NOT NULL DEFAULT 0 CHECK (repair_quantity >= 0),
+  outstanding_before INTEGER NOT NULL CHECK (outstanding_before >= 0),
+  outstanding_after INTEGER NOT NULL CHECK (outstanding_after >= 0),
+  notes TEXT DEFAULT NULL,
+  idempotency_key TEXT DEFAULT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  CHECK (good_quantity + damaged_quantity + lost_quantity + repair_quantity > 0)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_event_return_receipts_idem
+  ON event_return_receipts(allocation_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_event_return_receipts_allocation
+  ON event_return_receipts(allocation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_event_return_receipts_event
+  ON event_return_receipts(event_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_event_allocations_return_queue
+  ON event_allocations(event_id)
+  WHERE departed_at IS NOT NULL AND status <> 'Returned';
 
 CREATE INDEX IF NOT EXISTS idx_event_allocations_event ON event_allocations(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_allocations_item ON event_allocations(item_id);

@@ -321,7 +321,9 @@ async function getActiveAllocationQuantities(itemIds: string[]): Promise<Map<str
 
   const { data, error } = await supabase
     .from("event_allocations")
-    .select("item_id, quantity_allocated")
+    .select(
+      "item_id, quantity_allocated, returned_good_quantity, returned_damaged_quantity, returned_lost_quantity, returned_repair_quantity"
+    )
     .in("item_id", itemIds)
     .neq("status", "Returned");
 
@@ -333,14 +335,26 @@ async function getActiveAllocationQuantities(itemIds: string[]): Promise<Map<str
   }
 
   const allocatedByItem = new Map<string, number>();
-  for (const row of (data || []) as Array<{ item_id?: string | null; quantity_allocated?: number | string | null }>) {
+  for (const row of (data || []) as Array<{
+    item_id?: string | null;
+    quantity_allocated?: number | string | null;
+    returned_good_quantity?: number | string | null;
+    returned_damaged_quantity?: number | string | null;
+    returned_lost_quantity?: number | string | null;
+    returned_repair_quantity?: number | string | null;
+  }>) {
     if (!row.item_id) {
       continue;
     }
-    allocatedByItem.set(
-      row.item_id,
-      (allocatedByItem.get(row.item_id) || 0) + normalizeQuantity(row.quantity_allocated)
-    );
+    // Outstanding = allocated minus everything already accounted by return
+    // receipts (issue #173). Old rows have zero returned quantities.
+    const outstanding =
+      normalizeQuantity(row.quantity_allocated) -
+      normalizeQuantity(row.returned_good_quantity) -
+      normalizeQuantity(row.returned_damaged_quantity) -
+      normalizeQuantity(row.returned_lost_quantity) -
+      normalizeQuantity(row.returned_repair_quantity);
+    allocatedByItem.set(row.item_id, (allocatedByItem.get(row.item_id) || 0) + Math.max(0, outstanding));
   }
 
   return allocatedByItem;
