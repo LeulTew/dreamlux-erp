@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Button, buttonVariants } from "@/components/ui/button";
 
 // Issue #151: the canonical filled amber/orange action must use a WHITE
@@ -31,5 +33,22 @@ describe("canonical amber button variant (issue #151)", () => {
     const el = getByRole("button");
     expect(el.className).toContain("bg-amber-600");
     expect(el.className).toContain("text-white");
+  });
+});
+
+describe("filled gold/primary buttons use white foreground (both themes)", () => {
+  const globals = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+
+  it("sets --primary-foreground to white in both light and dark blocks", () => {
+    const matches = globals.match(/--primary-foreground:\s*#ffffff/gi) ?? [];
+    // One for :root (light), one for the dark block.
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+    expect(globals).not.toMatch(/--primary-foreground:\s*#1c1917/);
+  });
+
+  it("keeps the default button hover crisp (no glow/blur/oversized shadow)", () => {
+    const cls = buttonVariants({ variant: "default" });
+    expect(cls).toContain("hover:bg-primary-dark");
+    expect(cls).not.toMatch(/hover:shadow-lg|shadow-primary\/|blur/);
   });
 });
