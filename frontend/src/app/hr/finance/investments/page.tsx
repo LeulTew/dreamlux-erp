@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Select from "@/components/ui/Select";
 import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
-import { generateReportPdf } from "@/lib/pdf-report";
+import PdfExportModal, { type PdfColumn } from "@/components/PdfExportModal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import PaginationControls from "@/components/PaginationControls";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
@@ -167,6 +167,7 @@ export default function InvestmentsPage() {
   const [classificationFilter, setClassificationFilter] = useState<string>("all");
   const [linkedFilter, setLinkedFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<CapitalInvestment | null>(null);
@@ -325,35 +326,30 @@ export default function InvestmentsPage() {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "ETB" }).format(val);
   };
 
-  const handleGeneratePdf = () => {
-    const investments = listResponse?.investments ?? [];
-    const rows = investments.map((inv) => {
-      const total = Number(inv.quantity || 0) * Number(inv.unit_cost || 0);
-      return [
-        inv.purchase_date ? inv.purchase_date.slice(0, 10) : "-",
-        inv.item_name || "-",
-        t(inv.category),
-        String(inv.quantity ?? "-"),
-        formatCurrency(Number(inv.unit_cost || 0)),
-        formatCurrency(total),
-        inv.vendor || "-",
-        t(inv.status),
-      ];
-    });
-    const grandTotal = investments.reduce((sum, inv) => sum + Number(inv.quantity || 0) * Number(inv.unit_cost || 0), 0);
-    generateReportPdf({
-      title: "Capital Investment Register",
-      subtitle: selectedMonth ? `${t("Month")}: ${selectedMonth}` : undefined,
-      meta: [`${t("Generated")}: ${new Date().toLocaleString()}`, `${t("Records")}: ${investments.length}`],
-      sections: [{
-        columns: [t("Date"), t("Item"), t("Category"), t("Qty"), t("Unit Cost"), t("Total"), t("Vendor"), t("Status")],
-        rows,
-        foot: [["", "", "", "", t("Total"), formatCurrency(grandTotal), "", ""]],
-        columnStyles: { 4: { halign: "right" }, 5: { halign: "right" } },
-      }],
-      fileName: `investments-${selectedMonth || "report"}.pdf`,
-      orientation: "l",
-    });
+  const investmentsForPdf = listResponse?.investments ?? [];
+  const investmentsGrandTotal = investmentsForPdf.reduce((sum, inv) => sum + Number(inv.quantity || 0) * Number(inv.unit_cost || 0), 0);
+  const pdfColumns: PdfColumn[] = [
+    { key: "date", label: t("Date") },
+    { key: "item", label: t("Item") },
+    { key: "category", label: t("Category") },
+    { key: "qty", label: t("Qty"), align: "right" },
+    { key: "unit_cost", label: t("Unit Cost"), align: "right" },
+    { key: "total", label: t("Total"), align: "right" },
+    { key: "vendor", label: t("Vendor") },
+    { key: "status", label: t("Status") },
+  ];
+  const investmentRowValue = (inv: (typeof investmentsForPdf)[number], key: string): string => {
+    switch (key) {
+      case "date": return inv.purchase_date ? inv.purchase_date.slice(0, 10) : "-";
+      case "item": return inv.item_name || "-";
+      case "category": return t(inv.category);
+      case "qty": return String(inv.quantity ?? "-");
+      case "unit_cost": return formatCurrency(Number(inv.unit_cost || 0));
+      case "total": return formatCurrency(Number(inv.quantity || 0) * Number(inv.unit_cost || 0));
+      case "vendor": return inv.vendor || "-";
+      case "status": return t(inv.status);
+      default: return "";
+    }
   };
 
   const handleOpenAddForm = () => {
@@ -462,8 +458,8 @@ export default function InvestmentsPage() {
               </div>
             )}
             <button
-              onClick={handleGeneratePdf}
-              aria-label={t("Download PDF")}
+              onClick={() => setPdfOpen(true)}
+              aria-label={t("Export PDF")}
               className="flex items-center justify-center w-[40px] h-[40px] dl-radius-lg border border-border text-muted bg-card [@media(hover:hover)]:hover:text-foreground transition-all"
             >
               <HiPrinter className="w-4 h-4" />
@@ -925,6 +921,20 @@ export default function InvestmentsPage() {
           setIsActivityOpen(false);
           setSelectedActivityId(null);
         }}
+      />
+
+      <PdfExportModal
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        title="Capital Investment Register"
+        subtitle={selectedMonth ? `${t("Month")}: ${selectedMonth}` : undefined}
+        meta={[`${t("Generated")}: ${new Date().toLocaleString()}`, `${t("Records")}: ${investmentsForPdf.length}`]}
+        columns={pdfColumns}
+        buildRows={(keys) => investmentsForPdf.map((inv) => keys.map((k) => investmentRowValue(inv, k)))}
+        buildFoot={(keys) => [keys.map((k) => (k === "total" ? formatCurrency(investmentsGrandTotal) : k === "vendor" ? t("Total") : ""))]}
+        fileName={`investments-${selectedMonth || "report"}.pdf`}
+        defaultOrientation="l"
+        t={t}
       />
     </AuthLayout>
   );
