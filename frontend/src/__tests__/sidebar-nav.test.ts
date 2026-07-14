@@ -138,6 +138,17 @@ describe("sidebar permission navigation", () => {
     expect(nav.inventoryDashboardLink).toBeNull(); // no assets:read
   });
 
+  // --- Roles & Access discoverability (issue #144) ---
+  it("shows the Roles & Access link for users:manage", () => {
+    const nav = navFor("/settings/permissions", ["users:manage"]);
+    expect(nav.refDataLinks.some((l) => l.href === "/settings/permissions")).toBe(true);
+  });
+
+  it("hides Roles & Access from users without users:manage/settings:write", () => {
+    const nav = navFor("/settings/departments", ["hr:read"]);
+    expect(nav.refDataLinks.some((l) => l.href === "/settings/permissions")).toBe(false);
+  });
+
   // --- Fleet (issue #147) ---
   it("shows Fleet link for vehicles:read and reveals the inventory group", () => {
     const nav = navFor("/fleet", ["vehicles:read"]);
