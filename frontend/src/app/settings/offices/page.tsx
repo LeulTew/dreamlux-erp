@@ -12,6 +12,7 @@ import PaginationControls from "@/components/PaginationControls";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import ForbiddenState from "@/components/ForbiddenState";
+import Select from "@/components/ui/Select";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -214,14 +215,15 @@ function OfficesContent() {
                 <label className="block text-[11px] font-semibold uppercase text-muted-foreground mb-2 tracking-wide leading-none">
                   {t("Status Option")}
                 </label>
-                <select
+                <Select
                   value={form.is_active ? "true" : "false"}
-                  onChange={(e) => setForm({ ...form, is_active: e.target.value === "true" })}
-                  className="w-full h-11 px-4 bg-card-alt border border-border/80 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-primary/20 transition-all focus:border-primary/50 text-foreground"
-                >
-                  <option value="true">{t("Active")}</option>
-                  <option value="false">{t("Inactive")}</option>
-                </select>
+                  onChange={(v) => setForm({ ...form, is_active: v === "true" })}
+                  options={[
+                    { id: "true", label: t("Active") },
+                    { id: "false", label: t("Inactive") },
+                  ]}
+                  triggerClassName="w-full h-11 flex items-center justify-between px-4 bg-card-alt border border-border/80 rounded-xl font-semibold text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                />
               </div>
               <div className="flex gap-3">
                 <button
