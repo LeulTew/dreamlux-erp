@@ -139,13 +139,10 @@ describe("sidebar permission navigation", () => {
   });
 
   // --- Roles & Access discoverability (issue #144) ---
-  it("shows the Roles & Access link for users:manage", () => {
+  // The role editor lives under Settings (reachable from the Admin hub card),
+  // NOT in the Reference Data dropdown.
+  it("does not place the role editor in the Reference Data dropdown", () => {
     const nav = navFor("/settings/permissions", ["users:manage"]);
-    expect(nav.refDataLinks.some((l) => l.href === "/settings/permissions")).toBe(true);
-  });
-
-  it("hides Roles & Access from users without users:manage/settings:write", () => {
-    const nav = navFor("/settings/departments", ["hr:read"]);
     expect(nav.refDataLinks.some((l) => l.href === "/settings/permissions")).toBe(false);
   });
 
