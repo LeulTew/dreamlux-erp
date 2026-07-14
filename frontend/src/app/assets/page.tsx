@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { PillButton } from "@/components/ui/PillButton";
 import DatePicker from "@/components/ui/DatePicker";
-import { Suspense, useState, useCallback, useMemo, useEffect } from "react";
+import { Suspense, useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -39,6 +39,7 @@ import { fuzzySearch } from "@/lib/fuzzy-search";
 import { useLanguage } from "@/hooks/use-language";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import ForbiddenState from "@/components/ForbiddenState";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -176,9 +177,9 @@ function buildColumns(
   setItemToRecover: (item: Item) => void,
   t: (key: string) => string,
   sortBy: string,
-  sortOrder: string,
+  sortOrder: "asc" | "desc",
   setSortBy: (val: string) => void,
-  setSortOrder: (val: string) => void,
+  setSortOrder: (val: "asc" | "desc") => void,
 ) {
   return [
     ...(selectMode
@@ -413,10 +414,38 @@ function AssetsContent() {
   const [page, setPage] = useState(1);
   const [editMode, setEditMode] = useState(false);
   const [sortBy, setSortBy] = useState("updated_at");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+
+  // Issue #155: Per-user list state preferences
+  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("assets");
+  const prefsHydratedRef = useRef(false);
+
+  // Hydrate states once preferences are retrieved
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+    prefsHydratedRef.current = true;
+    const hasExplicitState = ["store", "filter", "q", "from", "to", "sortBy", "sortOrder"].some((k) => searchParams.get(k));
+    if (hasExplicitState || !listPreference) return;
+    if (listPreference.sort?.sortBy) {
+      setSortBy(listPreference.sort.sortBy);
+      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+    }
+    const storedFilters = listPreference.filters as { officeFilter?: string; stockFilter?: string } | undefined;
+    if (storedFilters?.officeFilter) setOfficeFilter(storedFilters.officeFilter);
+    if (storedFilters?.stockFilter) setStockFilter(storedFilters.stockFilter as StockFilterMode);
+  }, [prefsLoaded, listPreference, searchParams]);
+
+  // Persist preferences on changes
+  useEffect(() => {
+    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    savePreference({
+      sort: { sortBy, sortOrder },
+      filters: { officeFilter, stockFilter },
+    });
+  }, [prefsLoaded, sortBy, sortOrder, officeFilter, stockFilter, savePreference]);
 
   useEffect(() => {
     const urlStore = searchParams.get("store") || "all";
@@ -496,7 +525,7 @@ function AssetsContent() {
         sortBy,
         sortOrder,
       ),
-    enabled: isAuthenticated && hasAssetsRead,
+    enabled: isAuthenticated && hasAssetsRead && prefsLoaded,
   });
 
   const items = useMemo(() => data?.items || [], [data?.items]);

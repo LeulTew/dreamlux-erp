@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { PillButton } from "@/components/ui/PillButton";
-import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
+import { useState, useMemo, useCallback, useEffect, Suspense, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -38,6 +38,7 @@ import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { useLanguage } from "@/hooks/use-language";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -133,9 +134,9 @@ function buildColumns(
   selectMode: boolean,
   t: (key: string) => string,
   sortBy: string,
-  sortOrder: string,
+  sortOrder: "asc" | "desc",
   setSortBy: (val: string) => void,
-  setSortOrder: (val: string) => void,
+  setSortOrder: (val: "asc" | "desc") => void,
 ) {
   const cols = [];
 
@@ -381,7 +382,35 @@ function EmployeesPageInner() {
   const [officeId, setOfficeId] = useState("all");
   const [departmentId, setDepartmentId] = useState("all");
   const [sortBy, setSortBy] = useState("salary");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Issue #155: Per-user list state preferences
+  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("employees");
+  const prefsHydratedRef = useRef(false);
+
+  // Hydrate states once preferences are retrieved
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+    prefsHydratedRef.current = true;
+    const hasExplicitState = ["q", "office_id", "department_id", "sortBy", "sortOrder"].some((k) => searchParams.get(k));
+    if (hasExplicitState || !listPreference) return;
+    if (listPreference.sort?.sortBy) {
+      setSortBy(listPreference.sort.sortBy);
+      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+    }
+    const storedFilters = listPreference.filters as { officeId?: string; departmentId?: string } | undefined;
+    if (storedFilters?.officeId) setOfficeId(storedFilters.officeId);
+    if (storedFilters?.departmentId) setDepartmentId(storedFilters.departmentId);
+  }, [prefsLoaded, listPreference, searchParams]);
+
+  // Persist preferences on changes
+  useEffect(() => {
+    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    savePreference({
+      sort: { sortBy, sortOrder },
+      filters: { officeId, departmentId },
+    });
+  }, [prefsLoaded, sortBy, sortOrder, officeId, departmentId, savePreference]);
   const [advancedFilters, setAdvancedFilters] = useState<FilterRule[]>([]);
   const [filterLogic, setFilterLogic] = useState<"and" | "or">("and");
   const [exportingCSV, setExportingCSV] = useState(false);
@@ -411,6 +440,7 @@ function EmployeesPageInner() {
   const { data, isLoading } = useQuery<EmployeesResponse>({
     queryKey: ["employees", page, limit, search, showTrash, officeId, departmentId, sortBy, sortOrder],
     queryFn: () => getEmployees(page, limit, search, showTrash ? "trash" : "active", officeId, departmentId, sortBy, sortOrder),
+    enabled: prefsLoaded,
   });
 
   const { data: stores } = useQuery({

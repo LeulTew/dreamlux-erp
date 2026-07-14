@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -27,6 +27,7 @@ import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import {
   api,
@@ -101,6 +102,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Other Capex": "Other Capex",
     "Linked": "Linked",
     "Unlinked": "Unlinked",
+    "Descending": "Descending",
+    "Ascending": "Ascending",
+    "Sort: Recent": "Sort: Recent",
   },
   am: {
     "Capital Register": "የካፒታል መዝገብ",
@@ -158,6 +162,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Other Capex": "ሌላ ካፒታል",
     "Linked": "የተገናኘ",
     "Unlinked": "ያልተገናኘ",
+    "Descending": "ቀናሽ",
+    "Ascending": "አቀበት",
+    "Sort: Recent": "በቅርብ ጊዜ",
   },
 };
 
@@ -179,6 +186,42 @@ export default function InvestmentsPage() {
   const [linkedFilter, setLinkedFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [sortBy, setSortBy] = useState("recent");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Issue #155: Per-user list state preferences
+  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("investments");
+  const prefsHydratedRef = useRef(false);
+
+  // Hydrate states once preferences are retrieved
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+    prefsHydratedRef.current = true;
+    if (!listPreference) return;
+    const storedFilters = listPreference.filters as {
+      statusFilter?: string;
+      categoryFilter?: string;
+      classificationFilter?: string;
+      linkedFilter?: string;
+    } | undefined;
+    if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
+    if (storedFilters?.categoryFilter) setCategoryFilter(storedFilters.categoryFilter);
+    if (storedFilters?.classificationFilter) setClassificationFilter(storedFilters.classificationFilter);
+    if (storedFilters?.linkedFilter) setLinkedFilter(storedFilters.linkedFilter);
+    if (listPreference.sort?.sortBy) {
+      setSortBy(listPreference.sort.sortBy);
+      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+    }
+  }, [prefsLoaded, listPreference]);
+
+  // Persist preferences on changes
+  useEffect(() => {
+    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    savePreference({
+      sort: { sortBy, sortOrder },
+      filters: { statusFilter, categoryFilter, classificationFilter, linkedFilter },
+    });
+  }, [prefsLoaded, sortBy, sortOrder, statusFilter, categoryFilter, classificationFilter, linkedFilter, savePreference]);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<CapitalInvestment | null>(null);
@@ -238,7 +281,7 @@ export default function InvestmentsPage() {
 
   // Investments list
   const { data: listResponse, isLoading: listLoading, error: listError } = useQuery({
-    queryKey: ["finance-investments-list", selectedMonth, page, limit, statusFilter, categoryFilter, classificationFilter, linkedFilter, searchQuery],
+    queryKey: ["finance-investments-list", selectedMonth, page, limit, statusFilter, categoryFilter, classificationFilter, linkedFilter, searchQuery, sortBy, sortOrder],
     queryFn: () =>
       getCapitalInvestments({
         month: selectedMonth || undefined,
@@ -249,8 +292,10 @@ export default function InvestmentsPage() {
         capex_classification: classificationFilter === "all" ? undefined : classificationFilter,
         linked: linkedFilter === "all" ? undefined : linkedFilter,
         search: searchQuery.trim() || undefined,
+        sortBy,
+        sortOrder,
       }),
-    enabled: canRead,
+    enabled: canRead && prefsLoaded,
   });
 
   // Inventory assets lookup for select dropdown
@@ -617,6 +662,33 @@ export default function InvestmentsPage() {
                 { id: "all", label: t("Linked") + ": " + t("All") },
                 { id: "linked", label: t("Linked") },
                 { id: "unlinked", label: t("Unlinked") },
+              ]}
+              className="h-[38px] text-xs font-semibold"
+            />
+          </div>
+
+          <div className="w-[130px]">
+            <Select
+              value={sortBy}
+              onChange={(val) => { setSortBy(val); setPage(1); }}
+              options={[
+                { id: "recent", label: t("Sort: Recent") },
+                { id: "purchase_date", label: t("Purchase Date") },
+                { id: "quantity", label: t("Quantity") },
+                { id: "unit_cost", label: t("Unit Cost") },
+                { id: "status", label: t("Status") },
+              ]}
+              className="h-[38px] text-xs font-semibold"
+            />
+          </div>
+
+          <div className="w-[110px]">
+            <Select
+              value={sortOrder}
+              onChange={(val) => { setSortOrder(val as "asc" | "desc"); setPage(1); }}
+              options={[
+                { id: "desc", label: "↓ " + t("Descending") },
+                { id: "asc", label: "↑ " + t("Ascending") },
               ]}
               className="h-[38px] text-xs font-semibold"
             />

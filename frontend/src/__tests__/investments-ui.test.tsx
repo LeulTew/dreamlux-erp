@@ -72,6 +72,8 @@ vi.mock("@/lib/api", () => ({
   rejectCapitalInvestment: vi.fn(),
   downloadCapitalInvestmentsExport: vi.fn().mockResolvedValue(undefined),
   getItems: vi.fn().mockResolvedValue({ items: [] }),
+  getRecordListPreference: vi.fn().mockResolvedValue({ preference: null }),
+  saveRecordListPreference: vi.fn().mockResolvedValue({ preference: null }),
   api: { get: vi.fn(), defaults: { baseURL: "http://localhost:4000" } },
 }));
 

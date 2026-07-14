@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
@@ -28,6 +28,7 @@ import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
 import { generateReportPdf } from "@/lib/pdf-report";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import {
   api,
@@ -109,6 +110,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "House Expense": "House Expense",
     "Supplies": "Supplies",
     "Other": "Other",
+    "Descending": "Descending",
+    "Ascending": "Ascending",
+    "Sort: Recent": "Sort: Recent",
   },
   am: {
     "Overhead Register": "የወጪ መዝገብ",
@@ -173,6 +177,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "House Expense": "የቤት ወጪ",
     "Supplies": "አቅርቦቶች",
     "Other": "ሌሎች",
+    "Descending": "ቀናሽ",
+    "Ascending": "አቀበት",
+    "Sort: Recent": "በቅርብ ጊዜ",
   },
 };
 
@@ -196,6 +203,42 @@ export default function OverheadsPage() {
   const [kindFilter, setKindFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [sortBy, setSortBy] = useState("recent");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Issue #155: Per-user list state preferences
+  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("overheads");
+  const prefsHydratedRef = useRef(false);
+
+  // Hydrate states once preferences are retrieved
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+    prefsHydratedRef.current = true;
+    if (!listPreference) return;
+    const storedFilters = listPreference.filters as {
+      statusFilter?: string;
+      categoryFilter?: string;
+      scopeFilter?: string;
+      kindFilter?: string;
+    } | undefined;
+    if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
+    if (storedFilters?.categoryFilter) setCategoryFilter(storedFilters.categoryFilter);
+    if (storedFilters?.scopeFilter) setScopeFilter(storedFilters.scopeFilter);
+    if (storedFilters?.kindFilter) setKindFilter(storedFilters.kindFilter);
+    if (listPreference.sort?.sortBy) {
+      setSortBy(listPreference.sort.sortBy);
+      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+    }
+  }, [prefsLoaded, listPreference]);
+
+  // Persist preferences on changes
+  useEffect(() => {
+    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    savePreference({
+      sort: { sortBy, sortOrder },
+      filters: { statusFilter, categoryFilter, scopeFilter, kindFilter },
+    });
+  }, [prefsLoaded, sortBy, sortOrder, statusFilter, categoryFilter, scopeFilter, kindFilter, savePreference]);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<FinanceOverhead | null>(null);
@@ -246,7 +289,7 @@ export default function OverheadsPage() {
 
   // Overheads list
   const { data: ledgerResponse, isLoading: listLoading, error: listError } = useQuery({
-    queryKey: ["finance-overheads-list", selectedMonth, page, limit, statusFilter, categoryFilter, scopeFilter, kindFilter, searchQuery],
+    queryKey: ["finance-overheads-list", selectedMonth, page, limit, statusFilter, categoryFilter, scopeFilter, kindFilter, searchQuery, sortBy, sortOrder],
     queryFn: () =>
       getFinanceOverheads({
         month: selectedMonth,
@@ -257,8 +300,10 @@ export default function OverheadsPage() {
         scope: scopeFilter === "all" ? undefined : scopeFilter,
         payment_kind: kindFilter === "all" ? undefined : kindFilter,
         search: searchQuery.trim() || undefined,
+        sortBy,
+        sortOrder,
       }),
-    enabled: canRead,
+    enabled: canRead && prefsLoaded,
   });
 
   // Employees for staff payments dropdown
@@ -633,6 +678,33 @@ export default function OverheadsPage() {
                 { id: "all", label: t("Kind") + ": " + t("All") },
                 { id: "overhead", label: t("Overhead") },
                 { id: "staff_payment", label: t("Staff Payment") },
+              ]}
+              className="h-[38px] text-xs font-semibold"
+            />
+          </div>
+
+          <div className="w-[130px]">
+            <Select
+              value={sortBy}
+              onChange={(val) => { setSortBy(val); setPage(1); }}
+              options={[
+                { id: "recent", label: t("Sort: Recent") },
+                { id: "due_date", label: t("Due Date") },
+                { id: "amount", label: t("Amount") },
+                { id: "category", label: t("Category") },
+                { id: "status", label: t("Status") },
+              ]}
+              className="h-[38px] text-xs font-semibold"
+            />
+          </div>
+
+          <div className="w-[110px]">
+            <Select
+              value={sortOrder}
+              onChange={(val) => { setSortOrder(val as "asc" | "desc"); setPage(1); }}
+              options={[
+                { id: "desc", label: "↓ " + t("Descending") },
+                { id: "asc", label: "↑ " + t("Ascending") },
               ]}
               className="h-[38px] text-xs font-semibold"
             />
