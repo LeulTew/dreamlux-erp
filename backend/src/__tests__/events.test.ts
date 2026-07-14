@@ -1664,6 +1664,22 @@ describe("Events API", () => {
     expect(res.body[0].full_name).toBe("Abebe Girma");
   });
 
+  // Regression: the salary_levels join must use the real column `code`, not the
+  // non-existent `level_name` (which caused a 500 in production).
+  test("GET /events/:id/assignments/available-employees selects salary_levels.code (not level_name)", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", start_date: "2026-06-20", end_date: "2026-06-22" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    await request(app)
+      .get("/events/event-1/assignments/available-employees")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    const employeesSql = mockQuery.mock.calls.map((c: unknown[]) => String(c[0])).find((sql) => sql.includes("FROM employees emp"));
+    expect(employeesSql).toBeDefined();
+    expect(employeesSql).toContain("SL.code");
+    expect(employeesSql).not.toContain("SL.level_name");
+  });
+
   // Scheduling - GET available vehicles
   test("GET /events/:id/assignments/available-vehicles returns active vehicles not booked on overlapping dates", async () => {
     // Event check
