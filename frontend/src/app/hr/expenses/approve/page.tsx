@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ForbiddenState from "@/components/ForbiddenState";
+import Select from "@/components/ui/Select";
 
 // Distinguish HTTP failure classes so the queue can render the right state
 // (issue #148: authentication vs authorization vs schema/validation vs network).
@@ -354,7 +355,7 @@ function ExpenseApprovalContent() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-5">
           <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 dl-radius-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
+            <div className="w-12 h-12 dl-radius-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
               <HiClipboardDocumentList className="w-6 h-6" />
             </div>
             <div>
@@ -371,12 +372,12 @@ function ExpenseApprovalContent() {
           </div>
 
           {/* Dual Tabs Trigger */}
-          <div className="flex bg-neutral-100 dark:bg-neutral-900/60 p-1 dl-radius-xl border border-neutral-200 dark:border-neutral-800 self-start md:self-center">
+          <div className="flex bg-muted p-1 dl-radius-xl border border-border self-start md:self-center">
             <button
               onClick={() => handleTabChange("pending")}
               className={cn(
                 "px-4 py-2 text-xs font-bold dl-radius-lg transition-all duration-200 select-none cursor-pointer",
-                activeTab === "pending" ? "bg-primary text-primary-foreground shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
+                activeTab === "pending" ? "bg-primary text-primary-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground"
               )}
             >
               {t("Pending Queue")}
@@ -385,7 +386,7 @@ function ExpenseApprovalContent() {
               onClick={() => handleTabChange("history")}
               className={cn(
                 "px-4 py-2 text-xs font-bold dl-radius-lg transition-all duration-200 select-none cursor-pointer",
-                activeTab === "history" ? "bg-primary text-primary-foreground shadow-sm" : "text-neutral-500 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
+                activeTab === "history" ? "bg-primary text-primary-foreground" : "text-muted-foreground [@media(hover:hover)]:hover:text-foreground"
               )}
             >
               {t("History")}
@@ -408,19 +409,19 @@ function ExpenseApprovalContent() {
 
             {/* Category Select */}
             <div className="flex flex-col gap-1">
-              <select
+              <Select
                 value={categoryFilter}
-                onChange={(e) => handleFilterChange(setCategoryFilter, e.target.value)}
-                className="bg-card-alt border border-border text-xs h-[40px] dl-radius-lg px-3 text-foreground outline-none focus:border-primary/50 cursor-pointer"
-              >
-                <option value="">{t("All Categories")}</option>
-                <option value="Fuel">{t("Fuel")}</option>
-                <option value="Labor">{t("Labor")}</option>
-                <option value="Transportation">{t("Transportation")}</option>
-                <option value="Equipment Rental">{t("Equipment Rental")}</option>
-                <option value="Consumables">{t("Consumables")}</option>
-                <option value="Other">{t("Other")}</option>
-              </select>
+                onChange={(v) => handleFilterChange(setCategoryFilter, v)}
+                options={[
+                  { id: "", label: t("All Categories") },
+                  { id: "Fuel", label: t("Fuel") },
+                  { id: "Labor", label: t("Labor") },
+                  { id: "Transportation", label: t("Transportation") },
+                  { id: "Equipment Rental", label: t("Equipment Rental") },
+                  { id: "Consumables", label: t("Consumables") },
+                  { id: "Other", label: t("Other") },
+                ]}
+              />
             </div>
 
             {/* Date Filters */}
@@ -467,15 +468,15 @@ function ExpenseApprovalContent() {
             <div className="grid gap-3 sm:grid-cols-2 border-t border-border/40 pt-3">
               {/* Status Select */}
               <div className="flex flex-col gap-1">
-                <select
+                <Select
                   value={statusFilter}
-                  onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
-                  className="bg-card-alt border border-border text-xs h-[40px] dl-radius-lg px-3 text-foreground outline-none focus:border-primary/50 cursor-pointer"
-                >
-                  <option value="">{t("All Statuses")}</option>
-                  <option value="Approved">{t("Approved")}</option>
-                  <option value="Rejected">{t("Rejected")}</option>
-                </select>
+                  onChange={(v) => handleFilterChange(setStatusFilter, v)}
+                  options={[
+                    { id: "", label: t("All Statuses") },
+                    { id: "Approved", label: t("Approved") },
+                    { id: "Rejected", label: t("Rejected") },
+                  ]}
+                />
               </div>
 
               {/* Reviewer Search */}
@@ -542,8 +543,6 @@ function ExpenseApprovalContent() {
                       key={expense.id}
                       className="bg-card border border-border/70 dl-radius-2xl shadow-sm hover:shadow-md hover:border-border/90 transition-all duration-300 relative overflow-hidden group p-5"
                     >
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-500/60 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2.5">
@@ -576,7 +575,7 @@ function ExpenseApprovalContent() {
                               </div>
                             )}
                             {expense.receipt_image_key && (
-                              <div className="flex items-center gap-1 bg-amber-500/10 dark:bg-neutral-800/40 px-2 py-0.5 dl-radius-lg border border-amber-500/20 dark:border-neutral-700/60">
+                              <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 dl-radius-lg border border-amber-500/20">
                                 <span className="text-[10px] text-amber-600 dark:text-amber-400 font-extrabold uppercase">{t("Receipt")}</span>
                               </div>
                             )}
@@ -670,7 +669,7 @@ function ExpenseApprovalContent() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-border/80 bg-neutral-50 dark:bg-neutral-900/45">
+                      <tr className="border-b border-border/80 bg-muted/30">
                         <th className="p-4 text-xs font-semibold">
                           <SortableHeader
                             label={t("Event")}
@@ -699,10 +698,10 @@ function ExpenseApprovalContent() {
                             align="right"
                           />
                         </th>
-                        <th className="p-4 text-xs font-semibold text-neutral-400 uppercase tracking-[0.2em] text-[10px]">
+                        <th className="p-4 text-xs font-semibold text-muted-foreground uppercase tracking-[0.2em] text-[10px]">
                           {t("Submitted")}
                         </th>
-                        <th className="p-4 text-xs font-semibold text-neutral-400 uppercase tracking-[0.2em] text-[10px]">
+                        <th className="p-4 text-xs font-semibold text-muted-foreground uppercase tracking-[0.2em] text-[10px]">
                           {t("Reviewer")}
                         </th>
                         <th className="p-4 text-xs font-semibold text-center">
@@ -725,7 +724,7 @@ function ExpenseApprovalContent() {
                             align="right"
                           />
                         </th>
-                        <th className="p-4 text-xs font-semibold text-neutral-400 uppercase tracking-[0.2em] text-[10px]">
+                        <th className="p-4 text-xs font-semibold text-muted-foreground uppercase tracking-[0.2em] text-[10px]">
                           {t("Reason")}
                         </th>
                       </tr>
@@ -736,7 +735,7 @@ function ExpenseApprovalContent() {
                         return (
                           <tr
                             key={expense.id}
-                            className="border-b border-border/60 hover:bg-neutral-100 dark:hover:bg-neutral-800/10 transition-colors duration-150"
+                            className="border-b border-border/60 hover:bg-card-alt/40 transition-colors duration-150"
                           >
                             <td className="p-4 text-xs font-bold text-foreground max-w-[150px] truncate">
                               {expense.event_name || "-"}
