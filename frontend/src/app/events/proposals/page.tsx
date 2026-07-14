@@ -250,8 +250,7 @@ export default function ProposalsPage() {
           </div>
 
           {/* Card 2: Active Intake */}
-          <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-amber-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/10 to-transparent rounded-full blur-xl group-hover:scale-110 transition-transform duration-500 pointer-events-none" />
+          <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden hover:border-amber-500/30 transition-colors duration-300 flex flex-col justify-between h-[110px]">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-muted uppercase tracking-wider font-extrabold">{t("Active Intake")}</span>
               <div className="p-1.5 bg-amber-500/10 rounded-lg text-amber-500 border border-amber-500/20 group-hover:scale-105 transition-transform duration-300">

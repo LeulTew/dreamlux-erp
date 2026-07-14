@@ -1385,7 +1385,7 @@ function EventsPageContent() {
                 });
                 setIsFiltersOpen(false);
               }}
-              className="h-[44px] px-6 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:from-amber-600 hover:via-amber-700 hover:to-amber-800 transition-all border border-transparent cursor-pointer"
+              className="h-[44px] px-6 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-600 text-white hover:bg-amber-700 transition-colors border border-transparent cursor-pointer"
             >
               {t("Apply")}
             </button>

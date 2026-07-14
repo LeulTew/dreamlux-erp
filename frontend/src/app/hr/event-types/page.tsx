@@ -213,8 +213,8 @@ export default function EventTypesPage() {
             )}
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
-                showAddForm ? 'bg-muted text-foreground' : 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 [@media(hover:hover)]:hover:from-amber-600 [@media(hover:hover)]:hover:via-amber-700 [@media(hover:hover)]:hover:to-amber-800'
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest transition-colors active:scale-95 ${
+                showAddForm ? 'bg-muted text-foreground' : 'bg-amber-600 text-white [@media(hover:hover)]:hover:bg-amber-700'
               }`}
             >
               {showAddForm ? (

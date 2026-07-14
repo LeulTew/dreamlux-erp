@@ -985,7 +985,7 @@ function AssetsContent() {
               }}
               className={`min-h-11 inline-flex items-center px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${
                 stockFilter === "all"
-                  ? "bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-md shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.97]"
+                  ? "bg-amber-600 text-white [@media(hover:hover)]:hover:bg-amber-700"
                   : "bg-card-alt text-foreground border border-border hover:bg-border/50"
               }`}
             >
