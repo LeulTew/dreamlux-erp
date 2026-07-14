@@ -23,8 +23,9 @@ import PaginationControls from "@/components/PaginationControls";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
-import { generateReportPdf } from "@/lib/pdf-report";
+import PdfExportModal, { type PdfColumn } from "@/components/PdfExportModal";
 import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
+import { generateReportPdf } from "@/lib/pdf-report";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
@@ -194,6 +195,7 @@ export default function OverheadsPage() {
   const [scopeFilter, setScopeFilter] = useState<string>("all");
   const [kindFilter, setKindFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<FinanceOverhead | null>(null);
@@ -353,31 +355,32 @@ export default function OverheadsPage() {
   };
 
   const handleGeneratePdf = () => {
-    const overheads = ledgerResponse?.overheads ?? [];
-    const rows = overheads.map((exp) => [
-      t(exp.category),
-      t(exp.scope),
-      t(exp.payment_kind === "staff_payment" ? "Staff Payment" : "Overhead"),
-      (exp.payment_kind === "staff_payment" ? exp.employee_name : exp.payee) || "-",
-      exp.notes || "-",
-      formatCurrency(Number(exp.amount || 0)),
-      t(exp.status),
-    ]);
-    const total = overheads.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    generateReportPdf({
-      title: "Monthly Overhead Register",
-      subtitle: `${t("Month")}: ${selectedMonth}`,
-      meta: [`${t("Generated")}: ${new Date().toLocaleString()}`, `${t("Records")}: ${overheads.length}`],
-      sections: [{
-        columns: [t("Category"), t("Scope"), t("Type"), t("Payee"), t("Notes"), t("Amount"), t("Status")],
-        rows,
-        foot: [["", "", "", "", t("Total"), formatCurrency(total), ""]],
-        columnStyles: { 5: { halign: "right" } },
-      }],
-      fileName: `overheads-${selectedMonth || "report"}.pdf`,
-      orientation: "l",
-    });
+    setPdfOpen(true);
   };
+
+  const pdfColumns: PdfColumn[] = [
+    { key: "category", label: t("Category") },
+    { key: "scope", label: t("Scope") },
+    { key: "type", label: t("Type") },
+    { key: "payee", label: t("Payee") },
+    { key: "notes", label: t("Notes") },
+    { key: "amount", label: t("Amount"), align: "right" },
+    { key: "status", label: t("Status") },
+  ];
+  const overheadRowValue = (exp: FinanceOverhead, key: string): string => {
+    switch (key) {
+      case "category": return t(exp.category);
+      case "scope": return t(exp.scope);
+      case "type": return t(exp.payment_kind === "staff_payment" ? "Staff Payment" : "Overhead");
+      case "payee": return (exp.payment_kind === "staff_payment" ? exp.employee_name : exp.payee) || "-";
+      case "notes": return exp.notes || "-";
+      case "amount": return formatCurrency(Number(exp.amount || 0));
+      case "status": return t(exp.status);
+      default: return "";
+    }
+  };
+  const overheadsForPdf = ledgerResponse?.overheads ?? [];
+  const overheadsTotal = overheadsForPdf.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const handleMonthChange = (direction: "prev" | "next") => {
     const date = new Date(`${selectedMonth}-02`);
@@ -478,8 +481,8 @@ export default function OverheadsPage() {
               </button>
             )}
             <button
-              onClick={handleGeneratePdf}
-              aria-label={t("Download PDF")}
+              onClick={() => setPdfOpen(true)}
+              aria-label={t("Export PDF")}
               className="flex items-center justify-center w-[40px] h-[40px] dl-radius-lg border border-border text-muted bg-card [@media(hover:hover)]:hover:text-foreground transition-all"
             >
               <HiPrinter className="w-4 h-4" />
@@ -966,6 +969,20 @@ export default function OverheadsPage() {
           setIsActivityOpen(false);
           setSelectedActivityId(null);
         }}
+      />
+
+      <PdfExportModal
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        title="Monthly Overhead Register"
+        subtitle={`${t("Month")}: ${selectedMonth}`}
+        meta={[`${t("Generated")}: ${new Date().toLocaleString()}`, `${t("Records")}: ${overheadsForPdf.length}`]}
+        columns={pdfColumns}
+        buildRows={(keys) => overheadsForPdf.map((exp) => keys.map((k) => overheadRowValue(exp, k)))}
+        buildFoot={(keys) => [keys.map((k) => (k === "amount" ? formatCurrency(overheadsTotal) : k === "payee" ? t("Total") : ""))]}
+        fileName={`overheads-${selectedMonth || "report"}.pdf`}
+        defaultOrientation="l"
+        t={t}
       />
     </AuthLayout>
   );
