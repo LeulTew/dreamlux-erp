@@ -21,6 +21,11 @@ const buttonVariants = cva(
           "bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link:
           "text-primary-dark hover:text-primary hover:underline dark:text-primary dark:hover:text-primary-dark bg-transparent hover:scale-100 active:scale-100",
+        // Canonical filled amber/orange action (issue #151): solid fill, white
+        // foreground (text + icons) in both themes, crisp darker-on-hover with a
+        // clean focus ring — no gradient, glow, blur, or oversized shadow.
+        amber:
+          "bg-amber-600 text-white [&_svg]:text-white hover:bg-amber-700 focus-visible:ring-amber-500/40 dark:bg-amber-500 dark:text-white dark:hover:bg-amber-600",
       },
       size: {
         default:
