@@ -41,6 +41,7 @@ import Link from "next/link";
 import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { SortableHeader } from "@/components/ui/SortableHeader";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import ImportWizard from "@/components/ImportWizard";
@@ -339,6 +340,11 @@ function EventsPageContent() {
   const filterLogic = (searchParams.get("filterLogic") || "and") as "and" | "or";
   const activeViewId = searchParams.get("viewId") || "";
 
+  // Issue #155: per-user persisted list state. Hydrate the grid from the stored
+  // preference on a bare load, then debounce-save changes.
+  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("events");
+  const prefsHydratedRef = useRef(false);
+
   // Parse advanced filters from URL — base64url-encoded JSON for Amharic/special char safety
   const filters = useMemo<EventSavedView["filters"]>(() => {
     const raw = searchParams.get("filters");
@@ -504,6 +510,9 @@ function EventsPageContent() {
       filterLogic,
       filters
     ),
+    // Issue #155: wait until the stored preference has been applied so the
+    // default sort/filter state never flashes before hydration.
+    enabled: prefsLoaded,
   });
 
   // Fetch saved views
@@ -531,6 +540,36 @@ function EventsPageContent() {
     });
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
+
+  // Issue #155: hydrate the grid from the stored preference exactly once, and
+  // only on a "bare" load (no explicit URL params / saved view). An explicit
+  // shared link or active saved view always wins.
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+    prefsHydratedRef.current = true;
+    const hasExplicitState = ["sortBy", "sortOrder", "status", "dateRange", "filters", "viewId"].some((k) => searchParams.get(k));
+    if (hasExplicitState || !listPreference) return;
+    const updates: Record<string, string | null> = {};
+    if (listPreference.sort?.sortBy) {
+      updates.sortBy = listPreference.sort.sortBy;
+      updates.sortOrder = listPreference.sort.sortOrder;
+    }
+    const storedFilters = listPreference.filters as { status?: string; dateRange?: string } | undefined;
+    if (storedFilters?.status && storedFilters.status !== "all") updates.status = storedFilters.status;
+    if (storedFilters?.dateRange && storedFilters.dateRange !== "all") updates.dateRange = storedFilters.dateRange;
+    if (listPreference.active_tab && listPreference.active_tab !== "all") updates.dateRange = listPreference.active_tab;
+    if (Object.keys(updates).length > 0) updateUrl(updates);
+  }, [prefsLoaded, listPreference, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist sort / status / date-range changes after hydration.
+  useEffect(() => {
+    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    savePreference({
+      sort: { sortBy, sortOrder },
+      filters: { status, dateRange },
+      activeTab: dateRange,
+    });
+  }, [prefsLoaded, sortBy, sortOrder, status, dateRange, savePreference]);
 
   // Sync edits from URL searchParam "edit"
   useEffect(() => {
@@ -857,6 +896,16 @@ function EventsPageContent() {
                   </button>
                 ))}
               </div>
+
+              {/* Issue #155: "Recently edited" sort (maps to updated_at on the backend). */}
+              <button
+                type="button"
+                onClick={() => handleSort("recent", sortBy === "recent" && sortOrder === "desc" ? "asc" : "desc")}
+                aria-pressed={sortBy === "recent"}
+                className={`h-[44px] px-3.5 text-[10px] font-black uppercase tracking-wider rounded-2xl border transition-all ${sortBy === "recent" ? "bg-primary text-primary-foreground border-transparent" : "bg-card-alt text-muted border-border [@media(hover:hover)]:hover:text-foreground"}`}
+              >
+                {t("Recently Edited")}
+              </button>
 
               {/* Advanced filter builder button */}
               <button
