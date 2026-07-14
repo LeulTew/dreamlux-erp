@@ -974,122 +974,94 @@ function AssetsContent() {
         onChange={(s: string) => { setOfficeFilter(s); setPage(1); }}
       />
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4 shadow-sm">
-        <div className="lg:col-span-3">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Filter Method")}</label>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                setStockFilter("all");
-                setPage(1);
-              }}
-              className={`min-h-11 inline-flex items-center px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-300 ${
-                stockFilter === "all"
-                  ? "bg-amber-600 text-white [@media(hover:hover)]:hover:bg-amber-700"
-                  : "bg-card-alt text-foreground border border-border hover:bg-border/50"
-              }`}
-            >
-              {t("Active Catalog")}
-            </button>
-            <button
-              onClick={() => {
-                setStockFilter("low-stock");
-                setPage(1);
-              }}
-              className={`min-h-11 inline-flex items-center px-4 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all ${
-                stockFilter === "low-stock"
-                  ? "bg-danger text-white shadow-sm"
-                  : "bg-card-alt text-foreground border border-border hover:bg-border/50"
-              }`}
-            >
-              {t("Low Stock")}
-            </button>
-            <button
-              onClick={() => {
-                setReconcileMode(false);
-                setSelectedIds(new Set());
-                router.push("/assets/trash");
-              }}
-              className="min-h-11 inline-flex items-center px-4 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all bg-card-alt text-foreground border border-border hover:bg-border/50"
-            >
-              {t("Trash")}
-            </button>
+      <div className="mt-4 flex flex-col gap-4 bg-card border border-border rounded-2xl 2xl:rounded-4xl p-4 shadow-sm">
+        {/* Row 1: filter-method segment */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90">{t("Filter Method")}</span>
+          <button
+            onClick={() => { setStockFilter("all"); setPage(1); }}
+            className={`h-10 inline-flex items-center px-4 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-colors ${
+              stockFilter === "all"
+                ? "bg-amber-600 text-white [@media(hover:hover)]:hover:bg-amber-700"
+                : "bg-card-alt text-foreground border border-border [@media(hover:hover)]:hover:bg-border/50"
+            }`}
+          >
+            {t("Active Catalog")}
+          </button>
+          <button
+            onClick={() => { setStockFilter("low-stock"); setPage(1); }}
+            className={`h-10 inline-flex items-center px-4 rounded-xl text-xs font-semibold uppercase tracking-wider transition-colors ${
+              stockFilter === "low-stock"
+                ? "bg-danger text-white"
+                : "bg-card-alt text-foreground border border-border [@media(hover:hover)]:hover:bg-border/50"
+            }`}
+          >
+            {t("Low Stock")}
+          </button>
+          <button
+            onClick={() => { setReconcileMode(false); setSelectedIds(new Set()); router.push("/assets/trash"); }}
+            className="h-10 inline-flex items-center px-4 rounded-xl text-xs font-semibold uppercase tracking-wider transition-colors bg-card-alt text-foreground border border-border [@media(hover:hover)]:hover:bg-border/50"
+          >
+            {t("Trash")}
+          </button>
+        </div>
+
+        {/* Row 2: search + dates + advanced filters, all bottom-aligned */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="flex-1 min-w-0">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Search")}</label>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t("Search Placeholder")}
+              className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            />
           </div>
-        </div>
 
-        <div className="lg:col-span-3">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("Search")}</label>
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t("Search Placeholder")}
-            className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-foreground text-sm font-semibold placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-          />
-        </div>
+          <div className="w-full lg:w-44">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("From")}</label>
+            <DatePicker showTime value={fromDateTime} onChange={(val) => { setFromDateTime(val); setPage(1); }} placeholder={t("From")} />
+          </div>
 
-        <div className="lg:col-span-2">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("From")}</label>
-          <DatePicker
-            showTime
-            value={fromDateTime}
-            onChange={(val) => {
-              setFromDateTime(val);
-              setPage(1);
-            }}
-            placeholder={t("From")}
-          />
-        </div>
+          <div className="w-full lg:w-44">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("To")}</label>
+            <DatePicker showTime value={toDateTime} onChange={(val) => { setToDateTime(val); setPage(1); }} placeholder={t("To")} />
+          </div>
 
-        <div className="lg:col-span-2">
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-2 px-1">{t("To")}</label>
-          <DatePicker
-            showTime
-            value={toDateTime}
-            onChange={(val) => {
-              setToDateTime(val);
-              setPage(1);
-            }}
-            placeholder={t("To")}
-          />
-        </div>
-
-        <div className="lg:col-span-2 flex items-end gap-2">
-          <AdvancedFilterBuilder
-            pageKey="assets"
-            fields={[
-              { key: "name", label: t("Asset Name"), type: "string" },
-              { key: "store.name", label: t("Office"), type: "string" },
-              { key: "quantity", label: t("Quantity"), type: "number" },
-              { key: "description", label: t("Description"), type: "string" },
-            ]}
-            rules={advancedFilters}
-            logic={filterLogic}
-            onChange={(rules, logic) => {
-              setAdvancedFilters(rules);
-              setFilterLogic(logic);
-              setPage(1);
-            }}
-            data={items}
-          />
-          {(officeFilter !== "all" || stockFilter !== "all" || searchTerm || fromDateTime || toDateTime || advancedFilters.length > 0) && (
-            <button
-              onClick={() => {
-                setOfficeFilter("all");
-                setStockFilter("all");
-                setSearchInput("");
-                setSearchTerm("");
-                setFromDateTime("");
-                setToDateTime("");
-                setReconcileMode(false);
-                setAdvancedFilters([]);
-                setPage(1);
-              }}
-              className="h-11 px-1 self-center text-xs font-semibold text-muted-foreground underline underline-offset-4 decoration-border [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:decoration-foreground transition-colors"
-            >
-              {t("Clear")}
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            <AdvancedFilterBuilder
+              pageKey="assets"
+              fields={[
+                { key: "name", label: t("Asset Name"), type: "string" },
+                { key: "store.name", label: t("Office"), type: "string" },
+                { key: "quantity", label: t("Quantity"), type: "number" },
+                { key: "description", label: t("Description"), type: "string" },
+              ]}
+              rules={advancedFilters}
+              logic={filterLogic}
+              onChange={(rules, logic) => { setAdvancedFilters(rules); setFilterLogic(logic); setPage(1); }}
+              data={items}
+            />
+            {(officeFilter !== "all" || stockFilter !== "all" || searchTerm || fromDateTime || toDateTime || advancedFilters.length > 0) && (
+              <button
+                onClick={() => {
+                  setOfficeFilter("all");
+                  setStockFilter("all");
+                  setSearchInput("");
+                  setSearchTerm("");
+                  setFromDateTime("");
+                  setToDateTime("");
+                  setReconcileMode(false);
+                  setAdvancedFilters([]);
+                  setPage(1);
+                }}
+                className="h-11 px-1 text-xs font-semibold text-muted-foreground underline underline-offset-4 decoration-border [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:decoration-foreground transition-colors"
+              >
+                {t("Clear")}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
