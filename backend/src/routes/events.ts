@@ -2713,7 +2713,7 @@ router.get("/:id/assignments/available-employees", requireAuth, async (req: Auth
     const { start_date, end_date } = eventResult.rows[0];
 
     const availableEmployeesQuery = `
-      SELECT emp.*, SL.level_name as salary_level_name
+      SELECT emp.*, SL.code as salary_level_name
       FROM employees emp
       LEFT JOIN salary_levels SL ON emp.salary_level_id = SL.id
       WHERE emp.deleted_at IS NULL
