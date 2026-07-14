@@ -6,12 +6,14 @@
   /* Dream Lux ERP — Elegant Gold & Light Slate Palette */
   --background: #eaeaf0;
   --foreground: #1c1917;
-  --primary: oklch(78% 0.12 82);
-  --primary-light: oklch(99% 0.01 82);
-  --primary-dark: oklch(55% 0.10 82);
-  --primary-foreground: #1c1917;
-  --accent: oklch(78% 0.12 82);
-  --accent-foreground: #1c1917;
+  /* Deeper amber-gold so a white foreground on filled buttons meets contrast in
+     both themes (also improves gold-label contrast on light surfaces). */
+  --primary: oklch(60% 0.15 72);
+  --primary-light: oklch(97% 0.02 72);
+  --primary-dark: oklch(50% 0.13 72);
+  --primary-foreground: #ffffff;
+  --accent: oklch(60% 0.15 72);
+  --accent-foreground: #ffffff;
   --success: #15803d;
   --warning: #b45309;
   --danger: #b91c1c;
@@ -56,12 +58,12 @@
   /* Dream Lux ERP — Rich Gold & Deep Obsidian Palette */
   --background: #050506;
   --foreground: #ececee;
-  --primary: oklch(78% 0.12 82);
-  --primary-light: oklch(22% 0.04 82);
-  --primary-dark: oklch(68% 0.10 82);
-  --primary-foreground: #050506;
-  --accent: oklch(78% 0.12 82);
-  --accent-foreground: #ececee;
+  --primary: oklch(64% 0.15 72);
+  --primary-light: oklch(24% 0.05 72);
+  --primary-dark: oklch(54% 0.14 72);
+  --primary-foreground: #ffffff;
+  --accent: oklch(64% 0.15 72);
+  --accent-foreground: #ffffff;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
