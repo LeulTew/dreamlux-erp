@@ -138,6 +138,18 @@ describe("sidebar permission navigation", () => {
     expect(nav.inventoryDashboardLink).toBeNull(); // no assets:read
   });
 
+  // Issue #173: inbound returns share the dispatch capability.
+  it("shows the Returns link for event_allocations:write", () => {
+    const nav = navFor("/assets/returns", ["event_allocations:write"]);
+    expect(nav.returnsLink?.href).toBe("/assets/returns");
+    expect(nav.returnsLink?.active).toBe(true);
+    expect(nav.showInventoryGroup).toBe(true);
+  });
+
+  it("hides the Returns link without allocation/asset write", () => {
+    expect(navFor("/assets", ["assets:read"]).returnsLink).toBeNull();
+  });
+
   // --- Roles & Access discoverability (issue #144) ---
   // The role editor lives under Settings (reachable from the Admin hub card),
   // NOT in the Reference Data dropdown.

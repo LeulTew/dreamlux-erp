@@ -822,6 +822,55 @@ export interface CapitalInvestment {
   stock_applied_by?: string | null;
 }
 
+/** Return queue entry grouped by event (issue #173). */
+export interface ReturnQueueEntry {
+  event_id: string;
+  event_name: string;
+  client_name: string | null;
+  start_date: string;
+  end_date: string;
+  event_status: string;
+  open_allocation_count: number;
+  dispatched_quantity: number;
+  accounted_quantity: number;
+  outstanding_quantity: number;
+}
+
+/** Departed allocation with running return accounting (issue #173). */
+export interface EventReturnAllocation {
+  id: string;
+  item_id: string;
+  item_name: string;
+  unit_of_measurement: string | null;
+  store_name: string | null;
+  quantity_allocated: number;
+  status: "Reserved" | "Pulled" | "Returned";
+  notes: string | null;
+  departed_at: string | null;
+  returned_at: string | null;
+  returned_by_name: string | null;
+  returned_good_quantity: number;
+  returned_damaged_quantity: number;
+  returned_lost_quantity: number;
+  returned_repair_quantity: number;
+  outstanding_quantity: number;
+}
+
+/** Immutable return receipt line (issue #173). */
+export interface EventReturnReceipt {
+  id: string;
+  allocation_id: string;
+  good_quantity: number;
+  damaged_quantity: number;
+  lost_quantity: number;
+  repair_quantity: number;
+  outstanding_before: number;
+  outstanding_after: number;
+  notes: string | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
 /** Metadata returned when approving a stock-creating investment (issue #172). */
 export interface InvestmentStockApplication {
   movement_id: string;

@@ -989,6 +989,26 @@ export const updateOffice = (id: string, name: string, isActive: boolean) =>
 export const deleteOffice = (id: string) =>
   api.delete(`/offices/${id}`).then((r) => r.data);
 
+// Inventory Returns (issue #173)
+export const getReturnQueue = (params: { page?: number; limit?: number } = {}) =>
+  api.get("/events/returns/queue", { params }).then((r) => r.data);
+
+export const getEventReturns = (eventId: string) =>
+  api.get(`/events/${eventId}/returns`).then((r) => r.data);
+
+export const recordEventReturn = (
+  eventId: string,
+  allocationId: string,
+  data: {
+    good_quantity?: number;
+    damaged_quantity?: number;
+    lost_quantity?: number;
+    repair_quantity?: number;
+    notes?: string | null;
+    idempotency_key?: string | null;
+  },
+) => api.post(`/events/${eventId}/allocations/${allocationId}/returns`, data).then((r) => r.data);
+
 // Fleet / Vehicles (issue #147)
 export type VehiclePayload = {
   plate_number: string;
