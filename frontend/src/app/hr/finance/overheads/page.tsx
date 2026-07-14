@@ -4,8 +4,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
-  HiMagnifyingGlass,
-  HiArrowPath,
   HiPlus,
   HiCheck,
   HiXMark,
@@ -26,6 +24,7 @@ import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
 import { generateReportPdf } from "@/lib/pdf-report";
+import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
@@ -563,18 +562,25 @@ export default function OverheadsPage() {
         ) : null}
 
         {/* Filters Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 border border-border/60 bg-card p-3 dl-radius-xl no-print">
-          <div className="relative flex-1 min-w-[200px]">
-            <HiMagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-            <input
-              type="text"
+        <FilterToolbar
+          clearLabel={t("Clear")}
+          showClear={Boolean(searchQuery) || statusFilter !== "all" || categoryFilter !== "all" || scopeFilter !== "all" || kindFilter !== "all"}
+          onClear={() => {
+            setSearchQuery("");
+            setStatusFilter("all");
+            setCategoryFilter("all");
+            setScopeFilter("all");
+            setKindFilter("all");
+            setPage(1);
+          }}
+          search={
+            <ToolbarSearch
               value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              onChange={(v) => { setSearchQuery(v); setPage(1); }}
               placeholder={t("Search") + "..."}
-              className="w-full pl-10 pr-4 h-[38px] text-xs font-semibold rounded-lg bg-card-alt border border-border/80 outline-none focus:ring-1 focus:ring-primary/20"
             />
-          </div>
-
+          }
+        >
           <div className="w-[130px]">
             <Select
               value={statusFilter}
@@ -629,21 +635,7 @@ export default function OverheadsPage() {
             />
           </div>
 
-          <button
-            onClick={() => {
-              setSearchQuery("");
-              setStatusFilter("all");
-              setCategoryFilter("all");
-              setScopeFilter("all");
-              setKindFilter("all");
-              setPage(1);
-            }}
-            aria-label={t("Reset Filters")}
-            className="flex items-center justify-center w-[38px] h-[38px] rounded-lg border border-border/80 text-muted [@media(hover:hover)]:hover:text-foreground transition-all bg-card-alt"
-          >
-            <HiArrowPath className="w-4 h-4" />
-          </button>
-        </div>
+        </FilterToolbar>
 
         {/* Ledger Table */}
         {listLoading ? (

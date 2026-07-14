@@ -2,28 +2,39 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
 
-describe("FilterToolbar (issue #150)", () => {
-  it("renders its children in a wrapping row container", () => {
+describe("FilterToolbar (issues #150 + follow-up)", () => {
+  it("puts the search on its own full-width row above the filters", () => {
     render(
-      <FilterToolbar>
-        <span>child-a</span>
-        <span>child-b</span>
+      <FilterToolbar search={<ToolbarSearch value="" onChange={() => {}} placeholder="Search..." />}>
+        <span>filter-a</span>
       </FilterToolbar>,
     );
-    expect(screen.getByText("child-a")).toBeTruthy();
-    expect(screen.getByText("child-b")).toBeTruthy();
-  });
-
-  it("bounds the search width on desktop so it never dominates the row", () => {
-    render(<ToolbarSearch value="" onChange={() => {}} placeholder="Search..." />);
     const input = screen.getByPlaceholderText("Search...");
     const wrapper = input.parentElement as HTMLElement;
-    // Full width on mobile, capped on desktop.
     expect(wrapper.className).toContain("w-full");
-    expect(wrapper.className).toMatch(/sm:w-\d+/);
-    expect(wrapper.className).toMatch(/lg:w-\d+/);
-    // 44px touch target.
+    // 44px touch target on the search field.
     expect(input.className).toContain("h-11");
+    expect(screen.getByText("filter-a")).toBeTruthy();
+  });
+
+  it("shows an underlined Clear button only when filters are active", () => {
+    const onClear = vi.fn();
+    const { rerender } = render(
+      <FilterToolbar showClear={false} onClear={onClear}>
+        <span>f</span>
+      </FilterToolbar>,
+    );
+    expect(screen.queryByText("Clear")).toBeNull();
+
+    rerender(
+      <FilterToolbar showClear onClear={onClear} clearLabel="Clear">
+        <span>f</span>
+      </FilterToolbar>,
+    );
+    const clear = screen.getByText("Clear");
+    expect(clear.className).toContain("underline");
+    fireEvent.click(clear);
+    expect(onClear).toHaveBeenCalled();
   });
 
   it("emits changes from the search field", () => {

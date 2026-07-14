@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
   HiArrowDownTray,
-  HiArrowPath,
   HiPlus,
   HiCheck,
   HiXMark,
@@ -511,13 +510,26 @@ export default function InvestmentsPage() {
         ) : null}
 
         {/* Filters Toolbar */}
-        <FilterToolbar>
-          <ToolbarSearch
-            value={searchQuery}
-            onChange={(v) => { setSearchQuery(v); setPage(1); }}
-            placeholder={t("Search") + "..."}
-          />
-
+        <FilterToolbar
+          clearLabel={t("Clear")}
+          showClear={Boolean(searchQuery) || Boolean(selectedMonth) || statusFilter !== "all" || categoryFilter !== "all" || classificationFilter !== "all" || linkedFilter !== "all"}
+          onClear={() => {
+            setSearchQuery("");
+            setSelectedMonth("");
+            setStatusFilter("all");
+            setCategoryFilter("all");
+            setClassificationFilter("all");
+            setLinkedFilter("all");
+            setPage(1);
+          }}
+          search={
+            <ToolbarSearch
+              value={searchQuery}
+              onChange={(v) => { setSearchQuery(v); setPage(1); }}
+              placeholder={t("Search") + "..."}
+            />
+          }
+        >
           <div className="w-[120px]">
             <input
               type="month"
@@ -578,21 +590,6 @@ export default function InvestmentsPage() {
             />
           </div>
 
-          <button
-            onClick={() => {
-              setSearchQuery("");
-              setSelectedMonth("");
-              setStatusFilter("all");
-              setCategoryFilter("all");
-              setClassificationFilter("all");
-              setLinkedFilter("all");
-              setPage(1);
-            }}
-            aria-label={t("Reset Filters")}
-            className="flex items-center justify-center w-[38px] h-[38px] dl-radius-lg border border-border/80 text-muted [@media(hover:hover)]:hover:text-foreground transition-all bg-card-alt"
-          >
-            <HiArrowPath className="w-4 h-4" />
-          </button>
         </FilterToolbar>
 
         {/* Ledger Table */}

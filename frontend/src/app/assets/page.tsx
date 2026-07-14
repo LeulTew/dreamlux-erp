@@ -1072,22 +1072,24 @@ function AssetsContent() {
             }}
             data={items}
           />
-          <button
-            onClick={() => {
-              setOfficeFilter("all");
-              setStockFilter("all");
-              setSearchInput("");
-              setSearchTerm("");
-              setFromDateTime("");
-              setToDateTime("");
-              setReconcileMode(false);
-              setAdvancedFilters([]);
-              setPage(1);
-            }}
-            className="flex-1 h-11 px-3 rounded-xl text-[10px] sm:text-xs font-semibold uppercase tracking-wider bg-card-alt text-foreground border border-border hover:bg-border transition-all"
-          >
-            {t("Clear Filters")}
-          </button>
+          {(officeFilter !== "all" || stockFilter !== "all" || searchTerm || fromDateTime || toDateTime || advancedFilters.length > 0) && (
+            <button
+              onClick={() => {
+                setOfficeFilter("all");
+                setStockFilter("all");
+                setSearchInput("");
+                setSearchTerm("");
+                setFromDateTime("");
+                setToDateTime("");
+                setReconcileMode(false);
+                setAdvancedFilters([]);
+                setPage(1);
+              }}
+              className="h-11 px-1 self-center text-xs font-semibold text-muted-foreground underline underline-offset-4 decoration-border [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:decoration-foreground transition-colors"
+            >
+              {t("Clear")}
+            </button>
+          )}
         </div>
       </div>
 
