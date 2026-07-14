@@ -1,0 +1,10 @@
+# Issue #155: keep test fixtures, workbooks, and local artifacts out of the
+# production deployment (the bun build bundle already excludes non-imported
+# files; this is defense-in-depth for the uploaded source set).
+src/__tests__
+**/*.test.ts
+scratch
+*.xlsx
+*.csv
+.env
+.env.*
