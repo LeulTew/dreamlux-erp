@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AuthLayout from "@/components/AuthLayout";
 import { getPayrollRuns, updatePayrollRunStatus, exportPayrollPDF, permanentlyDeletePayrollRun, type PayrollRunsResponse } from "@/lib/api";
 import { HiClock, HiOutlineChevronRight, HiPencilSquare, HiPrinter, HiArrowUturnLeft, HiArrowPath, HiTrash } from "react-icons/hi2";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import PaginationControls from "@/components/PaginationControls";
 import toast from "@/lib/toast";
@@ -15,6 +15,7 @@ import { FancyButton } from "@/components/ui/FancyButton";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
 import ForbiddenState from "@/components/ForbiddenState";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -91,7 +92,40 @@ function PaymentsPageContent() {
   const [yearFilter, setYearFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortBy, setSortBy] = useState("period_start");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Issue #155: Per-user list state preferences
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("payroll");
+  const prefsHydratedRef = useRef(false);
+
+  // Hydrate states once preferences are retrieved
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+    prefsHydratedRef.current = true;
+    const hasExplicitState = ["year", "status", "sortBy", "sortOrder"].some((k) => searchParams.get(k));
+    if (hasExplicitState || !listPreference) {
+      markApplied();
+      return;
+    }
+    if (listPreference.sort?.sortBy) {
+      setSortBy(listPreference.sort.sortBy);
+      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+    }
+    const storedFilters = listPreference.filters as { yearFilter?: string; statusFilter?: string } | undefined;
+    if (storedFilters?.yearFilter) setYearFilter(storedFilters.yearFilter);
+    if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
+    markApplied();
+  }, [prefsLoaded, listPreference, searchParams, markApplied]);
+
+  // Persist preferences on changes
+  useEffect(() => {
+    if (!prefsReady || !prefsHydratedRef.current) return;
+    savePreference({
+      sort: { sortBy, sortOrder },
+      filters: { yearFilter, statusFilter },
+      pageSize: ITEMS_PER_PAGE,
+    });
+  }, [prefsReady, sortBy, sortOrder, yearFilter, statusFilter, savePreference]);
   const [confirmState, setConfirmState] = useState<{ id: string; action: "trash" | "restore" | "delete" } | null>(null);
   const highlightedId = searchParams.get("highlight");
 
@@ -111,7 +145,7 @@ function PaymentsPageContent() {
       page,
       limit: ITEMS_PER_PAGE,
     }),
-    enabled: isAuthenticated && hasPayrollAccess,
+    enabled: isAuthenticated && hasPayrollAccess && prefsReady,
   });
 
   const trashMutation = useMutation({

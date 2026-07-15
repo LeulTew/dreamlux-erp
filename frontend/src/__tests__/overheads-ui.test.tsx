@@ -69,6 +69,8 @@ vi.mock("@/lib/api", () => ({
   closeOverheadMonth: vi.fn(),
   reopenOverheadMonth: vi.fn(),
   getEmployees: vi.fn().mockResolvedValue({ employees: [] }),
+  getRecordListPreference: vi.fn().mockResolvedValue({ preference: null }),
+  saveRecordListPreference: vi.fn().mockResolvedValue({ preference: null }),
   api: { get: vi.fn() },
 }));
 

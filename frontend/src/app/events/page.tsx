@@ -41,6 +41,7 @@ import Link from "next/link";
 import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { SortableHeader } from "@/components/ui/SortableHeader";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import ImportWizard from "@/components/ImportWizard";
@@ -338,6 +339,13 @@ function EventsPageContent() {
   const sortOrder = (searchParams.get("sortOrder") || "asc") as "asc" | "desc";
   const filterLogic = (searchParams.get("filterLogic") || "and") as "and" | "or";
   const activeViewId = searchParams.get("viewId") || "";
+  const [limit, setLimit] = useState(10);
+
+  // Issue #155: per-user persisted list state. Hydrate the grid from the stored
+  // preference on a bare load, then debounce-save changes.
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("events");
+  const prefsHydratedRef = useRef(false);
+  const pendingPreferenceUrlRef = useRef<string | null>(null);
 
   // Parse advanced filters from URL — base64url-encoded JSON for Amharic/special char safety
   const filters = useMemo<EventSavedView["filters"]>(() => {
@@ -368,8 +376,6 @@ function EventsPageContent() {
   const [newViewScope, setNewViewScope] = useState<"personal" | "role" | "global">("personal");
   const [newViewRoleName, setNewViewRoleName] = useState("");
   const [newViewIsDefault, setNewViewIsDefault] = useState(false);
-
-  const [limit, setLimit] = useState(10);
 
   // Refs and hooks for dialog accessibility (focus trap and Escape key listener)
   const saveViewModalRef = useRef<HTMLFormElement>(null);
@@ -504,6 +510,9 @@ function EventsPageContent() {
       filterLogic,
       filters
     ),
+    // Issue #155: wait until the stored preference has been applied so the
+    // default sort/filter state never flashes before hydration.
+    enabled: prefsReady,
   });
 
   // Fetch saved views
@@ -531,6 +540,63 @@ function EventsPageContent() {
     });
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
+
+  // Issue #155: hydrate the grid from the stored preference exactly once, and
+  // only on a "bare" load (no explicit URL params / saved view). An explicit
+  // shared link or active saved view always wins.
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+
+    // router.replace() updates searchParams asynchronously. Do not enable the
+    // list query until the URL actually contains the stored preference.
+    if (pendingPreferenceUrlRef.current) {
+      if (searchParams.toString() !== pendingPreferenceUrlRef.current) return;
+      pendingPreferenceUrlRef.current = null;
+      prefsHydratedRef.current = true;
+      markApplied();
+      return;
+    }
+
+    const hasExplicitState = ["sortBy", "sortOrder", "status", "dateRange", "filters", "viewId"].some((k) => searchParams.get(k));
+    if (hasExplicitState || !listPreference) {
+      prefsHydratedRef.current = true;
+      markApplied();
+      return;
+    }
+    const updates: Record<string, string | null> = {};
+    if (listPreference.sort?.sortBy) {
+      updates.sortBy = listPreference.sort.sortBy;
+      updates.sortOrder = listPreference.sort.sortOrder;
+    }
+    const storedFilters = listPreference.filters as { status?: string; dateRange?: string } | undefined;
+    if (storedFilters?.status && storedFilters.status !== "all") updates.status = storedFilters.status;
+    if (storedFilters?.dateRange && storedFilters.dateRange !== "all") updates.dateRange = storedFilters.dateRange;
+    if (listPreference.active_tab && listPreference.active_tab !== "all") updates.dateRange = listPreference.active_tab;
+    if (listPreference.page_size) setLimit(listPreference.page_size);
+    if (Object.keys(updates).length > 0) {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null) nextParams.delete(key);
+        else nextParams.set(key, value);
+      });
+      pendingPreferenceUrlRef.current = nextParams.toString();
+      router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+      return;
+    }
+    prefsHydratedRef.current = true;
+    markApplied();
+  }, [prefsLoaded, listPreference, searchParams, markApplied, pathname, router]);
+
+  // Persist sort / status / date-range changes after hydration.
+  useEffect(() => {
+    if (!prefsReady || !prefsHydratedRef.current) return;
+    savePreference({
+      sort: { sortBy, sortOrder },
+      filters: { status, dateRange },
+      activeTab: dateRange,
+      pageSize: limit,
+    });
+  }, [prefsReady, sortBy, sortOrder, status, dateRange, limit, savePreference]);
 
   // Sync edits from URL searchParam "edit"
   useEffect(() => {
@@ -857,6 +923,16 @@ function EventsPageContent() {
                   </button>
                 ))}
               </div>
+
+              {/* Issue #155: "Recently edited" sort (maps to updated_at on the backend). */}
+              <button
+                type="button"
+                onClick={() => handleSort("recent", sortBy === "recent" && sortOrder === "desc" ? "asc" : "desc")}
+                aria-pressed={sortBy === "recent"}
+                className={`h-[44px] px-3.5 text-[10px] font-black uppercase tracking-wider rounded-2xl border transition-all ${sortBy === "recent" ? "bg-primary text-primary-foreground border-transparent" : "bg-card-alt text-muted border-border [@media(hover:hover)]:hover:text-foreground"}`}
+              >
+                {t("Recently Edited")}
+              </button>
 
               {/* Advanced filter builder button */}
               <button

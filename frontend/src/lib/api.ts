@@ -1018,6 +1018,37 @@ export const recordEventReturn = (
   },
 ) => api.post(`/events/${eventId}/allocations/${allocationId}/returns`, data).then((r) => r.data);
 
+// Per-user record list preferences (issue #155)
+export interface RecordListPreference {
+  record_type: string;
+  sort: { sortBy: string; sortOrder: "asc" | "desc" } | null;
+  filters: Record<string, unknown>;
+  page_size: number | null;
+  visible_columns: string[];
+  density: "compact" | "comfortable" | "spacious" | null;
+  active_tab: string | null;
+  updated_at: string | null;
+}
+
+export interface RecordListPreferencePayload {
+  sort?: { sortBy: string; sortOrder: "asc" | "desc" } | null;
+  filters?: Record<string, unknown>;
+  pageSize?: number | null;
+  visibleColumns?: string[];
+  density?: "compact" | "comfortable" | "spacious" | null;
+  activeTab?: string | null;
+}
+
+export const getRecordListPreference = (recordType: string) =>
+  api
+    .get<{ preference: RecordListPreference }>(`/api/preferences/record-list/${recordType}`)
+    .then((r) => r.data.preference);
+
+export const saveRecordListPreference = (recordType: string, payload: RecordListPreferencePayload) =>
+  api
+    .put<{ preference: RecordListPreference }>(`/api/preferences/record-list/${recordType}`, payload)
+    .then((r) => r.data.preference);
+
 // Fleet / Vehicles (issue #147)
 export type VehiclePayload = {
   plate_number: string;
