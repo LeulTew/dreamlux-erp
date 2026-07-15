@@ -14,6 +14,7 @@ import {
   updateItemSchema,
   paginationSchema,
   assetsPaginationSchema,
+  inventoryMovementListQuerySchema,
   reconcileItemsSchema,
 } from "../lib/validation";
 import { ZodError } from "zod";
@@ -1084,6 +1085,63 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
     console.error("Failed to fetch items:", error);
     res.status(500).json({
       error: "Failed to fetch items",
+      details: extractErrorMessage(error),
+    });
+  }
+});
+
+router.get("/movements", requirePermissions("assets", "read"), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const parsed = inventoryMovementListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message || "Invalid movement filters" });
+      return;
+    }
+
+    const { page, limit, itemId, sourceId } = parsed.data;
+    const filters: string[] = [];
+    const filterParams: unknown[] = [];
+    if (itemId) {
+      filterParams.push(itemId);
+      filters.push(`im.item_id = $${filterParams.length}`);
+    }
+    if (sourceId) {
+      filterParams.push(sourceId);
+      filters.push(`im.source_id = $${filterParams.length}`);
+    }
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM inventory_movements im ${whereClause}`,
+      filterParams,
+    );
+    const listParams = [...filterParams, limit, (page - 1) * limit];
+    const rowsResult = await pool.query(
+      `SELECT im.id, im.item_id, i.name AS item_name, i.unit_of_measurement,
+              im.quantity_delta, im.quantity_before, im.quantity_after,
+              im.source_type, im.source_id, im.created_at,
+              u.full_name AS created_by_name
+         FROM inventory_movements im
+         JOIN items i ON i.id = im.item_id
+         LEFT JOIN users u ON u.id = im.created_by
+         ${whereClause}
+        ORDER BY im.created_at DESC, im.id DESC
+        LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+      listParams,
+    );
+
+    const total = Number(countResult.rows[0]?.count || 0);
+    res.json({
+      movements: rowsResult.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (error: unknown) {
+    console.error("Failed to fetch inventory movements:", error);
+    res.status(500).json({
+      error: "Failed to fetch inventory movements",
       details: extractErrorMessage(error),
     });
   }

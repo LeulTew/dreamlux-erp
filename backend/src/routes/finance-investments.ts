@@ -97,6 +97,95 @@ function describeInvestment(row: Record<string, any>): string {
   return `${row.item_name} ${roundMoney(row.total_cost)} ${row.capex_classification}${vendor}${assetLink}`;
 }
 
+function normalizeUnit(value: string | null | undefined): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+type StockApplication = {
+  movement_id: string;
+  item_id: string;
+  item_name: string;
+  quantity_delta: number;
+  quantity_before: number;
+  quantity_after: number;
+};
+
+class StockApplicationError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * Apply a stock-creating investment to its linked item exactly once (issue #172).
+ *
+ * Invariant: items.quantity is TOTAL OWNED stock; availability is derived by
+ * subtracting outstanding event allocations, so this single increment is the
+ * only mutation an approved purchase performs. Must run inside the approval
+ * transaction with the investment row already locked; locks the item row second
+ * (deterministic order). The UNIQUE (source_type, source_id) index on
+ * inventory_movements is the database-level idempotency backstop.
+ */
+async function applyInvestmentStock(
+  client: PoolClient,
+  investment: Record<string, any>,
+  userId: string | null,
+): Promise<StockApplication> {
+  if (!investment.asset_id) {
+    throw new StockApplicationError(409, "This purchase is marked as creating stock but has no linked inventory item");
+  }
+  const quantity = Number(investment.quantity);
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new StockApplicationError(
+      409,
+      `Stock-creating purchases must use a positive whole-number quantity (got ${investment.quantity})`,
+    );
+  }
+
+  const itemResult = await client.query(
+    "SELECT id, name, quantity, unit_of_measurement FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+    [investment.asset_id],
+  );
+  if (itemResult.rowCount === 0) {
+    throw new StockApplicationError(409, "The linked inventory item no longer exists or was deleted");
+  }
+  const item = itemResult.rows[0];
+
+  const investmentUnit = normalizeUnit(investment.unit);
+  const itemUnit = normalizeUnit(item.unit_of_measurement || "pcs");
+  if (investmentUnit !== itemUnit) {
+    throw new StockApplicationError(
+      409,
+      `Unit mismatch: purchase is in "${investment.unit}" but item "${item.name}" is tracked in "${item.unit_of_measurement || "pcs"}"`,
+    );
+  }
+
+  const quantityBefore = Number(item.quantity);
+  const quantityAfter = quantityBefore + quantity;
+  const noteParts = [`Approved capital investment: ${investment.item_name}`];
+  if (investment.vendor) noteParts.push(`vendor: ${investment.vendor}`);
+
+  const movementResult = await client.query(
+    `INSERT INTO inventory_movements
+       (item_id, quantity_delta, quantity_before, quantity_after, source_type, source_id, notes, created_by)
+     VALUES ($1, $2, $3, $4, 'capital_investment', $5, $6, $7)
+     RETURNING id`,
+    [item.id, quantity, quantityBefore, quantityAfter, investment.id, noteParts.join(" | "), userId],
+  );
+  await client.query("UPDATE items SET quantity = $2, updated_at = NOW() WHERE id = $1", [item.id, quantityAfter]);
+
+  return {
+    movement_id: movementResult.rows[0].id,
+    item_id: item.id,
+    item_name: item.name,
+    quantity_delta: quantity,
+    quantity_before: quantityBefore,
+    quantity_after: quantityAfter,
+  };
+}
+
 // GET /finance/investments - paginated capex register
 router.get(
   "/",
@@ -387,6 +476,24 @@ router.patch(
         return;
       }
 
+      // Issue #172: validate the MERGED row for stock-creation rules (a partial
+      // patch could otherwise strip the asset link or introduce a fractional
+      // quantity on a stock-creating purchase).
+      const nextCreatesStock = input.creates_inventory_stock ?? existing.creates_inventory_stock;
+      const nextQuantity = input.quantity ?? Number(existing.quantity);
+      if (nextCreatesStock) {
+        if (!nextAssetId) {
+          await client.query("ROLLBACK");
+          res.status(400).json({ error: "A linked inventory item is required when the purchase creates stock" });
+          return;
+        }
+        if (!Number.isInteger(Number(nextQuantity))) {
+          await client.query("ROLLBACK");
+          res.status(400).json({ error: "Stock-creating purchases must use a whole-number quantity" });
+          return;
+        }
+      }
+
       const updateResult = await client.query(
         `UPDATE capital_investments
          SET purchase_date = COALESCE($2, purchase_date),
@@ -516,16 +623,26 @@ async function reviewInvestment(req: AuthRequest, res: Response, decision: "Appr
       return;
     }
 
+    // Issue #172: approving a stock-creating purchase applies the quantity to
+    // the linked item exactly once, inside this same transaction. Rejection and
+    // non-stock approvals never touch inventory.
+    let stockApplication: StockApplication | null = null;
+    if (decision === "Approved" && existing.creates_inventory_stock) {
+      stockApplication = await applyInvestmentStock(client, existing, req.user?.id || null);
+    }
+
     const updateResult = await client.query(
       `UPDATE capital_investments
        SET status = $2,
            rejected_reason = $3,
            approved_by = $4,
            approved_at = NOW(),
+           stock_applied_at = CASE WHEN $5::boolean THEN NOW() ELSE stock_applied_at END,
+           stock_applied_by = CASE WHEN $5::boolean THEN $4 ELSE stock_applied_by END,
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [req.params.id, decision, rejectedReason, req.user?.id || null],
+      [req.params.id, decision, rejectedReason, req.user?.id || null, stockApplication !== null],
     );
     const updated = updateResult.rows[0];
     await insertFinanceAuditLog(client, {
@@ -535,13 +652,25 @@ async function reviewInvestment(req: AuthRequest, res: Response, decision: "Appr
       action: decision === "Approved" ? "approve" : "reject",
       fieldChanged: "status",
       oldValue: "Pending",
-      newValue: decision,
+      newValue: stockApplication
+        ? `${decision} (stock applied: +${stockApplication.quantity_delta} to item ${stockApplication.item_id}, ${stockApplication.quantity_before} -> ${stockApplication.quantity_after})`
+        : decision,
       note: rejectedReason,
     });
     await client.query("COMMIT");
-    res.json({ investment: formatInvestmentRow(updated) });
+    res.json({ investment: formatInvestmentRow(updated), stock_application: stockApplication });
   } catch (error: any) {
     await client.query("ROLLBACK");
+    if (error instanceof StockApplicationError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    if (error?.code === "23505" && String(error?.constraint || "").includes("inventory_movements")) {
+      // Database-level idempotency backstop: a movement for this investment
+      // already exists (e.g. a racing approval that won).
+      res.status(409).json({ error: "Stock has already been applied for this investment" });
+      return;
+    }
     console.error(`[finance-investments-${decision.toLowerCase()}] Error:`, error);
     res.status(500).json({ error: error.message || "Internal server error" });
   } finally {

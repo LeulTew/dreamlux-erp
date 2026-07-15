@@ -34,7 +34,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
   test("Accountant records investment, links asset, Owner approves & exports capex", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, {
-      permissions: ["finance:investments:read", "finance:investments:write", "finance:investments:approve"],
+      permissions: ["finance:investments:read", "finance:investments:write", "finance:investments:approve", "assets:read"],
     });
     await mockCommonShellData(page);
 
@@ -42,7 +42,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     let isApproved = false;
 
     // Intercept inventory items lookup for Select dropdown
-    await page.route((url) => url.pathname === "/assets" && url.searchParams.get("page") === "1", (route) => {
+    await page.route((url) => url.pathname === "/api/assets" && url.searchParams.get("page") === "1", (route) => {
       return fulfillJson(route, {
         items: [{ id: "asset-e2e-1", name: "Twill Loom", quantity: 5, unit_of_measurement: "pcs" }],
         total: 1,
@@ -53,7 +53,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     });
 
     // Intercept investments list
-    await page.route((url) => url.pathname === "/finance/investments" && url.searchParams.has("page"), (route) => {
+    await page.route((url) => url.pathname === "/api/finance/investments" && url.searchParams.has("page"), (route) => {
       if (!hasInvestment) {
         return fulfillJson(route, LEDGER_BASE);
       }
@@ -62,6 +62,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
           {
             ...MOCK_INVESTMENT,
             status: isApproved ? "Approved" : "Pending",
+            stock_applied_at: isApproved ? "2026-06-10T12:05:00Z" : null,
           },
         ],
         total: 1,
@@ -72,7 +73,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     });
 
     // Intercept summary
-    await page.route((url) => url.pathname === "/finance/investments/summary", (route) => {
+    await page.route((url) => url.pathname === "/api/finance/investments/summary", (route) => {
       return fulfillJson(route, {
         totals: {
           approvedTotal: isApproved ? 50000 : 0,
@@ -87,7 +88,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     });
 
     // Intercept create API
-    await page.route((url) => url.pathname === "/finance/investments" && !url.searchParams.has("page"), (route) => {
+    await page.route((url) => url.pathname === "/api/finance/investments" && !url.searchParams.has("page"), (route) => {
       if (route.request().method() === "POST") {
         hasInvestment = true;
         return fulfillJson(route, { investment: MOCK_INVESTMENT });
@@ -98,7 +99,20 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     // Intercept approve API
     await page.route((url) => url.pathname.endsWith("/approve"), (route) => {
       isApproved = true;
-      return fulfillJson(route, { investment: { ...MOCK_INVESTMENT, status: "Approved" } });
+      return fulfillJson(route, {
+        investment: {
+          ...MOCK_INVESTMENT,
+          status: "Approved",
+          stock_applied_at: "2026-06-10T12:05:00Z",
+          stock_applied_by: "user-e2e",
+        },
+        stock_application: {
+          movement_id: "m-123",
+          quantity_delta: 2,
+          item_name: "Twill Loom",
+          quantity_after: 7,
+        },
+      });
     });
 
     // Visit page
@@ -118,7 +132,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     // Check creates stock and select asset link
     await page.getByLabel("Creates Stock?").check();
     await page.getByTestId("linked-asset-select").getByRole("button").first().click();
-    await page.getByRole("button", { name: "Twill Loom (5 pcs)" }).click();
+    await page.getByRole("option", { name: "Twill Loom (5 pcs)" }).click();
 
     await page.getByRole("button", { name: "Save Investment" }).click();
 
@@ -129,9 +143,35 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     // Owner approves it
     await page.getByRole("button", { name: "Approve" }).click();
     await expect(page.getByText("Approved", { exact: true })).toBeVisible();
+    await expect(page.getByText("Stock applied", { exact: true })).toBeVisible();
+
+    await page.route((url) => url.pathname === "/api/assets/movements", (route) => fulfillJson(route, {
+      movements: [{
+        id: "m-123",
+        item_id: "asset-e2e-1",
+        item_name: "Twill Loom",
+        unit_of_measurement: "pcs",
+        quantity_delta: 2,
+        quantity_before: 5,
+        quantity_after: 7,
+        source_type: "capital_investment",
+        source_id: "inv-e2e-1",
+        created_at: "2026-06-10T12:05:00Z",
+        created_by_name: "Phase 5 Reviewer",
+      }],
+      total: 1,
+      page: 1,
+      limit: 25,
+      totalPages: 1,
+    }));
+    await page.getByRole("link", { name: "Stock applied" }).click();
+    await expect(page.getByRole("heading", { name: "Stock Movements" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Twill Loom", exact: true })).toBeVisible();
+    await expect(page.getByText("5 → 7")).toBeVisible();
+    await page.goto("/hr/finance/investments");
 
     let exportRequested = false;
-    await page.route((url) => url.pathname === "/finance/investments/export", (route) => {
+    await page.route((url) => url.pathname === "/api/finance/investments/export", (route) => {
       exportRequested = true;
       return route.fulfill({
         status: 200,

@@ -10,6 +10,7 @@ export interface Item {
   quantity: number;
   allocated_quantity?: number;
   available_quantity?: number;
+  unit_of_measurement?: string | null;
   description: string | null;
   store: {
     id: string;
@@ -27,6 +28,28 @@ export interface ItemsResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface InventoryMovement {
+  id: string;
+  item_id: string;
+  item_name: string;
+  unit_of_measurement: string | null;
+  quantity_delta: number;
+  quantity_before: number;
+  quantity_after: number;
+  source_type: string;
+  source_id: string;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface InventoryMovementsResponse {
+  movements: InventoryMovement[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface Employee {
@@ -817,6 +840,18 @@ export interface CapitalInvestment {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  stock_applied_at?: string | null;
+  stock_applied_by?: string | null;
+}
+
+/** Metadata returned when approving a stock-creating investment (issue #172). */
+export interface InvestmentStockApplication {
+  movement_id: string;
+  item_id: string;
+  item_name: string;
+  quantity_delta: number;
+  quantity_before: number;
+  quantity_after: number;
 }
 
 export interface CapitalInvestmentSummary {
@@ -1018,4 +1053,3 @@ export interface HisabImportCommitResult {
     investments?: number;
   };
 }
-

@@ -19,6 +19,7 @@ const protectedTables = [
   "finance_overhead_expenses",
   "finance_overhead_month_closures",
   "finance_import_batches",
+  "inventory_movements",
 ];
 
 function isDenied(status: number): boolean {

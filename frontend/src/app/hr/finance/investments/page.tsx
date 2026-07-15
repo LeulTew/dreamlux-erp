@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
@@ -74,6 +75,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Cancel": "Cancel",
     "Notes": "Notes",
     "Creates Stock?": "Creates Stock?",
+    "Stock applied": "Stock applied",
+    "On approval": "On approval",
+    "Unit mismatch": "Unit mismatch",
+    "A linked inventory item is required when the purchase creates stock": "A linked inventory item is required when the purchase creates stock",
+    "Stock-creating purchases must use a whole-number quantity": "Stock-creating purchases must use a whole-number quantity",
     "Select Linked Asset": "Select Linked Asset",
     "Purchase Date": "Purchase Date",
     "Due Date": "Due Date",
@@ -126,6 +132,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Cancel": "ሰርዝ",
     "Notes": "ማስታወሻዎች",
     "Creates Stock?": "ክምችት ይፈጥራል?",
+    "Stock applied": "ክምችት ተጨምሯል",
+    "On approval": "ሲጸድቅ",
+    "Unit mismatch": "የመለኪያ አለመመጣጠን",
+    "A linked inventory item is required when the purchase creates stock": "ግዢው ክምችት ሲፈጥር የተገናኘ የክምችት እቃ ያስፈልጋል",
+    "Stock-creating purchases must use a whole-number quantity": "ክምችት የሚፈጥሩ ግዢዎች ሙሉ ቁጥር ብዛት መጠቀም አለባቸው",
     "Select Linked Asset": "የተገናኘ እቃ ይምረጡ",
     "Purchase Date": "የተገዛበት ቀን",
     "Due Date": "ቀን",
@@ -208,6 +219,7 @@ export default function InvestmentsPage() {
   const canRead = matches("finance:investments:read");
   const canWrite = matches("finance:investments:write");
   const canApprove = matches("finance:investments:approve");
+  const canReadInventoryHistory = matches("assets:read");
 
   // Summary
   const { data: summary, isLoading: summaryLoading } = useQuery({
@@ -292,12 +304,24 @@ export default function InvestmentsPage() {
       }
       return rejectCapitalInvestment(id, reason || "");
     },
-    onSuccess: () => {
-      toast.success(t("Investment reviewed"));
+    onSuccess: (data: {
+      stock_application?: { item_name: string; quantity_delta: number; quantity_after: number } | null;
+    }) => {
+      if (data?.stock_application) {
+        const sa = data.stock_application;
+        toast.success(`${t("Stock applied")}: +${sa.quantity_delta} → ${sa.item_name} (${sa.quantity_after})`);
+      } else {
+        toast.success(t("Investment reviewed"));
+      }
       setRejectingId(null);
       setRejectReason("");
       queryClient.invalidateQueries({ queryKey: ["finance-investments-list"] });
       queryClient.invalidateQueries({ queryKey: ["finance-investments-summary"] });
+      // Issue #172: an approved stock-creating purchase changes item quantities,
+      // so refresh every inventory-derived view.
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory-items-lookup"] });
     },
     onError: (err: unknown) => {
       const error = err as Error & { response?: { data?: { error?: string } } };
@@ -392,6 +416,18 @@ export default function InvestmentsPage() {
     if (Number.isNaN(costVal) || costVal <= 0) {
       toast.error(t("Unit Cost must be a positive number"));
       return;
+    }
+    // Issue #172: stock-creating purchases must link an item and use a whole
+    // quantity (inventory stock is an integer count). Mirrors the backend rules.
+    if (form.creates_inventory_stock) {
+      if (!form.asset_id) {
+        toast.error(t("A linked inventory item is required when the purchase creates stock"));
+        return;
+      }
+      if (!Number.isInteger(qtyVal)) {
+        toast.error(t("Stock-creating purchases must use a whole-number quantity"));
+        return;
+      }
     }
 
     const payload = {
@@ -643,7 +679,23 @@ export default function InvestmentsPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-4"><StatusBadge status={item.status} /></td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge status={item.status} />
+                          {item.stock_applied_at && (canReadInventoryHistory ? (
+                            <Link
+                              href={`/assets/movements?sourceId=${item.id}`}
+                              className="inline-flex min-h-11 items-center px-3 py-1 dl-radius-md text-[9px] font-black uppercase tracking-wider bg-success/10 text-success border border-success/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              {t("Stock applied")}
+                            </Link>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 dl-radius-md text-[9px] font-black uppercase tracking-wider bg-success/10 text-success border border-success/25">
+                              {t("Stock applied")}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
                       <td className="px-4 py-4 text-right no-print">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
                           {canApprove && item.status === "Pending" && rejectingId !== item.id && (
@@ -898,6 +950,41 @@ export default function InvestmentsPage() {
                 className="h-[44px] text-sm"
               />
             </div>
+
+            {form.creates_inventory_stock && (() => {
+              // Issue #172: stock is applied on APPROVAL (not when this draft is
+              // saved). Preview the quantity/unit impact and flag unit mismatch.
+              const linked = inventoryItemsList.find(
+                (item: { id: string; name: string; quantity: number; unit_of_measurement?: string | null }) => item.id === form.asset_id,
+              );
+              const qty = Number.parseFloat(form.quantity);
+              const unitMismatch =
+                linked && form.unit.trim() &&
+                form.unit.trim().toLowerCase() !== String(linked.unit_of_measurement || "pcs").trim().toLowerCase();
+              return (
+                <div
+                  role="status"
+                  className={`dl-radius-lg border px-3 py-2.5 text-xs font-semibold ${
+                    unitMismatch
+                      ? "border-danger/40 bg-danger/5 text-danger"
+                      : "border-primary/30 bg-primary/5 text-foreground"
+                  }`}
+                >
+                  {!form.asset_id ? (
+                    <span>{t("A linked inventory item is required when the purchase creates stock")}</span>
+                  ) : unitMismatch ? (
+                    <span>
+                      {t("Unit mismatch")}: {form.unit} ≠ {linked?.unit_of_measurement || "pcs"}
+                    </span>
+                  ) : (
+                    <span>
+                      {t("On approval")}: +{Number.isNaN(qty) ? "?" : qty} {form.unit || ""} → {linked?.name}
+                      {linked ? ` (${linked.quantity} → ${Number.isNaN(qty) ? "?" : linked.quantity + qty})` : ""}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             <div>
               <label htmlFor="notes" className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-1.5">{t("Notes")}</label>

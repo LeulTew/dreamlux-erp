@@ -12,6 +12,8 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={String(href)} {...props}>{children}</a> }));
+
 // Mock useLanguage
 let mockLang = "en";
 vi.mock("@/hooks/use-language", () => ({
@@ -110,6 +112,7 @@ const LEDGER_FIXTURE = {
       rejected_reason: null,
       created_by: "u-1",
       created_at: "2026-06-01T10:00:00Z",
+      stock_applied_at: "2026-06-01T10:05:00Z",
     },
     {
       id: "ci-2",
@@ -143,7 +146,7 @@ describe("Capital Investments Page UI", () => {
     mockLang = "en";
     mockAuthLoading = false;
     mockAuthData = {
-      permission_slugs: ["finance:investments:read", "finance:investments:write"],
+      permission_slugs: ["finance:investments:read", "finance:investments:write", "assets:read"],
       is_superuser: false,
     };
     mockSummaryData = SUMMARY_FIXTURE;
@@ -185,6 +188,15 @@ describe("Capital Investments Page UI", () => {
     // Check linked asset badge matches
     expect(screen.getByTestId("linked-asset-badge")).toBeInTheDocument();
     expect(screen.getByTestId("unlinked-asset-badge")).toBeInTheDocument();
+  });
+
+  // Issue #172: stock-applied investments show a durable badge; rows without a
+  // stock application never do.
+  it("shows the Stock applied badge only for stock-applied rows", () => {
+    render(<InvestmentsPage />);
+    const badges = screen.getAllByText("Stock applied");
+    expect(badges).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Stock applied" })).toHaveAttribute("href", "/assets/movements?sourceId=ci-1");
   });
 
   it("hides approve/reject buttons for write-only accountant", () => {

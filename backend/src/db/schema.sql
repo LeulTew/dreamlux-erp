@@ -890,8 +890,63 @@ CREATE TABLE IF NOT EXISTS capital_investments (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   approved_at TIMESTAMP DEFAULT NULL,
-  deleted_at TIMESTAMP DEFAULT NULL
+  deleted_at TIMESTAMP DEFAULT NULL,
+  stock_applied_at TIMESTAMP DEFAULT NULL,
+  stock_applied_by UUID REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Immutable inventory movement ledger (issue #172). items.quantity is TOTAL
+-- OWNED stock; each row records one atomic adjustment with its source. The
+-- unique (source_type, source_id) index enforces at-most-one stock application
+-- per stock-creating capital investment at the database level.
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id UUID NOT NULL REFERENCES items(id) ON DELETE RESTRICT,
+  quantity_delta INTEGER NOT NULL CHECK (quantity_delta <> 0),
+  quantity_before INTEGER NOT NULL CHECK (quantity_before >= 0),
+  quantity_after INTEGER NOT NULL CHECK (quantity_after >= 0),
+  source_type TEXT NOT NULL,
+  source_id UUID NOT NULL,
+  notes TEXT DEFAULT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_movements_source
+  ON inventory_movements(source_type, source_id);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_item
+  ON inventory_movements(item_id, created_at DESC);
+
+CREATE OR REPLACE FUNCTION public.prevent_inventory_movement_mutation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  RAISE EXCEPTION 'inventory_movements is append-only'
+    USING ERRCODE = '55000';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.prevent_inventory_movement_mutation() FROM PUBLIC;
+
+DROP TRIGGER IF EXISTS trg_inventory_movements_append_only ON public.inventory_movements;
+CREATE TRIGGER trg_inventory_movements_append_only
+  BEFORE UPDATE OR DELETE ON public.inventory_movements
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_inventory_movement_mutation();
+
+ALTER TABLE public.inventory_movements ENABLE ROW LEVEL SECURITY;
+DO $$
+DECLARE
+  role_name text;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.inventory_movements FROM %I', role_name);
+    END IF;
+  END LOOP;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_capital_investments_purchase_date
   ON capital_investments(purchase_date DESC)
