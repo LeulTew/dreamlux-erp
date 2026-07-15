@@ -19,6 +19,7 @@ export type SidebarNavState = {
   refDataLinks: SidebarNavLink[];
   inventoryLinks: SidebarNavLink[];
   dispatchLink: SidebarNavLink | null;
+  returnsLink: SidebarNavLink | null;
   reconcileLink: SidebarNavLink | null;
   auditLogLink: SidebarNavLink | null;
   reportsLink: SidebarNavLink | null;
@@ -227,6 +228,11 @@ export function buildSidebarNavState(params: {
     ? { href: "/assets/dispatch", label: t("Dispatch"), active: pathname === "/assets/dispatch" }
     : null;
 
+  // Inbound return checklist (issue #173) — same capability as dispatch.
+  const returnsLink = hasAny(["event_allocations:write", "assets:write"])
+    ? { href: "/assets/returns", label: t("Returns"), active: pathname === "/assets/returns" }
+    : null;
+
   const reconcileLink = hasPermission("assets:reconcile")
     ? { href: "/assets/reconcile", label: t("Reconcile"), active: pathname === "/assets/reconcile" }
     : null;
@@ -250,7 +256,7 @@ export function buildSidebarNavState(params: {
   return {
     showHRGroup: hasAny(HR_GROUP_PERMISSIONS),
     showEmployeesMenu: employeesLinks.length > 0,
-    showInventoryGroup: hasPermission("assets:read") || dispatchLink !== null || hasPermission("vehicles:read"),
+    showInventoryGroup: hasPermission("assets:read") || dispatchLink !== null || returnsLink !== null || hasPermission("vehicles:read"),
     showAdminGroup: hasAny([...ADMIN_PERMISSIONS, "departments:manage", "positions:manage", "offices:manage"]),
     employeesLinks,
     eventLinks,
@@ -259,6 +265,7 @@ export function buildSidebarNavState(params: {
     inventoryLinks,
     inventoryDashboardLink,
     dispatchLink,
+    returnsLink,
     reconcileLink,
     auditLogLink,
     reportsLink,

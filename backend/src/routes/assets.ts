@@ -203,6 +203,8 @@ interface ItemRow {
   id: string;
   name: string;
   quantity: number;
+  unavailable_damaged_quantity?: number;
+  unavailable_repair_quantity?: number;
   description: string | null;
   store_id: string;
   image_key: string | null;
@@ -321,7 +323,9 @@ async function getActiveAllocationQuantities(itemIds: string[]): Promise<Map<str
 
   const { data, error } = await supabase
     .from("event_allocations")
-    .select("item_id, quantity_allocated")
+    .select(
+      "item_id, quantity_allocated, returned_good_quantity, returned_damaged_quantity, returned_lost_quantity, returned_repair_quantity"
+    )
     .in("item_id", itemIds)
     .neq("status", "Returned");
 
@@ -333,14 +337,26 @@ async function getActiveAllocationQuantities(itemIds: string[]): Promise<Map<str
   }
 
   const allocatedByItem = new Map<string, number>();
-  for (const row of (data || []) as Array<{ item_id?: string | null; quantity_allocated?: number | string | null }>) {
+  for (const row of (data || []) as Array<{
+    item_id?: string | null;
+    quantity_allocated?: number | string | null;
+    returned_good_quantity?: number | string | null;
+    returned_damaged_quantity?: number | string | null;
+    returned_lost_quantity?: number | string | null;
+    returned_repair_quantity?: number | string | null;
+  }>) {
     if (!row.item_id) {
       continue;
     }
-    allocatedByItem.set(
-      row.item_id,
-      (allocatedByItem.get(row.item_id) || 0) + normalizeQuantity(row.quantity_allocated)
-    );
+    // Outstanding = allocated minus everything already accounted by return
+    // receipts (issue #173). Old rows have zero returned quantities.
+    const outstanding =
+      normalizeQuantity(row.quantity_allocated) -
+      normalizeQuantity(row.returned_good_quantity) -
+      normalizeQuantity(row.returned_damaged_quantity) -
+      normalizeQuantity(row.returned_lost_quantity) -
+      normalizeQuantity(row.returned_repair_quantity);
+    allocatedByItem.set(row.item_id, (allocatedByItem.get(row.item_id) || 0) + Math.max(0, outstanding));
   }
 
   return allocatedByItem;
@@ -1050,13 +1066,18 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
     const items = rows.map((row) => {
       const quantity = normalizeQuantity(row.quantity);
       const allocatedQuantity = allocatedByItem.get(row.id) || 0;
+      const unavailableQuantity =
+        normalizeQuantity(row.unavailable_damaged_quantity) +
+        normalizeQuantity(row.unavailable_repair_quantity);
 
       return {
         id: row.id,
         name: row.name,
         quantity: row.quantity,
         allocated_quantity: allocatedQuantity,
-        available_quantity: Math.max(0, quantity - allocatedQuantity),
+        unavailable_damaged_quantity: normalizeQuantity(row.unavailable_damaged_quantity),
+        unavailable_repair_quantity: normalizeQuantity(row.unavailable_repair_quantity),
+        available_quantity: Math.max(0, quantity - allocatedQuantity - unavailableQuantity),
         description: row.description,
         store: {
           id: row.store_id,

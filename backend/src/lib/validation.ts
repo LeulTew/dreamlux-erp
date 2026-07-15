@@ -533,6 +533,39 @@ export const createEventAllocationSchema = z.object({
 export const updateEventAllocationDispatchSchema = z.object({
   dispatch_checked: z.boolean({ required_error: "dispatch_checked is required" }),
 });
+// Issue #173: one immutable return receipt line. Quantities are whole numbers;
+// at least one condition quantity must be positive.
+const returnQuantitySchema = z.coerce
+  .number()
+  .int("Return quantities must be whole numbers")
+  .min(0, "Return quantities cannot be negative")
+  .max(1_000_000, "Return quantity too large")
+  .optional()
+  .default(0);
+
+export const recordEventReturnSchema = z
+  .object({
+    good_quantity: returnQuantitySchema,
+    damaged_quantity: returnQuantitySchema,
+    lost_quantity: returnQuantitySchema,
+    repair_quantity: returnQuantitySchema,
+    notes: z.string().trim().max(1000, "Notes too long").optional().nullable(),
+    idempotency_key: z.string().trim().min(1).max(120, "Idempotency key too long").optional().nullable(),
+  })
+  .refine(
+    (data) => data.good_quantity + data.damaged_quantity + data.lost_quantity + data.repair_quantity > 0,
+    { message: "At least one returned quantity must be greater than zero" },
+  );
+
+export type RecordEventReturnInput = z.infer<typeof recordEventReturnSchema>;
+
+export const resolveInventoryConditionSchema = z.object({
+  source_condition: z.enum(["damaged", "repair"]),
+  outcome: z.enum(["good", "damaged", "repair", "lost"]),
+  quantity: z.coerce.number().int().min(1).max(1_000_000),
+  notes: z.string().trim().max(1000).optional().nullable(),
+  idempotency_key: z.string().trim().min(1).max(120).optional().nullable(),
+});
 
 export const createEventChecklistItemSchema = z.object({
   title: z.string().min(1, "Task title is required").max(500, "Task title too long"),
@@ -546,7 +579,6 @@ export const createEventChecklistItemSchema = z.object({
 export const updateEventChecklistItemSchema = createEventChecklistItemSchema.partial().extend({
   status: z.enum(["Todo", "Done"]).optional(),
 });
-
 export type UpdateEventDesignInput = z.infer<typeof updateEventDesignSchema>;
 export type CreateEventAllocationInput = z.infer<typeof createEventAllocationSchema>;
 export type UpdateEventAllocationDispatchInput = z.infer<typeof updateEventAllocationDispatchSchema>;

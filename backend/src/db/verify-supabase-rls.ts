@@ -20,6 +20,8 @@ const protectedTables = [
   "finance_overhead_month_closures",
   "finance_import_batches",
   "inventory_movements",
+  "event_return_receipts",
+  "inventory_condition_resolutions",
 ];
 
 function isDenied(status: number): boolean {

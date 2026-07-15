@@ -11,6 +11,7 @@ import { calculateFuelCostLitersPerKm, FUEL_CONSUMPTION_UNIT, validateFuelConsum
 import { createEventProposalsRouter } from "./events/proposals";
 import { createEventProfitReportsRouter } from "./events/profit-reports";
 import { createEventSavedViewsRouter } from "./events/saved-views";
+import { createEventReturnsRouter } from "./events/returns";
 import {
   createEventSchema,
   updateEventSchema,
@@ -1032,6 +1033,7 @@ router.post("/import/commit", requireAuth, async (req: AuthRequest, res: Respons
 router.use(createEventProposalsRouter());
 router.use(createEventSavedViewsRouter());
 router.use(createEventProfitReportsRouter());
+router.use(createEventReturnsRouter());
 
 // Helper to build filters for expenses
 function buildExpensesQuery(req: AuthRequest, statusMode: "Pending" | "History") {
@@ -1926,8 +1928,12 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
         i.image_key,
         s.name AS store_name,
         COALESCE(
-          i.quantity - (
-            SELECT COALESCE(SUM(quantity_allocated), 0)
+          i.quantity - i.unavailable_damaged_quantity - i.unavailable_repair_quantity - (
+            -- Outstanding (unaccounted) allocation quantity: good/damaged/lost/
+            -- repair returns shrink it as receipts are recorded (issue #173).
+            SELECT COALESCE(SUM(quantity_allocated
+              - returned_good_quantity - returned_damaged_quantity
+              - returned_lost_quantity - returned_repair_quantity), 0)
             FROM event_allocations
             WHERE item_id = ea.item_id AND status != 'Returned'
           ),
@@ -2407,14 +2413,19 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
       const item = itemResult.rows[0];
 
       const activeAllocationsQuery = `
-        SELECT COALESCE(SUM(quantity_allocated), 0) as total_allocated
+        SELECT COALESCE(SUM(quantity_allocated
+          - returned_good_quantity - returned_damaged_quantity
+          - returned_lost_quantity - returned_repair_quantity), 0) as total_allocated
         FROM event_allocations
         WHERE item_id = $1 AND status != 'Returned'
       `;
       const activeAllocationsResult = await client.query(activeAllocationsQuery, [item_id]);
       const totalAllocated = parseInt(activeAllocationsResult.rows[0].total_allocated, 10);
 
-      const availableQuantity = item.quantity - totalAllocated;
+      const availableQuantity = item.quantity
+        - Number(item.unavailable_damaged_quantity || 0)
+        - Number(item.unavailable_repair_quantity || 0)
+        - totalAllocated;
 
       if (quantity_allocated > availableQuantity) {
         await client.query("ROLLBACK");
