@@ -12,6 +12,8 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={String(href)} {...props}>{children}</a> }));
+
 // Mock useLanguage
 let mockLang = "en";
 vi.mock("@/hooks/use-language", () => ({
@@ -144,7 +146,7 @@ describe("Capital Investments Page UI", () => {
     mockLang = "en";
     mockAuthLoading = false;
     mockAuthData = {
-      permission_slugs: ["finance:investments:read", "finance:investments:write"],
+      permission_slugs: ["finance:investments:read", "finance:investments:write", "assets:read"],
       is_superuser: false,
     };
     mockSummaryData = SUMMARY_FIXTURE;
@@ -194,6 +196,7 @@ describe("Capital Investments Page UI", () => {
     render(<InvestmentsPage />);
     const badges = screen.getAllByText("Stock applied");
     expect(badges).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Stock applied" })).toHaveAttribute("href", "/assets/movements?sourceId=ci-1");
   });
 
   it("hides approve/reject buttons for write-only accountant", () => {

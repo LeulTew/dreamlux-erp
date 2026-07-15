@@ -40,6 +40,13 @@ export const assetsPaginationSchema = paginationSchema.extend({
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
+export const inventoryMovementListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(25),
+  itemId: z.string().uuid("Invalid item ID").optional(),
+  sourceId: z.string().uuid("Invalid source ID").optional(),
+});
+
 export type AssetsPaginationInput = z.infer<typeof assetsPaginationSchema>;
 
 export const reconcileItemsSchema = z.object({
@@ -838,9 +845,8 @@ const investmentCoreFields = {
   creates_inventory_stock: z.coerce.boolean().optional().default(false),
 };
 
-// Issue #172: stock-creating purchases feed items.quantity (an INTEGER count),
-// so they must carry a linked item and a whole-number quantity. Fractional
-// quantities are rejected up front rather than truncated or rounded later.
+// Stock-creating purchases feed items.quantity (an integer count), so reject
+// missing links and fractional quantities before they reach the transaction.
 export function validateStockCreationRules(
   data: { creates_inventory_stock?: boolean; asset_id?: string | null; quantity?: number },
   ctx: z.RefinementCtx,

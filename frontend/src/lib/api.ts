@@ -4,6 +4,7 @@ import {
   User,
   Role,
   InventoryStats,
+  InventoryMovementsResponse,
   Store,
   ItemsResponse,
   Item,
@@ -452,6 +453,14 @@ export const login = (username: string, password: string) =>
 // Assets
 export const getInventoryStats = (): Promise<InventoryStats> =>
   getWithAliasFallback<InventoryStats>("/assets/stats");
+
+export const getInventoryMovements = (params: {
+  page?: number;
+  limit?: number;
+  itemId?: string;
+  sourceId?: string;
+} = {}) =>
+  getWithAliasFallback<InventoryMovementsResponse>("/assets/movements", { params });
 
 export const getItems = (
   page: number = 1,

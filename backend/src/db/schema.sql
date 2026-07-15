@@ -918,6 +918,36 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_movements_source
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_item
   ON inventory_movements(item_id, created_at DESC);
 
+CREATE OR REPLACE FUNCTION public.prevent_inventory_movement_mutation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  RAISE EXCEPTION 'inventory_movements is append-only'
+    USING ERRCODE = '55000';
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.prevent_inventory_movement_mutation() FROM PUBLIC;
+
+DROP TRIGGER IF EXISTS trg_inventory_movements_append_only ON public.inventory_movements;
+CREATE TRIGGER trg_inventory_movements_append_only
+  BEFORE UPDATE OR DELETE ON public.inventory_movements
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_inventory_movement_mutation();
+
+ALTER TABLE public.inventory_movements ENABLE ROW LEVEL SECURITY;
+DO $$
+DECLARE
+  role_name text;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.inventory_movements FROM %I', role_name);
+    END IF;
+  END LOOP;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_capital_investments_purchase_date
   ON capital_investments(purchase_date DESC)
   WHERE deleted_at IS NULL;

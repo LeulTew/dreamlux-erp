@@ -34,7 +34,7 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
   test("Accountant records investment, links asset, Owner approves & exports capex", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, {
-      permissions: ["finance:investments:read", "finance:investments:write", "finance:investments:approve"],
+      permissions: ["finance:investments:read", "finance:investments:write", "finance:investments:approve", "assets:read"],
     });
     await mockCommonShellData(page);
 
@@ -144,6 +144,31 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     await page.getByRole("button", { name: "Approve" }).click();
     await expect(page.getByText("Approved", { exact: true })).toBeVisible();
     await expect(page.getByText("Stock applied", { exact: true })).toBeVisible();
+
+    await page.route((url) => url.pathname === "/api/assets/movements", (route) => fulfillJson(route, {
+      movements: [{
+        id: "m-123",
+        item_id: "asset-e2e-1",
+        item_name: "Twill Loom",
+        unit_of_measurement: "pcs",
+        quantity_delta: 2,
+        quantity_before: 5,
+        quantity_after: 7,
+        source_type: "capital_investment",
+        source_id: "inv-e2e-1",
+        created_at: "2026-06-10T12:05:00Z",
+        created_by_name: "Phase 5 Reviewer",
+      }],
+      total: 1,
+      page: 1,
+      limit: 25,
+      totalPages: 1,
+    }));
+    await page.getByRole("link", { name: "Stock applied" }).click();
+    await expect(page.getByRole("heading", { name: "Stock Movements" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Twill Loom", exact: true })).toBeVisible();
+    await expect(page.getByText("5 → 7")).toBeVisible();
+    await page.goto("/hr/finance/investments");
 
     let exportRequested = false;
     await page.route((url) => url.pathname === "/api/finance/investments/export", (route) => {

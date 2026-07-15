@@ -30,6 +30,28 @@ export interface ItemsResponse {
   limit: number;
 }
 
+export interface InventoryMovement {
+  id: string;
+  item_id: string;
+  item_name: string;
+  unit_of_measurement: string | null;
+  quantity_delta: number;
+  quantity_before: number;
+  quantity_after: number;
+  source_type: string;
+  source_id: string;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface InventoryMovementsResponse {
+  movements: InventoryMovement[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface Employee {
   id: string;
   full_name: string;
@@ -1031,4 +1053,3 @@ export interface HisabImportCommitResult {
     investments?: number;
   };
 }
-

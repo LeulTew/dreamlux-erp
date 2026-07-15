@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
@@ -218,6 +219,7 @@ export default function InvestmentsPage() {
   const canRead = matches("finance:investments:read");
   const canWrite = matches("finance:investments:write");
   const canApprove = matches("finance:investments:approve");
+  const canReadInventoryHistory = matches("assets:read");
 
   // Summary
   const { data: summary, isLoading: summaryLoading } = useQuery({
@@ -680,11 +682,18 @@ export default function InvestmentsPage() {
                       <td className="px-4 py-4">
                         <div className="flex flex-col items-start gap-1">
                           <StatusBadge status={item.status} />
-                          {item.stock_applied_at && (
+                          {item.stock_applied_at && (canReadInventoryHistory ? (
+                            <Link
+                              href={`/assets/movements?sourceId=${item.id}`}
+                              className="inline-flex min-h-11 items-center px-3 py-1 dl-radius-md text-[9px] font-black uppercase tracking-wider bg-success/10 text-success border border-success/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              {t("Stock applied")}
+                            </Link>
+                          ) : (
                             <span className="inline-flex items-center px-2 py-0.5 dl-radius-md text-[9px] font-black uppercase tracking-wider bg-success/10 text-success border border-success/25">
                               {t("Stock applied")}
                             </span>
-                          )}
+                          ))}
                         </div>
                       </td>
                       <td className="px-4 py-4 text-right no-print">
