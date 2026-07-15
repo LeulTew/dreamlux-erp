@@ -199,7 +199,7 @@ describe("Recording return receipts (issue #173)", () => {
     expect(executed.some((sql) => sql.includes("COMMIT"))).toBe(true);
   });
 
-  test("damaged/lost/repair quantities create a negative ledger movement and reduce stock", async () => {
+  test("loss reduces owned stock while damaged and repair remain owned but unavailable", async () => {
     const executed: string[] = [];
     mockReturnQueries({ onSql: (sql) => { executed.push(sql); return undefined; } });
 
@@ -211,17 +211,17 @@ describe("Recording return receipts (issue #173)", () => {
     expect(res.status).toBe(201);
     expect(res.body.fully_returned).toBe(true); // 8 outstanding fully accounted
     expect(executed.some((sql) => sql.includes("INSERT INTO inventory_movements"))).toBe(true);
-    expect(executed.some((sql) => sql.includes("UPDATE items SET quantity"))).toBe(true);
+    expect(executed.some((sql) => sql.includes("unavailable_damaged_quantity"))).toBe(true);
   });
 
-  test("non-good return that would drive stock negative is rejected", async () => {
+  test("condition balances cannot exceed total owned stock", async () => {
     mockReturnQueries({ item: { ...LINKED_ITEM, quantity: 1 } });
     const res = await request(app)
       .post(`/events/${EVENT_ID}/allocations/${ALLOCATION_ID}/returns`)
       .set("Authorization", `Bearer ${getToken()}`)
       .send({ damaged_quantity: 5 });
     expect(res.status).toBe(409);
-    expect(res.body.error).toContain("negative");
+    expect(res.body.error).toContain("owned quantity");
   });
 
   test("duplicate idempotency key maps to an explicit conflict", async () => {
@@ -268,5 +268,45 @@ describe("Recording return receipts (issue #173)", () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error).toContain("exceeds the dispatched quantity");
+  });
+});
+
+describe("Resolving unavailable inventory conditions", () => {
+  test("repair completion restores availability without changing owned quantity", async () => {
+    const executed: Array<{ sql: string; params?: unknown[] }> = [];
+    mockQuery.mockImplementation((sql: string, params?: unknown[]) => {
+      const text = String(sql);
+      executed.push({ sql: text, params });
+      if (text.includes("FROM items WHERE id") && text.includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [{ ...LINKED_ITEM, unavailable_damaged_quantity: 1, unavailable_repair_quantity: 4 }], rowCount: 1 });
+      }
+      if (text.includes("INSERT INTO inventory_condition_resolutions")) {
+        return Promise.resolve({ rows: [{ id: "resolution-1" }], rowCount: 1 });
+      }
+      return Promise.resolve({ rows: [], rowCount: 1 });
+    });
+
+    const res = await request(app)
+      .post(`/events/returns/items/${LINKED_ITEM.id}/condition-resolutions`)
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({ source_condition: "repair", outcome: "good", quantity: 2, idempotency_key: "repair-1" });
+
+    expect(res.status).toBe(201);
+    expect(executed.some(({ sql }) => sql.includes("unavailable_repair_quantity = unavailable_repair_quantity - $2"))).toBe(true);
+    expect(executed.some(({ sql }) => sql.includes("INSERT INTO inventory_movements"))).toBe(false);
+  });
+
+  test("rejects resolving more than the unavailable balance", async () => {
+    mockQuery.mockImplementation((sql: string) => {
+      if (String(sql).includes("FROM items WHERE id") && String(sql).includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [{ ...LINKED_ITEM, unavailable_damaged_quantity: 0, unavailable_repair_quantity: 1 }], rowCount: 1 });
+      }
+      return Promise.resolve({ rows: [], rowCount: 1 });
+    });
+    const res = await request(app)
+      .post(`/events/returns/items/${LINKED_ITEM.id}/condition-resolutions`)
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({ source_condition: "repair", outcome: "good", quantity: 2 });
+    expect(res.status).toBe(409);
   });
 });

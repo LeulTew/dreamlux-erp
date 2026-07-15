@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { pool } from "../../db/pool";
 import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../../middleware/auth";
 import { hasPermissionSlug } from "../../lib/permissions";
-import { recordEventReturnSchema } from "../../lib/validation";
+import { recordEventReturnSchema, resolveInventoryConditionSchema } from "../../lib/validation";
 import { NotificationsService } from "../../services/notifications-service";
 
 /**
@@ -11,9 +11,8 @@ import { NotificationsService } from "../../services/notifications-service";
  * Invariant (documented in event_returns.sql):
  *   outstanding(allocation) = quantity_allocated - (good + damaged + lost + repair)
  *   availability            = items.quantity - SUM(outstanding) over status <> 'Returned'
- * Good returns restore availability by shrinking outstanding only; damaged /
- * lost / repair quantities additionally reduce items.quantity via one immutable
- * inventory_movements row per receipt. Receipts are append-only.
+ * Good returns restore availability by shrinking outstanding. Damaged and
+ * repair quantities remain owned but unavailable. Only loss reduces owned stock.
  */
 
 function hasPermission(req: AuthRequest, slug: string): boolean {
@@ -30,6 +29,78 @@ const OUTSTANDING_SQL =
 
 export function createEventReturnsRouter(): Router {
   const router = Router();
+
+  router.post("/returns/items/:itemId/condition-resolutions", requireAuth, async (req: AuthRequest, res: Response) => {
+    const client = await pool.connect();
+    try {
+      if (!canManageReturns(req)) {
+        res.status(403).json({ error: "Forbidden: Missing return processing privileges" });
+        return;
+      }
+      const parsed = resolveInventoryConditionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.errors[0].message });
+        return;
+      }
+      const input = parsed.data;
+      await client.query("BEGIN");
+      const itemResult = await client.query(
+        `SELECT id, quantity, unavailable_damaged_quantity, unavailable_repair_quantity
+         FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+        [req.params.itemId],
+      );
+      if (itemResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Inventory item not found" });
+        return;
+      }
+      const item = itemResult.rows[0];
+      const sourceColumn = input.source_condition === "damaged"
+        ? "unavailable_damaged_quantity"
+        : "unavailable_repair_quantity";
+      if (input.quantity > Number(item[sourceColumn])) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: `Only ${item[sourceColumn]} ${input.source_condition} items are awaiting resolution` });
+        return;
+      }
+      const lost = input.outcome === "lost" ? input.quantity : 0;
+      const damaged = input.outcome === "damaged" ? input.quantity : 0;
+      const repair = input.outcome === "repair" ? input.quantity : 0;
+      const resolutionResult = await client.query(
+        `INSERT INTO inventory_condition_resolutions
+           (item_id, source_condition, outcome, quantity, notes, idempotency_key, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [item.id, input.source_condition, input.outcome, input.quantity, input.notes ?? null, input.idempotency_key ?? null, req.user?.id || null],
+      );
+      await client.query(
+        `UPDATE items SET ${sourceColumn} = ${sourceColumn} - $2,
+           unavailable_damaged_quantity = unavailable_damaged_quantity + $3,
+           unavailable_repair_quantity = unavailable_repair_quantity + $4,
+           quantity = quantity - $5, updated_at = NOW() WHERE id = $1`,
+        [item.id, input.quantity, damaged, repair, lost],
+      );
+      if (lost > 0) {
+        await client.query(
+          `INSERT INTO inventory_movements
+             (item_id, quantity_delta, quantity_before, quantity_after, source_type, source_id, notes, created_by)
+           VALUES ($1, $2, $3, $4, 'condition_resolution', $5, $6, $7)`,
+          [item.id, -lost, Number(item.quantity), Number(item.quantity) - lost, resolutionResult.rows[0].id, input.notes ?? "Condition resolved as lost", req.user?.id || null],
+        );
+      }
+      await client.query("COMMIT");
+      res.status(201).json({ resolved: input.quantity, outcome: input.outcome });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      if (error?.code === "23505") {
+        res.status(409).json({ error: "This condition resolution was already recorded" });
+        return;
+      }
+      console.error("[resolve-inventory-condition] Error:", error?.message || error);
+      res.status(500).json({ error: "Failed to resolve inventory condition" });
+    } finally {
+      client.release();
+    }
+  });
 
   // GET /events/returns/queue — departed allocations awaiting reconciliation,
   // grouped by event. Completed events with outstanding returns are included;
@@ -156,7 +227,6 @@ export function createEventReturnsRouter(): Router {
       }
       const input = validationResult.data;
       const receiptTotal = input.good_quantity + input.damaged_quantity + input.lost_quantity + input.repair_quantity;
-      const nonGoodTotal = input.damaged_quantity + input.lost_quantity + input.repair_quantity;
 
       await client.query("BEGIN");
 
@@ -203,7 +273,8 @@ export function createEventReturnsRouter(): Router {
       const outstandingAfter = outstandingBefore - receiptTotal;
 
       const itemResult = await client.query(
-        "SELECT id, name, quantity FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        `SELECT id, name, quantity, unavailable_damaged_quantity, unavailable_repair_quantity
+         FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
         [allocation.item_id],
       );
       if (itemResult.rowCount === 0) {
@@ -212,6 +283,15 @@ export function createEventReturnsRouter(): Router {
         return;
       }
       const item = itemResult.rows[0];
+      const ownedAfter = Number(item.quantity) - input.lost_quantity;
+      const unavailableAfter =
+        Number(item.unavailable_damaged_quantity || 0) + input.damaged_quantity +
+        Number(item.unavailable_repair_quantity || 0) + input.repair_quantity;
+      if (ownedAfter < 0 || unavailableAfter > ownedAfter) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Return conditions exceed the item's owned quantity" });
+        return;
+      }
 
       const receiptResult = await client.query(
         `INSERT INTO event_return_receipts
@@ -236,32 +316,37 @@ export function createEventReturnsRouter(): Router {
       );
       const receipt = receiptResult.rows[0];
 
-      // Damaged/lost/repair quantities leave owned-good stock, through the
-      // shared immutable ledger (#172 pattern). Good quantities restore
-      // availability purely by shrinking outstanding — items.quantity untouched.
-      if (nonGoodTotal > 0) {
+      // Loss leaves owned stock. Damaged and repair stock remain owned but are
+      // unavailable until an audited condition resolution is recorded.
+      if (input.lost_quantity > 0) {
         const quantityBefore = Number(item.quantity);
-        const quantityAfter = quantityBefore - nonGoodTotal;
-        if (quantityAfter < 0) {
-          await client.query("ROLLBACK");
-          res.status(409).json({ error: "Return would drive item stock negative; run a recount first" });
-          return;
-        }
+        const quantityAfter = quantityBefore - input.lost_quantity;
         await client.query(
           `INSERT INTO inventory_movements
              (item_id, quantity_delta, quantity_before, quantity_after, source_type, source_id, notes, created_by)
            VALUES ($1, $2, $3, $4, 'event_return', $5, $6, $7)`,
           [
             item.id,
-            -nonGoodTotal,
+            -input.lost_quantity,
             quantityBefore,
             quantityAfter,
             receipt.id,
-            `Return receipt: damaged ${input.damaged_quantity}, lost ${input.lost_quantity}, repair ${input.repair_quantity}`,
+            `Return receipt loss: ${input.lost_quantity}`,
             req.user?.id || null,
           ],
         );
-        await client.query("UPDATE items SET quantity = $2, updated_at = NOW() WHERE id = $1", [item.id, quantityAfter]);
+      }
+
+      if (input.lost_quantity + input.damaged_quantity + input.repair_quantity > 0) {
+        await client.query(
+          `UPDATE items
+           SET quantity = quantity - $2,
+               unavailable_damaged_quantity = unavailable_damaged_quantity + $3,
+               unavailable_repair_quantity = unavailable_repair_quantity + $4,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [item.id, input.lost_quantity, input.damaged_quantity, input.repair_quantity],
+        );
       }
 
       const fullyAccounted = outstandingAfter === 0;

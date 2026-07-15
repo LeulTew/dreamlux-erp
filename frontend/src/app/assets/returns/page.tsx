@@ -41,6 +41,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Retry": "Retry",
     "outstanding": "outstanding",
     "of": "of",
+    "Page": "Page",
   },
   am: {
     "Inventory Returns": "የክምችት መመለሻዎች",
@@ -68,6 +69,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Retry": "እንደገና ሞክር",
     "outstanding": "ያልተመለሰ",
     "of": "ከ",
+    "Page": "ገጽ",
   },
 };
 
@@ -114,10 +116,11 @@ function ReturnsContent() {
   const canManageReturns = hasPermission("event_allocations:write") || hasPermission("assets:write");
   const selectedEventId = searchParams.get("event");
   const [forms, setForms] = useState<Record<string, ReturnFormState>>({});
+  const [queuePage, setQueuePage] = useState(1);
 
-  const queueQuery = useQuery<{ queue: ReturnQueueEntry[]; total: number }>({
-    queryKey: ["event-return-queue"],
-    queryFn: () => getReturnQueue(),
+  const queueQuery = useQuery<{ queue: ReturnQueueEntry[]; total: number; page: number; limit: number; totalPages: number }>({
+    queryKey: ["event-return-queue", queuePage],
+    queryFn: () => getReturnQueue({ page: queuePage, limit: 25 }),
     enabled: isAuthenticated && canManageReturns && !selectedEventId,
   });
 
@@ -458,6 +461,31 @@ function ReturnsContent() {
             </div>
           )}
         </section>
+        {(queueQuery.data?.totalPages ?? 1) > 1 && (
+          <nav aria-label="Return queue pagination" className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              disabled={queuePage <= 1 || queueQuery.isFetching}
+              onClick={() => setQueuePage((page) => Math.max(1, page - 1))}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-xs font-bold disabled:opacity-40"
+              aria-label="Previous page"
+            >
+              <HiArrowLeft className="h-4 w-4" />
+            </button>
+            <span className="text-xs font-semibold text-muted tabular-nums">
+              {t("Page")} {queuePage} {t("of")} {queueQuery.data?.totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={queuePage >= (queueQuery.data?.totalPages ?? 1) || queueQuery.isFetching}
+              onClick={() => setQueuePage((page) => page + 1)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-xs font-bold disabled:opacity-40"
+              aria-label="Next page"
+            >
+              <HiArrowRight className="h-4 w-4" />
+            </button>
+          </nav>
+        )}
       </div>
     </AuthLayout>
   );

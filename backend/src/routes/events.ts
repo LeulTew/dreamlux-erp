@@ -1928,7 +1928,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
         i.image_key,
         s.name AS store_name,
         COALESCE(
-          i.quantity - (
+          i.quantity - i.unavailable_damaged_quantity - i.unavailable_repair_quantity - (
             -- Outstanding (unaccounted) allocation quantity: good/damaged/lost/
             -- repair returns shrink it as receipts are recorded (issue #173).
             SELECT COALESCE(SUM(quantity_allocated
@@ -2422,7 +2422,10 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
       const activeAllocationsResult = await client.query(activeAllocationsQuery, [item_id]);
       const totalAllocated = parseInt(activeAllocationsResult.rows[0].total_allocated, 10);
 
-      const availableQuantity = item.quantity - totalAllocated;
+      const availableQuantity = item.quantity
+        - Number(item.unavailable_damaged_quantity || 0)
+        - Number(item.unavailable_repair_quantity || 0)
+        - totalAllocated;
 
       if (quantity_allocated > availableQuantity) {
         await client.query("ROLLBACK");

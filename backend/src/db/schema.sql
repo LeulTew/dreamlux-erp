@@ -213,6 +213,8 @@ CREATE TABLE IF NOT EXISTS items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 0,
+  unavailable_damaged_quantity INTEGER NOT NULL DEFAULT 0,
+  unavailable_repair_quantity INTEGER NOT NULL DEFAULT 0,
   description TEXT,
   store_id UUID REFERENCES stores(id),
   category_id UUID REFERENCES categories(id),
@@ -227,7 +229,12 @@ CREATE TABLE IF NOT EXISTS items (
   condition_status TEXT CHECK (condition_status IN ('Good', 'Damaged', 'Under Repair')) DEFAULT 'Good',
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  deleted_at TIMESTAMP DEFAULT NULL
+  deleted_at TIMESTAMP DEFAULT NULL,
+  CONSTRAINT chk_items_condition_quantities CHECK (
+    unavailable_damaged_quantity >= 0
+    AND unavailable_repair_quantity >= 0
+    AND unavailable_damaged_quantity + unavailable_repair_quantity <= quantity
+  )
 );
 
 CREATE INDEX IF NOT EXISTS idx_items_created_at_desc
@@ -801,6 +808,24 @@ CREATE TABLE IF NOT EXISTS event_return_receipts (
   created_at TIMESTAMP DEFAULT NOW(),
   CHECK (good_quantity + damaged_quantity + lost_quantity + repair_quantity > 0)
 );
+
+CREATE TABLE IF NOT EXISTS inventory_condition_resolutions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id UUID NOT NULL REFERENCES items(id) ON DELETE RESTRICT,
+  source_condition TEXT NOT NULL CHECK (source_condition IN ('damaged', 'repair')),
+  outcome TEXT NOT NULL CHECK (outcome IN ('good', 'damaged', 'repair', 'lost')),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  notes TEXT DEFAULT NULL,
+  idempotency_key TEXT DEFAULT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_condition_resolution_idem
+  ON inventory_condition_resolutions(item_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_inventory_condition_resolutions_item
+  ON inventory_condition_resolutions(item_id, created_at DESC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_event_return_receipts_idem
   ON event_return_receipts(allocation_id, idempotency_key)

@@ -559,6 +559,14 @@ export const recordEventReturnSchema = z
 
 export type RecordEventReturnInput = z.infer<typeof recordEventReturnSchema>;
 
+export const resolveInventoryConditionSchema = z.object({
+  source_condition: z.enum(["damaged", "repair"]),
+  outcome: z.enum(["good", "damaged", "repair", "lost"]),
+  quantity: z.coerce.number().int().min(1).max(1_000_000),
+  notes: z.string().trim().max(1000).optional().nullable(),
+  idempotency_key: z.string().trim().min(1).max(120).optional().nullable(),
+});
+
 export const createEventChecklistItemSchema = z.object({
   title: z.string().min(1, "Task title is required").max(500, "Task title too long"),
   due_date: z.string().optional().nullable().refine((val) => {

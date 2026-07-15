@@ -203,6 +203,8 @@ interface ItemRow {
   id: string;
   name: string;
   quantity: number;
+  unavailable_damaged_quantity?: number;
+  unavailable_repair_quantity?: number;
   description: string | null;
   store_id: string;
   image_key: string | null;
@@ -1064,13 +1066,18 @@ router.get("/", requirePermissions("assets", "read"), async (req: AuthRequest, r
     const items = rows.map((row) => {
       const quantity = normalizeQuantity(row.quantity);
       const allocatedQuantity = allocatedByItem.get(row.id) || 0;
+      const unavailableQuantity =
+        normalizeQuantity(row.unavailable_damaged_quantity) +
+        normalizeQuantity(row.unavailable_repair_quantity);
 
       return {
         id: row.id,
         name: row.name,
         quantity: row.quantity,
         allocated_quantity: allocatedQuantity,
-        available_quantity: Math.max(0, quantity - allocatedQuantity),
+        unavailable_damaged_quantity: normalizeQuantity(row.unavailable_damaged_quantity),
+        unavailable_repair_quantity: normalizeQuantity(row.unavailable_repair_quantity),
+        available_quantity: Math.max(0, quantity - allocatedQuantity - unavailableQuantity),
         description: row.description,
         store: {
           id: row.store_id,
