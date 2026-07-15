@@ -1,6 +1,10 @@
-## Summary
+## High-Level Overview (Plain English)
 
-Provide a brief description of the changes introduced in this PR and their business/architectural rationale.
+_Provide a brief, day-to-day English summary of what the problem is and how we are solving it. Keep it concise, high-level, and easy to read (use bullet points if necessary). Written for human understanding, not for AI._
+
+## Technical Summary
+
+_Provide a brief description of the changes introduced in this PR and their business/architectural rationale._
 
 ## Linked Issue
 

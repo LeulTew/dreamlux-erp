@@ -4,6 +4,16 @@ title: "[Research]: "
 labels: ["type:research", "needs:research"]
 body:
   - type: textarea
+    id: overview
+    attributes:
+      label: High-Level Overview (Plain English)
+      description: A very high-level summary of what the problem is and how we are solving it (concise and short, written for human review, not for AI).
+      placeholder: |
+        - Problem: ...
+        - Solution: ...
+    validations:
+      required: true
+  - type: textarea
     id: question
     attributes:
       label: Research question

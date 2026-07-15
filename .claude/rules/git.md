@@ -30,6 +30,7 @@ All commits must be prefix-based to maintain clean changelogs. Use the format `<
 
 ## 4. Pull Request & Verification Readiness
 PR descriptions must include:
+- **High-Level Overview (Plain English)**: A concise, day-to-day English summary of what the problem is and how we are solving it (for human review, not for AI; keep it as short as possible, bullet points if necessary).
 - A link/reference to the resolved GitHub issue.
 - A list of verification commands executed and their outcomes (e.g., test suites, lint checks).
 - Separate sections for local QA, CI results, deployment targets, and production smoke tests where applicable.
