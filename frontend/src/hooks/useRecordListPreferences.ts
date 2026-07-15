@@ -28,20 +28,28 @@ export function useRecordListPreferences(
   // When disabled we are trivially "loaded" (no fetch to wait for).
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const isLoaded = !enabled || loadedFor === recordType;
+  const [appliedFor, setAppliedFor] = useState<string | null>(null);
+  const isReady = !enabled || (isLoaded && appliedFor === recordType);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [saveError, setSaveError] = useState<Error | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestPayload = useRef<RecordListPreferencePayload | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    setAppliedFor(null);
+    setLoadError(null);
     getRecordListPreference(recordType)
       .then((pref) => {
         if (!cancelled) setPreference(pref);
       })
-      .catch(() => {
-        // A missing/failed preference must never block the grid — fall back to
-        // defaults silently.
-        if (!cancelled) setPreference(null);
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setPreference(null);
+          setLoadError(error instanceof Error ? error : new Error("Failed to load list preferences"));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadedFor(recordType);
@@ -51,25 +59,30 @@ export function useRecordListPreferences(
     };
   }, [recordType, enabled]);
 
+  const markApplied = useCallback(() => setAppliedFor(recordType), [recordType]);
+
   const flush = useCallback(() => {
     if (!enabled || !latestPayload.current) return;
     const payload = latestPayload.current;
     latestPayload.current = null;
+    setIsSaving(true);
+    setSaveError(null);
     saveRecordListPreference(recordType, payload)
       .then((pref) => setPreference(pref))
-      .catch(() => {
-        // Persistence is best-effort; a failed save should not disrupt the UI.
-      });
+      .catch((error: unknown) => {
+        setSaveError(error instanceof Error ? error : new Error("Failed to save list preferences"));
+      })
+      .finally(() => setIsSaving(false));
   }, [recordType, enabled]);
 
   const save = useCallback(
     (payload: RecordListPreferencePayload) => {
-      if (!enabled) return;
+      if (!enabled || !isReady) return;
       latestPayload.current = { ...(latestPayload.current ?? {}), ...payload };
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(flush, debounceMs);
     },
-    [enabled, debounceMs, flush],
+    [enabled, isReady, debounceMs, flush],
   );
 
   // Persist any pending change on unmount so navigation never drops the latest state.
@@ -80,5 +93,5 @@ export function useRecordListPreferences(
     };
   }, [flush]);
 
-  return { preference, isLoaded, save };
+  return { preference, isLoaded, isReady, markApplied, save, loadError, saveError, isSaving };
 }

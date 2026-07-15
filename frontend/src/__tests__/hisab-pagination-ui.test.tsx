@@ -64,6 +64,8 @@ vi.mock("@/lib/api", () => ({
   deleteFinanceOperationalExpense: vi.fn(),
   approveFinanceOperationalExpense: vi.fn(),
   rejectFinanceOperationalExpense: vi.fn(),
+  getRecordListPreference: vi.fn().mockResolvedValue(null),
+  saveRecordListPreference: vi.fn().mockResolvedValue({}),
   api: { get: vi.fn() },
 }));
 

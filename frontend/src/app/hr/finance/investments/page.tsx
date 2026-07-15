@@ -190,14 +190,17 @@ export default function InvestmentsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Issue #155: Per-user list state preferences
-  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("investments");
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("investments");
   const prefsHydratedRef = useRef(false);
 
   // Hydrate states once preferences are retrieved
   useEffect(() => {
     if (!prefsLoaded || prefsHydratedRef.current) return;
     prefsHydratedRef.current = true;
-    if (!listPreference) return;
+    if (!listPreference) {
+      markApplied();
+      return;
+    }
     const storedFilters = listPreference.filters as {
       statusFilter?: string;
       categoryFilter?: string;
@@ -212,16 +215,18 @@ export default function InvestmentsPage() {
       setSortBy(listPreference.sort.sortBy);
       setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
     }
-  }, [prefsLoaded, listPreference]);
+    markApplied();
+  }, [prefsLoaded, listPreference, markApplied]);
 
   // Persist preferences on changes
   useEffect(() => {
-    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    if (!prefsReady || !prefsHydratedRef.current) return;
     savePreference({
       sort: { sortBy, sortOrder },
       filters: { statusFilter, categoryFilter, classificationFilter, linkedFilter },
+      pageSize: limit,
     });
-  }, [prefsLoaded, sortBy, sortOrder, statusFilter, categoryFilter, classificationFilter, linkedFilter, savePreference]);
+  }, [prefsReady, sortBy, sortOrder, statusFilter, categoryFilter, classificationFilter, linkedFilter, limit, savePreference]);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<CapitalInvestment | null>(null);
@@ -295,7 +300,7 @@ export default function InvestmentsPage() {
         sortBy,
         sortOrder,
       }),
-    enabled: canRead && prefsLoaded,
+    enabled: canRead && prefsReady,
   });
 
   // Inventory assets lookup for select dropdown

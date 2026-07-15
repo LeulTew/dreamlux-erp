@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
@@ -27,6 +27,7 @@ import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
+import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import {
   api,
@@ -77,6 +78,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Profit": "Profit",
     "Category": "Category",
     "Amount": "Amount",
+    "Recently Edited": "Recently Edited",
     "Description": "Description",
     "Status": "Status",
     "Actions": "Actions",
@@ -153,6 +155,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Profit": "ትርፍ",
     "Category": "ምድብ",
     "Amount": "መጠን",
+    "Recently Edited": "በቅርብ የተስተካከለ",
     "Description": "መግለጫ",
     "Status": "ሁኔታ",
     "Actions": "ተግባሮች",
@@ -231,6 +234,8 @@ export default function HisabReportPage() {
   const [ledgerStatus, setLedgerStatus] = useState("");
   const [ledgerCategory, setLedgerCategory] = useState("");
   const [ledgerSearch, setLedgerSearch] = useState("");
+  const [ledgerSortBy, setLedgerSortBy] = useState("expense_date");
+  const [ledgerSortOrder, setLedgerSortOrder] = useState<"asc" | "desc">("desc");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<FinanceOperationalExpense | null>(null);
   const [form, setForm] = useState<ExpenseFormState>(EMPTY_FORM);
@@ -250,6 +255,43 @@ export default function HisabReportPage() {
   const hasHisabRead = hasPermission("finance:hisab:read");
   const canWrite = hasPermission("finance:opex:write");
   const canApprove = hasPermission("finance:opex:approve");
+  const {
+    preference: listPreference,
+    isLoaded: prefsLoaded,
+    isReady: prefsReady,
+    markApplied,
+    save: savePreference,
+  } = useRecordListPreferences("operational_expenses");
+  const prefsHydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (!prefsLoaded || prefsHydratedRef.current) return;
+    prefsHydratedRef.current = true;
+    if (listPreference) {
+      const filters = listPreference.filters as { status?: string; category?: string; search?: string };
+      if (filters.status) setLedgerStatus(filters.status);
+      if (filters.category) setLedgerCategory(filters.category);
+      if (filters.search) setLedgerSearch(filters.search);
+      if (listPreference.sort?.sortBy) {
+        setLedgerSortBy(listPreference.sort.sortBy);
+        setLedgerSortOrder(listPreference.sort.sortOrder);
+      }
+      if (listPreference.active_tab === "ledger" || listPreference.active_tab === "rollup") {
+        setActiveTab(listPreference.active_tab);
+      }
+    }
+    markApplied();
+  }, [prefsLoaded, listPreference, markApplied]);
+
+  useEffect(() => {
+    if (!prefsReady) return;
+    savePreference({
+      sort: { sortBy: ledgerSortBy, sortOrder: ledgerSortOrder },
+      filters: { status: ledgerStatus, category: ledgerCategory, search: ledgerSearch },
+      pageSize: 20,
+      activeTab,
+    });
+  }, [prefsReady, ledgerSortBy, ledgerSortOrder, ledgerStatus, ledgerCategory, ledgerSearch, activeTab, savePreference]);
 
   const rollupLimit = 10;
   const { data: rollup, isLoading: rollupLoading, isError: rollupError } = useQuery({
@@ -260,7 +302,7 @@ export default function HisabReportPage() {
 
   const ledgerLimit = 20;
   const { data: ledger, isLoading: ledgerLoading } = useQuery({
-    queryKey: ["finance-opex", ledgerPage, ledgerStatus, ledgerCategory, ledgerSearch, startDate, endDate],
+    queryKey: ["finance-opex", ledgerPage, ledgerStatus, ledgerCategory, ledgerSearch, ledgerSortBy, ledgerSortOrder, startDate, endDate],
     queryFn: () =>
       getFinanceOperationalExpenses({
         page: ledgerPage,
@@ -270,8 +312,10 @@ export default function HisabReportPage() {
         search: ledgerSearch || undefined,
         start_date: startDate,
         end_date: endDate,
+        sortBy: ledgerSortBy,
+        sortOrder: ledgerSortOrder,
       }),
-    enabled: !!hasHisabRead && activeTab === "ledger",
+    enabled: !!hasHisabRead && prefsReady && activeTab === "ledger",
   });
 
   const invalidateFinanceQueries = () => {
@@ -718,6 +762,16 @@ export default function HisabReportPage() {
                   ]}
                   value={ledgerCategory}
                   onChange={(val) => { setLedgerCategory(val); setLedgerPage(1); }}
+                  className="min-w-[160px]"
+                />
+                <Select
+                  options={[
+                    { id: "expense_date", label: t("Date") },
+                    { id: "recent", label: t("Recently Edited") },
+                    { id: "amount", label: t("Amount") },
+                  ]}
+                  value={ledgerSortBy}
+                  onChange={(value) => { setLedgerSortBy(value); setLedgerPage(1); }}
                   className="min-w-[160px]"
                 />
               </div>

@@ -207,14 +207,17 @@ export default function OverheadsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Issue #155: Per-user list state preferences
-  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("overheads");
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("overheads");
   const prefsHydratedRef = useRef(false);
 
   // Hydrate states once preferences are retrieved
   useEffect(() => {
     if (!prefsLoaded || prefsHydratedRef.current) return;
     prefsHydratedRef.current = true;
-    if (!listPreference) return;
+    if (!listPreference) {
+      markApplied();
+      return;
+    }
     const storedFilters = listPreference.filters as {
       statusFilter?: string;
       categoryFilter?: string;
@@ -229,16 +232,18 @@ export default function OverheadsPage() {
       setSortBy(listPreference.sort.sortBy);
       setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
     }
-  }, [prefsLoaded, listPreference]);
+    markApplied();
+  }, [prefsLoaded, listPreference, markApplied]);
 
   // Persist preferences on changes
   useEffect(() => {
-    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    if (!prefsReady || !prefsHydratedRef.current) return;
     savePreference({
       sort: { sortBy, sortOrder },
       filters: { statusFilter, categoryFilter, scopeFilter, kindFilter },
+      pageSize: limit,
     });
-  }, [prefsLoaded, sortBy, sortOrder, statusFilter, categoryFilter, scopeFilter, kindFilter, savePreference]);
+  }, [prefsReady, sortBy, sortOrder, statusFilter, categoryFilter, scopeFilter, kindFilter, limit, savePreference]);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<FinanceOverhead | null>(null);
@@ -303,7 +308,7 @@ export default function OverheadsPage() {
         sortBy,
         sortOrder,
       }),
-    enabled: canRead && prefsLoaded,
+    enabled: canRead && prefsReady,
   });
 
   // Employees for staff payments dropdown

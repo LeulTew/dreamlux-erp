@@ -339,11 +339,13 @@ function EventsPageContent() {
   const sortOrder = (searchParams.get("sortOrder") || "asc") as "asc" | "desc";
   const filterLogic = (searchParams.get("filterLogic") || "and") as "and" | "or";
   const activeViewId = searchParams.get("viewId") || "";
+  const [limit, setLimit] = useState(10);
 
   // Issue #155: per-user persisted list state. Hydrate the grid from the stored
   // preference on a bare load, then debounce-save changes.
-  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("events");
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("events");
   const prefsHydratedRef = useRef(false);
+  const pendingPreferenceUrlRef = useRef<string | null>(null);
 
   // Parse advanced filters from URL — base64url-encoded JSON for Amharic/special char safety
   const filters = useMemo<EventSavedView["filters"]>(() => {
@@ -374,8 +376,6 @@ function EventsPageContent() {
   const [newViewScope, setNewViewScope] = useState<"personal" | "role" | "global">("personal");
   const [newViewRoleName, setNewViewRoleName] = useState("");
   const [newViewIsDefault, setNewViewIsDefault] = useState(false);
-
-  const [limit, setLimit] = useState(10);
 
   // Refs and hooks for dialog accessibility (focus trap and Escape key listener)
   const saveViewModalRef = useRef<HTMLFormElement>(null);
@@ -512,7 +512,7 @@ function EventsPageContent() {
     ),
     // Issue #155: wait until the stored preference has been applied so the
     // default sort/filter state never flashes before hydration.
-    enabled: prefsLoaded,
+    enabled: prefsReady,
   });
 
   // Fetch saved views
@@ -546,9 +546,23 @@ function EventsPageContent() {
   // shared link or active saved view always wins.
   useEffect(() => {
     if (!prefsLoaded || prefsHydratedRef.current) return;
-    prefsHydratedRef.current = true;
+
+    // router.replace() updates searchParams asynchronously. Do not enable the
+    // list query until the URL actually contains the stored preference.
+    if (pendingPreferenceUrlRef.current) {
+      if (searchParams.toString() !== pendingPreferenceUrlRef.current) return;
+      pendingPreferenceUrlRef.current = null;
+      prefsHydratedRef.current = true;
+      markApplied();
+      return;
+    }
+
     const hasExplicitState = ["sortBy", "sortOrder", "status", "dateRange", "filters", "viewId"].some((k) => searchParams.get(k));
-    if (hasExplicitState || !listPreference) return;
+    if (hasExplicitState || !listPreference) {
+      prefsHydratedRef.current = true;
+      markApplied();
+      return;
+    }
     const updates: Record<string, string | null> = {};
     if (listPreference.sort?.sortBy) {
       updates.sortBy = listPreference.sort.sortBy;
@@ -558,18 +572,31 @@ function EventsPageContent() {
     if (storedFilters?.status && storedFilters.status !== "all") updates.status = storedFilters.status;
     if (storedFilters?.dateRange && storedFilters.dateRange !== "all") updates.dateRange = storedFilters.dateRange;
     if (listPreference.active_tab && listPreference.active_tab !== "all") updates.dateRange = listPreference.active_tab;
-    if (Object.keys(updates).length > 0) updateUrl(updates);
-  }, [prefsLoaded, listPreference, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (listPreference.page_size) setLimit(listPreference.page_size);
+    if (Object.keys(updates).length > 0) {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null) nextParams.delete(key);
+        else nextParams.set(key, value);
+      });
+      pendingPreferenceUrlRef.current = nextParams.toString();
+      router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+      return;
+    }
+    prefsHydratedRef.current = true;
+    markApplied();
+  }, [prefsLoaded, listPreference, searchParams, markApplied, pathname, router]);
 
   // Persist sort / status / date-range changes after hydration.
   useEffect(() => {
-    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    if (!prefsReady || !prefsHydratedRef.current) return;
     savePreference({
       sort: { sortBy, sortOrder },
       filters: { status, dateRange },
       activeTab: dateRange,
+      pageSize: limit,
     });
-  }, [prefsLoaded, sortBy, sortOrder, status, dateRange, savePreference]);
+  }, [prefsReady, sortBy, sortOrder, status, dateRange, limit, savePreference]);
 
   // Sync edits from URL searchParam "edit"
   useEffect(() => {

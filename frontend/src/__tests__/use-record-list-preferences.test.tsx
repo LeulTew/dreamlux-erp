@@ -31,8 +31,11 @@ describe("useRecordListPreferences (issue #155)", () => {
 
     const { result } = renderHook(() => useRecordListPreferences("events"));
     await waitFor(() => expect(result.current.isLoaded).toBe(true));
+    expect(result.current.isReady).toBe(false);
     expect(getMock).toHaveBeenCalledWith("events");
     expect(result.current.preference?.sort?.sortBy).toBe("recent");
+    act(() => result.current.markApplied());
+    expect(result.current.isReady).toBe(true);
   });
 
   it("stays loaded (defaults) when the fetch fails", async () => {
@@ -40,6 +43,7 @@ describe("useRecordListPreferences (issue #155)", () => {
     const { result } = renderHook(() => useRecordListPreferences("assets"));
     await waitFor(() => expect(result.current.isLoaded).toBe(true));
     expect(result.current.preference).toBeNull();
+    expect(result.current.loadError?.message).toBe("500");
   });
 
   it("debounces saves and coalesces rapid changes into one request", async () => {
@@ -47,6 +51,8 @@ describe("useRecordListPreferences (issue #155)", () => {
     getMock.mockResolvedValue(null);
     saveMock.mockResolvedValue({});
     const { result } = renderHook(() => useRecordListPreferences("events", { debounceMs: 300 }));
+    await act(async () => Promise.resolve());
+    act(() => result.current.markApplied());
 
     act(() => {
       result.current.save({ sort: { sortBy: "start_date", sortOrder: "asc" } });
@@ -66,6 +72,7 @@ describe("useRecordListPreferences (issue #155)", () => {
   it("does not fetch or save when disabled", async () => {
     const { result } = renderHook(() => useRecordListPreferences("events", { enabled: false }));
     expect(result.current.isLoaded).toBe(true);
+    expect(result.current.isReady).toBe(true);
     act(() => result.current.save({ filters: { status: "x" } }));
     expect(getMock).not.toHaveBeenCalled();
     expect(saveMock).not.toHaveBeenCalled();

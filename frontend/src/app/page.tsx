@@ -383,9 +383,10 @@ function EmployeesPageInner() {
   const [departmentId, setDepartmentId] = useState("all");
   const [sortBy, setSortBy] = useState("salary");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [limit, setLimit] = useState(10);
 
   // Issue #155: Per-user list state preferences
-  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("employees");
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("employees");
   const prefsHydratedRef = useRef(false);
 
   // Hydrate states once preferences are retrieved
@@ -393,7 +394,10 @@ function EmployeesPageInner() {
     if (!prefsLoaded || prefsHydratedRef.current) return;
     prefsHydratedRef.current = true;
     const hasExplicitState = ["q", "office_id", "department_id", "sortBy", "sortOrder"].some((k) => searchParams.get(k));
-    if (hasExplicitState || !listPreference) return;
+    if (hasExplicitState || !listPreference) {
+      markApplied();
+      return;
+    }
     if (listPreference.sort?.sortBy) {
       setSortBy(listPreference.sort.sortBy);
       setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
@@ -401,16 +405,19 @@ function EmployeesPageInner() {
     const storedFilters = listPreference.filters as { officeId?: string; departmentId?: string } | undefined;
     if (storedFilters?.officeId) setOfficeId(storedFilters.officeId);
     if (storedFilters?.departmentId) setDepartmentId(storedFilters.departmentId);
-  }, [prefsLoaded, listPreference, searchParams]);
+    if (listPreference.page_size) setLimit(listPreference.page_size);
+    markApplied();
+  }, [prefsLoaded, listPreference, searchParams, markApplied]);
 
   // Persist preferences on changes
   useEffect(() => {
-    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    if (!prefsReady || !prefsHydratedRef.current) return;
     savePreference({
       sort: { sortBy, sortOrder },
       filters: { officeId, departmentId },
+      pageSize: limit,
     });
-  }, [prefsLoaded, sortBy, sortOrder, officeId, departmentId, savePreference]);
+  }, [prefsReady, sortBy, sortOrder, officeId, departmentId, limit, savePreference]);
   const [advancedFilters, setAdvancedFilters] = useState<FilterRule[]>([]);
   const [filterLogic, setFilterLogic] = useState<"and" | "or">("and");
   const [exportingCSV, setExportingCSV] = useState(false);
@@ -435,12 +442,10 @@ function EmployeesPageInner() {
     catch (e) { console.error("Export Failed", e); }
     finally { setExportingExcel(false); }
   };
-  const [limit, setLimit] = useState(10);
-
   const { data, isLoading } = useQuery<EmployeesResponse>({
     queryKey: ["employees", page, limit, search, showTrash, officeId, departmentId, sortBy, sortOrder],
     queryFn: () => getEmployees(page, limit, search, showTrash ? "trash" : "active", officeId, departmentId, sortBy, sortOrder),
-    enabled: prefsLoaded,
+    enabled: prefsReady,
   });
 
   const { data: stores } = useQuery({
@@ -990,4 +995,3 @@ export default function EmployeesPage() {
     </Suspense>
   );
 }
-

@@ -420,7 +420,7 @@ function AssetsContent() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
 
   // Issue #155: Per-user list state preferences
-  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("assets");
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("assets");
   const prefsHydratedRef = useRef(false);
 
   // Hydrate states once preferences are retrieved
@@ -428,7 +428,10 @@ function AssetsContent() {
     if (!prefsLoaded || prefsHydratedRef.current) return;
     prefsHydratedRef.current = true;
     const hasExplicitState = ["store", "filter", "q", "from", "to", "sortBy", "sortOrder"].some((k) => searchParams.get(k));
-    if (hasExplicitState || !listPreference) return;
+    if (hasExplicitState || !listPreference) {
+      markApplied();
+      return;
+    }
     if (listPreference.sort?.sortBy) {
       setSortBy(listPreference.sort.sortBy);
       setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
@@ -436,16 +439,19 @@ function AssetsContent() {
     const storedFilters = listPreference.filters as { officeFilter?: string; stockFilter?: string } | undefined;
     if (storedFilters?.officeFilter) setOfficeFilter(storedFilters.officeFilter);
     if (storedFilters?.stockFilter) setStockFilter(storedFilters.stockFilter as StockFilterMode);
-  }, [prefsLoaded, listPreference, searchParams]);
+    if (listPreference.page_size) setLimit(listPreference.page_size);
+    markApplied();
+  }, [prefsLoaded, listPreference, searchParams, markApplied]);
 
   // Persist preferences on changes
   useEffect(() => {
-    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    if (!prefsReady || !prefsHydratedRef.current) return;
     savePreference({
       sort: { sortBy, sortOrder },
       filters: { officeFilter, stockFilter },
+      pageSize: limit,
     });
-  }, [prefsLoaded, sortBy, sortOrder, officeFilter, stockFilter, savePreference]);
+  }, [prefsReady, sortBy, sortOrder, officeFilter, stockFilter, limit, savePreference]);
 
   useEffect(() => {
     const urlStore = searchParams.get("store") || "all";
@@ -525,7 +531,7 @@ function AssetsContent() {
         sortBy,
         sortOrder,
       ),
-    enabled: isAuthenticated && hasAssetsRead && prefsLoaded,
+    enabled: isAuthenticated && hasAssetsRead && prefsReady,
   });
 
   const items = useMemo(() => data?.items || [], [data?.items]);

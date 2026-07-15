@@ -95,7 +95,7 @@ function PaymentsPageContent() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Issue #155: Per-user list state preferences
-  const { preference: listPreference, isLoaded: prefsLoaded, save: savePreference } = useRecordListPreferences("payroll");
+  const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("payroll");
   const prefsHydratedRef = useRef(false);
 
   // Hydrate states once preferences are retrieved
@@ -103,7 +103,10 @@ function PaymentsPageContent() {
     if (!prefsLoaded || prefsHydratedRef.current) return;
     prefsHydratedRef.current = true;
     const hasExplicitState = ["year", "status", "sortBy", "sortOrder"].some((k) => searchParams.get(k));
-    if (hasExplicitState || !listPreference) return;
+    if (hasExplicitState || !listPreference) {
+      markApplied();
+      return;
+    }
     if (listPreference.sort?.sortBy) {
       setSortBy(listPreference.sort.sortBy);
       setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
@@ -111,16 +114,18 @@ function PaymentsPageContent() {
     const storedFilters = listPreference.filters as { yearFilter?: string; statusFilter?: string } | undefined;
     if (storedFilters?.yearFilter) setYearFilter(storedFilters.yearFilter);
     if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
-  }, [prefsLoaded, listPreference, searchParams]);
+    markApplied();
+  }, [prefsLoaded, listPreference, searchParams, markApplied]);
 
   // Persist preferences on changes
   useEffect(() => {
-    if (!prefsLoaded || !prefsHydratedRef.current) return;
+    if (!prefsReady || !prefsHydratedRef.current) return;
     savePreference({
       sort: { sortBy, sortOrder },
       filters: { yearFilter, statusFilter },
+      pageSize: ITEMS_PER_PAGE,
     });
-  }, [prefsLoaded, sortBy, sortOrder, yearFilter, statusFilter, savePreference]);
+  }, [prefsReady, sortBy, sortOrder, yearFilter, statusFilter, savePreference]);
   const [confirmState, setConfirmState] = useState<{ id: string; action: "trash" | "restore" | "delete" } | null>(null);
   const highlightedId = searchParams.get("highlight");
 
@@ -140,7 +145,7 @@ function PaymentsPageContent() {
       page,
       limit: ITEMS_PER_PAGE,
     }),
-    enabled: isAuthenticated && hasPayrollAccess && prefsLoaded,
+    enabled: isAuthenticated && hasPayrollAccess && prefsReady,
   });
 
   const trashMutation = useMutation({
