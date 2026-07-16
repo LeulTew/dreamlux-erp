@@ -875,23 +875,25 @@ function AssetsContent() {
 
              <div className="w-px h-6 bg-border hidden sm:block mx-1" />
 
-            <Button
-              onClick={() => {
-                if (reconcileMode) {
-                  setReconcileMode(false);
-                  setReconcileCounts(new Map());
-                } else {
-                  setReconcileMode(true);
-                  setEditMode(false);
-                  setSelectMode(false);
-                }
-              }}
-              variant={reconcileMode ? "default" : "secondary"}
-              className="px-4 py-2 text-sm font-medium h-auto rounded-2xl"
-            >
-              <HiCheckCircle className="w-4 h-4" />
-              {reconcileMode ? t("Cancel Count") : t("Reconcile")}
-            </Button>
+            {hasPermission("assets:reconcile") && (
+              <Button
+                onClick={() => {
+                  if (reconcileMode) {
+                    setReconcileMode(false);
+                    setReconcileCounts(new Map());
+                  } else {
+                    setReconcileMode(true);
+                    setEditMode(false);
+                    setSelectMode(false);
+                  }
+                }}
+                variant={reconcileMode ? "default" : "secondary"}
+                className="px-4 py-2 text-sm font-medium h-auto rounded-2xl"
+              >
+                <HiCheckCircle className="w-4 h-4" />
+                {reconcileMode ? t("Cancel Count") : t("Reconcile")}
+              </Button>
+            )}
 
             <button
               onClick={() => {
