@@ -8,6 +8,7 @@ let mockQueueState: "success" | "loading" | "error" | "empty" = "success";
 const mockSearchParams = new URLSearchParams();
 const { mockMutate, mockToastError } = vi.hoisted(() => ({ mockMutate: vi.fn(), mockToastError: vi.fn() }));
 let mockMutationPending = false;
+let mockMutationConflict = false;
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
@@ -72,7 +73,12 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false, isError: false, refetch: vi.fn() };
   },
-  useMutation: () => ({ mutate: mockMutate, isPending: mockMutationPending }),
+  useMutation: (options: { onError?: (error: Error & { response?: { data?: { error?: string } } }) => void }) => ({
+    mutate: mockMutationConflict
+      ? () => options.onError?.(Object.assign(new Error("Conflict"), { response: { data: { error: "Return exceeds outstanding quantity" } } }))
+      : mockMutate,
+    isPending: mockMutationPending,
+  }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
@@ -90,6 +96,7 @@ describe("Inventory Returns page (issue #173)", () => {
     mockLang = "en";
     mockQueueState = "success";
     mockMutationPending = false;
+    mockMutationConflict = false;
     mockMutate.mockReset();
     mockToastError.mockReset();
     mockSearchParams.delete("event");
@@ -156,5 +163,14 @@ describe("Inventory Returns page (issue #173)", () => {
     mockMutationPending = true;
     render(<ReturnsPage />);
     expect(screen.getByRole("button", { name: "Record return" })).toBeDisabled();
+  });
+
+  it("surfaces an actionable backend conflict", () => {
+    mockSearchParams.set("event", "ev-1");
+    mockMutationConflict = true;
+    render(<ReturnsPage />);
+    fireEvent.change(screen.getByLabelText("Good"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record return" }));
+    expect(mockToastError).toHaveBeenCalledWith("Return exceeds outstanding quantity");
   });
 });

@@ -121,7 +121,8 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     await expect(page.getByRole("heading", { name: "Capital Register" })).toBeVisible();
 
     // Fill and submit Create Form
-    await page.getByRole("button", { name: "Add Investment" }).click();
+    await page.getByRole("button", { name: "Add Investment" }).focus();
+    await page.keyboard.press("Enter");
     await page.getByLabel("Item Name").fill("Industrial Fabric Machine");
     await page.getByLabel("Quantity").fill("2");
     await page.getByLabel("Unit", { exact: true }).fill("pcs");

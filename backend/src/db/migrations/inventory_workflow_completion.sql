@@ -39,6 +39,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_event_return_corrections_idem
   WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_event_return_corrections_allocation
   ON public.event_return_corrections(allocation_id, created_at DESC);
+CREATE OR REPLACE FUNCTION public.prevent_return_audit_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  RAISE EXCEPTION 'return audit records are append-only' USING ERRCODE = '55000';
+END;
+$$;
+REVOKE ALL ON FUNCTION public.prevent_return_audit_mutation() FROM PUBLIC;
 DROP TRIGGER IF EXISTS trg_event_return_corrections_immutable ON public.event_return_corrections;
 CREATE TRIGGER trg_event_return_corrections_immutable
   BEFORE UPDATE OR DELETE ON public.event_return_corrections
