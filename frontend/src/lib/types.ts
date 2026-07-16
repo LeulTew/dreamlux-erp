@@ -893,6 +893,21 @@ export interface EventReturnReceipt {
   created_by_name: string | null;
 }
 
+export interface EventReturnCorrection {
+  id: string;
+  receipt_id: string;
+  allocation_id: string;
+  good_delta: number;
+  damaged_delta: number;
+  lost_delta: number;
+  repair_delta: number;
+  outstanding_before: number;
+  outstanding_after: number;
+  reason: string;
+  created_at: string;
+  created_by_name: string | null;
+}
+
 /** Metadata returned when approving a stock-creating investment (issue #172). */
 export interface InvestmentStockApplication {
   movement_id: string;

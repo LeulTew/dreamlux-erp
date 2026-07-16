@@ -18,7 +18,6 @@ import {
   HiChevronLeft,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
-import UserAvatar from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import { buildSidebarNavState } from "@/lib/sidebar-nav";
 
@@ -351,12 +350,7 @@ export function AppSidebar() {
 
   const t = useMemo(() => (key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
 
-  const { hasPermission, user: authUser } = useAuth();
-  const currentUser = useMemo(() => ({
-    role_name: authUser?.role_name || authUser?.role_names?.[0] || "User",
-    full_name: authUser?.full_name || authUser?.username || "User",
-    profile_image_url: authUser?.profile_image_url || null,
-  }), [authUser]);
+  const { hasPermission } = useAuth();
 
   const navState = useMemo(() => {
     return buildSidebarNavState({

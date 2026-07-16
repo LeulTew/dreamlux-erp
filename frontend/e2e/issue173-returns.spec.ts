@@ -55,7 +55,7 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
     });
     await mockCommonShellData(page);
 
-    let hasRecordedReturn = false;
+    let recordedReturnCount = 0;
 
     // Intercept return queue query
     await page.route(
@@ -65,8 +65,8 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
           queue: [
             {
               ...MOCK_QUEUE_ENTRY,
-              accounted_quantity: hasRecordedReturn ? 9 : 4,
-              outstanding_quantity: hasRecordedReturn ? 1 : 6,
+              accounted_quantity: recordedReturnCount === 0 ? 4 : recordedReturnCount === 1 ? 9 : 10,
+              outstanding_quantity: recordedReturnCount === 0 ? 6 : recordedReturnCount === 1 ? 1 : 0,
             },
           ],
           total: 1,
@@ -88,19 +88,20 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
           allocations: [
             {
               ...MOCK_ALLOCATION,
-              returned_good_quantity: hasRecordedReturn ? 9 : 4,
-              outstanding_quantity: hasRecordedReturn ? 1 : 6,
-              status: hasRecordedReturn ? "Pulled" : "Pulled",
+              returned_good_quantity: recordedReturnCount === 0 ? 4 : recordedReturnCount === 1 ? 8 : 9,
+              returned_damaged_quantity: recordedReturnCount === 0 ? 0 : 1,
+              outstanding_quantity: recordedReturnCount === 0 ? 6 : recordedReturnCount === 1 ? 1 : 0,
+              status: recordedReturnCount >= 2 ? "Returned" : "Pulled",
             },
           ],
-          receipts: hasRecordedReturn
+          receipts: recordedReturnCount > 0
             ? [
                 MOCK_RECEIPT,
                 {
                   id: "rec-e2e-returns-2",
                   allocation_id: "alloc-e2e-returns-1",
-                  good_quantity: 5,
-                  damaged_quantity: 0,
+                  good_quantity: 4,
+                  damaged_quantity: 1,
                   lost_quantity: 0,
                   repair_quantity: 0,
                   outstanding_before: 6,
@@ -109,6 +110,12 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
                   created_at: "2026-07-14T09:00:00Z",
                   created_by_name: "Sam Storekeeper",
                 },
+                ...(recordedReturnCount >= 2 ? [{
+                  id: "rec-e2e-returns-3", allocation_id: "alloc-e2e-returns-1", good_quantity: 1,
+                  damaged_quantity: 0, lost_quantity: 0, repair_quantity: 0, outstanding_before: 1,
+                  outstanding_after: 0, notes: "Final unit", created_at: "2026-07-14T10:00:00Z",
+                  created_by_name: "Sam Storekeeper",
+                }] : []),
               ]
             : [MOCK_RECEIPT],
         });
@@ -120,8 +127,8 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
       (url) => url.pathname === "/api/events/evt-e2e-returns-1/allocations/alloc-e2e-returns-1/returns",
       (route) => {
         if (route.request().method() === "POST") {
-          hasRecordedReturn = true;
-          return fulfillJson(route, { fully_returned: false });
+          recordedReturnCount += 1;
+          return fulfillJson(route, { fully_returned: recordedReturnCount >= 2 });
         }
         return route.continue();
       }
@@ -138,7 +145,8 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
     await expect(page.locator("text=Outstanding").first()).toBeVisible();
 
     // Open returns checklist for event
-    await page.getByRole("button", { name: "Open returns" }).click();
+    await page.getByRole("button", { name: "Open returns" }).focus();
+    await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { name: "Gala Night Return" })).toBeVisible();
 
     // Verify checklist line renders with correct stats
@@ -146,7 +154,8 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
     await expect(page.getByText("6 of 10 outstanding")).toBeVisible();
 
     // Fill returns checklist inputs
-    await page.locator('input[id^="good-"]').fill("5");
+    await page.locator('input[id^="good-"]').fill("4");
+    await page.locator('input[id^="damaged-"]').fill("1");
     await page.locator('input[id^="notes-"]').fill("Second batch return");
 
     // Click Record Return
@@ -156,6 +165,12 @@ test.describe("Issue 173 Inventory Returns Checklist Flow", () => {
     await expect(page.getByText("9 of 10 outstanding")).not.toBeVisible();
     await expect(page.getByText("1 of 10 outstanding")).toBeVisible();
     await expect(page.getByText("Second batch return")).toBeVisible();
+
+    await page.locator('input[id^="good-"]').fill("1");
+    await page.locator('input[id^="notes-"]').fill("Final unit");
+    await page.getByRole("button", { name: "Record return" }).click();
+    await expect(page.locator("span").filter({ hasText: /^Fully returned$/ }).first()).toBeVisible();
+    await expect(page.getByText("Final unit")).toBeVisible();
   });
 
   test("Unauthorized users are shown ForbiddenState", async ({ page }) => {

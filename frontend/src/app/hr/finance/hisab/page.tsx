@@ -266,8 +266,13 @@ export default function HisabReportPage() {
 
   useEffect(() => {
     if (!prefsLoaded || prefsHydratedRef.current) return;
-    prefsHydratedRef.current = true;
-    if (listPreference) {
+    if (!listPreference) {
+      prefsHydratedRef.current = true;
+      markApplied();
+      return;
+    }
+    const timer = setTimeout(() => {
+      prefsHydratedRef.current = true;
       const filters = listPreference.filters as { status?: string; category?: string; search?: string };
       if (filters.status) setLedgerStatus(filters.status);
       if (filters.category) setLedgerCategory(filters.category);
@@ -279,8 +284,9 @@ export default function HisabReportPage() {
       if (listPreference.active_tab === "ledger" || listPreference.active_tab === "rollup") {
         setActiveTab(listPreference.active_tab);
       }
-    }
-    markApplied();
+      markApplied();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [prefsLoaded, listPreference, markApplied]);
 
   useEffect(() => {

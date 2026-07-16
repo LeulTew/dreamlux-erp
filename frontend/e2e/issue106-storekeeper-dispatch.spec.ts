@@ -40,7 +40,7 @@ test.describe("Issue 106 storekeeper dispatch flow", () => {
     await mockAuth(page, { permissions: ["assets:read", "assets:write", "assets:reconcile"] });
     await mockCommonShellData(page);
 
-    await page.route("http://localhost:4000/events/dispatch/queue", (route) =>
+    await page.route((url) => url.pathname.endsWith("/events/dispatch/queue"), (route) =>
       fulfillJson(route, {
         queue: [
           {
@@ -75,7 +75,7 @@ test.describe("Issue 106 storekeeper dispatch flow", () => {
     let departed = false;
     const notificationRequests: string[] = [];
 
-    await page.route("http://localhost:4000/events/dispatch/queue", (route) =>
+    await page.route((url) => url.pathname.endsWith("/events/dispatch/queue"), (route) =>
       fulfillJson(route, {
         queue: [
           {
@@ -94,7 +94,7 @@ test.describe("Issue 106 storekeeper dispatch flow", () => {
       }),
     );
 
-    await page.route("http://localhost:4000/events/event-dispatch-e2e/workspace", (route) =>
+    await page.route((url) => url.pathname.endsWith("/events/event-dispatch-e2e/workspace"), (route) =>
       fulfillJson(route, {
         ...workspacePayload,
         allocations: workspacePayload.allocations.map((allocation) => ({
@@ -106,21 +106,21 @@ test.describe("Issue 106 storekeeper dispatch flow", () => {
       }),
     );
 
-    await page.route("http://localhost:4000/events/event-dispatch-e2e/allocations/alloc-chair/dispatch-check", async (route) => {
+    await page.route((url) => url.pathname.endsWith("/events/event-dispatch-e2e/allocations/alloc-chair/dispatch-check"), async (route) => {
       allocationChecked = true;
       await fulfillJson(route, { id: "alloc-chair", dispatch_checked_at: "2026-07-01T10:00:00.000Z" });
     });
 
-    await page.route("http://localhost:4000/events/event-dispatch-e2e/dispatch/depart", async (route) => {
+    await page.route((url) => url.pathname.endsWith("/events/event-dispatch-e2e/dispatch/depart"), async (route) => {
       departed = true;
       await fulfillJson(route, { success: true, departed_count: 1, already_departed: false });
     });
 
-    await page.route("http://localhost:4000/api/notifications/unread-count", (route) => {
+    await page.route((url) => url.pathname.endsWith("/notifications/unread-count"), (route) => {
       notificationRequests.push(route.request().url());
       return fulfillJson(route, { count: departed ? 1 : 0 });
     });
-    await page.route("http://localhost:4000/api/notifications?**", (route) => {
+    await page.route((url) => url.pathname.endsWith("/notifications"), (route) => {
       notificationRequests.push(route.request().url());
       return fulfillJson(route, {
         notifications: departed

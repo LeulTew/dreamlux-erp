@@ -572,7 +572,7 @@ function EventsPageContent() {
     if (storedFilters?.status && storedFilters.status !== "all") updates.status = storedFilters.status;
     if (storedFilters?.dateRange && storedFilters.dateRange !== "all") updates.dateRange = storedFilters.dateRange;
     if (listPreference.active_tab && listPreference.active_tab !== "all") updates.dateRange = listPreference.active_tab;
-    if (listPreference.page_size) setLimit(listPreference.page_size);
+    if (listPreference.page_size) queueMicrotask(() => setLimit(listPreference.page_size as number));
     if (Object.keys(updates).length > 0) {
       const nextParams = new URLSearchParams(searchParams.toString());
       Object.entries(updates).forEach(([key, value]) => {

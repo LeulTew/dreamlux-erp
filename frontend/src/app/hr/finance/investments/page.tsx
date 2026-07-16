@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -25,6 +25,7 @@ import PaginationControls from "@/components/PaginationControls";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
+import { invalidateInventoryState } from "@/lib/inventory-cache";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
@@ -196,8 +197,8 @@ export default function InvestmentsPage() {
   // Hydrate states once preferences are retrieved
   useEffect(() => {
     if (!prefsLoaded || prefsHydratedRef.current) return;
-    prefsHydratedRef.current = true;
     if (!listPreference) {
+      prefsHydratedRef.current = true;
       markApplied();
       return;
     }
@@ -207,15 +208,24 @@ export default function InvestmentsPage() {
       classificationFilter?: string;
       linkedFilter?: string;
     } | undefined;
-    if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
-    if (storedFilters?.categoryFilter) setCategoryFilter(storedFilters.categoryFilter);
-    if (storedFilters?.classificationFilter) setClassificationFilter(storedFilters.classificationFilter);
-    if (storedFilters?.linkedFilter) setLinkedFilter(storedFilters.linkedFilter);
-    if (listPreference.sort?.sortBy) {
-      setSortBy(listPreference.sort.sortBy);
-      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
-    }
-    markApplied();
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      prefsHydratedRef.current = true;
+      if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
+      if (storedFilters?.categoryFilter) setCategoryFilter(storedFilters.categoryFilter);
+      if (storedFilters?.classificationFilter) setClassificationFilter(storedFilters.classificationFilter);
+      if (storedFilters?.linkedFilter) setLinkedFilter(storedFilters.linkedFilter);
+      if (listPreference.sort?.sortBy) {
+        setSortBy(listPreference.sort.sortBy);
+        setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+      }
+      markApplied();
+    });
+    return () => {
+      cancelled = true;
+      if (!prefsHydratedRef.current) prefsHydratedRef.current = false;
+    };
   }, [prefsLoaded, listPreference, markApplied]);
 
   // Persist preferences on changes
@@ -354,7 +364,7 @@ export default function InvestmentsPage() {
       }
       return rejectCapitalInvestment(id, reason || "");
     },
-    onSuccess: (data: {
+    onSuccess: async (data: {
       stock_application?: { item_name: string; quantity_delta: number; quantity_after: number } | null;
     }) => {
       if (data?.stock_application) {
@@ -365,13 +375,7 @@ export default function InvestmentsPage() {
       }
       setRejectingId(null);
       setRejectReason("");
-      queryClient.invalidateQueries({ queryKey: ["finance-investments-list"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-investments-summary"] });
-      // Issue #172: an approved stock-creating purchase changes item quantities,
-      // so refresh every inventory-derived view.
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-      queryClient.invalidateQueries({ queryKey: ["inventory-items-lookup"] });
+      await invalidateInventoryState(queryClient, { includeFinance: true });
     },
     onError: (err: unknown) => {
       const error = err as Error & { response?: { data?: { error?: string } } };

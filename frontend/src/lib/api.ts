@@ -1018,6 +1018,18 @@ export const recordEventReturn = (
   },
 ) => api.post(`/events/${eventId}/allocations/${allocationId}/returns`, data).then((r) => r.data);
 
+export const correctEventReturn = (
+  receiptId: string,
+  data: {
+    good_delta?: number;
+    damaged_delta?: number;
+    lost_delta?: number;
+    repair_delta?: number;
+    reason: string;
+    idempotency_key?: string | null;
+  },
+) => api.post(`/events/returns/${receiptId}/corrections`, data).then((r) => r.data);
+
 // Per-user record list preferences (issue #155)
 export interface RecordListPreference {
   record_type: string;

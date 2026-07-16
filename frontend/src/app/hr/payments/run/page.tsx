@@ -239,7 +239,7 @@ function parseMonth(monthValue: string): { month: number; year: number } {
 
 function PaymentRunProcessPageContent() {
   const { lang } = useLanguage();
-  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
   const searchParams = useSearchParams();
   const router = useRouter();
   const hasAutoLoaded = useRef<string | null>(null);
@@ -695,7 +695,7 @@ function PaymentRunProcessPageContent() {
     payload.period_end = activeDates.end;
 
     return payload;
-  }, [employees, eventLinesByEmployee, getEmployeeEventPrice, periodType, selectedMonth]);
+  }, [activeDates.end, activeDates.kind, activeDates.start, employees, eventLinesByEmployee, getEmployeeEventPrice, selectedMonth]);
 
   const handleSaveDraft = useCallback((source: "manual" | "auto") => {
     if (employeesLoading || authLoading) return;

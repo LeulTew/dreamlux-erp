@@ -22,22 +22,20 @@ vi.mock("@/hooks/use-language", () => ({
 // Mock AuthLayout
 vi.mock("@/components/AuthLayout", () => ({
   __esModule: true,
-  default: ({ children }: { children: React.Node }) => <div data-testid="auth-layout">{children}</div>,
+  default: ({ children }: { children: React.ReactNode }) => <div data-testid="auth-layout">{children}</div>,
 }));
 
 // Mock react-query
-let mockAuthData: any = null;
-let mockRollupData: any = null;
-let mockLedgerData: any = null;
-let mockQueryKeyReceived: any = null;
+let mockAuthData: { permission_slugs: string[]; is_superuser: boolean } | null = null;
+let mockRollupData: typeof ROLLUP_FIXTURE_PAGINATED | null = null;
+let mockLedgerData: unknown = null;
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: { queryKey: any[]; queryFn: () => any }) => {
+  useQuery: (options: { queryKey: readonly unknown[]; queryFn: () => unknown }) => {
     if (options.queryKey[0] === "auth-permissions") {
       return { data: mockAuthData, isLoading: false };
     }
     if (options.queryKey[0] === "hisab-report") {
-      mockQueryKeyReceived = options.queryKey;
       options.queryFn(); // Execute the query function to register call
       return { data: mockRollupData, isLoading: false, isError: false };
     }
@@ -53,7 +51,7 @@ vi.mock("@tanstack/react-query", () => ({
 const mockGetHisabReport = vi.fn();
 vi.mock("@/lib/api", () => ({
   FINANCE_OPEX_CATEGORIES: ["Transport", "Rental", "Labour", "Office Lunch", "Lunch", "Utilities", "Supplies", "Maintenance", "Other"],
-  getHisabReport: (params: any) => {
+  getHisabReport: (params: Record<string, unknown>) => {
     mockGetHisabReport(params);
     return Promise.resolve(mockRollupData);
   },
@@ -119,7 +117,6 @@ describe("HisabRollupPaginationUI", () => {
     mockAuthData = { permission_slugs: ["finance:hisab:read"], is_superuser: false };
     mockRollupData = ROLLUP_FIXTURE_PAGINATED;
     mockLedgerData = null;
-    mockQueryKeyReceived = null;
     vi.clearAllMocks();
   });
 
