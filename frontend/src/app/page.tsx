@@ -35,6 +35,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import toast from "@/lib/toast";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
 import { SortableHeader } from "@/components/ui/SortableHeader";
 import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
@@ -347,6 +348,7 @@ function buildColumns(
 
 // Wrapper that enforces page-level RBAC before mounting the hook-heavy inner component
 function EmployeesPageContent() {
+  const { hasPermission } = useAuth();
 
   if (!hasPermission("hr:read") && !hasPermission("hr:write")) {
     return (
