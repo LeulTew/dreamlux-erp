@@ -372,7 +372,7 @@ function ExpenseApprovalContent() {
           </div>
 
           {/* Dual Tabs Trigger */}
-          <div className="flex bg-muted p-1 dl-radius-xl border border-border self-start md:self-center">
+          <div className="flex bg-card-alt p-1 dl-radius-xl border border-border/60 self-start md:self-center">
             <button
               onClick={() => handleTabChange("pending")}
               className={cn(
@@ -575,7 +575,7 @@ function ExpenseApprovalContent() {
                               </div>
                             )}
                             {expense.receipt_image_key && (
-                              <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 dl-radius-lg border border-amber-500/20">
+                              <div className="flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 dl-radius-sm border border-amber-500/20">
                                 <span className="text-[10px] text-amber-600 dark:text-amber-400 font-extrabold uppercase">{t("Receipt")}</span>
                               </div>
                             )}
@@ -669,7 +669,7 @@ function ExpenseApprovalContent() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-border/80 bg-muted/30">
+                      <tr className="border-b border-border/80 bg-muted/65">
                         <th className="p-4 text-xs font-semibold">
                           <SortableHeader
                             label={t("Event")}
