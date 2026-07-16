@@ -14,7 +14,12 @@ jobs:
         env:
           ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impyd3djcW91ZWxxZnp1cWpoZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Njg3MDYsImV4cCI6MjA5OTU0NDcwNn0.OV1Kfn8p_cx0QU4XiaqbZVMMCpDKkNPl7goX3cbc6f4' }}
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" -H "apikey: $ANON_KEY" "https://jrwwcqouelqfzuqjhfjp.supabase.co/rest/v1/roles?select=id")
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            --retry 3 \
+            --retry-delay 10 \
+            --retry-connrefused \
+            -H "apikey: $ANON_KEY" \
+            "https://jrwwcqouelqfzuqjhfjp.supabase.co/auth/v1/health")
           if [ "$response" -ne 200 ]; then
             echo "Keep-alive ping failed with status $response"
             exit 1
