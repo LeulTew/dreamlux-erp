@@ -133,3 +133,20 @@ Do NOT use `apply_migration` to change a local database schema — it writes a m
 
 - **Skill Feedback** → [references/skill-feedback.md](references/skill-feedback.md)
   **MUST read when** the user reports that this skill gave incorrect guidance or is missing information.
+
+## Environment Configuration and Database Migrations
+
+**1. Match Local `.env`, Workflows, and Vercel Deployments**
+- Ensure that the project reference (e.g. `jrwwcqouelqfzuqjhfjp`) in `.env`, `.env.local` matches the active environment configuration in GitHub workflows (`keep-alive.yml`) and Vercel. 
+- When a project is migrated or deleted, update all files immediately to prevent keep-alive pings and app instances from pointing to deprecated or dead databases.
+
+**2. Running Migrations**
+- Custom database migration scripts (e.g. `bun run migrate` or `migrate-robust.ts`) connect via standard environment variables (`DATABASE_URL`). Always verify that the database URL configured in the local `.env` is targeting the correct database before running migrations.
+
+**3. Vercel Env Variable Management**
+- When deploying, make sure to update environment variables on Vercel (`DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) to match the live project.
+- To programmatically update Vercel variables non-interactively in WSL or local environments:
+  - First, link to the Vercel project: `vercel link --yes --team <team-id> --project <project-id>`
+  - Then, update variables using: `vercel env rm <NAME> production --yes --scope <team-id>` and `echo "<VALUE>" | vercel env add <NAME> production --scope <team-id>`
+  - Finally, trigger a production build using: `vercel --prod --yes --scope <team-id>`
+
