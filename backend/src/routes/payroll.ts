@@ -8,6 +8,7 @@ import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/
 import { NotificationsService } from "../services/notifications-service";
 import { ActivityService } from "../services/activity-service";
 import { hasPermissionSlug } from "../lib/permissions";
+import { getSettings } from "../lib/settings";
 import { pool } from "../db/pool";
 
 const router = express.Router();
@@ -152,6 +153,26 @@ async function insertPayrollAuditLog(input: {
 }
 
 // GET /payroll/runs — list runs with aggregated totals
+// GET /payroll/settings — payroll cycle configuration for payroll users.
+// The full GET /settings endpoint requires settings:write/users:manage, which
+// accountants don't have; the Run Payroll page silently fell back to a weekly
+// cycle whenever the configured cycle differed (issue #182).
+router.get("/settings", async (req: AuthRequest, res) => {
+  try {
+    if (!requirePayrollRead(req, res)) return;
+    const settings = await getSettings();
+    res.json({
+      payroll_cycle: settings.payroll_cycle,
+      payroll_cycle_days: settings.payroll_cycle_days,
+      payroll_calendar_type: settings.payroll_calendar_type,
+      payroll_manual_start_date: settings.payroll_manual_start_date,
+    });
+  } catch (error) {
+    console.error("Error fetching payroll settings:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/runs", async (req: AuthRequest, res) => {
   try {
     if (!requirePayrollRead(req, res)) return;
@@ -205,8 +226,8 @@ router.get("/runs", async (req: AuthRequest, res) => {
           pr.id,
           pr.title,
           pr.period_kind,
-          pr.period_start,
-          pr.period_end,
+          pr.period_start::text AS period_start,
+          pr.period_end::text AS period_end,
           pr.status,
           pr.created_at,
           pr.updated_at,
