@@ -9,6 +9,7 @@ import ForbiddenState from "@/components/ForbiddenState";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "@/components/ui/StatusBadge";
 import toast from "@/lib/toast";
+import { invalidateInventoryState } from "@/lib/inventory-cache";
 import { getReturnQueue, getEventReturns, recordEventReturn } from "@/lib/api";
 import type { ReturnQueueEntry, EventReturnAllocation, EventReturnReceipt } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,6 +43,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "outstanding": "outstanding",
     "of": "of",
     "Page": "Page",
+    "Previous page": "Previous page",
+    "Next page": "Next page",
+    "Access Restricted": "Access Restricted",
+    "Only authorized personnel can process inventory returns.": "Only authorized personnel can process inventory returns.",
+    "Failed to record the return": "Failed to record the return",
   },
   am: {
     "Inventory Returns": "የክምችት መመለሻዎች",
@@ -70,6 +76,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "outstanding": "ያልተመለሰ",
     "of": "ከ",
     "Page": "ገጽ",
+    "Previous page": "ያለፈው ገጽ",
+    "Next page": "ቀጣይ ገጽ",
+    "Access Restricted": "መዳረሻ የተገደበ",
+    "Only authorized personnel can process inventory returns.": "ፈቃድ ያላቸው ሰራተኞች ብቻ የክምችት መመለሻን ማስኬድ ይችላሉ።",
+    "Failed to record the return": "መመለሻውን መመዝገብ አልተሳካም",
   },
 };
 
@@ -139,19 +150,14 @@ function ReturnsContent() {
       allocationId: string;
       payload: { good_quantity: number; damaged_quantity: number; lost_quantity: number; repair_quantity: number; notes: string | null; idempotency_key: string };
     }) => recordEventReturn(selectedEventId as string, allocationId, payload),
-    onSuccess: (data: { fully_returned: boolean }, variables) => {
+    onSuccess: async (data: { fully_returned: boolean }, variables) => {
       toast.success(data.fully_returned ? t("Fully returned") : t("Return recorded"));
       setForms((prev) => ({ ...prev, [variables.allocationId]: emptyForm() }));
-      queryClient.invalidateQueries({ queryKey: ["event-returns", selectedEventId] });
-      queryClient.invalidateQueries({ queryKey: ["event-return-queue"] });
-      // Availability and stock views change when returns land.
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      queryClient.invalidateQueries({ queryKey: ["items"] });
-      queryClient.invalidateQueries({ queryKey: ["event-workspace"] });
+      await invalidateInventoryState(queryClient, { eventId: selectedEventId });
     },
     onError: (err: unknown) => {
       const error = err as Error & { response?: { data?: { error?: string } } };
-      toast.error(error.response?.data?.error || error.message || "Failed to record the return");
+      toast.error(error.response?.data?.error || error.message || t("Failed to record the return"));
     },
   });
 
@@ -169,7 +175,7 @@ function ReturnsContent() {
   if (!isAuthenticated || !canManageReturns) {
     return (
       <AuthLayout>
-        <ForbiddenState title="Access Restricted" description="Only authorized personnel can process inventory returns." />
+        <ForbiddenState title={t("Access Restricted")} description={t("Only authorized personnel can process inventory returns.")} />
       </AuthLayout>
     );
   }
@@ -228,7 +234,7 @@ function ReturnsContent() {
           <button
             type="button"
             onClick={() => router.push(pathname)}
-            className="inline-flex min-h-11 items-center gap-2 text-xs font-black uppercase tracking-widest text-muted [@media(hover:hover)]:hover:text-foreground transition-colors"
+            className="inline-flex min-h-12 items-center gap-2 text-xs font-black uppercase tracking-widest text-muted [@media(hover:hover)]:hover:text-foreground transition-colors"
           >
             <HiArrowLeft className="h-4 w-4" />
             {t("Back to queue")}
@@ -312,7 +318,7 @@ function ReturnsContent() {
                                 step={1}
                                 value={form[field]}
                                 onChange={(e) => setFormField(allocation.id, field, e.target.value)}
-                                className="h-11 w-full rounded-md border border-border bg-card-alt px-3 text-sm tabular-nums text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                                className="h-12 w-full rounded-md border border-border bg-card-alt px-3 text-sm tabular-nums text-foreground outline-none focus:ring-2 focus:ring-primary/20"
                               />
                             </div>
                           ))}
@@ -325,14 +331,14 @@ function ReturnsContent() {
                               type="text"
                               value={form.notes}
                               onChange={(e) => setFormField(allocation.id, "notes", e.target.value)}
-                              className="h-11 w-full rounded-md border border-border bg-card-alt px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                              className="h-12 w-full rounded-md border border-border bg-card-alt px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
                             />
                           </div>
                           <button
                             type="button"
                             disabled={recordMutation.isPending}
                             onClick={() => handleRecord(allocation)}
-                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-xs font-black uppercase tracking-widest text-primary-foreground transition-colors [@media(hover:hover)]:hover:bg-primary-dark disabled:opacity-50"
+                            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-primary px-4 text-xs font-black uppercase tracking-widest text-primary-foreground transition-colors [@media(hover:hover)]:hover:bg-primary-dark disabled:opacity-50"
                           >
                             <HiArchiveBoxArrowDown className="h-4 w-4" />
                             {t("Record return")}
@@ -468,7 +474,7 @@ function ReturnsContent() {
               disabled={queuePage <= 1 || queueQuery.isFetching}
               onClick={() => setQueuePage((page) => Math.max(1, page - 1))}
               className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-xs font-bold disabled:opacity-40"
-              aria-label="Previous page"
+              aria-label={t("Previous page")}
             >
               <HiArrowLeft className="h-4 w-4" />
             </button>
@@ -480,7 +486,7 @@ function ReturnsContent() {
               disabled={queuePage >= (queueQuery.data?.totalPages ?? 1) || queueQuery.isFetching}
               onClick={() => setQueuePage((page) => page + 1)}
               className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-xs font-bold disabled:opacity-40"
-              aria-label="Next page"
+              aria-label={t("Next page")}
             >
               <HiArrowRight className="h-4 w-4" />
             </button>

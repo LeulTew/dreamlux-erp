@@ -39,8 +39,12 @@ export function useRecordListPreferences(
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    setAppliedFor(null);
-    setLoadError(null);
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setAppliedFor(null);
+        setLoadError(null);
+      }
+    });
     getRecordListPreference(recordType)
       .then((pref) => {
         if (!cancelled) setPreference(pref);

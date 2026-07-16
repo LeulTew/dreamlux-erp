@@ -101,21 +101,27 @@ function PaymentsPageContent() {
   // Hydrate states once preferences are retrieved
   useEffect(() => {
     if (!prefsLoaded || prefsHydratedRef.current) return;
-    prefsHydratedRef.current = true;
     const hasExplicitState = ["year", "status", "sortBy", "sortOrder"].some((k) => searchParams.get(k));
     if (hasExplicitState || !listPreference) {
+      prefsHydratedRef.current = true;
       markApplied();
       return;
     }
-    if (listPreference.sort?.sortBy) {
-      setSortBy(listPreference.sort.sortBy);
-      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
-    }
     const storedFilters = listPreference.filters as { yearFilter?: string; statusFilter?: string } | undefined;
-    if (storedFilters?.yearFilter) setYearFilter(storedFilters.yearFilter);
-    if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
-    markApplied();
+    const timer = setTimeout(() => {
+      prefsHydratedRef.current = true;
+      if (listPreference.sort?.sortBy) {
+        setSortBy(listPreference.sort.sortBy);
+        setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+      }
+      if (storedFilters?.yearFilter) setYearFilter(storedFilters.yearFilter);
+      if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
+      markApplied();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [prefsLoaded, listPreference, searchParams, markApplied]);
+
+  const ITEMS_PER_PAGE = 8;
 
   // Persist preferences on changes
   useEffect(() => {
@@ -131,8 +137,6 @@ function PaymentsPageContent() {
 
   const hasPayrollAccess = hasPermission("payroll:read") || hasPermission("payroll:write");
   const hasPayrollWrite = hasPermission("payroll:write");
-
-  const ITEMS_PER_PAGE = 8;
 
   const { data: runsPayload, isLoading, isRefetching, refetch } = useQuery<PayrollRunsResponse>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder, page],

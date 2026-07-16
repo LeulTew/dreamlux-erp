@@ -63,11 +63,11 @@ function mockInvestmentQueries(options: {
   existing?: Record<string, unknown> | null;
   assetExists?: boolean;
   item?: Record<string, unknown> | null;
-  onSql?: (sql: string) => any;
+  onSql?: (sql: string, params?: unknown[]) => any;
 }) {
-  mockQuery.mockImplementation((sql: string) => {
+  mockQuery.mockImplementation((sql: string, params?: unknown[]) => {
     const text = String(sql);
-    const custom = options.onSql?.(text);
+    const custom = options.onSql?.(text, params);
     if (custom) return custom;
     if (text.includes("unit_of_measurement FROM items")) {
       // Issue #172 approval item lock.
@@ -290,9 +290,13 @@ describe("Capital investment register", () => {
 describe("Investment stock application (issue #172)", () => {
   test("approving a stock-creating investment applies stock once and returns movement metadata", async () => {
     const executed: string[] = [];
+    let movementParams: unknown[] | undefined;
+    let auditParams: unknown[] | undefined;
     mockInvestmentQueries({
-      onSql: (sql) => {
+      onSql: (sql, params) => {
         executed.push(sql);
+        if (sql.includes("INSERT INTO inventory_movements")) movementParams = params;
+        if (sql.includes("INSERT INTO public.activity_logs")) auditParams = params;
         if (sql.includes("UPDATE capital_investments") && sql.includes("RETURNING")) {
           return Promise.resolve({
             rows: [{ ...PENDING_INVESTMENT, status: "Approved", approved_by: "user-1", stock_applied_at: "2026-07-14T00:00:00Z" }],
@@ -320,6 +324,9 @@ describe("Investment stock application (issue #172)", () => {
     expect(executed.some((sql) => sql.includes("INSERT INTO inventory_movements"))).toBe(true);
     expect(executed.some((sql) => sql.includes("UPDATE items SET quantity"))).toBe(true);
     expect(executed.some((sql) => sql.includes("COMMIT"))).toBe(true);
+    expect(movementParams?.[4]).toBe(PENDING_INVESTMENT.id);
+    expect(movementParams?.[6]).toBe("user-1");
+    expect(auditParams?.slice(0, 4)).toEqual(["capital_investment", PENDING_INVESTMENT.id, "user-1", "approve"]);
   });
 
   test("approving a non-stock investment never touches inventory", async () => {
@@ -432,6 +439,64 @@ describe("Investment stock application (issue #172)", () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error).toContain("already been applied");
+  });
+
+  test("finance audit failure rolls back approval, stock, and movement", async () => {
+    const executed: string[] = [];
+    mockInvestmentQueries({
+      onSql: (sql) => {
+        executed.push(sql);
+        if (sql.includes("UPDATE capital_investments") && sql.includes("RETURNING")) {
+          return Promise.resolve({ rows: [{ ...PENDING_INVESTMENT, status: "Approved" }], rowCount: 1 });
+        }
+        if (sql.includes("INSERT INTO public.activity_logs")) {
+          return Promise.reject(new Error("finance audit unavailable"));
+        }
+        return undefined;
+      },
+    });
+    const res = await request(app)
+      .post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`)
+      .set("Authorization", `Bearer ${getToken()}`);
+    expect(res.status).toBe(500);
+    expect(executed.some((sql) => sql.includes("ROLLBACK"))).toBe(true);
+    expect(executed.some((sql) => sql.includes("COMMIT"))).toBe(false);
+  });
+
+  test("two concurrent approvals produce one stock movement and one conflict", async () => {
+    let reviewed = false;
+    let lockOwnerSelected = false;
+    let releaseLock!: () => void;
+    const lockReleased = new Promise<void>((resolve) => { releaseLock = resolve; });
+    let movementCount = 0;
+    mockQuery.mockImplementation(async (sql: string) => {
+        if (sql.includes("FROM capital_investments") && sql.includes("FOR UPDATE")) {
+          if (!lockOwnerSelected) {
+            lockOwnerSelected = true;
+            return { rows: [PENDING_INVESTMENT], rowCount: 1 };
+          }
+          await lockReleased;
+          return { rows: [{ ...PENDING_INVESTMENT, status: "Approved" }], rowCount: 1 };
+        }
+        if (sql.includes("INSERT INTO inventory_movements")) {
+          movementCount += 1;
+          return { rows: [{ id: "movement-concurrent" }], rowCount: 1 };
+        }
+        if (sql.includes("UPDATE capital_investments") && sql.includes("RETURNING")) {
+          reviewed = true;
+          return { rows: [{ ...PENDING_INVESTMENT, status: "Approved" }], rowCount: 1 };
+        }
+        if (sql.includes("unit_of_measurement FROM items")) return { rows: [LINKED_ITEM], rowCount: 1 };
+        if (sql.includes("COMMIT") && reviewed) releaseLock();
+        return { rows: [], rowCount: 1 };
+    });
+
+    const [first, second] = await Promise.all([
+      request(app).post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`).set("Authorization", `Bearer ${getToken()}`),
+      request(app).post(`/finance/investments/${PENDING_INVESTMENT.id}/approve`).set("Authorization", `Bearer ${getToken()}`),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    expect(movementCount).toBe(1);
   });
 
   test("create validation requires a linked item and whole quantity when creating stock", async () => {

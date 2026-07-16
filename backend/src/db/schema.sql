@@ -834,8 +834,61 @@ CREATE INDEX IF NOT EXISTS idx_event_return_receipts_allocation
   ON event_return_receipts(allocation_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_event_return_receipts_event
   ON event_return_receipts(event_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_event_return_receipts_event_history
+  ON event_return_receipts(event_id, created_at DESC, allocation_id);
+
+CREATE TABLE IF NOT EXISTS event_return_corrections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  receipt_id UUID NOT NULL REFERENCES event_return_receipts(id) ON DELETE RESTRICT,
+  allocation_id UUID NOT NULL REFERENCES event_allocations(id) ON DELETE RESTRICT,
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE RESTRICT,
+  item_id UUID NOT NULL REFERENCES items(id) ON DELETE RESTRICT,
+  good_delta INTEGER NOT NULL DEFAULT 0,
+  damaged_delta INTEGER NOT NULL DEFAULT 0,
+  lost_delta INTEGER NOT NULL DEFAULT 0,
+  repair_delta INTEGER NOT NULL DEFAULT 0,
+  outstanding_before INTEGER NOT NULL CHECK (outstanding_before >= 0),
+  outstanding_after INTEGER NOT NULL CHECK (outstanding_after >= 0),
+  reason TEXT NOT NULL CHECK (length(trim(reason)) >= 3),
+  idempotency_key TEXT,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CHECK (good_delta <> 0 OR damaged_delta <> 0 OR lost_delta <> 0 OR repair_delta <> 0)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_event_return_corrections_idem
+  ON event_return_corrections(receipt_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_event_return_corrections_allocation
+  ON event_return_corrections(allocation_id, created_at DESC);
+CREATE OR REPLACE FUNCTION prevent_return_audit_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'return audit records are append-only' USING ERRCODE = '55000';
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_event_return_receipts_immutable ON event_return_receipts;
+CREATE TRIGGER trg_event_return_receipts_immutable BEFORE UPDATE OR DELETE ON event_return_receipts
+  FOR EACH ROW EXECUTE FUNCTION prevent_return_audit_mutation();
+DROP TRIGGER IF EXISTS trg_condition_resolutions_immutable ON inventory_condition_resolutions;
+CREATE TRIGGER trg_condition_resolutions_immutable BEFORE UPDATE OR DELETE ON inventory_condition_resolutions
+  FOR EACH ROW EXECUTE FUNCTION prevent_return_audit_mutation();
+DROP TRIGGER IF EXISTS trg_event_return_corrections_immutable ON event_return_corrections;
+CREATE TRIGGER trg_event_return_corrections_immutable BEFORE UPDATE OR DELETE ON event_return_corrections
+  FOR EACH ROW EXECUTE FUNCTION prevent_return_audit_mutation();
+ALTER TABLE event_return_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_condition_resolutions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_return_corrections ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_event_allocations_return_queue
   ON event_allocations(event_id)
+  WHERE departed_at IS NOT NULL AND status <> 'Returned';
+CREATE INDEX IF NOT EXISTS idx_event_allocations_open_returns
+  ON event_allocations(event_id, departed_at, item_id)
+  INCLUDE (
+    quantity_allocated,
+    returned_good_quantity,
+    returned_damaged_quantity,
+    returned_lost_quantity,
+    returned_repair_quantity
+  )
   WHERE departed_at IS NOT NULL AND status <> 'Returned';
 
 CREATE INDEX IF NOT EXISTS idx_event_allocations_event ON event_allocations(event_id);
@@ -987,6 +1040,9 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_movements_source
   ON inventory_movements(source_type, source_id);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_source_id
+  ON inventory_movements(source_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_item
   ON inventory_movements(item_id, created_at DESC);

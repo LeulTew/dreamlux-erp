@@ -38,6 +38,11 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     });
     await mockCommonShellData(page);
 
+    await page.route(
+      (url) => url.pathname.endsWith("/preferences/record-list/investments"),
+      (route) => fulfillJson(route, { preference: null }),
+    );
+
     let hasInvestment = false;
     let isApproved = false;
 
@@ -53,7 +58,11 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
     });
 
     // Intercept investments list
-    await page.route((url) => url.pathname === "/api/finance/investments" && url.searchParams.has("page"), (route) => {
+    await page.route((url) => url.pathname === "/api/finance/investments", (route) => {
+      if (route.request().method() === "POST") {
+        hasInvestment = true;
+        return fulfillJson(route, { investment: MOCK_INVESTMENT });
+      }
       if (!hasInvestment) {
         return fulfillJson(route, LEDGER_BASE);
       }
@@ -85,15 +94,6 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
         byCategory: isApproved ? [{ category: "Equipment", amount: 50000 }] : [],
         byClassification: isApproved ? [{ capex_classification: "Capital Asset", amount: 50000 }] : [],
       });
-    });
-
-    // Intercept create API
-    await page.route((url) => url.pathname === "/api/finance/investments" && !url.searchParams.has("page"), (route) => {
-      if (route.request().method() === "POST") {
-        hasInvestment = true;
-        return fulfillJson(route, { investment: MOCK_INVESTMENT });
-      }
-      return route.continue();
     });
 
     // Intercept approve API
@@ -131,8 +131,14 @@ test.describe("Issue 111 Capital Investments Page Flow", () => {
 
     // Check creates stock and select asset link
     await page.getByLabel("Creates Stock?").check();
+    await expect(page.getByRole("status")).toContainText("A linked inventory item is required");
     await page.getByTestId("linked-asset-select").getByRole("button").first().click();
     await page.getByRole("option", { name: "Twill Loom (5 pcs)" }).click();
+    await expect(page.getByRole("status")).toContainText("On approval");
+    await expect(page.getByRole("status")).toContainText("5 → 7");
+    await page.getByLabel("Unit", { exact: true }).fill("kg");
+    await expect(page.getByRole("status")).toContainText("Unit mismatch");
+    await page.getByLabel("Unit", { exact: true }).fill("pcs");
 
     await page.getByRole("button", { name: "Save Investment" }).click();
 

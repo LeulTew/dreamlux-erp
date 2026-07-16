@@ -16,20 +16,23 @@ export function useAuth() {
   const [previewSlugs, setPreviewSlugs] = useState<string[] | null>(null);
 
   useEffect(() => {
-    setHasMounted(true);
-    const pRole = localStorage.getItem("previewRole");
-    const pSlugs = localStorage.getItem("previewPermissionSlugs");
-    if (pRole && pSlugs) {
-      setPreviewRole(pRole);
-      try {
-        setPreviewSlugs(JSON.parse(pSlugs));
-      } catch {
-        // ignore
+    const timer = setTimeout(() => {
+      setHasMounted(true);
+      const pRole = localStorage.getItem("previewRole");
+      const pSlugs = localStorage.getItem("previewPermissionSlugs");
+      if (pRole && pSlugs) {
+        setPreviewRole(pRole);
+        try {
+          setPreviewSlugs(JSON.parse(pSlugs));
+        } catch {
+          setPreviewSlugs(null);
+        }
       }
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
-  const { data, isLoading, isFetching, error, isError } = useQuery<AuthResponse>({
+  const { data, isLoading, isFetching, error } = useQuery<AuthResponse>({
     queryKey: ["me"],
     queryFn: async () => {
       const { data } = await api.get<AuthResponse>("/auth/me");

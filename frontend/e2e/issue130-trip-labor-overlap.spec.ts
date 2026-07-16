@@ -21,7 +21,7 @@ test.describe("Issue 130 trip visibility, driver ownership, opex labor prereqs, 
     });
     await mockCommonShellData(page);
 
-    let workspace = {
+    const workspace = {
       event: {
         id: eventId,
         name: "Logistics Fleet Gala",
@@ -110,7 +110,7 @@ test.describe("Issue 130 trip visibility, driver ownership, opex labor prereqs, 
     });
     await mockCommonShellData(page);
 
-    let workspace = {
+    const workspace = {
       event: {
         id: eventId,
         name: "Completed Expo Gala",

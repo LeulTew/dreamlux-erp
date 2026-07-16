@@ -213,8 +213,8 @@ export default function OverheadsPage() {
   // Hydrate states once preferences are retrieved
   useEffect(() => {
     if (!prefsLoaded || prefsHydratedRef.current) return;
-    prefsHydratedRef.current = true;
     if (!listPreference) {
+      prefsHydratedRef.current = true;
       markApplied();
       return;
     }
@@ -224,15 +224,19 @@ export default function OverheadsPage() {
       scopeFilter?: string;
       kindFilter?: string;
     } | undefined;
-    if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
-    if (storedFilters?.categoryFilter) setCategoryFilter(storedFilters.categoryFilter);
-    if (storedFilters?.scopeFilter) setScopeFilter(storedFilters.scopeFilter);
-    if (storedFilters?.kindFilter) setKindFilter(storedFilters.kindFilter);
-    if (listPreference.sort?.sortBy) {
-      setSortBy(listPreference.sort.sortBy);
-      setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
-    }
-    markApplied();
+    const timer = setTimeout(() => {
+      prefsHydratedRef.current = true;
+      if (storedFilters?.statusFilter) setStatusFilter(storedFilters.statusFilter);
+      if (storedFilters?.categoryFilter) setCategoryFilter(storedFilters.categoryFilter);
+      if (storedFilters?.scopeFilter) setScopeFilter(storedFilters.scopeFilter);
+      if (storedFilters?.kindFilter) setKindFilter(storedFilters.kindFilter);
+      if (listPreference.sort?.sortBy) {
+        setSortBy(listPreference.sort.sortBy);
+        setSortOrder(listPreference.sort.sortOrder as "asc" | "desc");
+      }
+      markApplied();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [prefsLoaded, listPreference, markApplied]);
 
   // Persist preferences on changes

@@ -567,6 +567,19 @@ export const resolveInventoryConditionSchema = z.object({
   idempotency_key: z.string().trim().min(1).max(120).optional().nullable(),
 });
 
+const correctionDeltaSchema = z.coerce.number().int().min(-1_000_000).max(1_000_000).optional().default(0);
+export const correctEventReturnSchema = z.object({
+  good_delta: correctionDeltaSchema,
+  damaged_delta: correctionDeltaSchema,
+  lost_delta: correctionDeltaSchema,
+  repair_delta: correctionDeltaSchema,
+  reason: z.string().trim().min(3, "Correction reason is required").max(1000),
+  idempotency_key: z.string().trim().min(1).max(120).optional().nullable(),
+}).refine(
+  (data) => data.good_delta !== 0 || data.damaged_delta !== 0 || data.lost_delta !== 0 || data.repair_delta !== 0,
+  { message: "At least one correction delta must be non-zero" },
+);
+
 export const createEventChecklistItemSchema = z.object({
   title: z.string().min(1, "Task title is required").max(500, "Task title too long"),
   due_date: z.string().optional().nullable().refine((val) => {
