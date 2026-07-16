@@ -95,6 +95,13 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       if (!cached && shouldQueryDB) {
         try {
           const roleContext = await fetchUserRoleContext(payload.id);
+          if (roleContext.userExists === false) {
+            // Valid signature but the user row is gone (e.g. re-seeded DB).
+            // Without this, JWT-embedded slugs pass authorization and writes
+            // blow up with created_by FK violations / 500s (issue #182).
+            res.status(401).json({ error: "Your session is no longer valid. Please sign in again." });
+            return;
+          }
           if (roleContext.roleNames.length > 0) {
             cached = {
               permissionSlugs: roleContext.permissionSlugs,

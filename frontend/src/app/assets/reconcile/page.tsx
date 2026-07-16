@@ -195,10 +195,19 @@ export default function ReconcilePage() {
     },
     onError: (err: unknown) => {
       setShowConfirm(false);
+      const e = err as { response?: { status?: number; data?: { error?: string; details?: string; message?: string } } };
+      if (e?.response?.status === 409) {
+        // Optimistic-concurrency conflict: quantities moved since page load.
+        // Refresh the working set and tell the user what to do next (issue #182).
+        queryClient.invalidateQueries({ queryKey: ["assets"] });
+        queryClient.invalidateQueries({ queryKey: ["reconcilePreview"] });
+        toast.error("Stock levels changed while you were counting. The list has been refreshed — please review the numbers and submit again.");
+        return;
+      }
       const message =
-        (err as { response?: { data?: { error?: string; details?: string; message?: string } } })?.response?.data?.error ||
-        (err as { response?: { data?: { error?: string; details?: string; message?: string } } })?.response?.data?.details ||
-        (err as { response?: { data?: { error?: string; details?: string; message?: string } } })?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.response?.data?.details ||
+        e?.response?.data?.message ||
         "Failed to submit reconciliation";
       toast.error(message);
     }
