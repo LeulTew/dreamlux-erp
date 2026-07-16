@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
@@ -25,7 +25,6 @@ import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
 import PdfExportModal, { type PdfColumn } from "@/components/PdfExportModal";
 import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
-import { generateReportPdf } from "@/lib/pdf-report";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
@@ -406,10 +405,6 @@ export default function OverheadsPage() {
   // Helpers
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "ETB" }).format(val);
-  };
-
-  const handleGeneratePdf = () => {
-    setPdfOpen(true);
   };
 
   const pdfColumns: PdfColumn[] = [

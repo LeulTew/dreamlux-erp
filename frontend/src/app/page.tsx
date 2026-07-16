@@ -24,7 +24,6 @@ import {
 import { Employee, EmployeesResponse } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
-import { useAuth } from "@/hooks/useAuth";
 import ImageCell from "@/components/ImageCell";
 import MobileEmployeeCard from "@/components/MobileEmployeeCard";
 import { HiMagnifyingGlass, HiTrash, HiPencilSquare, HiUsers, HiExclamationTriangle, HiPlus, HiArrowUturnLeft } from "react-icons/hi2";
@@ -348,7 +347,6 @@ function buildColumns(
 
 // Wrapper that enforces page-level RBAC before mounting the hook-heavy inner component
 function EmployeesPageContent() {
-  const { hasPermission } = useAuth();
 
   if (!hasPermission("hr:read") && !hasPermission("hr:write")) {
     return (
@@ -366,7 +364,6 @@ function EmployeesPageContent() {
 function EmployeesPageInner() {
   const { lang } = useLanguage();
   const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
-  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const router = useRouter();
