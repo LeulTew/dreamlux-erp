@@ -48,6 +48,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Detail": "Detail",
     "Location": "Location",
     "Dispatch": "Dispatch",
+    "Finance": "Finance",
+    "Hisab Reports": "Hisab Reports",
+    "Overhead Register": "Overhead Register",
+    "Capital Register": "Capital Register",
+    "Net Profit": "Net Profit",
+    "Hisab Import": "Hisab Import",
+    "Departments": "Departments",
+    "Positions": "Positions",
+    "Offices": "Offices",
+    "Returns": "Returns",
+    "Fleet": "Fleet",
+    "Notifications": "Notifications",
   },
   am: {
     "HR": "የሰው ኃይል",
@@ -89,6 +101,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Detail": "ዝርዝር",
     "Location": "ቦታ",
     "Dispatch": "መላኪያ",
+    "Finance": "ፋይናንስ",
+    "Hisab Reports": "የሂሳብ ሪፖርቶች",
+    "Overhead Register": "የወጪ መዝገብ",
+    "Capital Register": "የካፒታል መዝገብ",
+    "Net Profit": "የተጣራ ትርፍ",
+    "Hisab Import": "የሂሳብ ማስገቢያ",
+    "Departments": "የሥራ ክፍሎች",
+    "Positions": "የስራ መደቦች",
+    "Offices": "ቢሮዎች",
+    "Returns": "መመለሻ",
+    "Fleet": "ተሽከርካሪዎች",
+    "Notifications": "ማሳወቂያዎች",
   }
 };
 
@@ -109,6 +133,12 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/hr/salary-levels/trash": { label: "Trash", permissions: ["salary-levels:manage"] },
   "/hr/expenses/approve": { label: "Expense Approvals", permissions: ["expenses:approve"] },
   "/hr/reports/profit": { label: "Profit Reports", permissions: ["reports:profit:read"] },
+  "/hr/finance": { label: "Finance", permissions: ["finance:hisab:read", "finance:overheads:read", "finance:investments:read"] },
+  "/hr/finance/hisab": { label: "Hisab Reports", permissions: ["finance:hisab:read"] },
+  "/hr/finance/overheads": { label: "Overhead Register", permissions: ["finance:overheads:read"] },
+  "/hr/finance/investments": { label: "Capital Register", permissions: ["finance:investments:read"] },
+  "/hr/finance/net-profit": { label: "Net Profit", permissions: ["finance:hisab:read"] },
+  "/hr/finance/imports": { label: "Hisab Import", permissions: ["finance:imports:write"] },
   "/assets": { label: "Items", permissions: ["assets:read"] },
   "/assets/dashboard": { label: "Dashboard", permissions: ["assets:read"] },
   "/assets/dispatch": { label: "Dispatch", permissions: ["event_allocations:write", "assets:write"] },
@@ -119,7 +149,16 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/assets/reports": { label: "Reports", permissions: ["assets:read"] },
   "/assets/low-stock": { label: "Low Stock", permissions: ["assets:read"] },
   "/assets/location": { label: "Location", href: "/assets" },
+  "/assets/insert": { label: "Add Item", permissions: ["assets:write"] },
+  "/assets/returns": { label: "Returns", permissions: ["event_allocations:write", "assets:write"] },
+  "/assets/trash": { label: "Trash", permissions: ["assets:read"] },
+  "/fleet": { label: "Fleet", permissions: ["vehicles:read"] },
+  "/notifications": { label: "Notifications" },
+  "/report": { label: "Report" },
   "/settings": { label: "Settings", permissions: ["users:manage", "settings:write"] },
+  "/settings/departments": { label: "Departments", permissions: ["departments:manage", "hr:read", "departments:read"] },
+  "/settings/positions": { label: "Positions", permissions: ["positions:manage", "hr:read", "positions:read"] },
+  "/settings/offices": { label: "Offices", permissions: ["offices:manage", "hr:read", "offices:read"] },
   "/settings/users": { label: "Users", permissions: ["users:manage"] },
   "/settings/permissions": { label: "Role Permissions", permissions: ["users:manage", "settings:write"] },
   "/settings/security": { label: "Security Posture", permissions: ["users:manage", "settings:write"] },
@@ -178,25 +217,30 @@ export default function Breadcrumbs() {
     let label = "";
     let permissions: string[] | undefined = undefined;
     let overrideHref: string | undefined = undefined;
+    // Grouping-only segments (e.g. /hr/expenses, /hr/reports) have no page of
+    // their own; linking them triggers RSC prefetch 404s (issue #178).
+    let isNavigable = false;
 
     if (isId(segment)) {
       const parentSegment = i > 0 ? segments[i - 1] : "";
       label = getDynamicLabel(segment, parentSegment);
       const parentPath = cumulative.substring(0, cumulative.lastIndexOf("/"));
       permissions = PATH_METADATA[parentPath]?.permissions;
+      isNavigable = true;
     } else {
       const meta = PATH_METADATA[cumulative];
       if (meta) {
         label = meta.label;
         permissions = meta.permissions;
         overrideHref = meta.href;
+        isNavigable = true;
       } else {
         label = segment.charAt(0).toUpperCase() + segment.slice(1);
       }
     }
 
-    // Only add a link for intermediate segments
-    const href = i < segments.length - 1 ? (overrideHref || cumulative) : undefined;
+    // Only add a link for intermediate segments that resolve to a real page
+    const href = i < segments.length - 1 && isNavigable ? (overrideHref || cumulative) : undefined;
 
     crumbs.push({
       label: t(label),

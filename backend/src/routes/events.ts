@@ -99,6 +99,13 @@ function canReadEvents(req: AuthRequest): boolean {
   return hasPermission(req, "events:read");
 }
 
+// Storekeepers (event_allocations:write) need the event workspace to run the
+// dispatch/return checklists even though they lack events:read (issue #178).
+// Financial fields remain redacted by canViewEventFinancials.
+function canReadEventOperations(req: AuthRequest): boolean {
+  return canReadEvents(req) || hasPermission(req, "event_allocations:write");
+}
+
 function canManageDispatch(req: AuthRequest): boolean {
   return hasAnyPermission(req, ["event_allocations:write", "assets:write"]);
 }
@@ -1540,7 +1547,7 @@ router.delete("/:id/permanent", requireAuth, async (req: AuthRequest, res: Respo
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!canReadEvents(req)) {
+    if (!canReadEventOperations(req)) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
       return;
     }
@@ -1885,7 +1892,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!canReadEvents(req)) {
+    if (!canReadEventOperations(req)) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
       return;
     }

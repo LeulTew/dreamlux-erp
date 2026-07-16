@@ -269,7 +269,7 @@ export default function ReportsPage() {
             <p className="text-xs font-medium text-muted">{t("How items are split across locations.")}</p>
             <div className="h-64 mt-6 min-w-0">
               {chartsReady ? (
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1} debounce={50}>
+                <ResponsiveContainer width="100%" height={256} minWidth={0} minHeight={1} debounce={50} initialDimension={{ width: 320, height: 256 }}>
                   <PieChart>
                     <Pie data={pieData} innerRadius={60} outerRadius={85} paddingAngle={8} dataKey="value" stroke="none">
                       {pieData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -312,7 +312,7 @@ export default function ReportsPage() {
             <p className="text-xs font-medium text-muted">{t("Recent stock level and movement signal.")}</p>
             <div className="h-64 mt-6 min-w-0">
               {chartsReady ? (
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1} debounce={50}>
+                <ResponsiveContainer width="100%" height={256} minWidth={0} minHeight={1} debounce={50} initialDimension={{ width: 320, height: 256 }}>
                   <ComposedChart data={distributionTimeline}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontWeight: 900, fontSize: 10 }} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--muted)", fontWeight: 900, fontSize: 10 }} />
