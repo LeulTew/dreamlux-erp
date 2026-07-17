@@ -19,6 +19,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import { getRoles, getPermissionsCatalog, updateRolePermissions, createRole, updateRole, deleteRole, getUsers } from "@/lib/api";
 import type { Role, User } from "@/lib/types";
+import { permissionLabel } from "@/lib/permission-labels";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -723,8 +724,8 @@ export default function RolePermissionsPage() {
                             <span className="text-[10px] font-black text-emerald-500 uppercase py-0.5 select-none">{t("+ Added")}:</span>
                             <div className="flex flex-wrap gap-1">
                               {addedSlugs.map(slug => (
-                                <span key={slug} className="px-2 py-0.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-bold text-emerald-400 font-mono">
-                                  {slug}
+                                <span key={slug} className="px-2 py-0.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-bold text-emerald-400">
+                                  {permissionLabel(slug)}
                                 </span>
                               ))}
                             </div>
@@ -733,10 +734,10 @@ export default function RolePermissionsPage() {
                         {removedSlugs.length > 0 && (
                           <div className="flex items-start gap-2">
                             <span className="text-[10px] font-black text-rose-500 uppercase py-0.5 select-none">{t("- Removed")}:</span>
-                            <div className="flex flex-wrap gap-1 font-mono">
+                            <div className="flex flex-wrap gap-1">
                               {removedSlugs.map(slug => (
-                                <span key={slug} className="px-2 py-0.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-[10px] font-bold text-rose-400 font-mono">
-                                  {slug}
+                                <span key={slug} className="px-2 py-0.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-[10px] font-bold text-rose-400">
+                                  {permissionLabel(slug)}
                                 </span>
                               ))}
                             </div>
@@ -781,8 +782,8 @@ export default function RolePermissionsPage() {
                                   </div>
                                   <div>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="block text-xs font-bold text-foreground font-mono">
-                                        {t(perm.slug)}
+                                      <span className="block text-xs font-bold text-foreground">
+                                        {permissionLabel(perm.slug)}
                                       </span>
                                       {isDangerous && (
                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-500 select-none">
@@ -891,8 +892,8 @@ export default function RolePermissionsPage() {
               </p>
               <div className="my-2 flex flex-wrap gap-1">
                 {addedSlugs.filter(slug => DANGEROUS_PERMISSIONS.includes(slug)).map(slug => (
-                  <span key={slug} className="px-2 py-0.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[10px] font-bold text-amber-500 font-mono">
-                    {slug}
+                  <span key={slug} className="px-2 py-0.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[10px] font-bold text-amber-500">
+                    {permissionLabel(slug)}
                   </span>
                 ))}
               </div>

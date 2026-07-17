@@ -27,6 +27,7 @@ import {
   HiArrowTopRightOnSquare,
   HiInboxStack
 } from "react-icons/hi2";
+import { motion } from "framer-motion";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -1001,13 +1002,13 @@ function NewProposalContent() {
               </div>
             )}
 
-            {/* Step Controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border/40 pt-5 mt-6 w-full">
-              <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+            {/* Step Controls — stacked full-width 48px targets below 640px, inline row above */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-border/40 pt-5 mt-6 pb-2 sm:pb-0 w-full">
+              <div className="flex items-center justify-between sm:justify-start gap-2.5 w-full sm:w-auto">
                 {step > 1 ? (
                   <button
                     onClick={() => setStep(step - 1)}
-                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 min-h-12 sm:min-h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
                   >
                     <HiArrowLeft className="w-4 h-4" />
                     <span>{t("Back")}</span>
@@ -1015,18 +1016,18 @@ function NewProposalContent() {
                 ) : (
                   <button
                     onClick={() => router.push("/events/proposals")}
-                    className="flex items-center justify-center h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
+                    className="flex items-center justify-center min-h-12 sm:min-h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground transition-all active:scale-[0.98] w-full sm:w-auto select-none cursor-pointer"
                   >
                     <span>{t("Cancel")}</span>
                   </button>
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-2 w-full sm:w-auto">
                 {step < 3 ? (
                   <button
                     onClick={handleNextStep}
-                    className="flex items-center justify-center gap-1.5 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] w-full cursor-pointer select-none"
+                    className="flex items-center justify-center gap-1.5 min-h-12 sm:min-h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] w-full cursor-pointer select-none"
                   >
                     <span>{t("Next")}</span>
                     <HiArrowRight className="w-4 h-4" />
@@ -1036,14 +1037,17 @@ function NewProposalContent() {
                     <button
                       onClick={handleSaveDraft}
                       disabled={createProposalMutation.isPending || isSubmitting}
-                      className="flex items-center justify-center h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto disabled:opacity-50 select-none"
+                      className="flex items-center justify-center min-h-12 sm:min-h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto disabled:opacity-50 select-none"
                     >
                       {createProposalMutation.isPending ? "Saving..." : t("Create Draft")}
                     </button>
-                    <button
+                    <motion.button
                       onClick={handleSubmitForApproval}
                       disabled={createProposalMutation.isPending || isSubmitting}
-                      className="flex items-center justify-center gap-2 h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto select-none disabled:opacity-50"
+                      whileTap={{ scale: 0.97 }}
+                      animate={isSubmitting ? { scale: 0.98, opacity: 0.85 } : { scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="flex items-center justify-center gap-2 min-h-12 sm:min-h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-indigo-600 text-white [@media(hover:hover)]:hover:bg-indigo-700 dark:bg-indigo-500 dark:[@media(hover:hover)]:hover:bg-indigo-600 border border-indigo-600/20 shadow-md shadow-indigo-600/10 cursor-pointer w-full sm:w-auto select-none disabled:opacity-50"
                     >
                       {isSubmitting ? (
                         <>
@@ -1053,7 +1057,7 @@ function NewProposalContent() {
                       ) : (
                         <span>{t("Submit for Approval")}</span>
                       )}
-                    </button>
+                    </motion.button>
                   </>
                 )}
               </div>

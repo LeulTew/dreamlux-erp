@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { HiArrowRight, HiClipboardDocumentCheck, HiTruck } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
 import { Skeleton } from "@/components/ui/skeleton";
+import PaginationControls from "@/components/PaginationControls";
 import { getEventDispatchQueue } from "@/lib/api";
 import type { EventDispatchQueueItem } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,7 +47,10 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("en-ET", { month: "short", day: "2-digit", year: "numeric" }).format(date);
 }
 
+const QUEUE_PAGE_SIZE = 10;
+
 export default function DispatchQueuePage() {
+  const [page, setPage] = useState(1);
   const { hasPermission, isAuthenticated, isLoading } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
@@ -77,6 +82,9 @@ export default function DispatchQueuePage() {
   }
 
   const queue = queueQuery.data?.queue || [];
+  const totalPages = Math.max(1, Math.ceil(queue.length / QUEUE_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedQueue = queue.slice((safePage - 1) * QUEUE_PAGE_SIZE, safePage * QUEUE_PAGE_SIZE);
   const totalAllocations = queue.reduce((sum, item) => sum + Number(item.allocation_count || 0), 0);
   const totalReady = queue.reduce((sum, item) => sum + Number(item.checked_count || 0), 0);
   const totalDeparted = queue.reduce((sum, item) => sum + Number(item.departed_count || 0), 0);
@@ -127,7 +135,7 @@ export default function DispatchQueuePage() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {queue.map((item) => {
+              {pagedQueue.map((item) => {
                 const pendingCount = Math.max(0, Number(item.allocation_count || 0) - Number(item.checked_count || 0));
                 return (
                   <div key={item.event_id} className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_240px_150px] md:items-center">
@@ -168,6 +176,9 @@ export default function DispatchQueuePage() {
             </div>
           )}
         </section>
+        {totalPages > 1 && (
+          <PaginationControls page={safePage} totalPages={totalPages} onPageChange={setPage} />
+        )}
       </div>
     </AuthLayout>
   );
