@@ -29,6 +29,7 @@ import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { generateReportPdf } from "@/lib/pdf-report";
 import {
   api,
   FINANCE_OPEX_CATEGORIES,
@@ -65,6 +66,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event": "Event",
     "Date": "Date",
     "Income": "Income",
+    "Period Summary": "Period Summary",
+    "Period": "Period",
+    "Operational": "Operational",
     "Transport": "Transport",
     "Rental": "Rental",
     "Labour": "Labour",
@@ -142,6 +146,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Event": "ዝግጅት",
     "Date": "ቀን",
     "Income": "ገቢ",
+    "Period Summary": "የወቅት ማጠቃለያ",
+    "Period": "ወቅት",
+    "Operational": "የስራ ማስኬጃ",
     "Transport": "ትራንስፖርት",
     "Rental": "ኪራይ",
     "Labour": "ሰራተኛ",
@@ -458,14 +465,8 @@ export default function HisabReportPage() {
 
   return (
     <AuthLayout>
+      {/* Print output uses generateReportPdf (issue #189), not screenshot CSS. */}
       <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          body { background: white !important; color: black !important; }
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          header, footer, nav, aside, [data-sidebar], .toolbar-container, .tabs-container { display: none !important; }
-          main, .page-container-lg { border: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; background: transparent !important; }
-        }
         .dl-radius-sm { border-radius: var(--radius-sm) !important; }
         .dl-radius-md { border-radius: var(--radius-md) !important; }
         .dl-radius-lg { border-radius: var(--radius-lg) !important; }
@@ -475,22 +476,7 @@ export default function HisabReportPage() {
         .dl-radius-4xl { border-radius: var(--radius-4xl) !important; }
       `}} />
 
-      <div className="page-container-lg space-y-6 px-4 sm:px-6 md:px-8 pt-4 md:py-8 print-container">
-        {/* Printable Header */}
-        <div className="hidden print-only border-b-2 border-primary pb-4 mb-6">
-          <div className="flex justify-between items-end">
-            <div>
-              <h1 className="text-2xl font-black text-foreground tracking-tight">DREAM LUX</h1>
-              <p className="text-[10px] text-primary uppercase font-bold tracking-widest">{t("Premium Event Logistics & Rentals")}</p>
-            </div>
-            <div className="text-right text-xs text-muted">
-              <div className="font-bold text-foreground">{t("Dream Lux Weekly & Monthly Hisab Report")}</div>
-              <div>{t("Date Range")}: {startDate} - {endDate}</div>
-              <div>{t("Generated on")}: {new Date().toLocaleDateString(lang === "am" ? "am-ET" : "en-US")}</div>
-            </div>
-          </div>
-        </div>
-
+      <div className="page-container-lg space-y-6 px-4 sm:px-6 md:px-8 pt-4 md:py-8">
         {/* Screen Header */}
         <div className="flex flex-col gap-4 border-b border-border/50 pb-5 lg:flex-row lg:items-end lg:justify-between no-print">
           <div className="min-w-0">
@@ -505,7 +491,39 @@ export default function HisabReportPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => window.print()} variant="outline" className="flex items-center gap-2 font-bold cursor-pointer h-[44px]">
+            <Button
+              onClick={() => {
+                if (periods.length === 0) return;
+                generateReportPdf({
+                  title: t("Hisab Reports"),
+                  subtitle: `${startDate} → ${endDate}`,
+                  output: "print",
+                  orientation: "l",
+                  fileName: `hisab-${startDate}_${endDate}.pdf`,
+                  sections: [{
+                    title: t("Period Summary"),
+                    columns: [t("Period"), t("Income"), t("Event Expenses"), t("Operational"), t("Net")],
+                    rows: periods.map((p) => [
+                      periodType === "month" ? p.label : `${p.period_start} — ${p.period_end}`,
+                      formatCurrency(p.eventTotals.income),
+                      formatCurrency(p.eventTotals.expenses),
+                      formatCurrency(p.operational.total),
+                      formatCurrency(p.net),
+                    ]),
+                    foot: summary ? [[
+                      t("Total"),
+                      formatCurrency(summary.eventIncome),
+                      formatCurrency(summary.eventExpenses),
+                      formatCurrency(summary.operationalExpenses),
+                      formatCurrency(summary.net),
+                    ]] : undefined,
+                    columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+                  }],
+                });
+              }}
+              variant="outline"
+              className="flex items-center gap-2 font-bold cursor-pointer h-[44px]"
+            >
               <HiPrinter className="h-4 w-4" />
               {t("Print Report")}
             </Button>

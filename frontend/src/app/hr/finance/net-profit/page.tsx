@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Select from "@/components/ui/Select";
 import { useLanguage } from "@/hooks/use-language";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { generateReportPdf } from "@/lib/pdf-report";
 import {
   api,
   getMonthlyNetProfitStatement,
@@ -335,7 +336,43 @@ export default function NetProfitPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.print()}
+              onClick={() => {
+                if (!statement) return;
+                const T = statement.totals;
+                const etb = (n: number) => `${Number(n).toLocaleString("en-US")} ETB`;
+                generateReportPdf({
+                  title: t("Net Profit Statement"),
+                  subtitle: formatMonthName(selectedMonth),
+                  output: "print",
+                  fileName: `net-profit-${selectedMonth}.pdf`,
+                  sections: [
+                    {
+                      title: t("Profit & Loss"),
+                      columns: [t("Line"), t("Amount")],
+                      rows: [
+                        [t("Event Revenue"), etb(T.eventRevenue)],
+                        [t("Approved Event Expenses"), etb(T.approvedEventExpenses)],
+                        [t("Event Gross Profit"), etb(T.eventGrossProfit)],
+                        [t("Operational Expenses"), etb(T.operationalExpenses)],
+                        [t("Overhead Expenses"), etb(T.overheadExpenses)],
+                        [t("Payroll Expenses"), etb(T.payrollExpenses)],
+                        [t("Operating Profit"), etb(T.operatingProfit)],
+                        [t("Approved Investments"), etb(T.approvedInvestments)],
+                        [t("Net After Investments"), etb(T.netAfterInvestments)],
+                        [t("Pending Exposure"), etb(T.pendingExposure)],
+                        [t("Margin"), `${T.marginPercentage}%`],
+                      ],
+                      columnStyles: { 1: { halign: "right" } },
+                    },
+                    {
+                      title: t("Event Expenses by Category"),
+                      columns: [t("Category"), t("Count"), t("Amount")],
+                      rows: statement.breakdowns.eventExpensesByCategory.map((c) => [c.category, c.count, etb(c.amount)]),
+                      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+                    },
+                  ],
+                });
+              }}
               className="dl-radius-md hover:bg-card-alt select-none border-border/80 text-foreground"
             >
               <HiPrinter className="w-4 h-4 mr-2" />

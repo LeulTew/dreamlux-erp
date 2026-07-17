@@ -15,6 +15,7 @@ import {
 import { EventProposal, EventProposalLog } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { generateReportPdf } from "@/lib/pdf-report";
 import {
   HiInboxStack,
   HiCheckCircle,
@@ -33,6 +34,11 @@ import { HiOutlineClock } from "react-icons/hi2";
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
     "Proposal Details": "Proposal Details",
+    "Event Proposal": "Event Proposal",
+    "Item": "Item",
+    "Client": "Client",
+    "Estimated Cost": "Estimated Cost",
+    "Margin": "Margin",
     "Client Details": "Client Details",
     "Client Name": "Client Name",
     "Client Phone": "Client Phone",
@@ -75,6 +81,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   },
   am: {
     "Proposal Details": "የፕሮፖዛል ዝርዝሮች",
+    "Event Proposal": "የዝግጅት ፕሮፖዛል",
+    "Item": "እቃ",
+    "Client": "ደንበኛ",
+    "Estimated Cost": "የተገመተ ወጪ",
+    "Margin": "ህዳግ",
     "Client Details": "የደንበኛ ዝርዝሮች",
     "Client Name": "የደንበኛ ስም",
     "Client Phone": "የደንበኛ ስልክ",
@@ -246,7 +257,33 @@ export default function ProposalDetailPage() {
   });
 
   const handlePrint = () => {
-    window.print();
+    if (!proposal) return;
+    const etb = (n: number | string) => `ETB ${Number(n).toLocaleString("en-US")}`;
+    const cb = proposal.cost_breakdown;
+    const costSection = (title: string, lines: { label: string; amount: number }[]) => ({
+      title,
+      columns: [t("Item"), t("Amount")],
+      rows: lines.length ? lines.map((l) => [l.label, etb(l.amount)]) : [["—", "—"]],
+      columnStyles: { 1: { halign: "right" as const } },
+    });
+    generateReportPdf({
+      title: t("Event Proposal"),
+      subtitle: proposal.name,
+      meta: [
+        `${t("Client")}: ${proposal.client_name}${proposal.client_phone ? ` · ${proposal.client_phone}` : ""}`,
+        `${t("Venue")}: ${proposal.venue_location || "-"}   ${t("Status")}: ${proposal.status}`,
+        `${t("Requested Budget")}: ${etb(proposal.requested_budget)}   ${t("Estimated Cost")}: ${etb(proposal.estimated_total_cost)}`,
+        `${t("Net Profit")}: ${etb(proposal.estimated_net_profit)}   ${t("Margin")}: ${proposal.estimated_margin_percentage}%`,
+      ],
+      output: "print",
+      fileName: `proposal-${proposal.name.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+      sections: [
+        costSection(t("Design Cost"), cb.design ?? []),
+        costSection(t("Team Cost"), cb.team ?? []),
+        costSection(t("Trip Cost"), cb.trip ?? []),
+        costSection(t("Other Cost"), cb.other ?? []),
+      ],
+    });
   };
 
   if (isLoading) {
@@ -272,30 +309,7 @@ export default function ProposalDetailPage() {
   return (
     <AuthLayout>
       <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
-        <style dangerouslySetInnerHTML={{ __html: `
-          @media print {
-            body {
-              background: white !important;
-              color: black !important;
-            }
-            .no-print {
-              display: none !important;
-            }
-            header, footer, nav, aside, [data-sidebar], .actions-panel, .logs-panel {
-              display: none !important;
-            }
-            main, .page-container {
-              border: none !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              width: 100% !important;
-            }
-            .print-grid {
-              grid-template-cols: 1fr !important;
-              gap: 16px !important;
-            }
-          }
-        ` }} />
+        {/* Print output uses generateReportPdf (issue #189), not screenshot CSS. */}
 
         {/* Back Link */}
         <button

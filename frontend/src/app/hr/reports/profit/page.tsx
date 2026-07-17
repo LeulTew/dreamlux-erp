@@ -8,6 +8,7 @@ import ForbiddenState from "@/components/ForbiddenState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfitReport, getEventTypes, getProfitReportExportUrl, api } from "@/lib/api";
+import { generateReportPdf } from "@/lib/pdf-report";
 import Select from "@/components/ui/Select";
 import DatePicker from "@/components/ui/DatePicker";
 import PaginationControls from "@/components/PaginationControls";
@@ -23,6 +24,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Print Report": "Print Report",
     "Total Revenue": "Total Revenue",
     "Total Approved Expenses": "Total Approved Expenses",
+    "Profit Report": "Profit Report",
+    "Monthly Trend": "Monthly Trend",
+    "Expenses": "Expenses",
+    "Expense Categories": "Expense Categories",
+    "Month": "Month",
+    "Events": "Events",
     "Net Profit": "Net Profit",
     "Profit Margin": "Profit Margin",
     "Profit Trend": "Profit Trend",
@@ -86,6 +93,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Print Report": "ሪፖርት አትም",
     "Total Revenue": "አጠቃላይ ገቢ",
     "Total Approved Expenses": "አጠቃላይ የጸደቁ ወጪዎች",
+    "Profit Report": "የትርፍ ሪፖርት",
+    "Monthly Trend": "ወርሃዊ አዝማሚያ",
+    "Expenses": "ወጪዎች",
+    "Expense Categories": "የወጪ ምድቦች",
+    "Month": "ወር",
+    "Events": "ዝግጅቶች",
     "Net Profit": "የተጣራ ትርፍ",
     "Profit Margin": "የትርፍ ህዳግ",
     "Profit Trend": "የትርፍ አዝማሚያ",
@@ -196,7 +209,39 @@ export default function FinancialDashboardPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    if (!data) return;
+    const s = data.summary;
+    generateReportPdf({
+      title: t("Profit Report"),
+      subtitle: `${startDate} → ${endDate}`,
+      meta: [
+        `${t("Revenue")}: ${formatCurrency(s.totalRevenue)}   ${t("Expenses")}: ${formatCurrency(s.totalExpenses)}`,
+        `${t("Net Profit")}: ${formatCurrency(s.netProfit)}   ${t("Margin")}: ${s.profitMargin.toFixed(1)}%`,
+      ],
+      orientation: "l",
+      output: "print",
+      fileName: `profit-report-${startDate}_${endDate}.pdf`,
+      sections: [
+        {
+          title: t("Monthly Trend"),
+          columns: [t("Month"), t("Events"), t("Revenue"), t("Expenses"), t("Net Profit"), t("Margin")],
+          rows: monthlyData.map((m) => [m.month, m.eventCount, formatCurrency(m.revenue), formatCurrency(m.expenses), formatCurrency(m.profit), `${m.margin.toFixed(1)}%`]),
+          columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+        },
+        {
+          title: t("Event Type Performance"),
+          columns: [t("Event Type"), t("Events"), t("Revenue"), t("Expenses"), t("Net Profit"), t("Margin")],
+          rows: eventTypePerformance.map((e) => [e.eventType, e.eventCount, formatCurrency(e.revenue), formatCurrency(e.expenses), formatCurrency(e.netProfit), `${e.averageMargin.toFixed(1)}%`]),
+          columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+        },
+        {
+          title: t("Expense Categories"),
+          columns: [t("Category"), t("Amount"), "%"],
+          rows: categoryBreakdown.map((c) => [t(c.category), formatCurrency(c.amount), `${(s.totalExpenses > 0 ? (c.amount / s.totalExpenses) * 100 : 0).toFixed(1)}%`]),
+          columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+        },
+      ],
+    });
   };
 
   const handleExport = (format: "csv" | "xlsx") => {
@@ -295,47 +340,7 @@ export default function FinancialDashboardPage() {
 
   return (
     <AuthLayout>
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          body {
-            background: white !important;
-            color: black !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-          .print-only {
-            display: block !important;
-          }
-          header, footer, nav, aside, [data-sidebar], .toolbar-container, .tabs-container {
-            display: none !important;
-          }
-          main, .page-container-lg {
-            border: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            width: 100% !important;
-            background: transparent !important;
-          }
-        }
-      `}} />
-
-      <div className="page-container-lg space-y-6 px-4 sm:px-6 md:px-8 pt-4 md:py-8 print-container">
-        {/* Printable Header */}
-        <div className="hidden print-only border-b-2 border-primary pb-4 mb-6">
-          <div className="flex justify-between items-end">
-            <div>
-              <h1 className="text-2xl font-black text-foreground tracking-tight">DREAM LUX</h1>
-              <p className="text-[10px] text-primary uppercase font-bold tracking-widest">{t("Premium Event Logistics & Rentals")}</p>
-            </div>
-            <div className="text-right text-xs text-muted">
-              <div className="font-bold text-foreground">{t("Dream Lux Event Profitability Report")}</div>
-              <div>{t("Date Range")}: {startDate} - {endDate}</div>
-              <div>{t("Generated on")}: {new Date().toLocaleDateString(lang === "am" ? "am-ET" : "en-US")}</div>
-            </div>
-          </div>
-        </div>
-
+      <div className="page-container-lg space-y-6 px-4 sm:px-6 md:px-8 pt-4 md:py-8">
         {/* Screen Header */}
         <div className="flex flex-col gap-4 border-b border-border/50 pb-5 lg:flex-row lg:items-end lg:justify-between no-print">
           <div className="min-w-0">

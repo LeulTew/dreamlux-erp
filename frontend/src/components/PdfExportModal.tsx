@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { HiXMark, HiDocumentArrowDown, HiCheck } from "react-icons/hi2";
+import { HiXMark, HiDocumentArrowDown, HiCheck, HiPrinter } from "react-icons/hi2";
 import { generateReportPdf, type ReportSection } from "@/lib/pdf-report";
 
 export interface PdfColumn {
@@ -67,7 +67,7 @@ export default function PdfExportModal({
 
   const orderedKeys = columns.filter((c) => selected.has(c.key)).map((c) => c.key);
 
-  const handleExport = () => {
+  const run = (output: "save" | "print") => {
     if (orderedKeys.length === 0) return;
     const cols = columns.filter((c) => selected.has(c.key));
     const columnStyles: Record<number, Record<string, unknown>> = {};
@@ -80,7 +80,7 @@ export default function PdfExportModal({
       foot: buildFoot?.(orderedKeys),
       columnStyles,
     };
-    generateReportPdf({ title, subtitle, meta, sections: [section], fileName, orientation });
+    generateReportPdf({ title, subtitle, meta, sections: [section], fileName, orientation, output });
     onClose();
   };
 
@@ -149,7 +149,16 @@ export default function PdfExportModal({
           </button>
           <button
             type="button"
-            onClick={handleExport}
+            onClick={() => run("print")}
+            disabled={orderedKeys.length === 0}
+            className="h-11 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-foreground [@media(hover:hover)]:hover:bg-border/40 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+          >
+            <HiPrinter className="w-4 h-4" />
+            {t("Print")}
+          </button>
+          <button
+            type="button"
+            onClick={() => run("save")}
             disabled={orderedKeys.length === 0}
             className="h-11 px-5 rounded-xl text-xs font-black uppercase tracking-wider bg-primary text-primary-foreground [&_svg]:text-primary-foreground [@media(hover:hover)]:hover:bg-primary-dark transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
           >
