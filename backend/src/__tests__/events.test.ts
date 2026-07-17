@@ -3116,6 +3116,43 @@ describe("Events API", () => {
       expect(mockQuery).not.toHaveBeenCalled();
     });
 
+    // Issue #178: storekeepers run the dispatch/return checklists inside the
+    // event workspace, so allocation writers get a redacted operational read.
+    test("GET /events/:id/workspace allows INVENTORY_OFFICER (event_allocations:write) with financials redacted", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // allocations
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // checklist
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // assignments
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // vehicle assignments
+
+      const res = await request(app)
+        .get("/events/event-1/workspace")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.event.contract_price).toBeUndefined();
+      expect(res.body.event.estimated_design_cost).toBeUndefined();
+      expect(res.body.expenses).toEqual([]);
+    });
+
+    test("GET /events/:id allows INVENTORY_OFFICER (event_allocations:write) with financials redacted", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // event logs
+
+      const res = await request(app)
+        .get("/events/event-1")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.event.contract_price).toBeUndefined();
+    });
+
     test("GET /events/:id/workspace redacts commission_amount and employee_phone for DRIVER", async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],

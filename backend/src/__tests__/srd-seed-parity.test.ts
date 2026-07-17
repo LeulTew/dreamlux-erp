@@ -50,10 +50,10 @@ describe("DreamLux SRD seed parity", () => {
   test("grants dispatch allocation permission to inventory storekeeper roles", () => {
     expect(seedSql).toContain("WHERE r.name = 'INVENTORY_OFFICER' ON CONFLICT DO NOTHING");
     expect(seedSql).toContain("WHERE r.name = 'INVENTORY_CONTROLLER' ON CONFLICT DO NOTHING");
-    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write')");
-    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write')");
-    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read')");
-    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read')");
+    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'offices:read')");
+    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'offices:read')");
+    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read', 'offices:read')");
+    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read', 'offices:read')");
     expect(inventoryDispatchMigrationSql).toContain("WHERE LOWER(r.name) IN ('inventory_officer', 'inventory_controller')");
   });
 

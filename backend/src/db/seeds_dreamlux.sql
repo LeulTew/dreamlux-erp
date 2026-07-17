@@ -51,11 +51,11 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', '
 WHERE r.name = 'EVENT_MANAGER' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write')
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'offices:read')
 WHERE r.name = 'INVENTORY_OFFICER' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write')
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'offices:read')
 WHERE r.name = 'INVENTORY_CONTROLLER' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)

@@ -96,6 +96,9 @@ app.get("/health", async (_req, res) => {
     res.status(200).json({
       status: "ok",
       database: "connected",
+      // Deployment-parity check (issue #178): expose the deployed commit so a
+      // stale Vercel deploy is detectable against the repository HEAD.
+      commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {

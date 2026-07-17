@@ -86,7 +86,8 @@ INSERT INTO permissions (slug, description) VALUES
   ('finance:investments:read', 'View capital investment register and summaries'),
   ('finance:investments:write', 'Create and update capital investment entries'),
   ('finance:investments:approve', 'Approve, reject, delete, and export capital investment entries'),
-  ('finance:imports:write', 'Preview and commit legacy Hisab workbook imports')
+  ('finance:imports:write', 'Preview and commit legacy Hisab workbook imports'),
+  ('offices:read', 'View offices and store locations')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Role-to-permission mappings
@@ -100,7 +101,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read', 'offices:read')
 WHERE LOWER(r.name) IN ('inventory_controller')
 ON CONFLICT DO NOTHING;
 
@@ -128,7 +129,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read', 'offices:read')
 WHERE LOWER(r.name) IN ('inventory_officer')
 ON CONFLICT DO NOTHING;
 
