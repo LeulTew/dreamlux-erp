@@ -20,6 +20,12 @@ export interface ReportPdfOptions {
   sections: ReportSection[];
   fileName: string;
   orientation?: "p" | "l";
+  /**
+   * "save" downloads the file (default). "print" opens the finished document in
+   * the browser print dialog — a real print of the clean document, never a
+   * screenshot of the app screen (issue #189).
+   */
+  output?: "save" | "print";
 }
 
 /**
@@ -90,6 +96,37 @@ export function generateReportPdf(opts: ReportPdfOptions): void {
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.text(`Page ${i} of ${pageCount}`, centerX, pageHeight - 8, { align: "center" });
+  }
+
+  if (opts.output === "print") {
+    // Print the generated document itself (not the app screen). autoPrint marks
+    // the PDF to auto-open the print dialog; we load it into a hidden iframe so
+    // no extra tab is left behind, with a windowed fallback for blocked iframes.
+    doc.autoPrint();
+    const blobUrl = doc.output("bloburl");
+    if (typeof document !== "undefined") {
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.src = String(blobUrl);
+      document.body.appendChild(frame);
+      // Leave the frame mounted long enough for the print dialog to read it.
+      window.setTimeout(() => {
+        try {
+          frame.contentWindow?.focus();
+          frame.contentWindow?.print();
+        } catch {
+          window.open(String(blobUrl), "_blank");
+        }
+      }, 400);
+    } else {
+      window.open(String(blobUrl), "_blank");
+    }
+    return;
   }
 
   doc.save(opts.fileName);

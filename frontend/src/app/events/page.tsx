@@ -13,6 +13,7 @@ import {
   api
 } from "@/lib/api";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { generateReportPdf } from "@/lib/pdf-report";
 import { Event, EventsResponse, EventSavedView } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import {
@@ -109,6 +110,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Match All (AND)": "Match All (AND)",
     "Match Any (OR)": "Match Any (OR)",
     "Event Name": "Event Name",
+    "Print": "Print",
+    "Client": "Client",
+    "Start": "Start",
+    "End": "End",
+    "Contract": "Contract",
     "Event Type Name": "Event Type Name",
     "Start Date": "Start Date",
     "End Date": "End Date",
@@ -216,6 +222,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Match All (AND)": "ሁሉንም አዛምድ (AND)",
     "Match Any (OR)": "ማንኛውንም አዛምድ (OR)",
     "Event Name": "የዝግጅት ስም",
+    "Print": "አትም",
+    "Client": "ደንበኛ",
+    "Start": "ጀምር",
+    "End": "ፍጻሜ",
+    "Contract": "ውል",
     "Event Type Name": "የዝግጅት አይነት ስም",
     "Start Date": "የመጀመሪያ ቀን",
     "End Date": "የማብቂያ ቀን",
@@ -746,36 +757,7 @@ function EventsPageContent() {
   return (
     <AuthLayout>
       <div className="page-container pt-4 md:py-8 px-4 sm:px-6 md:px-8">
-        <style dangerouslySetInnerHTML={{ __html: `
-          @media print {
-            body {
-              background: white !important;
-              color: black !important;
-            }
-            .no-print {
-              display: none !important;
-            }
-            header, footer, nav, aside, [data-sidebar], .toolbar-container {
-              display: none !important;
-            }
-            main, .page-container, .table-container {
-              border: none !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              width: 100% !important;
-              background: transparent !important;
-            }
-            table {
-              width: 100% !important;
-              border-collapse: collapse !important;
-            }
-            th, td {
-              border: 1px solid #ddd !important;
-              padding: 8px !important;
-              font-size: 11px !important;
-            }
-          }
-        ` }} />
+        {/* print output uses generateReportPdf, not screenshot CSS (issue #189) */}
 
         {/* Header Title */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 no-print">
@@ -977,11 +959,38 @@ function EventsPageContent() {
                       {t("Export XLSX")}
                     </button>
                     <button
-                      onClick={() => window.print()}
+                      onClick={() => {
+                        setIsExportOpen(false);
+                        generateReportPdf({
+                          title: t("Events"),
+                          subtitle: new Date().toLocaleDateString(lang === "am" ? "am-ET" : "en-US"),
+                          output: "print",
+                          orientation: "l",
+                          fileName: "events.pdf",
+                          sections: [{
+                            columns: hasProfitAccess
+                              ? [t("Event Name"), t("Client"), t("Start"), t("End"), t("Venue"), t("Contract"), t("Status")]
+                              : [t("Event Name"), t("Client"), t("Start"), t("End"), t("Venue"), t("Status")],
+                            rows: events.map((e) => {
+                              const base = [
+                                e.name,
+                                e.client_name + (e.client_phone ? ` (${e.client_phone})` : ""),
+                                e.start_date.split("T")[0],
+                                e.end_date.split("T")[0],
+                                e.venue_location || "-",
+                              ];
+                              return hasProfitAccess
+                                ? [...base, `ETB ${Number(e.contract_price).toLocaleString()}`, e.status]
+                                : [...base, e.status];
+                            }),
+                            columnStyles: hasProfitAccess ? { 5: { halign: "right" } } : undefined,
+                          }],
+                        });
+                      }}
                       className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt flex items-center gap-1.5"
                     >
                       <HiPrinter className="w-4 h-4" />
-                      {t("Print PDF")}
+                      {t("Print")}
                     </button>
                   </div>
                 )}

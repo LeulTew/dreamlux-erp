@@ -43,4 +43,33 @@ describe("generateReportPdf (issue #152)", () => {
       }),
     ).not.toThrow();
   });
+
+  it("prints the generated document (not the screen) when output is 'print' (issue #189)", () => {
+    // Print path mounts a hidden iframe of the generated PDF and invokes its own
+    // print — it must never call window.print() on the live app screen.
+    const appPrint = vi.spyOn(window, "print").mockImplementation(() => {});
+    const appended: string[] = [];
+    const realCreate = document.createElement.bind(document);
+    const createSpy = vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "iframe") appended.push(tag);
+      return el;
+    });
+
+    expect(() =>
+      generateReportPdf({
+        title: "Profit Report",
+        subtitle: "2026-01-01 → 2026-12-31",
+        output: "print",
+        sections: [{ columns: ["Month", "Net"], rows: [["Jan", "ETB 1,000"]] }],
+        fileName: "profit.pdf",
+      }),
+    ).not.toThrow();
+
+    expect(appended).toContain("iframe"); // clean document iframe, not a screen print
+    expect(appPrint).not.toHaveBeenCalled(); // never prints the app screen synchronously
+
+    createSpy.mockRestore();
+    appPrint.mockRestore();
+  });
 });
