@@ -257,6 +257,35 @@ describe("Payroll Validation Schema (unit)", () => {
   });
 });
 
+// ─── Integration Tests: GET /payroll/settings (issue #182) ───────────────────
+describe("Payroll API > GET /payroll/settings", () => {
+  test("returns cycle configuration for payroll:read holders", async () => {
+    const res = await request(app)
+      .get("/payroll/settings")
+      .set("Authorization", PAYROLL_READ_ONLY_AUTH());
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("payroll_cycle");
+    expect(res.body).toHaveProperty("payroll_calendar_type");
+    // Only payroll fields are exposed — no admin-only settings leak.
+    expect(res.body).not.toHaveProperty("employee_id_prefix");
+  });
+
+  test("is denied without any payroll permission", async () => {
+    const secret = process.env.JWT_SECRET || "dev-secret";
+    const token = jwt.sign(
+      { id: "u-x", username: "x", role: "DRIVER", roles: ["DRIVER"], permission_slugs: ["trips:create"] },
+      secret,
+      { expiresIn: "1h" },
+    );
+    const res = await request(app)
+      .get("/payroll/settings")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(403);
+  });
+});
+
 // ─── Integration Tests: GET /payroll/runs ────────────────────────────────────
 describe("Payroll API > GET /payroll/runs", () => {
   test("returns empty paginated payload when no runs exist", async () => {

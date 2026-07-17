@@ -1098,6 +1098,15 @@ export const deleteVehicle = (id: string) =>
 export const getAppSettings = () =>
   api.get("/settings").then((r) => r.data);
 
+// Payroll-scoped cycle configuration (issue #182): readable with payroll:read,
+// unlike the admin-gated GET /settings.
+export const getPayrollCycleSettings = (): Promise<{
+  payroll_cycle?: string;
+  payroll_cycle_days?: number | null;
+  payroll_calendar_type?: string;
+  payroll_manual_start_date?: string | null;
+}> => api.get("/payroll/settings").then((r) => r.data);
+
 export const updateAppSettings = (data: {
   employee_id_prefix: string;
   inventory_id_prefix?: string;

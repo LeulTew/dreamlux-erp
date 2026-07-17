@@ -32,7 +32,7 @@ import {
   finalizePayrollRun,
   getPayrollRuns,
   getPayrollRun,
-  getAppSettings,
+  getPayrollCycleSettings,
 } from "@/lib/api";
 import { 
   Employee, 
@@ -339,8 +339,8 @@ function PaymentRunProcessPageContent() {
   const runsHistory = useMemo(() => runsHistoryPayload?.runs ?? [], [runsHistoryPayload]);
 
   const { data: settings } = useQuery({
-    queryKey: ["appSettings"],
-    queryFn: getAppSettings,
+    queryKey: ["payrollCycleSettings"],
+    queryFn: getPayrollCycleSettings,
     enabled: hasPayrollWrite,
   });
 

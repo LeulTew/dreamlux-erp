@@ -86,13 +86,17 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
   }
 
   if (rows.length === 0) {
-    return { roleNames: [] as string[], permissions: {} as Record<string, unknown>, permissionSlugs: [] as string[] };
+    // The JWT references a user row that no longer exists (e.g. the database
+    // was re-seeded). Callers must treat this as an invalid session, not an
+    // empty-permission user — otherwise embedded JWT slugs pass authorization
+    // and writes fail later with created_by FK violations (issue #182).
+    return { userExists: false, roleNames: [] as string[], permissions: {} as Record<string, unknown>, permissionSlugs: [] as string[] };
   }
 
   const roleIds = normalizeRoleIds(rows[0]?.role_id || primaryRoleId, rows[0]?.role_ids);
 
   if (roleIds.length === 0) {
-    return { roleNames: [] as string[], permissions: {} as Record<string, unknown>, permissionSlugs: [] as string[] };
+    return { userExists: true, roleNames: [] as string[], permissions: {} as Record<string, unknown>, permissionSlugs: [] as string[] };
   }
 
   let roleRows: any[] = [];
@@ -173,6 +177,7 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
   const permissionSlugs = roleRows.flatMap((row) => resolveEffectivePermissionSlugs(row.permission_slugs, row.permissions, [row.name]));
 
   return {
+    userExists: true,
     roleNames,
     permissions: roleRows[0]?.permissions || {},
     permissionSlugs: [...new Set(permissionSlugs)],

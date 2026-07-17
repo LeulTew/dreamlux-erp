@@ -76,6 +76,10 @@ const mockQuery = mock((sql: string, params?: any[]) => {
   }
 
   if (sql.includes("SELECT role_ids, role_id FROM users WHERE id = $1")) {
+    if (safeParams[0] === "verify-db-missing-user") {
+      // Simulates a stale JWT whose user row was removed (issue #182).
+      return Promise.resolve({ rows: [], rowCount: 0 });
+    }
     return Promise.resolve({ rows: [{ role_id: "role-1", role_ids: ["role-1"] }], rowCount: 1 });
   }
 
@@ -264,6 +268,21 @@ describe("RBAC Caching & Guardrails", () => {
     expect(cached).not.toBeNull();
     expect(cached?.roleNames).toContain("STORE_MANAGER");
     expect(cached?.permissionSlugs).toContain("users:manage");
+  });
+
+  test("requireAuth rejects a valid JWT whose user row no longer exists (issue #182)", async () => {
+    const staleToken = jwt.sign(
+      { id: "verify-db-missing-user", role: "SUPER_ADMIN", username: "ghost", permission_slugs: ["*"] },
+      JWT_SECRET,
+      { expiresIn: "1h" },
+    );
+    const res = await request(app)
+      .get("/users/roles")
+      .set("Authorization", `Bearer ${staleToken}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toContain("sign in again");
+    expect(getCachedUserPermissions("verify-db-missing-user")).toBeNull();
   });
 
   test("requireAuth falls back to role_id when role_ids column is missing", async () => {
