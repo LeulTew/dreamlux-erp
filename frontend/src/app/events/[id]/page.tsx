@@ -797,12 +797,12 @@ export default function EventWorkspacePage() {
     user?.role_name?.toUpperCase() === "DRIVER" ||
     user?.role_names?.some((r) => r.toUpperCase() === "DRIVER") ||
     (user as { role?: string })?.role?.toUpperCase() === "DRIVER";
-  const filteredVehicleAssignments = vehicleAssignments.filter((va: VehicleAssignment) => {
-    if (!isDriverRole) return true;
-    const driverName = (va.driver_name || "").trim().toLowerCase();
-    const currentUserName = (user?.full_name || "").trim().toLowerCase();
-    return driverName === currentUserName && driverName.length > 0;
-  });
+  // B11 fix: Previously the trip-log vehicle selector filtered assignments by driver_name === user.full_name,
+  // which broke when the assignment had no named driver, or names differed by case/whitespace.
+  // The backend POST /events/:id/trips already enforces that a DRIVER user must be the assigned driver
+  // (via email→employee→driver_id check), so the UI filter is redundant and blocks legitimate access.
+  // Show all vehicle assignments so drivers can see their truck; the server will reject unauthorized submissions.
+  const filteredVehicleAssignments = vehicleAssignments;
 
   const selectedTripVehicle = vehicleAssignments.find((vehicleAssignment) => vehicleAssignment.id === tripVehicleAssignmentId);
   const selectedFuelConsumptionRate = selectedTripVehicle

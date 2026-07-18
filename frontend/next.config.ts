@@ -28,6 +28,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // E5 fix: prevent back-button bfcache from restoring authenticated pages after logout.
+  // All app routes are protected client-side, but browsers may serve bfcache copies;
+  // Cache-Control: no-store forces a fresh network fetch, ensuring auth guards re-evaluate.
+  async headers() {
+    return [
+      {
+        source: "/((?!_next/static|_next/image|favicon.ico).*)",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Expires", value: "0" },
+        ],
+      },
+    ];
+  },
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
