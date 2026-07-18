@@ -752,7 +752,7 @@ export default function AuthLayout({
             </div>
           )}
           {/* Header - Flat borderless design */}
-          <header className="flex h-12 2xl:h-16 shrink-0 items-center gap-2 2xl:gap-3 px-3 md:px-5 2xl:px-6 bg-transparent select-none">
+          <header className="flex h-12 2xl:h-16 shrink-0 items-center gap-2 2xl:gap-3 px-3 md:px-5 2xl:px-6 bg-transparent select-none no-print">
             <SidebarTrigger className="text-muted hover:text-foreground transition-all cursor-pointer" />
             <div className="h-4 w-px bg-border/50 shrink-0" />
             <Breadcrumbs />
