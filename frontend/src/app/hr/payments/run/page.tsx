@@ -543,12 +543,15 @@ function PaymentRunProcessPageContent() {
 
   const computeEmployeeTotals = useCallback((employee: Employee) => {
     const level = employee.salary_level ? salaryLevelMap.get(employee.salary_level) : undefined;
-    const baseSalary = Number(level?.base_salary ?? 0);
+    const baseSalaryVal = level ? Number(level.base_salary ?? 0) : Number(employee.base_salary ?? 0);
+    const baseSalary = Number.isNaN(baseSalaryVal) ? 0 : baseSalaryVal;
     const lines = eventLinesByEmployee[employee.id] ?? [];
 
     const commission = lines.reduce((sum, line) => {
-      const unitPrice = line.price_override ?? getEmployeeEventPrice(employee, line.event_type_id);
-      return sum + unitPrice * Math.max(1, Number(line.quantity || 1));
+      const unitPriceVal = line.price_override ?? getEmployeeEventPrice(employee, line.event_type_id);
+      const unitPrice = Number.isNaN(Number(unitPriceVal)) ? 0 : Number(unitPriceVal);
+      const qty = Number.isNaN(Number(line.quantity)) ? 1 : Math.max(1, Number(line.quantity || 1));
+      return sum + unitPrice * qty;
     }, 0);
 
     return {
@@ -1046,8 +1049,10 @@ function PaymentRunProcessPageContent() {
                     <p className="text-xs text-muted-foreground italic">{t("No events added for this employee yet.")}</p>
                   ) : (
                     lines.map((line, index) => {
-                      const unitPrice = line.price_override != null ? Number(line.price_override) : getEmployeeEventPrice(employee, line.event_type_id);
-                      const lineTotal = unitPrice * Math.max(1, Number(line.quantity || 1));
+                      const rawUnitPrice = line.price_override != null ? Number(line.price_override) : getEmployeeEventPrice(employee, line.event_type_id);
+                      const unitPrice = Number.isNaN(rawUnitPrice) ? 0 : rawUnitPrice;
+                      const rawLineTotal = unitPrice * Math.max(1, Number(line.quantity || 1));
+                      const lineTotal = Number.isNaN(rawLineTotal) ? 0 : rawLineTotal;
 
                       return (
                         <div key={`${employee.id}-${index}`} className="flex flex-col gap-2 p-2.5 border border-border/40 rounded-xl bg-card-alt/50 mb-2">

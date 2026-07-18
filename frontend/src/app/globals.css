@@ -354,6 +354,36 @@ body {
     print-color-adjust: exact !important;
   }
 
+  /* Hide interactive layout wrappers from paper print */
+  [data-sidebar="sidebar"],
+  aside,
+  header,
+  .no-print,
+  button,
+  a.no-print,
+  .sidebar-trigger,
+  [class*="sidebar"],
+  .toolbar-container,
+  .actions-panel,
+  .logs-panel {
+    display: none !important;
+  }
+
+  /* Make sure inset fills the whole page */
+  main,
+  .sidebar-inset,
+  div[class*="SidebarInset"],
+  .print-grid {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    border: none !important;
+    background: white !important;
+    display: block !important;
+  }
+
   .print-table {
     width: 100% !important;
     border-collapse: collapse !important;

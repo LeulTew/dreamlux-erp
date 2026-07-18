@@ -8,3 +8,5 @@ bun.lockb
 .DS_Store
 backups/
 ux-polish-tracking.md
+.vercel
+.env*

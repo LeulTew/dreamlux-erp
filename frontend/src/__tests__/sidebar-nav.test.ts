@@ -28,7 +28,6 @@ describe("sidebar permission navigation", () => {
     expect(nav.reconcileLink).toBeNull();
     expect(nav.auditLogLink).toBeNull();
     expect(nav.reportsLink).toBeNull();
-    expect(nav.inventoryDashboardLink).toBeNull();
   });
 
   it("does not expose profit reports or expense approvals to event-only users", () => {
@@ -108,10 +107,9 @@ describe("sidebar permission navigation", () => {
     expect(insertLink?.active).toBe(true);
   });
 
-  // --- Inventory group ---
   it("shows inventory dashboard and list for assets:read, not Add Item", () => {
     const nav = navFor("/assets", ["assets:read"]);
-    expect(nav.inventoryDashboardLink).not.toBeNull();
+    expect(nav.inventoryLinks.some((l) => l.href === "/assets/dashboard")).toBe(true);
     expect(nav.inventoryLinks.some((l) => l.href === "/assets")).toBe(true);
     expect(nav.inventoryLinks.some((l) => l.href === "/assets/insert")).toBe(false);
     expect(nav.auditLogLink).not.toBeNull();
@@ -135,7 +133,7 @@ describe("sidebar permission navigation", () => {
     const nav = navFor("/assets/dispatch", ["event_allocations:write"]);
     expect(nav.dispatchLink).not.toBeNull();
     expect(nav.showInventoryGroup).toBe(true);
-    expect(nav.inventoryDashboardLink).toBeNull(); // no assets:read
+    expect(nav.inventoryLinks.some((l) => l.href === "/assets/dashboard")).toBe(false); // no assets:read
   });
 
   // Issue #173: inbound returns share the dispatch capability.

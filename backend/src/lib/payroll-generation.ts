@@ -83,15 +83,20 @@ export function buildPayrollLines(input: {
     if (!employee) continue;
 
     const levelData = salaryLevelByCode.get(employee.salary_level ?? "");
-    const baseSalary = levelData?.amount ?? Number(employee.base_salary ?? 0);
+    let baseSalary = levelData?.amount ?? Number(employee.base_salary ?? 0);
+    if (Number.isNaN(baseSalary)) baseSalary = 0;
+
     const levelCode = levelData?.code ?? employee.salary_level ?? "";
     let eventsTotal = 0;
 
     const events = line.events.map((eventLine) => {
       const eventMaster = eventTypeById.get(eventLine.event_type_id);
       const employeeDefinedPrice = Number(employee.event_prices?.[eventLine.event_type_id] ?? 0);
-      const priceApplied = eventLine.price_override != null ? Number(eventLine.price_override) : employeeDefinedPrice;
-      const lineTotal = eventLine.quantity * priceApplied;
+      let priceApplied = eventLine.price_override != null ? Number(eventLine.price_override) : employeeDefinedPrice;
+      if (Number.isNaN(priceApplied)) priceApplied = 0;
+
+      let lineTotal = eventLine.quantity * priceApplied;
+      if (Number.isNaN(lineTotal)) lineTotal = 0;
       eventsTotal += lineTotal;
 
       const levelSuffix = eventLine.selected_level_id && salaryLevelCodeById.has(String(eventLine.selected_level_id))

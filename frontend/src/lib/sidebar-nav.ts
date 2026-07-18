@@ -23,7 +23,6 @@ export type SidebarNavState = {
   reconcileLink: SidebarNavLink | null;
   auditLogLink: SidebarNavLink | null;
   reportsLink: SidebarNavLink | null;
-  inventoryDashboardLink: SidebarNavLink | null;
   adminLink: SidebarNavLink | null;
 };
 
@@ -120,34 +119,16 @@ export function buildSidebarNavState(params: {
       show: hasAny(PAYROLL_PERMISSIONS),
     },
     {
-      href: "/hr/expenses/approve",
-      label: t("Expense Approvals"),
-      active: pathname === "/hr/expenses/approve",
-      show: hasPermission("expenses:approve"),
-    },
-    {
-      href: "/hr/reports/profit",
-      label: t("Profit Reports"),
-      active: pathname === "/hr/reports/profit",
-      show: hasPermission("reports:profit:read"),
+      href: "/hr/salary-levels",
+      label: t("Salary"),
+      active: pathname === "/hr/salary-levels",
+      show: hasPermission("salary-levels:manage"),
     },
     {
       href: "/hr/finance/hisab",
       label: t("Hisab Reports"),
       active: pathname === "/hr/finance/hisab",
       show: hasPermission("finance:hisab:read"),
-    },
-    {
-      href: "/hr/finance/overheads",
-      label: t("Overhead Register"),
-      active: pathname === "/hr/finance/overheads",
-      show: hasPermission("finance:overheads:read"),
-    },
-    {
-      href: "/hr/finance/investments",
-      label: t("Capital Register"),
-      active: pathname === "/hr/finance/investments",
-      show: hasPermission("finance:investments:read"),
     },
     {
       href: "/hr/finance/net-profit",
@@ -162,10 +143,28 @@ export function buildSidebarNavState(params: {
       show: hasPermission("finance:imports:write"),
     },
     {
-      href: "/hr/salary-levels",
-      label: t("Salary"),
-      active: pathname === "/hr/salary-levels",
-      show: hasPermission("salary-levels:manage"),
+      href: "/hr/expenses/approve",
+      label: t("Expense Approvals"),
+      active: pathname === "/hr/expenses/approve",
+      show: hasPermission("expenses:approve"),
+    },
+    {
+      href: "/hr/reports/profit",
+      label: t("Profit Reports"),
+      active: pathname === "/hr/reports/profit",
+      show: hasPermission("reports:profit:read"),
+    },
+    {
+      href: "/hr/finance/overheads",
+      label: t("Overhead Register"),
+      active: pathname === "/hr/finance/overheads",
+      show: hasPermission("finance:overheads:read"),
+    },
+    {
+      href: "/hr/finance/investments",
+      label: t("Capital Register"),
+      active: pathname === "/hr/finance/investments",
+      show: hasPermission("finance:investments:read"),
     },
   ]
     .filter((link) => link.show)
@@ -195,12 +194,17 @@ export function buildSidebarNavState(params: {
     .filter((link) => link.show)
     .map(({ href, label, active }) => ({ href, label, active }));
 
-  // Inventory list and dashboard
-  const inventoryDashboardLink = hasPermission("assets:read")
-    ? { href: "/assets/dashboard", label: t("Dashboard"), active: pathname === "/assets/dashboard" }
-    : null;
-
   const inventoryLinks = [
+    ...(hasPermission("assets:read")
+      ? [
+          {
+            href: "/assets/dashboard",
+            label: t("Dashboard"),
+            active: pathname === "/assets/dashboard",
+            show: true,
+          },
+        ]
+      : []),
     {
       href: "/assets",
       label: t("List Items"),
@@ -263,7 +267,6 @@ export function buildSidebarNavState(params: {
     financeLinks,
     refDataLinks,
     inventoryLinks,
-    inventoryDashboardLink,
     dispatchLink,
     returnsLink,
     reconcileLink,
