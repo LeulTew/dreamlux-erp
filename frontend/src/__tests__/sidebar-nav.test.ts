@@ -81,10 +81,10 @@ describe("sidebar permission navigation", () => {
       expect(nav.showInventoryGroup).toBe(true);
       expect(nav.showAdminGroup).toBe(true);
       expect(nav.eventLinks).toHaveLength(3);
-      // 9 finance links: Payroll, Expense Approvals, Profit Reports,
-      // Hisab Reports, Overhead Register, Capital Register, Net Profit,
-      // Hisab Import, Salary
-      expect(nav.financeLinks).toHaveLength(9);
+      // 7 finance links: Payroll, Expense Approvals, Profit Reports,
+      // Hisab Reports, Overhead Register, Capital Register, Salary
+      // (Net Profit and Hisab Import are now layout subpages reachable via buttons inside Hisab Reports)
+      expect(nav.financeLinks).toHaveLength(7);
       expect(nav.employeesLinks).toHaveLength(3); // HR Dashboard, List Employees, Add Employee
       expect(nav.adminLink).not.toBeNull();
     }
@@ -185,11 +185,11 @@ describe("sidebar permission navigation", () => {
   });
 
   // --- Finance: hisab-related entries ---
-  it("shows hisab and net-profit links together for finance:hisab:read", () => {
+  it("shows hisab report but hides net-profit from sidebar for finance:hisab:read (net-profit is subpage button)", () => {
     const nav = navFor("/hr/finance/hisab", ["finance:hisab:read"]);
     const hrefs = nav.financeLinks.map((l) => l.href);
     expect(hrefs).toContain("/hr/finance/hisab");
-    expect(hrefs).toContain("/hr/finance/net-profit");
+    expect(hrefs).not.toContain("/hr/finance/net-profit");
   });
 
   it("shows overhead register for finance:overheads:read", () => {
@@ -202,9 +202,9 @@ describe("sidebar permission navigation", () => {
     expect(nav.financeLinks.some((l) => l.href === "/hr/finance/investments")).toBe(true);
   });
 
-  it("shows hisab import for finance:imports:write", () => {
+  it("hides hisab import from sidebar for finance:imports:write (import is subpage button)", () => {
     const nav = navFor("/", ["finance:imports:write"]);
-    expect(nav.financeLinks.some((l) => l.href === "/hr/finance/imports")).toBe(true);
+    expect(nav.financeLinks.some((l) => l.href === "/hr/finance/imports")).toBe(false);
   });
 });
 

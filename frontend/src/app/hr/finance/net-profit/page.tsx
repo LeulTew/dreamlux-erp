@@ -289,16 +289,27 @@ export default function NetProfitPage() {
     <AuthLayout>
       <div className="flex flex-col gap-6 p-8 max-w-7xl mx-auto w-full no-print">
         {/* Header section */}
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground select-none">
-              {t("Net Profit Statement")}
-            </h1>
-            <p className="text-sm text-neutral-400 font-medium">
-              {t(
-                "Aggregated operating financials, overhead deductions, payroll adjustments, and below-the-line capital investments."
-              )}
-            </p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between select-none">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/hr/finance/hisab"
+              className="w-10 h-10 rounded-xl bg-card-alt border border-border text-muted-foreground [@media(hover:hover)]:hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+              title={t("Go back")}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+            </Link>
+            <div className="flex flex-col gap-1">
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                {t("Net Profit Statement")}
+              </h1>
+              <p className="text-sm text-neutral-400 font-medium">
+                {t(
+                  "Aggregated operating financials, overhead deductions, payroll adjustments, and below-the-line capital investments."
+                )}
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

@@ -131,18 +131,6 @@ export function buildSidebarNavState(params: {
       show: hasPermission("finance:hisab:read"),
     },
     {
-      href: "/hr/finance/net-profit",
-      label: t("Net Profit"),
-      active: pathname === "/hr/finance/net-profit",
-      show: hasPermission("finance:hisab:read"),
-    },
-    {
-      href: "/hr/finance/imports",
-      label: t("Hisab Import"),
-      active: pathname === "/hr/finance/imports",
-      show: hasPermission("finance:imports:write"),
-    },
-    {
       href: "/hr/expenses/approve",
       label: t("Expense Approvals"),
       active: pathname === "/hr/expenses/approve",
