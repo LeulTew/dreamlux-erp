@@ -90,13 +90,4 @@ describe("Breadcrumbs Component", () => {
     expect(eventsLink.closest("a")).toHaveAttribute("href", "/events");
   });
 
-  it("includes security posture breadcrumb for authorized settings users", () => {
-    mockPathname = "/settings/security";
-    mockPermissions = ["settings:write"];
-    render(<Breadcrumbs />);
-
-    expect(screen.getByText("Admin")).toBeInTheDocument();
-    expect(screen.getByText("Settings").closest("a")).toHaveAttribute("href", "/settings");
-    expect(screen.getByText("Security Posture")).toBeInTheDocument();
-  });
 });

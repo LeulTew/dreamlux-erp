@@ -18,7 +18,7 @@ const ROLE_ROUTES = {
     "/assets", "/assets/dashboard", "/assets/reports", "/assets/movements",
     "/fleet", "/notifications", "/report", "/report/employees", "/docs/guidelines",
   ],
-  admin: ["/settings", "/settings/users", "/settings/permissions", "/settings/security", "/assets/trash"],
+  admin: ["/settings", "/settings/users", "/settings/permissions", "/assets/trash"],
   inv: ["/assets", "/assets/insert", "/assets/dispatch", "/assets/returns", "/assets/reconcile", "/assets/history"],
   ops: ["/events", "/events/proposals/new", "/hr", "/fleet"],
   acc: ["/hr/payments", "/hr/expenses/approve", "/hr/reports/profit", "/hr/finance/net-profit"],

@@ -112,7 +112,7 @@ dreamlux-erp/
 
 ```
 App Bootstrap
-  └─ Load JWT from localStorage.getItem("token")
+  └─ Authenticate with an HttpOnly session cookie
   └─ Fetch GET /auth/permissions
         ├─ Returns effective permission slugs (e.g. "events:write", "*")
         ├─ Returns user metadata and role context
@@ -172,6 +172,7 @@ CSV Importer Path
 *   [x] **[DONE] Issue #32**: Event completion commission and attendance payroll automation.
 *   [x] **[DONE] Issue #33**: Advanced event proposals intake, filters, import/export, and profit reports.
 *   [x] **[DONE] Issue #83 (STORY)**: Security posture status page with OWASP/CVE tracking. Redesigned /settings/security as a clean, plain-language, non-technical UI for Ethiopian business users. No jargon visible — friendly area names (Who Can Access What, Software Safety, Data Protection, etc.), traffic-light status cards, overall banner, KPI chips, Amharic i18n. 20/20 Vitest tests. Merged via PR #101 with all CI checks passing.
+    *   Retired in Issue #181 after security controls moved to automated checks and HttpOnly cookie authentication.
 *   [x] **[DONE] Issue #84 (STORY)**: PWA installability, offline shell, and notification readiness. Added manifest.webmanifest, conservative service worker, /offline fallback page, PwaLifecycle bottom sheet, user-action pre-prompts for desktop notifications, and zero cache policy for authenticated API routes. 5/5 Vitest tests and 6/6 Playwright E2E tests pass. Merged to main with clean CI checks.
 *   [x] **[DONE] Issue #85 (STORY)**: HR Dashboard for workforce, payroll, and staffing readiness. Theme-aware dashboard at `/hr` with KPI metric cards, payroll redaction gate, exception tables (Missing Bank/IDs/Contracts), click-to-edit drawer, Amharic i18n, empty/loading states, 15/15 Vitest tests. Merged via PR #100.
 *   [x] **[DONE] Issue #86 (FEAT)**: Custom role manager UX guardrails and auditability. Added permissions search filter, pending changes diff preview pane, dangerous permission confirmation validation modals, role deletion check notifications, and touch-safety improvements. 8/8 Playwright E2E tests pass cleanly.
@@ -182,7 +183,7 @@ CSV Importer Path
 
 ## 7. Known Issues & Notes
 
-*   **LocalStorage JWT**: JWT is stored in `localStorage` as `token`. High-risk XSS vector.
+*   **Session security**: Authentication uses an HttpOnly cookie; legacy local-storage tokens are removed during session initialization.
 *   **In-Memory Cache**: `permissions-cache.ts` Map is local to Node. Cannot scale horizontally without Redis sync.
 *   **Monolithic Route File**: `events.ts` route file exceeds 2.6k lines. Needs refactoring.
 *   **Bilingual local fallback**: Unrecognized translation keys default to English labels.

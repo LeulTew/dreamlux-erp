@@ -77,7 +77,7 @@ test.describe("Issue 130 trip visibility, driver ownership, opex labor prereqs, 
       ],
     };
 
-    await page.route(`http://localhost:4000/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
+    await page.route(`**/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
 
     await page.goto(`/events/${eventId}`);
     await page.getByRole("button", { name: /Expenses & Trips/i }).click();
@@ -136,7 +136,7 @@ test.describe("Issue 130 trip visibility, driver ownership, opex labor prereqs, 
       trips: [],
     };
 
-    await page.route(`http://localhost:4000/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
+    await page.route(`**/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
 
     await page.goto(`/events/${eventId}`);
     await page.getByRole("button", { name: /Expenses & Trips/i }).click();
@@ -148,7 +148,7 @@ test.describe("Issue 130 trip visibility, driver ownership, opex labor prereqs, 
 
     // Update workspace to set event Completed, but still no attendance
     workspace.event.status = "Completed";
-    await page.route(`http://localhost:4000/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
+    await page.route(`**/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
     await page.goto(`/events/${eventId}`);
     await page.getByRole("button", { name: /Expenses & Trips/i }).click();
 
@@ -159,7 +159,7 @@ test.describe("Issue 130 trip visibility, driver ownership, opex labor prereqs, 
 
     // Update workspace to set employee attended = true
     workspace.assignments[0].attended = true;
-    await page.route(`http://localhost:4000/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
+    await page.route(`**/events/${eventId}/workspace`, (route) => fulfillJson(route, workspace));
     await page.goto(`/events/${eventId}`);
     await page.getByRole("button", { name: /Expenses & Trips/i }).click();
 

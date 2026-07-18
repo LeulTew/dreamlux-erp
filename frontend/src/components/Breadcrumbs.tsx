@@ -161,7 +161,6 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/settings/offices": { label: "Offices", permissions: ["offices:manage", "hr:read", "offices:read"] },
   "/settings/users": { label: "Users", permissions: ["users:manage"] },
   "/settings/permissions": { label: "Role Permissions", permissions: ["users:manage", "settings:write"] },
-  "/settings/security": { label: "Security Posture", permissions: ["users:manage", "settings:write"] },
   "/report/employees": { label: "Employee Reports", permissions: ["hr:read", "hr:write"] },
 };
 
