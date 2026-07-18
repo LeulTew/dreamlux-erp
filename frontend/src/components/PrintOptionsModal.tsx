@@ -58,13 +58,13 @@ export default function PrintOptionsModal({
               </div>
 
               <div className="p-8 flex flex-col gap-6">
-                <label className="flex items-center justify-between cursor-pointer p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors group">
+                <label className="flex items-center justify-between cursor-pointer p-4 rounded-xl border border-border/80 hover:border-primary/40 dark:hover:border-primary/50 transition-colors group">
                   <div className="flex flex-col gap-1">
                     <span className="font-semibold text-foreground text-sm">Include Images</span>
                     <span className="text-xs font-medium text-muted-foreground text-balance">Show item thumbnails in the document</span>
                   </div>
-                  <div className={`w-14 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${includeImages ? "bg-primary" : "bg-muted"}`}>
-                    <div className={`w-5 h-5 rounded-full shadow-lg transform transition-transform duration-300 ${includeImages ? "translate-x-7 bg-background" : "translate-x-0 bg-foreground/60"}`} />
+                  <div className={`w-11 h-6 rounded-full p-1 transition-all duration-200 border ${includeImages ? "bg-primary border-transparent" : "bg-card-alt border-border/80 dark:bg-card-alt/60 dark:border-border/20"}`}>
+                    <div className={`w-4 h-4 rounded-full shadow-sm transform transition-transform duration-200 ${includeImages ? "translate-x-5 bg-white" : "translate-x-0 bg-neutral-400 dark:bg-neutral-500"}`} />
                   </div>
                   <input
                     type="checkbox"
@@ -75,13 +75,13 @@ export default function PrintOptionsModal({
                 </label>
 
                 {showIncludeEvents && (
-                  <label className="flex items-center justify-between cursor-pointer p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors group">
+                  <label className="flex items-center justify-between cursor-pointer p-4 rounded-xl border border-border/80 hover:border-primary/40 dark:hover:border-primary/50 transition-colors group">
                     <div className="flex flex-col gap-1">
                       <span className="font-semibold text-foreground text-sm">Include Event Prices</span>
                       <span className="text-xs font-medium text-muted-foreground text-balance">Print each employee&apos;s configured event pricing on the card</span>
                     </div>
-                    <div className={`w-14 h-7 flex items-center rounded-full p-1 transition-all duration-300 ${includeEvents ? "bg-primary" : "bg-muted"}`}>
-                      <div className={`w-5 h-5 rounded-full shadow-lg transform transition-transform duration-300 ${includeEvents ? "translate-x-7 bg-background" : "translate-x-0 bg-foreground/60"}`} />
+                    <div className={`w-11 h-6 rounded-full p-1 transition-all duration-200 border ${includeEvents ? "bg-primary border-transparent" : "bg-card-alt border-border/80 dark:bg-card-alt/60 dark:border-border/20"}`}>
+                      <div className={`w-4 h-4 rounded-full shadow-sm transform transition-transform duration-200 ${includeEvents ? "translate-x-5 bg-white" : "translate-x-0 bg-neutral-400 dark:bg-neutral-500"}`} />
                     </div>
                     <input
                       type="checkbox"
@@ -96,7 +96,7 @@ export default function PrintOptionsModal({
               <div className="p-6 bg-card-alt border-t border-border/50 flex justify-end gap-3 px-8">
                 <button
                   onClick={onClose}
-                  className="h-11 px-5 rounded-xl font-semibold text-sm bg-card border border-border text-foreground hover:bg-muted transition-all active:scale-[0.98]"
+                  className="h-11 px-5 rounded-xl font-semibold text-sm bg-card border border-border text-foreground hover:bg-primary-light hover:text-primary-dark dark:hover:text-primary hover:border-primary/30 transition-all active:scale-[0.98] cursor-pointer"
                 >
                   Cancel
                 </button>

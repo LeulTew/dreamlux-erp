@@ -83,7 +83,7 @@ export default function DeleteConfirmModal({
                 <button
                   onClick={onClose}
                   disabled={isDeleting}
-                  className="w-full h-11 bg-card-alt text-foreground border border-border rounded-xl font-semibold text-sm hover:bg-border active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full h-11 bg-card-alt text-foreground border border-border rounded-xl font-semibold text-sm hover:bg-primary-light hover:text-primary-dark dark:hover:text-primary hover:border-primary/30 active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
                 >
                   Cancel
                 </button>

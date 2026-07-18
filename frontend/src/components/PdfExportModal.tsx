@@ -144,14 +144,14 @@ export default function PdfExportModal({
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-11 px-4 rounded-xl text-sm font-semibold text-foreground bg-card-alt border border-border/60 [@media(hover:hover)]:hover:bg-border/40 transition-colors">
+          <button type="button" onClick={onClose} className="h-11 px-4 rounded-xl text-sm font-semibold text-foreground bg-card-alt border border-border/60 hover:bg-primary-light hover:text-primary-dark dark:hover:text-primary hover:border-primary/30 transition-all cursor-pointer">
             {t("Cancel")}
           </button>
           <button
             type="button"
             onClick={() => run("print")}
             disabled={orderedKeys.length === 0}
-            className="h-11 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-foreground [@media(hover:hover)]:hover:bg-border/40 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+            className="h-11 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-card-alt border border-border text-foreground hover:bg-primary-light hover:text-primary-dark dark:hover:text-primary hover:border-primary/30 transition-all disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
           >
             <HiPrinter className="w-4 h-4" />
             {t("Print")}

@@ -427,17 +427,21 @@ export default function NetProfitPage() {
               className="flex items-center gap-3 cursor-pointer group select-none text-left"
             >
               <div
-                className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary ${
-                  includeInvestments ? "bg-primary" : "bg-neutral-800"
+                className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 border focus:outline-none focus:ring-2 focus:ring-primary ${
+                  includeInvestments 
+                    ? "bg-primary border-transparent" 
+                    : "bg-card-alt border-border/80 dark:bg-card-alt/60 dark:border-border/20"
                 }`}
               >
                 <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                    includeInvestments ? "translate-x-5" : "translate-x-0"
+                  className={`w-4 h-4 rounded-full transition-transform duration-200 shadow-sm ${
+                    includeInvestments 
+                      ? "translate-x-5 bg-white" 
+                      : "translate-x-0 bg-neutral-400 dark:bg-neutral-500"
                   }`}
                 />
               </div>
-              <span className="text-sm font-semibold text-neutral-200 group-hover:text-foreground">
+              <span className="text-sm font-semibold text-foreground/80 group-hover:text-foreground">
                 {t("Include Investments in Net Profit")}
               </span>
             </button>

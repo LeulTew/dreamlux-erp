@@ -163,6 +163,23 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
+  --color-primary-light-hover: oklch(95% 0.03 72);
+}
+
+.dark {
+  --color-primary-light-hover: oklch(21% 0.06 72);
+}
+
+/* Custom global buttons subtle hover states */
+.hover-bg-subtle:hover {
+  background-color: var(--primary-light) !important;
+  color: var(--primary-dark) !important;
+  border-color: var(--primary) !important;
+}
+.dark .hover-bg-subtle:hover {
+  background-color: var(--primary-light) !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
 }
 
 .dl-radius-sm {
