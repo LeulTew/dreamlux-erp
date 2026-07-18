@@ -232,33 +232,11 @@ function ReportContent() {
     if (authLoading || !isAuthenticated || !hasHRRead) return;
     if (!loading && employees.length > 0) {
       const timer = setTimeout(() => {
-        const rows = employees.map((emp) => {
-          const base = Number(emp.base_salary ?? (emp.salary_level ? salaryByLevelName[emp.salary_level] : 0) ?? 0);
-          return [
-            emp.full_name || "-",
-            emp.position || "-",
-            emp.department || "-",
-            emp.office || "-",
-            emp.phone || "-",
-            base ? `ETB ${base.toLocaleString("en-US")}` : "-",
-          ];
-        });
-        generateReportPdf({
-          title: "Personnel Directory",
-          subtitle: officeName ? `Office: ${officeName}` : undefined,
-          meta: [`Generated: ${new Date().toLocaleString()}`, `Employees: ${employees.length}`],
-          sections: [{
-            columns: ["Name", "Position", "Department", "Office", "Phone", "Base Salary"],
-            rows,
-            columnStyles: { 5: { halign: "right" } },
-          }],
-          fileName: "personnel-directory.pdf",
-          orientation: "l",
-        });
-      }, 400);
+        window.print();
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [loading, employees, salaryByLevelName, officeName, authLoading, isAuthenticated, hasHRRead]);
+  }, [loading, employees, authLoading, isAuthenticated, hasHRRead]);
 
   if (authLoading || (loading && isAuthenticated && hasHRRead)) {
     return (

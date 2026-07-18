@@ -30,6 +30,7 @@ import ImageCell from "@/components/ImageCell";
 import MobileAssetCard from "@/components/MobileAssetCard";
 import EditAssetSheet from "@/components/EditAssetSheet";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
+import PrintOptionsModal from "@/components/PrintOptionsModal";
 import PaginationControls from "@/components/PaginationControls";
 import AdvancedStatsDashboard from "@/components/AdvancedStatsDashboard";
 import AdvancedFilterBuilder, { FilterRule } from "@/components/AdvancedFilterBuilder";
@@ -418,6 +419,7 @@ function AssetsContent() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // Issue #155: Per-user list state preferences
   const { preference: listPreference, isLoaded: prefsLoaded, isReady: prefsReady, markApplied, save: savePreference } = useRecordListPreferences("assets");
@@ -733,7 +735,7 @@ function AssetsContent() {
       toast.error("No items to export");
       return;
     }
-    window.open(`/report?store=${officeFilter}`, "_blank");
+    setIsPrintModalOpen(true);
   };
 
   const handleExportExcel = async () => {
@@ -1211,6 +1213,17 @@ function AssetsContent() {
         title={t("Delete Selected Assets")}
         message={t("Delete Warning")}
         itemName={`${selectedIds.size} selected`}
+      />
+
+      <PrintOptionsModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        onPrint={(options) => {
+          const imgQuery = options.includeImages ? "&images=true" : "&images=false";
+          router.push(`/report?store=${officeFilter}${imgQuery}`);
+        }}
+        title={t("Print Asset Report")}
+        description={t("Choose whether to include item thumbnails in your printed layout.")}
       />
 
       <QuantityModal

@@ -688,18 +688,7 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
-                {/* Dashboard */}
-                {navState.inventoryDashboardLink && (
-                  <SidebarMenuItem className="w-full flex justify-center">
-                    <SidebarLink
-                      href={navState.inventoryDashboardLink.href}
-                      icon={HiBuildingOffice}
-                      label={navState.inventoryDashboardLink.label}
-                      active={navState.inventoryDashboardLink.active}
-                      isCollapsed={isCollapsed}
-                    />
-                  </SidebarMenuItem>
-                )}
+
 
                 {/* Items (Nested) */}
                 {navState.inventoryLinks.length > 0 && (

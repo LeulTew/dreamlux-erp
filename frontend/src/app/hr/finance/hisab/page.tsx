@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   HiPrinter,
@@ -14,6 +15,8 @@ import {
   HiTrash,
   HiBanknotes,
   HiCalendarDays,
+  HiArrowTrendingUp,
+  HiDocumentArrowDown,
 } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
@@ -105,6 +108,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Approved": "Approved",
     "Rejected": "Rejected",
     "Reset": "Reset",
+    "Import Hisab": "Import Hisab",
+    "Net Profit": "Net Profit",
     "No data found for the selected date range.": "No data found for the selected date range.",
     "No operational expenses recorded yet.": "No operational expenses recorded yet.",
     "Non-Event Expenses": "Non-Event Expenses",
@@ -185,6 +190,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Approved": "የጸደቀ",
     "Rejected": "የተከለከለ",
     "Reset": "ዳግም ጀምር",
+    "Import Hisab": "ሂሳብ አስገባ",
+    "Net Profit": "የተጣራ ትርፍ",
     "No data found for the selected date range.": "ከተመረጠው የቀን ገደብ ምንም መረጃ አልተገኘም።",
     "No operational expenses recorded yet.": "እስካሁን ምንም የስራ ማስኬጃ ወጪ አልተመዘገበም።",
     "Non-Event Expenses": "ከዝግጅት ውጪ ወጪዎች",
@@ -225,6 +232,7 @@ export default function HisabReportPage() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const currentYear = new Date().getFullYear();
   const [periodType, setPeriodType] = useState<"week" | "month">("week");
@@ -491,6 +499,24 @@ export default function HisabReportPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {hasPermission("finance:imports:write") && (
+              <Button
+                onClick={() => router.push("/hr/finance/imports")}
+                variant="outline"
+                className="flex items-center gap-2 font-bold cursor-pointer h-[44px]"
+              >
+                <HiDocumentArrowDown className="h-4 w-4 text-primary" />
+                {t("Import Hisab")}
+              </Button>
+            )}
+            <Button
+              onClick={() => router.push("/hr/finance/net-profit")}
+              variant="outline"
+              className="flex items-center gap-2 font-bold cursor-pointer h-[44px]"
+            >
+              <HiArrowTrendingUp className="h-4 w-4 text-emerald-500" />
+              {t("Net Profit")}
+            </Button>
             <Button
               onClick={() => {
                 if (periods.length === 0) return;
