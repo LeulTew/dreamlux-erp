@@ -505,7 +505,7 @@ export default function HisabReportPage() {
                 variant="outline"
                 className="flex items-center gap-2 font-bold cursor-pointer h-[44px]"
               >
-                <HiDocumentArrowDown className="h-4 w-4 text-primary" />
+                <HiDocumentArrowDown className="h-4 w-4" />
                 {t("Import Hisab")}
               </Button>
             )}
@@ -514,7 +514,7 @@ export default function HisabReportPage() {
               variant="outline"
               className="flex items-center gap-2 font-bold cursor-pointer h-[44px]"
             >
-              <HiArrowTrendingUp className="h-4 w-4 text-emerald-500" />
+              <HiArrowTrendingUp className="h-4 w-4" />
               {t("Net Profit")}
             </Button>
             <Button
