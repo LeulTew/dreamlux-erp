@@ -501,7 +501,7 @@ export default function HisabReportPage() {
           <div className="flex flex-wrap items-center gap-2">
             {hasPermission("finance:imports:write") && (
               <Button
-                onClick={() => router.push("/hr/finance/imports")}
+                onClick={() => router.push("/hr/finance/hisab/imports")}
                 variant="outline"
                 className="flex items-center gap-2 font-bold cursor-pointer h-[44px]"
               >
@@ -510,7 +510,7 @@ export default function HisabReportPage() {
               </Button>
             )}
             <Button
-              onClick={() => router.push("/hr/finance/net-profit")}
+              onClick={() => router.push("/hr/finance/hisab/net-profit")}
               variant="outline"
               className="flex items-center gap-2 font-bold cursor-pointer h-[44px]"
             >

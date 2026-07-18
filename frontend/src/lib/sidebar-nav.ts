@@ -127,7 +127,7 @@ export function buildSidebarNavState(params: {
     {
       href: "/hr/finance/hisab",
       label: t("Hisab Reports"),
-      active: pathname === "/hr/finance/hisab",
+      active: pathname === "/hr/finance/hisab" || pathname.startsWith("/hr/finance/hisab/"),
       show: hasPermission("finance:hisab:read"),
     },
     {

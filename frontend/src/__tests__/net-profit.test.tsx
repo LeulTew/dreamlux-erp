@@ -3,7 +3,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import NetProfitPage from "../app/hr/finance/net-profit/page";
+import NetProfitPage from "../app/hr/finance/hisab/net-profit/page";
 import type { MonthlyNetProfitStatement } from "@/lib/types";
 
 // Mock next/navigation

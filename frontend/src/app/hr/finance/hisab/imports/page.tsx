@@ -10,18 +10,18 @@ import {
   HiXMark,
   HiCheck,
 } from "react-icons/hi2";
-import AuthLayout from "@/components/AuthLayout";
-import ForbiddenState from "@/components/ForbiddenState";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import Select from "@/components/ui/Select";
-import { useLanguage } from "@/hooks/use-language";
-import { useAuth } from "@/hooks/useAuth";
+import AuthLayout from "../../../../../components/AuthLayout";
+import ForbiddenState from "../../../../../components/ForbiddenState";
+import { Button } from "../../../../../components/ui/button";
+import { Skeleton } from "../../../../../components/ui/skeleton";
+import Select from "../../../../../components/ui/Select";
+import { useLanguage } from "../../../../../hooks/use-language";
+import { useAuth } from "../../../../../hooks/useAuth";
 import {
   getEvents,
   previewHisabImport,
   commitHisabImport,
-} from "@/lib/api";
+} from "../../../../../lib/api";
 import Link from "next/link";
 import {
   HisabImportCommitPayload,
@@ -30,8 +30,8 @@ import {
   HisabImportPreview,
   HisabImportResolution,
   HisabImportRow,
-} from "@/lib/types";
-import toast from "@/lib/toast";
+} from "../../../../../lib/types";
+import toast from "../../../../../lib/toast";
 
 type ImportEventLookup = {
   id: string;

@@ -9,19 +9,19 @@ import {
   HiExclamationCircle,
 } from "react-icons/hi2";
 import { HiCheck, HiXMark } from "react-icons/hi2";
-import AuthLayout from "@/components/AuthLayout";
-import ForbiddenState from "@/components/ForbiddenState";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import Select from "@/components/ui/Select";
-import { useLanguage } from "@/hooks/use-language";
-import { createPermissionMatcher } from "@/lib/permission-matcher";
-import { generateReportPdf } from "@/lib/pdf-report";
+import AuthLayout from "../../../../../components/AuthLayout";
+import ForbiddenState from "../../../../../components/ForbiddenState";
+import { Button } from "../../../../../components/ui/button";
+import { Skeleton } from "../../../../../components/ui/skeleton";
+import Select from "../../../../../components/ui/Select";
+import { useLanguage } from "../../../../../hooks/use-language";
+import { createPermissionMatcher } from "../../../../../lib/permission-matcher";
+import { generateReportPdf } from "../../../../../lib/pdf-report";
 import {
   api,
   getMonthlyNetProfitStatement,
   downloadMonthlyNetProfitExport,
-} from "@/lib/api";
+} from "../../../../../lib/api";
 import Link from "next/link";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
