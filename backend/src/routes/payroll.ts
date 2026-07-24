@@ -629,7 +629,7 @@ router.post("/preview", async (req: AuthRequest, res) => {
       .is("deleted_at", null);
 
     const { totalPayrollValue, lines: processedLines } = buildPayrollLines({
-      employeeLineEvents,
+      employeeLineEvents: employeeLineEvents ?? [],
       eventTypes: eventsMaster ?? [],
       employees: employees ?? [],
       salaryLevels: salaryLevels ?? [],
@@ -705,7 +705,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       .is("deleted_at", null);
 
     const { lines: processedLines } = buildPayrollLines({
-      employeeLineEvents,
+      employeeLineEvents: employeeLineEvents ?? [],
       eventTypes: eventsMaster ?? [],
       employees: employees ?? [],
       salaryLevels: salaryLevels ?? [],
@@ -876,7 +876,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
       .is("deleted_at", null);
 
     const { lines: processedLines } = buildPayrollLines({
-      employeeLineEvents,
+      employeeLineEvents: employeeLineEvents ?? [],
       eventTypes: eventsMaster ?? [],
       employees: employees ?? [],
       salaryLevels: salaryLevels ?? [],

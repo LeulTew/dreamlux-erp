@@ -467,7 +467,7 @@ export function createEventProposalsRouter(): Router {
       );
 
       const total = Number(countResult.rows[0]?.count || 0);
-      res.json({ proposals: result.rows.map(formatProposal), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
+      res.json({ proposals: result.rows.map((r) => formatProposal(r)), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
     } catch (error: any) {
       console.error("[event-proposals-trash-list] Error:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
@@ -605,7 +605,7 @@ export function createEventProposalsRouter(): Router {
         return;
       }
 
-      const validationResult = eventProposalPayloadSchema.partial().safeParse(req.body);
+      const validationResult = eventProposalPayloadSchema.innerType().partial().safeParse(req.body);
       if (!validationResult.success) {
         res.status(400).json({ error: validationResult.error.errors[0].message });
         return;

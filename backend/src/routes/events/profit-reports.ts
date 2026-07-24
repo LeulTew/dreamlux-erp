@@ -210,7 +210,7 @@ function formatProfitReportRow(row: ProfitReportRow, scopesMap?: Map<string, Ser
 }
 
 function buildProfitAnalytics(rows: ProfitReportRow[]) {
-  const formattedRows = rows.map(formatProfitReportRow);
+  const formattedRows = rows.map((r) => formatProfitReportRow(r));
   const summary = formattedRows.reduce((acc, row) => {
     acc.totalEvents += 1;
     acc.totalRevenue += row.revenue;

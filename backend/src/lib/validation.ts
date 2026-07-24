@@ -139,8 +139,6 @@ export const generatePayrollPreviewSchema = z.object({
   period_kind: z.enum(["month", "range", "half_month", "weekly"]).default("month"),
   period_start: z.string().optional(),
   period_end: z.string().optional(),
-  period_start: z.string().optional(),
-  period_end: z.string().optional(),
   employeeLineEvents: z.array(z.object({
     employee_id: z.string().uuid(),
     events: z.array(z.object({
