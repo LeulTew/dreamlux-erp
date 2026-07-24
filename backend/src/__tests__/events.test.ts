@@ -2422,6 +2422,7 @@ describe("Events API", () => {
             event_id: "event-1",
             event_name: "Corporate Gala",
             event_type_name: "Gala",
+            venue_location: "Hilton Addis Ababa",
             start_date: "2026-06-10",
             status: "Completed",
             revenue: "100000.00",
@@ -2470,6 +2471,7 @@ describe("Events API", () => {
       expect(res.body.total).toBe(2);
       expect(res.body.events).toHaveLength(1);
       expect(res.body.events[0].event_name).toBe("Corporate Gala");
+      expect(res.body.events[0].venue_location).toBe("Hilton Addis Ababa");
       expect(res.body.summary.totalEvents).toBe(2);
       expect(res.body.summary.totalRevenue).toBe(150000.00);
       expect(res.body.summary.totalExpenses).toBe(35000.00);
@@ -2497,6 +2499,7 @@ describe("Events API", () => {
       expect(julyData.expenses).toBe(10000.00);
       expect(julyData.profit).toBe(40000.00);
       expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN event_proposals");
+      expect(String(mockQuery.mock.calls[1][0])).toContain("e.venue_location");
       expect(String(mockQuery.mock.calls[1][0])).toContain("ORDER BY profit_rows.net_profit DESC");
       expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Approved' AND category = 'Labor'");
       expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Pending'");
@@ -2570,6 +2573,7 @@ describe("Events API", () => {
           event_id: "event-1",
           event_name: "Corporate Gala",
           event_type_name: "Gala",
+          venue_location: "Hilton Addis Ababa",
           start_date: "2026-06-10",
           status: "Completed",
           revenue: "100000.00",
@@ -2598,6 +2602,8 @@ describe("Events API", () => {
       expect(res.headers["content-type"]).toContain("text/csv");
       expect(res.text).toContain("Net Profit");
       expect(res.text).toContain("Corporate Gala");
+      expect(res.text).toContain("Venue / Address");
+      expect(res.text).toContain("Hilton Addis Ababa");
       expect(res.text).toContain("Labor / Commission");
       expect(res.text).toContain("20000");
       expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
