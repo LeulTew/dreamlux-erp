@@ -219,7 +219,7 @@ describe("ServiceScopeSelect Component", () => {
     expect(retryButton).toHaveClass("min-w-[48px]");
   });
 
-  it("isolates hover styles behind md: modifier for mobile touch safety", () => {
+  it("isolates hover styles behind pointer-capability [@media(hover:hover)_and_(pointer:fine)] for touch safety", () => {
     render(
       <ServiceScopeSelect
         selectedIds={["scope-1"]}
@@ -231,8 +231,49 @@ describe("ServiceScopeSelect Component", () => {
     const combobox = screen.getByRole("combobox");
     const classList = combobox.className;
 
-    // Verify no bare hover: class — all hover should be behind md:hover:
-    expect(classList).not.toMatch(/(?<!\bmd:)hover:/);
+    // Verify hover is isolated behind pointer:fine and hover:hover media queries
+    expect(classList).toContain("[@media(hover:hover)_and_(pointer:fine)]:hover:border-slate-600");
+  });
+
+  it("handles disabled state: aria-disabled=true, clicks and keyboard events ignored", () => {
+    const onChangeMock = vi.fn();
+    render(
+      <ServiceScopeSelect
+        selectedIds={["scope-1"]}
+        onChange={onChangeMock}
+        scopes={mockScopes}
+        disabled={true}
+      />
+    );
+
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toHaveAttribute("aria-disabled", "true");
+
+    // Click should not open listbox
+    fireEvent.click(combobox);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+    // ArrowDown should not open listbox
+    fireEvent.keyDown(combobox, { key: "ArrowDown" });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("renders custom label, placeholder, and ID attributes correctly", () => {
+    render(
+      <ServiceScopeSelect
+        selectedIds={[]}
+        onChange={vi.fn()}
+        scopes={mockScopes}
+        label="Custom Scope Label"
+        placeholder="Choose custom scope"
+        id="custom-scope-id"
+      />
+    );
+
+    expect(screen.getByText("Custom Scope Label")).toBeInTheDocument();
+    expect(screen.getByText("Choose custom scope")).toBeInTheDocument();
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toHaveAttribute("id", "custom-scope-id");
   });
 
   it("service scopes are independent from event category/type", () => {
@@ -258,3 +299,4 @@ describe("ServiceScopeSelect Component", () => {
     expect(onChangeMock).toHaveBeenCalledWith(["scope-1"]);
   });
 });
+

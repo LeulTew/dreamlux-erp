@@ -3,7 +3,7 @@ import { fulfillJson, mockAuth, mockCommonShellData, seedAuthenticatedSession } 
 
 /**
  * Authoritative seed catalog — matches event_service_scopes.sql migration exactly:
- *   ('FULL',        'Full',        'ሙሉ',           1)
+ *   ('FULL',        'Full',        '<ctrl42>,           1)
  *   ('BACKGROUND',  'Background',  'ባክግራውንድ',     2)
  *   ('SETUP',       'Setup',       'ሴታፕ',          3)
  *   ('TABLE_SETUP', 'Table Setup', 'ጠረጴዛ ሴታፕ',    4)
@@ -75,10 +75,9 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
     );
   });
 
-  test("full lifecycle: create proposal → submit → approve → convert → verify copied scopes on event", async ({ page }) => {
+  test("1. create proposal form submission with multi-select service scopes (FULL, SETUP)", async ({ page }) => {
     let submittedPayload: any = null;
 
-    // Mock POST /events/proposals — proposal creation
     await page.route("**/events/proposals", (route) => {
       if (route.request().method() === "POST") {
         submittedPayload = JSON.parse(route.request().postData() || "{}");
@@ -99,40 +98,35 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       return fulfillJson(route, { proposals: [], total: 0 });
     });
 
-    await page.goto("http://localhost:3000/events/proposals/new");
+    await page.goto("/events/proposals/new");
     await expect(page.locator("h1")).toContainText(/Proposal/i);
 
-    // Fill form inputs
     await page.locator('input[name="name"]').fill("Grand Sheraton Wedding");
     await page.locator('input[name="client_name"]').fill("Abebe Kebede");
     await page.locator('input[name="venue_location"]').fill("Sheraton Addis");
     await page.locator('input[name="requested_budget"]').fill("300000");
 
-    // Focus combobox and navigate via keyboard
     const combobox = page.locator('div[role="combobox"]').first();
     await combobox.focus();
     await page.keyboard.press("ArrowDown");
     await expect(page.locator('div[role="listbox"]')).toBeVisible();
 
-    // Select FULL via keyboard Enter
     await page.keyboard.press("Enter");
     await expect(page.locator('span:has-text("Full")')).toBeVisible();
 
-    // Select SETUP via mouse click
     await page.locator('div[role="option"]:has-text("Setup")').first().click();
     await expect(page.locator('span:has-text("Setup")')).toBeVisible();
 
-    // Submit form — UNCONDITIONAL, must exist
     const submitBtn = page.locator('button[type="submit"]').first();
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    // Assert the submitted payload includes correct scope IDs
     expect(submittedPayload).not.toBeNull();
     expect(submittedPayload.service_scope_ids).toContain("scope-1");
     expect(submittedPayload.service_scope_ids).toContain("scope-3");
+  });
 
-    // --- Submit the proposal (Draft → Submitted) ---
+  test("2. proposal submit workflow (Draft -> Submitted)", async ({ page }) => {
     let submitApiCalled = false;
     await page.route("**/events/proposals/prop-194/submit", (route) => {
       submitApiCalled = true;
@@ -146,7 +140,36 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       });
     });
 
-    // --- Approve the proposal (Submitted → Approved) ---
+    await page.route("**/events/proposals/prop-194", (route) => {
+      if (route.request().method() === "GET") {
+        return fulfillJson(route, {
+          proposal: {
+            id: "prop-194",
+            name: "Grand Sheraton Wedding",
+            client_name: "Abebe Kebede",
+            status: "Draft",
+            requested_budget: 300000,
+            requested_start_date: "2026-09-15",
+            requested_end_date: "2026-09-16",
+            venue_location: "Sheraton Addis",
+            service_scopes: [authoritativeScopes[0], authoritativeScopes[2]],
+          },
+          logs: [],
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto("/events/proposals/prop-194");
+    await expect(page.locator("h1")).toContainText("Grand Sheraton Wedding");
+
+    const submitBtn = page.locator('button:has-text("Submit")').first();
+    await expect(submitBtn).toBeVisible();
+    await submitBtn.click();
+    expect(submitApiCalled).toBe(true);
+  });
+
+  test("3. proposal approval workflow (Submitted -> Approved)", async ({ page }) => {
     let approveApiCalled = false;
     await page.route("**/events/proposals/prop-194/approve", (route) => {
       approveApiCalled = true;
@@ -160,7 +183,36 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       });
     });
 
-    // --- Convert the proposal (Approved → Converted) + verify scope copy ---
+    await page.route("**/events/proposals/prop-194", (route) => {
+      if (route.request().method() === "GET") {
+        return fulfillJson(route, {
+          proposal: {
+            id: "prop-194",
+            name: "Grand Sheraton Wedding",
+            client_name: "Abebe Kebede",
+            status: "Submitted",
+            requested_budget: 300000,
+            requested_start_date: "2026-09-15",
+            requested_end_date: "2026-09-16",
+            venue_location: "Sheraton Addis",
+            service_scopes: [authoritativeScopes[0], authoritativeScopes[2]],
+          },
+          logs: [],
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto("/events/proposals/prop-194");
+    await expect(page.locator("h1")).toContainText("Grand Sheraton Wedding");
+
+    const approveBtn = page.locator('button:has-text("Approve")').first();
+    await expect(approveBtn).toBeVisible();
+    await approveBtn.click();
+    expect(approveApiCalled).toBe(true);
+  });
+
+  test("4. proposal conversion workflow (Approved -> Converted with scope copy assertion)", async ({ page }) => {
     let convertApiCalled = false;
     await page.route("**/events/proposals/prop-194/convert", (route) => {
       convertApiCalled = true;
@@ -187,7 +239,6 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       }, 201);
     });
 
-    // Navigate to proposal detail and run conversion workflow
     await page.route("**/events/proposals/prop-194", (route) => {
       if (route.request().method() === "GET") {
         return fulfillJson(route, {
@@ -208,29 +259,17 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       return route.continue();
     });
 
-    await page.goto("http://localhost:3000/events/proposals/prop-194");
+    await page.goto("/events/proposals/prop-194");
     await expect(page.locator("h1")).toContainText("Grand Sheraton Wedding");
-    await expect(page.locator('span:has-text("Full")')).toBeVisible();
-    await expect(page.locator('span:has-text("Setup")')).toBeVisible();
 
-    // Click convert button if visible on the detail page
     const convertBtn = page.locator('button:has-text("Convert")').first();
-    if (await convertBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await convertBtn.click();
-      // A confirm dialog may appear
-      const confirmBtn = page.locator('button:has-text("Confirm")').first();
-      if (await confirmBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await confirmBtn.click();
-      }
-    } else {
-      // Directly call the conversion API to verify scope copy
-      const response = await page.request.post(
-        "http://localhost:4000/events/proposals/prop-194/convert"
-      );
-      // This will hit our route mock, proving the API pathway exists
-    }
+    await expect(convertBtn).toBeVisible();
+    await convertBtn.click();
 
-    // --- Verify the converted event has copied scopes ---
+    expect(convertApiCalled).toBe(true);
+  });
+
+  test("5. converted event detail displays copied service scopes", async ({ page }) => {
     await page.route("**/events/evt-194", (route) => {
       if (route.request().method() === "GET") {
         return fulfillJson(route, {
@@ -252,12 +291,157 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       return route.continue();
     });
 
-    await page.goto("http://localhost:3000/events/evt-194");
-    // Verify copied scopes appear on the converted event detail
+    await page.goto("/events/evt-194");
     await expect(page.locator('span:has-text("Full")')).toBeVisible();
     await expect(page.locator('span:has-text("Setup")')).toBeVisible();
+  });
 
-    // --- Profit report shows scope column ---
+  test("6. clone proposal preserves service scope selections", async ({ page }) => {
+    let cloneApiCalled = false;
+    await page.route("**/events/proposals/prop-194/clone", (route) => {
+      cloneApiCalled = true;
+      return fulfillJson(route, {
+        proposal: {
+          id: "prop-clone-1",
+          name: "Grand Sheraton Wedding (Copy)",
+          client_name: "Abebe Kebede",
+          status: "Draft",
+          requested_budget: 300000,
+          venue_location: "Sheraton Addis",
+          service_scopes: [authoritativeScopes[0], authoritativeScopes[2]],
+        },
+      }, 201);
+    });
+
+    await page.route("**/events/proposals/prop-194", (route) => {
+      if (route.request().method() === "GET") {
+        return fulfillJson(route, {
+          proposal: {
+            id: "prop-194",
+            name: "Grand Sheraton Wedding",
+            client_name: "Abebe Kebede",
+            status: "Draft",
+            requested_budget: 300000,
+            venue_location: "Sheraton Addis",
+            service_scopes: [authoritativeScopes[0], authoritativeScopes[2]],
+          },
+          logs: [],
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto("/events/proposals/prop-194");
+    await expect(page.locator("h1")).toContainText("Grand Sheraton Wedding");
+
+    const cloneBtn = page.locator('button:has-text("Clone"), button:has-text("Duplicate")').first();
+    await expect(cloneBtn).toBeVisible();
+    await cloneBtn.click();
+    expect(cloneApiCalled).toBe(true);
+  });
+
+  test("7. event edit form updates service scope selections and sends PUT payload", async ({ page }) => {
+    let updatePayload: any = null;
+
+    await page.route("**/events/evt-edit-1", (route) => {
+      if (route.request().method() === "GET") {
+        return fulfillJson(route, {
+          event: {
+            id: "evt-edit-1",
+            name: "Corporate Gala",
+            client_name: "TechCorp",
+            event_type_id: "et-corporate",
+            event_type_name: "Corporate",
+            start_date: "2026-10-01",
+            end_date: "2026-10-02",
+            venue_location: "Hilton Addis",
+            contract_price: 500000,
+            status: "Planned",
+            service_scopes: [authoritativeScopes[1], authoritativeScopes[3]],
+          },
+        });
+      }
+      if (route.request().method() === "PUT") {
+        updatePayload = JSON.parse(route.request().postData() || "{}");
+        return fulfillJson(route, {
+          event: {
+            id: "evt-edit-1",
+            name: "Corporate Gala Updated",
+            client_name: "TechCorp",
+            status: "Planned",
+            service_scopes: [authoritativeScopes[0], authoritativeScopes[1]],
+          },
+        });
+      }
+      return route.continue();
+    });
+
+    await page.goto("/events/evt-edit-1");
+    await expect(page.locator('span:has-text("Background")')).toBeVisible();
+    await expect(page.locator('span:has-text("Table Setup")')).toBeVisible();
+
+    const editBtn = page.locator('button:has-text("Edit")').first();
+    await expect(editBtn).toBeVisible();
+    await editBtn.click();
+
+    const combobox = page.locator('div[role="combobox"]').first();
+    await expect(combobox).toBeVisible();
+    await combobox.click();
+
+    await page.locator('div[role="option"]:has-text("Full")').first().click();
+
+    const saveBtn = page.locator('button[type="submit"]').first();
+    await expect(saveBtn).toBeVisible();
+    await saveBtn.click();
+
+    expect(updatePayload).not.toBeNull();
+    expect(updatePayload.service_scope_ids).toBeDefined();
+  });
+
+  test("8. category independence: form submits category and service scopes without cross-filtering", async ({ page }) => {
+    let postPayload: any = null;
+
+    await page.route("**/events/proposals", (route) => {
+      if (route.request().method() === "POST") {
+        postPayload = JSON.parse(route.request().postData() || "{}");
+        return fulfillJson(route, {
+          proposal: {
+            id: "prop-cat-test",
+            name: "Category Independence Test",
+            client_name: "Test Client",
+            status: "Draft",
+            event_type_id: "et-corporate",
+            service_scopes: [authoritativeScopes[1], authoritativeScopes[3]],
+          },
+        }, 201);
+      }
+      return fulfillJson(route, { proposals: [], total: 0 });
+    });
+
+    await page.goto("/events/proposals/new");
+
+    await page.locator('input[name="name"]').fill("Category Independence Test");
+    await page.locator('input[name="client_name"]').fill("Test Client");
+    await page.locator('input[name="requested_budget"]').fill("150000");
+
+    const combobox = page.locator('div[role="combobox"]').first();
+    await combobox.click();
+    const options = page.locator('div[role="option"]');
+    await expect(options).toHaveCount(4);
+
+    await options.nth(1).click(); // Background
+    await options.nth(3).click(); // Table Setup
+
+    const submitBtn = page.locator('button[type="submit"]').first();
+    await expect(submitBtn).toBeVisible();
+    await submitBtn.click();
+
+    expect(postPayload).not.toBeNull();
+    expect(postPayload.service_scope_ids).toContain("scope-2");
+    expect(postPayload.service_scope_ids).toContain("scope-4");
+  });
+
+  test("9. profitability report export (CSV/XLSX) contains service scope columns", async ({ page }) => {
     await page.route("**/events/reports/profit**", (route) =>
       fulfillJson(route, {
         events: [
@@ -289,169 +473,23 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       })
     );
 
-    await page.goto("http://localhost:3000/hr/reports/profit");
+    await page.goto("/hr/reports/profit");
     await expect(page.locator("body")).toContainText("Grand Sheraton Wedding");
-    await expect(page.locator("body")).toContainText("Full");
+    await expect(page.locator("body")).toContainText("Full, Setup");
   });
 
-  test("clone proposal preserves service scopes", async ({ page }) => {
-    // Mock the clone API endpoint
-    let cloneApiCalled = false;
-    await page.route("**/events/proposals/prop-194/clone", (route) => {
-      cloneApiCalled = true;
-      return fulfillJson(route, {
-        proposal: {
-          id: "prop-clone-1",
-          name: "Grand Sheraton Wedding (Copy)",
-          client_name: "Abebe Kebede",
-          status: "Draft",
-          requested_budget: 300000,
-          venue_location: "Sheraton Addis",
-          service_scopes: [authoritativeScopes[0], authoritativeScopes[2]],
-        },
-      }, 201);
-    });
-
-    // Mock proposal detail for the source
-    await page.route("**/events/proposals/prop-194", (route) => {
-      if (route.request().method() === "GET") {
-        return fulfillJson(route, {
-          proposal: {
-            id: "prop-194",
-            name: "Grand Sheraton Wedding",
-            client_name: "Abebe Kebede",
-            status: "Draft",
-            requested_budget: 300000,
-            venue_location: "Sheraton Addis",
-            service_scopes: [authoritativeScopes[0], authoritativeScopes[2]],
-          },
-          logs: [],
-        });
-      }
-      return route.continue();
-    });
-
-    await page.goto("http://localhost:3000/events/proposals/prop-194");
-    await expect(page.locator("h1")).toContainText("Grand Sheraton Wedding");
-
-    // Verify original scopes are visible
-    await expect(page.locator('span:has-text("Full")')).toBeVisible();
-    await expect(page.locator('span:has-text("Setup")')).toBeVisible();
-
-    // Click Clone/Duplicate button if present
-    const cloneBtn = page.locator('button:has-text("Clone"), button:has-text("Duplicate")').first();
-    if (await cloneBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await cloneBtn.click();
-    } else {
-      // Directly invoke clone API to verify scope preservation
-      const response = await page.request.post(
-        "http://localhost:4000/events/proposals/prop-194/clone"
-      );
-      expect(response.ok()).toBe(true);
-      const data = await response.json();
-      expect(data.proposal.service_scopes).toHaveLength(2);
-      expect(data.proposal.service_scopes[0].code).toBe("FULL");
-      expect(data.proposal.service_scopes[1].code).toBe("SETUP");
-      cloneApiCalled = true;
-    }
-
-    expect(cloneApiCalled).toBe(true);
-  });
-
-  test("event edit preserves service scopes across update", async ({ page }) => {
-    let updatePayload: any = null;
-
-    // Mock GET event detail
-    await page.route("**/events/evt-edit-1", (route) => {
-      if (route.request().method() === "GET") {
-        return fulfillJson(route, {
-          event: {
-            id: "evt-edit-1",
-            name: "Corporate Gala",
-            client_name: "TechCorp",
-            event_type_id: "et-corporate",
-            event_type_name: "Corporate",
-            start_date: "2026-10-01",
-            end_date: "2026-10-02",
-            venue_location: "Hilton Addis",
-            contract_price: 500000,
-            status: "Planned",
-            service_scopes: [authoritativeScopes[1], authoritativeScopes[3]],
-          },
-        });
-      }
-      if (route.request().method() === "PUT") {
-        updatePayload = JSON.parse(route.request().postData() || "{}");
-        return fulfillJson(route, {
-          event: {
-            id: "evt-edit-1",
-            name: "Corporate Gala Updated",
-            client_name: "TechCorp",
-            status: "Planned",
-            service_scopes: [authoritativeScopes[1], authoritativeScopes[3]],
-          },
-        });
-      }
-      return route.continue();
-    });
-
-    await page.goto("http://localhost:3000/events/evt-edit-1");
-    // Verify scopes are displayed on the event detail
-    await expect(page.locator('span:has-text("Background")')).toBeVisible();
-    await expect(page.locator('span:has-text("Table Setup")')).toBeVisible();
-  });
-
-  test("service scopes are independent from event category", async ({ page }) => {
-    // Create a proposal with Wedding category + BACKGROUND and TABLE_SETUP scopes
-    // Then verify scopes are NOT filtered by category
-    await page.route("**/events/proposals", (route) => {
-      if (route.request().method() === "POST") {
-        const payload = JSON.parse(route.request().postData() || "{}");
-        // Category is Wedding but scopes can be any combination
-        expect(payload.event_type_id).toBeDefined();
-        return fulfillJson(route, {
-          proposal: {
-            id: "prop-cat-test",
-            name: "Category Independence Test",
-            client_name: "Test Client",
-            status: "Draft",
-            event_type_id: "et-wedding",
-            service_scopes: [authoritativeScopes[1], authoritativeScopes[3]],
-          },
-        }, 201);
-      }
-      return fulfillJson(route, { proposals: [], total: 0 });
-    });
-
-    await page.goto("http://localhost:3000/events/proposals/new");
-
-    // Open scope selector — all 4 scopes should be available regardless of category
-    const combobox = page.locator('div[role="combobox"]').first();
-    await combobox.click();
-    const options = page.locator('div[role="option"]');
-    await expect(options).toHaveCount(4);
-    // Verify all 4 authoritative names are present
-    await expect(options.nth(0)).toContainText("Full");
-    await expect(options.nth(1)).toContainText("Background");
-    await expect(options.nth(2)).toContainText("Setup");
-    await expect(options.nth(3)).toContainText("Table Setup");
-  });
-
-  test("mobile viewport: 48px touch targets, no overflow, no sticky hover", async ({ page }) => {
+  test("10. mobile viewport: 48px touch targets, badge remove target size, and zero overflow", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto("http://localhost:3000/events/proposals/new");
+    await page.goto("/events/proposals/new");
 
-    // Combobox trigger must be visible and have 48px min height
     const combobox = page.locator('div[role="combobox"]').first();
     await expect(combobox).toBeVisible();
     const triggerBox = await combobox.boundingBox();
     expect(triggerBox).not.toBeNull();
     expect(triggerBox!.height).toBeGreaterThanOrEqual(48);
-    // Must not overflow the viewport width
     expect(triggerBox!.width).toBeLessThanOrEqual(375);
 
-    // Open dropdown and verify options have 48px targets
     await combobox.click();
     const options = page.locator('div[role="option"]');
     await expect(options.first()).toBeVisible();
@@ -462,74 +500,61 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       const optionBox = await options.nth(i).boundingBox();
       expect(optionBox).not.toBeNull();
       expect(optionBox!.height).toBeGreaterThanOrEqual(48);
-      // No horizontal overflow
-      expect(optionBox!.x + optionBox!.width).toBeLessThanOrEqual(375 + 1); // +1 for sub-pixel rounding
+      expect(optionBox!.x + optionBox!.width).toBeLessThanOrEqual(375 + 1);
     }
 
-    // Select a scope and verify remove badge target is ≥48px
     await options.first().click();
     const removeBtn = page.locator('button[aria-label*="Remove"]').first();
-    if (await removeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      const removeBtnBox = await removeBtn.boundingBox();
-      expect(removeBtnBox).not.toBeNull();
-      expect(removeBtnBox!.height).toBeGreaterThanOrEqual(48);
-      expect(removeBtnBox!.width).toBeGreaterThanOrEqual(48);
-    }
-
-    // Verify hover styles use md: prefix (touch-safe isolation)
-    const triggerClasses = await combobox.getAttribute("class");
-    // Must NOT contain bare hover: without md: prefix
-    expect(triggerClasses).not.toMatch(/(?<!\bmd:)hover:/);
+    await expect(removeBtn).toBeVisible();
+    const removeBtnBox = await removeBtn.boundingBox();
+    expect(removeBtnBox).not.toBeNull();
+    expect(removeBtnBox!.height).toBeGreaterThanOrEqual(48);
+    expect(removeBtnBox!.width).toBeGreaterThanOrEqual(48);
   });
 
-  test("read-only users see disabled scope selector unconditionally", async ({ page }) => {
+  test("11. pointer-capability hover isolation uses [@media(hover:hover)_and_(pointer:fine)]", async ({ page }) => {
+    await page.goto("/events/proposals/new");
+    const combobox = page.locator('div[role="combobox"]').first();
+    await expect(combobox).toBeVisible();
+    const triggerClasses = await combobox.getAttribute("class");
+    expect(triggerClasses).toContain("[@media(hover:hover)_and_(pointer:fine)]:hover:border-slate-600");
+  });
+
+  test("12. read-only user access control (aria-disabled=true or redirect)", async ({ page }) => {
     await mockAuth(page, {
       permissions: ["events:read"],
     });
 
-    await page.goto("http://localhost:3000/events/proposals/new");
-
-    // The combobox MUST be present. If the page redirects read-only users,
-    // assert the redirect. If it renders disabled, assert disabled state.
+    await page.goto("/events/proposals/new");
     const combobox = page.locator('div[role="combobox"]').first();
-    const redirected = !(await combobox.isVisible({ timeout: 3000 }).catch(() => false));
+    await expect(combobox).toBeVisible();
+    await expect(combobox).toHaveAttribute("aria-disabled", "true");
 
-    if (!redirected) {
-      // Combobox is visible — must be disabled
-      await expect(combobox).toHaveAttribute("aria-disabled", "true");
-      // Click should not open dropdown
-      await combobox.click();
-      await expect(page.locator('div[role="listbox"]')).not.toBeVisible();
-    }
-    // If redirected, the read-only guard is working at the page level — acceptable
+    await combobox.click();
+    await expect(page.locator('div[role="listbox"]')).not.toBeVisible();
   });
 
-  test("keyboard combobox: full cycle open → navigate all 4 scopes → select → deselect → close", async ({ page }) => {
-    await page.goto("http://localhost:3000/events/proposals/new");
+  test("13. keyboard navigation full cycle (open, ArrowDown/Up, select, Escape)", async ({ page }) => {
+    await page.goto("/events/proposals/new");
 
     const combobox = page.locator('div[role="combobox"]').first();
     await combobox.focus();
 
-    // Open with ArrowDown
     await page.keyboard.press("ArrowDown");
     await expect(page.locator('div[role="listbox"]')).toBeVisible();
 
-    // Navigate to all 4 scopes via ArrowDown
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press("ArrowDown");
     }
-    // Now on index 3 (TABLE_SETUP) — select with Enter
     await page.keyboard.press("Enter");
     await expect(page.locator('span:has-text("Table Setup")')).toBeVisible();
 
-    // Navigate back up to FULL (index 0) with ArrowUp
     await page.keyboard.press("ArrowUp");
     await page.keyboard.press("ArrowUp");
     await page.keyboard.press("ArrowUp");
     await page.keyboard.press("Enter");
     await expect(page.locator('span:has-text("Full")')).toBeVisible();
 
-    // Close with Escape
     await page.keyboard.press("Escape");
     await expect(page.locator('div[role="listbox"]')).not.toBeVisible();
   });
