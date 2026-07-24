@@ -1296,7 +1296,7 @@ export const deleteSalaryLevel = (id: string) => api.delete(`/salary-levels/${id
 export const deleteSalaryLevelPermanent = (id: string) => api.delete(`/salary-levels/${id}/permanent`).then(res => res.data);
 
 // ====================================================
-// EVENT TYPES
+// EVENT TYPES & SERVICE SCOPES
 // ====================================================
 export const getEventTypes = () => api.get("/event-types").then(res => res.data);
 export const getEventType = (id: string) => api.get(`/event-types/${id}`).then(res => res.data);
@@ -1304,6 +1304,7 @@ export const createEventType = (data: { event_name: string; description?: string
 export const updateEventType = (id: string, data: { event_name?: string; description?: string | null }) => api.put(`/event-types/${id}`, data).then(res => res.data);
 export const deleteEventType = (id: string) => api.delete(`/event-types/${id}`).then(res => res.data);
 export const deleteEventTypePermanent = (id: string) => api.delete(`/event-types/${id}/permanent`).then(res => res.data);
+export const getServiceScopes = () => api.get<{ service_scopes: import("./types").ServiceScope[] }>("/service-scopes").then(res => res.data);
 // ====================================================
 // PAYROLL RUNS
 // ====================================================

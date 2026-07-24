@@ -256,8 +256,10 @@ describe("Events API", () => {
     expect(res.header["content-type"]).toContain("text/csv");
     expect(res.text).toContain("Event Name,Client Name,Net Profit");
     expect(res.text).toContain("Corporate Gala,Aster,60000");
-    expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
-    expect((mockQuery.mock.calls[2][1] as unknown[])[2]).toBe("events_export_financial");
+    const auditCall = mockQuery.mock.calls.find((call) => String(call[0]).includes("INSERT INTO event_logs"))!;
+    expect(auditCall).toBeDefined();
+    expect(String(auditCall[0])).toContain("INSERT INTO event_logs");
+    expect((auditCall[1] as unknown[])[2]).toBe("events_export_financial");
   });
 
   test("GET /events/export redacts financial columns for non-financial export users", async () => {
@@ -1078,6 +1080,8 @@ describe("Events API", () => {
       rowCount: 1,
     });
 
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
     mockQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -1320,7 +1324,9 @@ describe("Events API", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(String(mockQuery.mock.calls[1][0])).toContain("INSERT INTO event_logs");
+    const auditCall = mockQuery.mock.calls.find((call) => String(call[0]).includes("INSERT INTO event_logs"))!;
+    expect(auditCall).toBeDefined();
+    expect(String(auditCall[0])).toContain("INSERT INTO event_logs");
   });
 
   test("DELETE /events/:id blocks users without events:delete before DB access", async () => {
@@ -2463,6 +2469,8 @@ describe("Events API", () => {
         rowCount: 2,
       });
 
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
       const res = await request(app)
         .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-07-31&sortBy=net_profit&sortOrder=desc&page=1&limit=1")
         .set("Authorization", `Bearer ${getToken("OWNER")}`);
@@ -2498,12 +2506,14 @@ describe("Events API", () => {
       expect(julyData.revenue).toBe(50000.00);
       expect(julyData.expenses).toBe(10000.00);
       expect(julyData.profit).toBe(40000.00);
-      expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN event_proposals");
-      expect(String(mockQuery.mock.calls[1][0])).toContain("e.venue_location");
-      expect(String(mockQuery.mock.calls[1][0])).toContain("ORDER BY profit_rows.net_profit DESC");
-      expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Approved' AND category = 'Labor'");
-      expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Pending'");
-      expect(String(mockQuery.mock.calls[1][0])).not.toContain("status != 'Rejected'");
+      const profitQueryCall = mockQuery.mock.calls.find((call) => String(call[0]).includes("ORDER BY profit_rows"))!;
+      expect(profitQueryCall).toBeDefined();
+      expect(String(profitQueryCall[0])).toContain("LEFT JOIN event_proposals");
+      expect(String(profitQueryCall[0])).toContain("e.venue_location");
+      expect(String(profitQueryCall[0])).toContain("ORDER BY profit_rows.net_profit DESC");
+      expect(String(profitQueryCall[0])).toContain("status = 'Approved' AND category = 'Labor'");
+      expect(String(profitQueryCall[0])).toContain("status = 'Pending'");
+      expect(String(profitQueryCall[0])).not.toContain("status != 'Rejected'");
     });
 
     test("GET /events/reports/profit keeps reversed generated labor out of approved profit math", async () => {
@@ -2537,6 +2547,8 @@ describe("Events API", () => {
         rowCount: 1,
       });
 
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
       const res = await request(app)
         .get("/events/reports/profit?start_date=2026-06-01&end_date=2026-06-30")
         .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
@@ -2548,10 +2560,12 @@ describe("Events API", () => {
       expect(res.body.categoryBreakdown).toContainEqual({ category: "Labor", amount: 20000.00 });
       expect(res.body.events[0].labor_cost).toBe(20000.00);
       expect(res.body.events[0].pending_expense_exposure).toBe(3500.00);
-      expect(String(mockQuery.mock.calls[1][0])).toContain("SUM(amount) FILTER (WHERE status = 'Approved')");
-      expect(String(mockQuery.mock.calls[1][0])).toContain("SUM(amount) FILTER (WHERE status = 'Approved' AND category = 'Labor')");
-      expect(String(mockQuery.mock.calls[1][0])).toContain("SUM(amount) FILTER (WHERE status = 'Pending')");
-      expect(String(mockQuery.mock.calls[1][0])).not.toContain("status != 'Rejected'");
+      const laborQueryCall = mockQuery.mock.calls.find((call) => String(call[0]).includes("SUM(amount) FILTER (WHERE status = 'Approved')"))!;
+      expect(laborQueryCall).toBeDefined();
+      expect(String(laborQueryCall[0])).toContain("SUM(amount) FILTER (WHERE status = 'Approved')");
+      expect(String(laborQueryCall[0])).toContain("SUM(amount) FILTER (WHERE status = 'Approved' AND category = 'Labor')");
+      expect(String(laborQueryCall[0])).toContain("SUM(amount) FILTER (WHERE status = 'Pending')");
+      expect(String(laborQueryCall[0])).not.toContain("status != 'Rejected'");
     });
 
     test("GET /events/reports/profit validates bounded report filters", async () => {
@@ -2606,8 +2620,10 @@ describe("Events API", () => {
       expect(res.text).toContain("Hilton Addis Ababa");
       expect(res.text).toContain("Labor / Commission");
       expect(res.text).toContain("20000");
-      expect(String(mockQuery.mock.calls[2][0])).toContain("INSERT INTO event_logs");
-      expect((mockQuery.mock.calls[2][1] as unknown[])[1]).toBe("profit_report_export");
+      const auditCall = mockQuery.mock.calls.find((call) => String(call[0]).includes("INSERT INTO event_logs"))!;
+      expect(auditCall).toBeDefined();
+      expect(String(auditCall[0])).toContain("INSERT INTO event_logs");
+      expect((auditCall[1] as unknown[])[1]).toBe("profit_report_export");
       expect(String(mockQuery.mock.calls[1][0])).toContain("status = 'Approved' AND category = 'Labor'");
     });
 

@@ -13,6 +13,12 @@ import { createEventProfitReportsRouter } from "./events/profit-reports";
 import { createEventSavedViewsRouter } from "./events/saved-views";
 import { createEventReturnsRouter } from "./events/returns";
 import {
+  fetchEventServiceScopes,
+  validateAndResolveServiceScopes,
+  setEventServiceScopes,
+  ServiceScopeSummary,
+} from "../lib/service-scopes";
+import {
   createEventSchema,
   updateEventSchema,
   updateEventDesignSchema,
@@ -29,6 +35,21 @@ import {
   eventImportPayloadSchema,
   updateEventAllocationDispatchSchema,
 } from "../lib/validation";
+
+async function attachServiceScopesToEvents(client: PoolClient | Pool, rows: any[]): Promise<any[]> {
+  if (!rows || rows.length === 0) return rows;
+  const eventIds = rows.map((r) => r.id);
+  const scopesMap = await fetchEventServiceScopes(client, eventIds);
+  return rows.map((r) => {
+    const scopes = scopesMap.get(r.id) || r.service_scopes || [];
+    return {
+      ...r,
+      service_scopes: scopes,
+      service_scope_ids: scopes.map((s: any) => s.id),
+      service_scopes_str: scopes.map((s: any) => s.name_en).join(", "),
+    };
+  });
+}
 
 
 const router = Router();
@@ -255,6 +276,7 @@ const EVENT_EXPORT_COLUMNS: Record<string, { header: string; financial?: boolean
   client_name: { header: "Client Name" },
   client_phone: { header: "Client Phone" },
   event_type_name: { header: "Event Type" },
+  service_scopes_str: { header: "Service Scopes" },
   status: { header: "Status" },
   start_date: { header: "Start Date" },
   end_date: { header: "End Date" },
@@ -277,6 +299,7 @@ const DEFAULT_EVENT_EXPORT_COLUMNS = [
   "name",
   "client_name",
   "event_type_name",
+  "service_scopes_str",
   "status",
   "start_date",
   "end_date",
@@ -676,7 +699,8 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const dataResult = await pool.query(dataQuery, queryParams);
 
-    const events = await Promise.all(dataResult.rows.map((row: any) => redactEventForPermissions(row, req)));
+    const rowsWithScopes = await attachServiceScopesToEvents(pool, dataResult.rows);
+    const events = await Promise.all(rowsWithScopes.map((row: any) => redactEventForPermissions(row, req)));
 
     res.json({
       events,
@@ -821,7 +845,8 @@ router.get("/export", requireAuth, async (req: AuthRequest, res: Response) => {
       `,
       dataParams,
     );
-    const events = await Promise.all(eventsResult.rows.map((row: any) => redactEventForPermissions(row, req)));
+    const rowsWithScopes = await attachServiceScopesToEvents(pool, eventsResult.rows);
+    const events = await Promise.all(rowsWithScopes.map((row: any) => redactEventForPermissions(row, req)));
     const columns = getRequestedExportColumns(payload.columns, canViewEventFinancials(req));
     const exportRows = buildExportRows(events, columns);
     const columnDefinitions = columns.map((column) => ({ key: column, header: EVENT_EXPORT_COLUMNS[column].header }));
@@ -889,6 +914,14 @@ router.post("/import/preview", requireAuth, async (req: AuthRequest, res: Respon
       }
       if (mode === "update" && !row.id) {
         errors.push({ row: index + 1, field: "id", message: "id is required for update imports" });
+      }
+      const scopeInput = (row as any).service_scope_ids || (row as any).service_scopes;
+      if (scopeInput !== undefined) {
+        try {
+          await validateAndResolveServiceScopes(pool, scopeInput);
+        } catch (err: any) {
+          errors.push({ row: index + 1, field: "service_scopes", message: err.message || "Invalid service scope" });
+        }
       }
       preparedRows.push({ row: index + 1, event_type_id: eventTypeId, action: mode, name: row.name });
     }
@@ -968,8 +1001,14 @@ router.post("/import/commit", requireAuth, async (req: AuthRequest, res: Respons
             row.estimated_design_cost ?? null,
           ],
         );
-        importedIds.push(insertResult.rows[0].id);
-        await insertEventAuditLog(client, insertResult.rows[0].id, req.user?.id || null, "event_import_created", null, row.name);
+        const targetId = insertResult.rows[0].id;
+        const scopeInput = (row as any).service_scope_ids || (row as any).service_scopes;
+        if (scopeInput !== undefined) {
+          const resolvedScopeIds = await validateAndResolveServiceScopes(client, scopeInput);
+          await setEventServiceScopes(client, targetId, resolvedScopeIds);
+        }
+        importedIds.push(targetId);
+        await insertEventAuditLog(client, targetId, req.user?.id || null, "event_import_created", null, row.name);
       } else {
         const updateResult = await client.query(
           `
@@ -1012,8 +1051,14 @@ router.post("/import/commit", requireAuth, async (req: AuthRequest, res: Respons
           errors.push({ row: index + 1, field: "id", message: "Event not found or deleted" });
           continue;
         }
-        importedIds.push(updateResult.rows[0].id);
-        await insertEventAuditLog(client, updateResult.rows[0].id, req.user?.id || null, "event_import_updated", null, row.name);
+        const targetId = updateResult.rows[0].id;
+        const scopeInput = (row as any).service_scope_ids || (row as any).service_scopes;
+        if (scopeInput !== undefined) {
+          const resolvedScopeIds = await validateAndResolveServiceScopes(client, scopeInput);
+          await setEventServiceScopes(client, targetId, resolvedScopeIds);
+        }
+        importedIds.push(targetId);
+        await insertEventAuditLog(client, targetId, req.user?.id || null, "event_import_updated", null, row.name);
       }
     }
 
@@ -1566,7 +1611,8 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const event = eventResult.rows[0];
+    const rowsWithScopes = await attachServiceScopesToEvents(pool, [eventResult.rows[0]]);
+    const event = rowsWithScopes[0];
 
     const logsQuery = `
       SELECT el.*, u.full_name as user_full_name, u.username as user_username
@@ -1616,6 +1662,11 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
       contract_price,
     } = validationResult.data;
 
+    const resolvedScopeIds = await validateAndResolveServiceScopes(
+      pool,
+      req.body.service_scope_ids || req.body.service_scopes,
+    );
+
     const insertQuery = `
       INSERT INTO events (
         name, client_name, client_phone, event_type_id,
@@ -1639,8 +1690,12 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
       req.user?.id || null,
     ]);
 
+    const createdEventId = result.rows[0].id;
+    await setEventServiceScopes(pool, createdEventId, resolvedScopeIds);
+    const rowsWithScopes = await attachServiceScopesToEvents(pool, [result.rows[0]]);
+
     // Redact contract_price/estimated_design_cost if user doesn't have privileges
-    const event = await redactEventForPermissions(result.rows[0], req);
+    const event = await redactEventForPermissions(rowsWithScopes[0], req);
 
     NotificationsService.emitNotificationToRoleOrPermission({
       permissionSlug: "events:read",
@@ -1838,10 +1893,29 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
           action_url: `/events/${id}`,
         });
       }
-      const event = await redactEventForPermissions(result.rows[0], req);
+
+      if (req.body.service_scope_ids !== undefined || req.body.service_scopes !== undefined) {
+        const resolvedScopeIds = await validateAndResolveServiceScopes(
+          pool,
+          req.body.service_scope_ids || req.body.service_scopes,
+        );
+        await setEventServiceScopes(pool, id, resolvedScopeIds);
+      }
+
+      const updatedRow = result.rows[0];
+      const rowsWithScopes = await attachServiceScopesToEvents(pool, [updatedRow]);
+      const event = await redactEventForPermissions(rowsWithScopes[0], req);
       res.json({ event });
     } else {
-      const event = await redactEventForPermissions(currentEvent, req);
+      if (req.body.service_scope_ids !== undefined || req.body.service_scopes !== undefined) {
+        const resolvedScopeIds = await validateAndResolveServiceScopes(
+          pool,
+          req.body.service_scope_ids || req.body.service_scopes,
+        );
+        await setEventServiceScopes(pool, id, resolvedScopeIds);
+      }
+      const rowsWithScopes = await attachServiceScopesToEvents(pool, [currentEvent]);
+      const event = await redactEventForPermissions(rowsWithScopes[0], req);
       res.json({ event });
     }
   } catch (error: any) {

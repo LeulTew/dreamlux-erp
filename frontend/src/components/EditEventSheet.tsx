@@ -12,6 +12,7 @@ import Select from "./ui/Select";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ResponsiveDrawer from "./ui/ResponsiveDrawer";
 import ActivityDrawer from "./ActivityDrawer";
+import { ServiceScopeSelect } from "./ui/ServiceScopeSelect";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
@@ -109,11 +110,14 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     return timeStr.slice(0, 5); // HH:MM:SS -> HH:MM
   };
 
+  const initialScopeIds = event?.service_scope_ids || (event?.service_scopes?.map((s) => s.id) || []);
+
   const [formData, setFormData] = useState({
     name: event?.name || "",
     client_name: event?.client_name || "",
     client_phone: event?.client_phone || "",
     event_type_id: event?.event_type_id || "",
+    service_scope_ids: initialScopeIds,
     start_date: formatDateForInput(event?.start_date),
     end_date: formatDateForInput(event?.end_date),
     start_time: formatTimeForInput(event?.start_time),
@@ -134,6 +138,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       client_name: event.client_name || "",
       client_phone: event.client_phone || "",
       event_type_id: event.event_type_id || "",
+      service_scope_ids: initialScopeIds,
       start_date: formatDateForInput(event.start_date),
       end_date: formatDateForInput(event.end_date),
       start_time: formatTimeForInput(event.start_time),
@@ -379,6 +384,14 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       className={isReadOnly ? "pointer-events-none opacity-60" : ""}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <ServiceScopeSelect
+                    selectedIds={formData.service_scope_ids}
+                    onChange={(ids) => setFormData({ ...formData, service_scope_ids: ids })}
+                    disabled={isReadOnly}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

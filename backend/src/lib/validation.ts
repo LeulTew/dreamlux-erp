@@ -139,6 +139,8 @@ export const generatePayrollPreviewSchema = z.object({
   period_kind: z.enum(["month", "range", "half_month", "weekly"]).default("month"),
   period_start: z.string().optional(),
   period_end: z.string().optional(),
+  period_start: z.string().optional(),
+  period_end: z.string().optional(),
   employeeLineEvents: z.array(z.object({
     employee_id: z.string().uuid(),
     events: z.array(z.object({
@@ -148,7 +150,7 @@ export const generatePayrollPreviewSchema = z.object({
       price_override: z.coerce.number().min(0).optional().nullable(),
       override_reason: z.string().optional().nullable()
     }))
-  }))
+  })).optional()
 });
 
 export const finalizePayrollRunSchema = generatePayrollPreviewSchema.extend({
@@ -159,7 +161,7 @@ export const savePayrollDraftSchema = generatePayrollPreviewSchema.extend({
   created_by_user_id: z.string().uuid().optional().nullable(),
 });
 
-const eventBaseSchema = z.object({
+const eventBaseRawObject = z.object({
   name: z.string().min(1, "Event name is required").max(500, "Event name too long"),
   client_name: z.string().min(1, "Client name is required").max(500, "Client name too long"),
   client_phone: z
@@ -176,29 +178,19 @@ const eventBaseSchema = z.object({
   end_time: nullableText(20, "End time too long"),
   venue_location: z.string().min(1, "Venue location is required").max(1000, "Venue location too long"),
   contract_price: z.coerce.number().min(0, "Contract price cannot be negative"),
+  service_scope_ids: z.array(z.string()).optional(),
 });
 
-export const createEventSchema = eventBaseSchema.refine((data) => {
-  return new Date(data.start_date) <= new Date(data.end_date);
-}, {
+const eventBaseSchema = eventBaseRawObject.refine((data) => new Date(data.start_date) <= new Date(data.end_date), {
   message: "End date must be on or after start date",
   path: ["end_date"],
 });
 
-export const updateEventSchema = eventBaseSchema.partial().extend({
+export const createEventSchema = eventBaseSchema;
+
+export const updateEventSchema = eventBaseRawObject.partial().extend({
   status: z.enum(["Planned", "Ongoing", "Completed"]).optional(),
-}).refine((data) => {
-  if (data.start_date && data.end_date) {
-    return new Date(data.start_date) <= new Date(data.end_date);
-  }
-  return true;
-}, {
-  message: "End date must be on or after start date",
-  path: ["end_date"],
 });
-
-export type CreateEventInput = z.infer<typeof createEventSchema>;
-export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 
 const eventAdvancedFilterValueSchema = z.union([
   z.string().max(500),
@@ -400,6 +392,8 @@ const eventImportRowSchema = z.object({
   status: z.enum(["Planned", "Ongoing", "Completed"]).optional().default("Planned"),
   package_design_notes: nullableText(4000, "Design notes too long"),
   estimated_design_cost: z.coerce.number().min(0, "Estimated design cost cannot be negative").optional().nullable(),
+  service_scopes: z.union([z.string(), z.array(z.string())]).optional(),
+  service_scope_ids: z.array(z.string()).optional(),
 }).refine((data) => new Date(data.start_date) <= new Date(data.end_date), {
   message: "End date must be on or after start date",
   path: ["end_date"],
@@ -438,6 +432,7 @@ export const eventProposalPayloadSchema = z.object({
   venue_location: nullableText(1000, "Venue location too long"),
   notes: nullableText(4000, "Notes too long"),
   package_design_notes: nullableText(4000, "Design notes too long"),
+  service_scope_ids: z.array(z.string()).optional(),
   cost_breakdown: z.object({
     design: z.array(proposalEstimateLineSchema).max(50).optional().default([]),
     team: z.array(proposalEstimateLineSchema.extend({
