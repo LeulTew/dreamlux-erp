@@ -17,12 +17,19 @@ vi.mock("@/hooks/use-language", () => ({
   useLanguage: () => ({ lang: mockLanguageState.lang, toggle: vi.fn() }),
 }));
 
+/**
+ * Authoritative seed catalog — matches event_service_scopes.sql exactly:
+ *   ('FULL',        'Full',        'ሙሉ',           1)
+ *   ('BACKGROUND',  'Background',  'ባክግራውንድ',     2)
+ *   ('SETUP',       'Setup',       'ሴታፕ',          3)
+ *   ('TABLE_SETUP', 'Table Setup', 'ጠረጴዛ ሴታፕ',    4)
+ */
 const mockScopes: ServiceScope[] = [
   {
     id: "scope-1",
     code: "FULL",
-    name_en: "Full Event Management",
-    name_am: "ሙሉ የዝግጅት ማኔጅመንት",
+    name_en: "Full",
+    name_am: "ሙሉ",
     description: "End-to-end planning, stage design, vendor management, and execution.",
     display_order: 1,
     is_active: true,
@@ -30,8 +37,8 @@ const mockScopes: ServiceScope[] = [
   {
     id: "scope-2",
     code: "BACKGROUND",
-    name_en: "Background Setup Only",
-    name_am: "የጀርባ ዲዛይን እና ዝግጅት ብቻ",
+    name_en: "Background",
+    name_am: "ባክግራውንድ",
     description: "Stage backdrops, lighting rigging, structural frame setup.",
     display_order: 2,
     is_active: true,
@@ -39,10 +46,19 @@ const mockScopes: ServiceScope[] = [
   {
     id: "scope-3",
     code: "SETUP",
-    name_en: "Setup & Logistics",
-    name_am: "የዝግጅት ዕቃዎች ዝግጅት እና ትራንስፖርት",
+    name_en: "Setup",
+    name_am: "ሴታፕ",
     description: "Material transport, unloading, spatial positioning.",
     display_order: 3,
+    is_active: true,
+  },
+  {
+    id: "scope-4",
+    code: "TABLE_SETUP",
+    name_en: "Table Setup",
+    name_am: "ጠረጴዛ ሴታፕ",
+    description: "Table arrangement, linen, and centerpiece positioning.",
+    display_order: 4,
     is_active: true,
   },
 ];
@@ -71,18 +87,35 @@ describe("ServiceScopeSelect Component", () => {
     expect(screen.getByText("Select Service Scopes...")).toBeInTheDocument();
   });
 
-  it("renders Amharic scope names and Amharic labels when lang is set to am", () => {
-    mockLanguageState.lang = "am";
+  it("renders authoritative English scope names from the migration catalog", () => {
     render(
       <ServiceScopeSelect
-        selectedIds={["scope-1", "scope-2"]}
+        selectedIds={["scope-1", "scope-2", "scope-3", "scope-4"]}
         onChange={vi.fn()}
         scopes={mockScopes}
       />
     );
 
-    expect(screen.getByText("ሙሉ የዝግጅት ማኔጅመንት")).toBeInTheDocument();
-    expect(screen.getByText("የጀርባ ዲዛይን እና ዝግጅት ብቻ")).toBeInTheDocument();
+    expect(screen.getByText("Full")).toBeInTheDocument();
+    expect(screen.getByText("Background")).toBeInTheDocument();
+    expect(screen.getByText("Setup")).toBeInTheDocument();
+    expect(screen.getByText("Table Setup")).toBeInTheDocument();
+  });
+
+  it("renders authoritative Amharic scope names when lang is am", () => {
+    mockLanguageState.lang = "am";
+    render(
+      <ServiceScopeSelect
+        selectedIds={["scope-1", "scope-2", "scope-3", "scope-4"]}
+        onChange={vi.fn()}
+        scopes={mockScopes}
+      />
+    );
+
+    expect(screen.getByText("ሙሉ")).toBeInTheDocument();
+    expect(screen.getByText("ባክግራውንድ")).toBeInTheDocument();
+    expect(screen.getByText("ሴታፕ")).toBeInTheDocument();
+    expect(screen.getByText("ጠረጴዛ ሴታፕ")).toBeInTheDocument();
   });
 
   it("displays selected scopes as badges with 48px remove button target", () => {
@@ -94,13 +127,13 @@ describe("ServiceScopeSelect Component", () => {
       />
     );
 
-    expect(screen.getByText("Full Event Management")).toBeInTheDocument();
+    expect(screen.getByText("Full")).toBeInTheDocument();
     const removeButton = screen.getByRole("button", { name: /Remove/i });
     expect(removeButton).toHaveClass("min-h-[48px]");
     expect(removeButton).toHaveClass("min-w-[48px]");
   });
 
-  it("opens dropdown and toggles scope selection on click", async () => {
+  it("opens dropdown showing all 4 authoritative scopes and toggles selection on click", async () => {
     const onChangeMock = vi.fn();
     render(
       <ServiceScopeSelect
@@ -115,11 +148,11 @@ describe("ServiceScopeSelect Component", () => {
 
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     const options = screen.getAllByRole("option");
-    expect(options).toHaveLength(3);
+    expect(options).toHaveLength(4);
 
-    // Click third option (Setup & Logistics)
-    fireEvent.click(options[2]);
-    expect(onChangeMock).toHaveBeenCalledWith(["scope-1", "scope-3"]);
+    // Click fourth option (Table Setup) — authoritative TABLE_SETUP scope
+    fireEvent.click(options[3]);
+    expect(onChangeMock).toHaveBeenCalledWith(["scope-1", "scope-4"]);
   });
 
   it("deselects scope when clicking remove button on badge", () => {
@@ -149,7 +182,7 @@ describe("ServiceScopeSelect Component", () => {
     );
 
     const combobox = screen.getByRole("combobox");
-    
+
     // Press ArrowDown to open dropdown and focus first item
     fireEvent.keyDown(combobox, { key: "ArrowDown" });
     expect(screen.getByRole("listbox")).toBeInTheDocument();
@@ -157,7 +190,7 @@ describe("ServiceScopeSelect Component", () => {
     // Press ArrowDown to move to second item
     fireEvent.keyDown(combobox, { key: "ArrowDown" });
 
-    // Press Enter to select second item
+    // Press Enter to select second item (Background)
     fireEvent.keyDown(combobox, { key: "Enter" });
     expect(onChangeMock).toHaveBeenCalledWith(["scope-2"]);
 
@@ -184,5 +217,44 @@ describe("ServiceScopeSelect Component", () => {
     expect(retryButton).toBeInTheDocument();
     expect(retryButton).toHaveClass("min-h-[48px]");
     expect(retryButton).toHaveClass("min-w-[48px]");
+  });
+
+  it("isolates hover styles behind md: modifier for mobile touch safety", () => {
+    render(
+      <ServiceScopeSelect
+        selectedIds={["scope-1"]}
+        onChange={vi.fn()}
+        scopes={mockScopes}
+      />
+    );
+
+    const combobox = screen.getByRole("combobox");
+    const classList = combobox.className;
+
+    // Verify no bare hover: class — all hover should be behind md:hover:
+    expect(classList).not.toMatch(/(?<!\bmd:)hover:/);
+  });
+
+  it("service scopes are independent from event category/type", () => {
+    // Scopes have their own catalog table (event_service_scopes) and junction
+    // tables (proposal_service_scopes, event_service_scope_links), entirely
+    // separate from event_types. Verify the component operates without any
+    // event_type_id or category prop.
+    const onChangeMock = vi.fn();
+    render(
+      <ServiceScopeSelect
+        selectedIds={[]}
+        onChange={onChangeMock}
+        scopes={mockScopes}
+      />
+    );
+
+    const combobox = screen.getByRole("combobox");
+    fireEvent.click(combobox);
+    const options = screen.getAllByRole("option");
+    // All 4 scopes are available regardless of any event category
+    expect(options).toHaveLength(4);
+    fireEvent.click(options[0]);
+    expect(onChangeMock).toHaveBeenCalledWith(["scope-1"]);
   });
 });

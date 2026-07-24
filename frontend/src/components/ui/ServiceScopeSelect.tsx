@@ -172,7 +172,7 @@ export function ServiceScopeSelect({
           <button
             type="button"
             onClick={fetchScopes}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-rose-800 hover:bg-rose-700 active:bg-rose-900 text-rose-100 rounded-md font-semibold text-xs min-h-[48px] min-w-[48px] transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-rose-800 md:hover:bg-rose-700 active:bg-rose-900 text-rose-100 rounded-md font-semibold text-xs min-h-[48px] min-w-[48px] transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-rose-400"
           >
             <RefreshCw className="w-4 h-4" />
             <span>{isAmharic ? "ድጋሚ ሞክር" : "Retry"}</span>
@@ -200,7 +200,7 @@ export function ServiceScopeSelect({
             ? "border-amber-500 bg-slate-900 text-slate-100 ring-1 ring-amber-500/50"
             : error
             ? "border-rose-500 bg-rose-950/20 text-rose-200"
-            : "border-slate-700 bg-slate-900 text-slate-100 hover:border-slate-600"
+            : "border-slate-700 bg-slate-900 text-slate-100 md:hover:border-slate-600"
         }`}
       >
         <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0 py-0.5">
@@ -217,7 +217,7 @@ export function ServiceScopeSelect({
                     <button
                       type="button"
                       onClick={(e) => handleRemoveScope(e, scope.id)}
-                      className="inline-flex items-center justify-center rounded-md min-w-[48px] min-h-[48px] p-2 hover:bg-amber-500/30 text-amber-200 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      className="inline-flex items-center justify-center rounded-md min-w-[48px] min-h-[48px] p-2 md:hover:bg-amber-500/30 text-amber-200 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
                       title={isAmharic ? "አስወግድ" : "Remove"}
                       aria-label={`${isAmharic ? "አስወግድ" : "Remove"} ${displayName}`}
                     >
@@ -281,14 +281,14 @@ export function ServiceScopeSelect({
                     className={`group relative flex items-center gap-3 rounded-md px-3 py-2.5 min-h-[48px] text-sm cursor-pointer transition-colors ${
                       isActive || isSelected
                         ? "bg-slate-800 text-amber-300 font-medium border border-amber-500/30"
-                        : "text-slate-200 hover:bg-slate-800 active:bg-slate-800"
+                        : "text-slate-200 md:hover:bg-slate-800 active:bg-slate-800"
                     }`}
                   >
                     <div
                       className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                         isSelected
                           ? "border-amber-400 bg-amber-500 text-slate-950 font-bold"
-                          : "border-slate-600 bg-slate-900 group-hover:border-slate-500"
+                          : "border-slate-600 bg-slate-900 md:group-hover:border-slate-500"
                       }`}
                     >
                       {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
