@@ -40,5 +40,7 @@ For any code-changing task, you MUST follow this structured pipeline:
 
 ---
 
-## 5. Checklist Synchronization
-- Keep issue checklists and PR descriptions synchronized with the actual implementation state. Only tick boxes as complete when the code, verification tests, and senior reviews support it.
+## 5. Checklist Synchronization & Issue Closing Mandate
+- **Line-by-Line Inspection**: Before merging any PR or declaring a task complete, AI agents MUST view the GitHub issue (`wsl fish -c "gh issue view <issue_number>"`) and verify every single acceptance criterion (`[ ]`) line by line against the implementation, unit tests, integration tests, and Playwright E2E coverage.
+- **Tick Off Completion**: AI agents MUST edit the issue body (`wsl fish -c "gh issue edit <issue_number> --body '...'"`") to tick off every completed item (`[x]`).
+- **Issue Closing**: Once all acceptance criteria are verified 100% and the PR is merged into `main`, the AI agent MUST close the GitHub issue using `wsl fish -c "gh issue close <issue_number>"`.

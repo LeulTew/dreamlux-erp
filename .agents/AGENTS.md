@@ -23,4 +23,11 @@
 >   `wsl fish -c "gh <command>"` (e.g., `wsl fish -c "gh issue list"` or `wsl fish -c "gh pr status"`).
 > - Never attempt to run `gh` directly from host Windows PowerShell.
 
+> [!IMPORTANT]
+> **MANDATORY GITHUB ISSUE CHECKLIST VERIFICATION & CLOSING BEFORE MERGE**:
+> - Before merging any PR or declaring an issue complete, AI agents MUST view the GitHub issue body (`wsl fish -c "gh issue view <issue_number>"`).
+> - Verify every acceptance criteria item (`[ ]`) line by line against authoritative code, unit tests, integration tests, and Playwright E2E coverage.
+> - AI agents MUST edit the issue body (`wsl fish -c "gh issue edit <issue_number> --body '...'`") to tick off every completed item (`[x]`).
+> - Once all acceptance criteria are verified 100% and the PR is merged into `main`, the AI agent MUST close the GitHub issue using `wsl fish -c "gh issue close <issue_number>"`.
+
 

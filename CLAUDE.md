@@ -26,7 +26,8 @@ DreamLux ERP is an integrated enterprise resource planning system managing event
 | **Run E2E Tests** | `bun run test:e2e` (inside `frontend/`) |
 | **Build Frontend** | `bun run build:frontend` |
 | **Build Backend** | `bun run build` (inside `backend/`) |
-| **GitHub CLI (`gh`)** | `wsl fish -c "gh <command>"` (authenticated under `LeulTew` in WSL Fish) |
+| **Environment Mandate** | All `gh` commands, GitHub API operations, issue workflows, and PR commands MUST be executed strictly inside WSL Fish using `wsl fish -c "gh <command>"`. Host `pwsh` is NOT authenticated with GitHub (`gh auth status` fails on host). |
+| **Checklist & Closing Mandate** | Before merging any PR, AI agents MUST view the GitHub issue (`wsl fish -c "gh issue view <id>"`), verify all criteria line by line against code/tests, tick off completed items (`[x]`) via `wsl fish -c "gh issue edit <id> --body '...'"`), and close the issue via `wsl fish -c "gh issue close <id>"` upon 100% completion. |
 
 ---
 

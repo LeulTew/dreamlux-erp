@@ -22,10 +22,21 @@ All commits must be prefix-based to maintain clean changelogs. Use the format `<
 
 ---
 
-## 3. GitHub & CLI Tooling (WSL Fish Mandate)
-- **Mandatory WSL Fish Execution**: GitHub CLI (`gh`) credentials, active tokens (`LeulTew`), and SSH keys reside exclusively inside the WSL Fish shell environment (`Ubuntu 24.04` / `fish`). Host Windows `pwsh` is NOT authenticated.
-- **`gh` Command Prefix**: AI agents MUST ALWAYS execute all `gh` commands (managing issues, labels, assignments, PRs, comments, status checks) via WSL Fish using `wsl fish -c "gh <command>"` (e.g. `wsl fish -c "gh issue list"` or `wsl fish -c "gh pr view 106"`).
-- **Checklist Maintenance**: Before closing an issue or declaring it complete, you MUST fetch the GitHub issue description via `wsl fish -c "gh issue view <number>"`, systematically go through the task checklist items one by one to verify and test them, and tick them off (`[x]`) in the GitHub issue description. This ensures no features or requirements are missed and prevents automation pipelines from failing or reopening issues.
+## 3. GitHub CLI (`gh`) Execution & Checklist Mandate
+> [!CAUTION]
+> **WSL FISH MANDATE FOR GITHUB CLI (`gh`)**:
+> - GitHub CLI (`gh`) authentication, active tokens (`LeulTew`), and SSH keys reside ONLY inside the WSL Fish shell environment (`Ubuntu 24.04` / `fish`).
+> - Host Windows `pwsh` is NOT authenticated with GitHub.
+> - AI agents MUST ALWAYS execute all `gh` commands, GitHub API operations, issue workflows, and PR commands via WSL Fish using:
+>   `wsl fish -c "gh <command>"` (e.g., `wsl fish -c "gh issue list"` or `wsl fish -c "gh pr status"`).
+> - Never attempt to run `gh` directly from host Windows PowerShell.
+
+> [!IMPORTANT]
+> **MANDATORY ISSUE CHECKLIST VERIFICATION & CLOSING BEFORE MERGE**:
+> - Before merging any PR or declaring an issue complete, AI agents MUST view the GitHub issue body (`wsl fish -c "gh issue view <issue_number>"`).
+> - Verify every acceptance criteria item (`[ ]`) line by line against code, unit tests, integration tests, and Playwright E2E coverage.
+> - AI agents MUST edit the issue body (`wsl fish -c "gh issue edit <issue_number> --body '...'`") to tick off every completed item (`[x]`).
+> - Once all acceptance criteria are verified 100% and the PR is merged into `main`, the AI agent MUST close the GitHub issue using `wsl fish -c "gh issue close <issue_number>"`.
 
 
 ---
