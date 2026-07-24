@@ -647,6 +647,7 @@ export default function EventWorkspacePage() {
   const eventId = params.id;
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const isAmharic = lang === "am";
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("details");
   const [itemSearch, setItemSearch] = useState("");
