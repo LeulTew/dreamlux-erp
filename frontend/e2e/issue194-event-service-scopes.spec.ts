@@ -1,72 +1,179 @@
 import { expect, test } from "@playwright/test";
 import { fulfillJson, mockAuth, mockCommonShellData, seedAuthenticatedSession } from "./helpers";
 
-test.describe("Issue 194 multi-select event service scopes flow", () => {
-  test("renders service scope selector, proposal conversion preview, and profit report columns", async ({ page }) => {
+test.describe("Issue 194 multi-select event service scopes full lifecycle", () => {
+  test.beforeEach(async ({ page }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, {
       permissions: [
         "events:read",
         "events:write",
-        "proposals:read",
-        "proposals:write",
+        "events:proposals:read",
+        "events:proposals:write",
+        "events:proposals:approve",
         "reports:profit:read",
       ],
     });
     await mockCommonShellData(page);
 
-    await page.route("http://localhost:4000/service-scopes**", (route) =>
+    // Mock catalog service scopes endpoint
+    await page.route("**/service-scopes", (route) =>
       fulfillJson(route, {
         service_scopes: [
-          { id: "scope-full", code: "FULL", name_en: "Full Decor & Event Management", name_am: "ሙሉ የጌጣጌጥ እና የዝግጅት አመራር", display_order: 1, is_active: true },
-          { id: "scope-bg", code: "BACKGROUND", name_en: "Background Decor", name_am: "የጀርባ ጌጣጌጥ", display_order: 2, is_active: true },
-          { id: "scope-setup", code: "SETUP", name_en: "Setup & Teardown", name_am: "ተከላ እና ማፍረስ", display_order: 3, is_active: true },
-          { id: "scope-table", code: "TABLE_SETUP", name_en: "Table & Seating Setup", name_am: "የጠረጴዛ ዝግጅት", display_order: 4, is_active: true },
+          { id: "scope-full", code: "FULL", name_en: "Full Event Management", name_am: "ሙሉ የዝግጅት አመራር", display_order: 1, is_active: true },
+          { id: "scope-bg", code: "BACKGROUND", name_en: "Background Setup Only", name_am: "የጀርባ ዲዛይን ብቻ", display_order: 2, is_active: true },
+          { id: "scope-setup", code: "SETUP", name_en: "Setup & Logistics", name_am: "የዝግጅት ዕቃዎች ዝግጅት", display_order: 3, is_active: true },
         ],
       })
     );
 
-    await page.route("http://localhost:4000/events/reports/profit**", (route) =>
+    // Mock event types catalog
+    await page.route("**/event-types", (route) =>
+      fulfillJson(route, [
+        { id: "et-wedding", name: "Wedding", event_name: "Wedding", description: "Wedding celebrations" },
+      ])
+    );
+  });
+
+  test("full lifecycle: proposal creation with service scopes -> proposal detail -> event workspace -> profit report", async ({ page }) => {
+    // 1. Proposal creation with multi-select service scopes
+    await page.route("**/events/proposals", (route) => {
+      if (route.request().method() === "POST") {
+        const postData = JSON.parse(route.request().postData() || "{}");
+        expect(postData.service_scope_ids).toContain("scope-full");
+        expect(postData.service_scope_ids).toContain("scope-setup");
+        return fulfillJson(route, {
+          proposal: {
+            id: "prop-194",
+            name: "Grand Sheraton Wedding",
+            client_name: "Abebe Kebede",
+            status: "Draft",
+            requested_budget: 300000,
+            requested_start_date: "2026-09-15",
+            requested_end_date: "2026-09-16",
+            venue_location: "Sheraton Addis",
+            service_scopes: [
+              { id: "scope-full", code: "FULL", name_en: "Full Event Management", name_am: "ሙሉ የዝግጅት አመራር" },
+              { id: "scope-setup", code: "SETUP", name_en: "Setup & Logistics", name_am: "የዝግጅት ዕቃዎች ዝግጅት" },
+            ],
+          },
+        });
+      }
+      return fulfillJson(route, { proposals: [], total: 0 });
+    });
+
+    await page.goto("http://localhost:3000/events/proposals/new");
+    await expect(page.locator("h1")).toContainText(/Proposal/i);
+
+    // Fill form fields
+    await page.locator('input[name="name"]').fill("Grand Sheraton Wedding");
+    await page.locator('input[name="client_name"]').fill("Abebe Kebede");
+    await page.locator('input[name="venue_location"]').fill("Sheraton Addis");
+    await page.locator('input[name="requested_budget"]').fill("300000");
+
+    // Open ServiceScopeSelect combobox
+    const scopeCombobox = page.locator('div[role="combobox"]').first();
+    await scopeCombobox.click();
+    await expect(page.locator('div[role="listbox"]')).toBeVisible();
+
+    // Select "Full Event Management" and "Setup & Logistics"
+    await page.locator('div[role="option"]:has-text("Full Event Management")').click();
+    await page.locator('div[role="option"]:has-text("Setup & Logistics")').click();
+
+    // Verify badges appear in trigger
+    await expect(page.locator('span:has-text("Full Event Management")')).toBeVisible();
+    await expect(page.locator('span:has-text("Setup & Logistics")')).toBeVisible();
+
+    // 2. Proposal detail view mock
+    await page.route("**/events/proposals/prop-194", (route) =>
+      fulfillJson(route, {
+        proposal: {
+          id: "prop-194",
+          name: "Grand Sheraton Wedding",
+          client_name: "Abebe Kebede",
+          status: "Approved",
+          requested_budget: 300000,
+          requested_start_date: "2026-09-15",
+          requested_end_date: "2026-09-16",
+          venue_location: "Sheraton Addis",
+          cost_breakdown: {},
+          service_scopes: [
+            { id: "scope-full", code: "FULL", name_en: "Full Event Management", name_am: "ሙሉ የዝግጅት አመራር" },
+            { id: "scope-setup", code: "SETUP", name_en: "Setup & Logistics", name_am: "የዝግጅት ዕቃዎች ዝግጅት" },
+          ],
+        },
+        logs: [],
+      })
+    );
+
+    await page.goto("http://localhost:3000/events/proposals/prop-194");
+    await expect(page.locator("h1")).toContainText("Grand Sheraton Wedding");
+    await expect(page.locator('span:has-text("Full Event Management")')).toBeVisible();
+    await expect(page.locator('span:has-text("Setup & Logistics")')).toBeVisible();
+
+    // 3. Event Workspace view mock with copied service scopes
+    await page.route("**/events/workspace/evt-194", (route) =>
+      fulfillJson(route, {
+        event: {
+          id: "evt-194",
+          name: "Grand Sheraton Wedding Event",
+          client_name: "Abebe Kebede",
+          status: "Planned",
+          start_date: "2026-09-15",
+          end_date: "2026-09-16",
+          venue_location: "Sheraton Addis",
+          contract_price: 300000,
+          service_scopes: [
+            { id: "scope-full", code: "FULL", name_en: "Full Event Management", name_am: "ሙሉ የዝግጅት አመራር" },
+            { id: "scope-setup", code: "SETUP", name_en: "Setup & Logistics", name_am: "የዝግጅት ዕቃዎች ዝግጅት" },
+          ],
+        },
+        allocations: [],
+        checklist: [],
+        assignments: [],
+        vehicleAssignments: [],
+        expenses: [],
+        trips: [],
+      })
+    );
+
+    await page.goto("http://localhost:3000/events/evt-194");
+    await expect(page.locator("h1")).toContainText("Grand Sheraton Wedding Event");
+    await expect(page.locator('span:has-text("Full Event Management")')).toBeVisible();
+
+    // 4. Profit Analytics Report mock displaying service scope badges
+    await page.route("**/events/reports/profit**", (route) =>
       fulfillJson(route, {
         events: [
           {
             event_id: "evt-194",
-            event_name: "Luxury Gala",
+            event_name: "Grand Sheraton Wedding Event",
             client_name: "Abebe Kebede",
-            venue_location: "Hilton Addis Ababa",
+            venue_location: "Sheraton Addis",
             event_type_name: "Wedding",
-            start_date: "2026-08-10",
-            status: "Completed",
-            revenue: 250000,
+            start_date: "2026-09-15",
+            status: "Planned",
+            revenue: 300000,
             approved_expenses: 50000,
-            labor_cost: 20000,
-            fuel_cost: 5000,
-            other_cost: 25000,
-            pending_expense_exposure: 0,
-            net_profit: 200000,
-            margin_percentage: 80,
-            proposal_id: "prop-194",
-            proposal_status: "Converted",
+            net_profit: 250000,
+            margin_percentage: 83.3,
             service_scopes: [
-              { id: "scope-bg", code: "BACKGROUND", name_en: "Background Decor", name_am: "የጀርባ ጌጣጌጥ" },
-              { id: "scope-setup", code: "SETUP", name_en: "Setup & Teardown", name_am: "ተከላ እና ማፍረስ" },
+              { id: "scope-full", code: "FULL", name_en: "Full Event Management", name_am: "ሙሉ የዝግጅት አመራር" },
+              { id: "scope-setup", code: "SETUP", name_en: "Setup & Logistics", name_am: "የዝግጅት ዕቃዎች ዝግጅት" },
             ],
-            service_scopes_str: "Background Decor, Setup & Teardown",
+            service_scopes_str: "Full Event Management, Setup & Logistics",
           },
         ],
         summary: {
           totalEvents: 1,
-          totalRevenue: 250000,
+          totalRevenue: 300000,
           totalExpenses: 50000,
-          netProfit: 200000,
-          profitMargin: 80,
+          netProfit: 250000,
+          profitMargin: 83.3,
           pendingExpenseExposure: 0,
         },
-        kpis: {
-          mostProfitableEvent: { event_name: "Luxury Gala", net_profit: 200000 },
-          highestMarginEventType: { eventType: "Wedding", margin: 80 },
-        },
-        categoryBreakdown: [{ category: "Labor", amount: 20000 }],
+        kpis: { mostProfitableEvent: null, highestMarginEventType: null },
+        categoryBreakdown: [],
         proposalVariance: { averageVariance: 0, events: [] },
         monthlyData: [],
         page: 1,
@@ -77,7 +184,7 @@ test.describe("Issue 194 multi-select event service scopes flow", () => {
     );
 
     await page.goto("http://localhost:3000/hr/reports/profit");
-    await expect(page.locator("body")).toContainText("Luxury Gala");
-    await expect(page.locator("body")).toContainText("Background Decor, Setup & Teardown");
+    await expect(page.locator("body")).toContainText("Grand Sheraton Wedding Event");
+    await expect(page.locator("body")).toContainText("Full Event Management");
   });
 });

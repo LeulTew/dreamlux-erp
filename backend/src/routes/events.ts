@@ -1662,52 +1662,62 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
       contract_price,
     } = validationResult.data;
 
-    const resolvedScopeIds = await validateAndResolveServiceScopes(
-      pool,
-      req.body.service_scope_ids || req.body.service_scopes,
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    const insertQuery = `
-      INSERT INTO events (
-        name, client_name, client_phone, event_type_id,
-        start_date, end_date, start_time, end_time,
-        venue_location, contract_price, status, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Planned', $11)
-      RETURNING *
-    `;
+      const resolvedScopeIds = await validateAndResolveServiceScopes(
+        client,
+        req.body.service_scope_ids || req.body.service_scopes,
+      );
 
-    const result = await pool.query(insertQuery, [
-      name,
-      client_name,
-      client_phone || null,
-      event_type_id || null,
-      start_date,
-      end_date,
-      start_time || null,
-      end_time || null,
-      venue_location,
-      contract_price,
-      req.user?.id || null,
-    ]);
+      const insertQuery = `
+        INSERT INTO events (
+          name, client_name, client_phone, event_type_id,
+          start_date, end_date, start_time, end_time,
+          venue_location, contract_price, status, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Planned', $11)
+        RETURNING *
+      `;
 
-    const createdEventId = result.rows[0].id;
-    await setEventServiceScopes(pool, createdEventId, resolvedScopeIds);
-    const rowsWithScopes = await attachServiceScopesToEvents(pool, [result.rows[0]]);
+      const result = await client.query(insertQuery, [
+        name,
+        client_name,
+        client_phone || null,
+        event_type_id || null,
+        start_date,
+        end_date,
+        start_time || null,
+        end_time || null,
+        venue_location,
+        contract_price,
+        req.user?.id || null,
+      ]);
 
-    // Redact contract_price/estimated_design_cost if user doesn't have privileges
-    const event = await redactEventForPermissions(rowsWithScopes[0], req);
+      const createdEventId = result.rows[0].id;
+      await setEventServiceScopes(client, createdEventId, resolvedScopeIds);
+      await client.query("COMMIT");
 
-    NotificationsService.emitNotificationToRoleOrPermission({
-      permissionSlug: "events:read",
-      actor_id: req.user?.id,
-      title: "New Event Created",
-      message: `A new event "${result.rows[0].name}" has been created by ${req.user?.username || "Someone"}.`,
-      entity_type: "event",
-      entity_id: result.rows[0].id,
-      action_url: `/events/${result.rows[0].id}`,
-    });
+      const rowsWithScopes = await attachServiceScopesToEvents(pool, [result.rows[0]]);
+      const event = await redactEventForPermissions(rowsWithScopes[0], req);
 
-    res.status(201).json({ event });
+      NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "events:read",
+        actor_id: req.user?.id,
+        title: "New Event Created",
+        message: `A new event "${result.rows[0].name}" has been created by ${req.user?.username || "Someone"}.`,
+        entity_type: "event",
+        entity_id: result.rows[0].id,
+        action_url: `/events/${result.rows[0].id}`,
+      });
+
+      res.status(201).json({ event });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error: any) {
     console.error("[create-event] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
@@ -1858,31 +1868,40 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       }
     }
 
-    if (setClauses.length > 0) {
-      updateParams.push(id);
-      const idPlaceholder = `$${updateParams.length}`;
-      const updateQuery = `
-        UPDATE events
-        SET ${setClauses.join(", ")}, updated_at = NOW()
-        WHERE id = ${idPlaceholder}
-        RETURNING *
-      `;
-      const result = await pool.query(updateQuery, updateParams);
-      if (shouldGenerateLaborOnCompletion) {
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      let updatedRow = currentEvent;
+      if (setClauses.length > 0) {
+        updateParams.push(id);
+        const idPlaceholder = `$${updateParams.length}`;
+        const updateQuery = `
+          UPDATE events
+          SET ${setClauses.join(", ")}, updated_at = NOW()
+          WHERE id = ${idPlaceholder}
+          RETURNING *
+        `;
+        const result = await client.query(updateQuery, updateParams);
+        updatedRow = result.rows[0];
+
+        if (shouldGenerateLaborOnCompletion) {
           const generationResult = await generateLaborExpenseFromAssignments(client, id, req.user?.id || null);
           await auditLaborGenerationOutcome(client, id, req.user?.id || null, generationResult, "event_completion");
-          await client.query("COMMIT");
-        } catch (generationError) {
-          await client.query("ROLLBACK");
-          throw generationError;
-        } finally {
-          client.release();
         }
       }
-      if (updateData.status && updateData.status !== currentEvent.status) {
+
+      if (req.body.service_scope_ids !== undefined || req.body.service_scopes !== undefined) {
+        const resolvedScopeIds = await validateAndResolveServiceScopes(
+          client,
+          req.body.service_scope_ids || req.body.service_scopes,
+        );
+        await setEventServiceScopes(client, id, resolvedScopeIds);
+      }
+
+      await client.query("COMMIT");
+
+      if (setClauses.length > 0 && updateData.status && updateData.status !== currentEvent.status) {
         NotificationsService.emitNotificationToRoleOrPermission({
           permissionSlug: "events:read",
           actor_id: req.user?.id,
@@ -1894,29 +1913,14 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
         });
       }
 
-      if (req.body.service_scope_ids !== undefined || req.body.service_scopes !== undefined) {
-        const resolvedScopeIds = await validateAndResolveServiceScopes(
-          pool,
-          req.body.service_scope_ids || req.body.service_scopes,
-        );
-        await setEventServiceScopes(pool, id, resolvedScopeIds);
-      }
-
-      const updatedRow = result.rows[0];
       const rowsWithScopes = await attachServiceScopesToEvents(pool, [updatedRow]);
       const event = await redactEventForPermissions(rowsWithScopes[0], req);
       res.json({ event });
-    } else {
-      if (req.body.service_scope_ids !== undefined || req.body.service_scopes !== undefined) {
-        const resolvedScopeIds = await validateAndResolveServiceScopes(
-          pool,
-          req.body.service_scope_ids || req.body.service_scopes,
-        );
-        await setEventServiceScopes(pool, id, resolvedScopeIds);
-      }
-      const rowsWithScopes = await attachServiceScopesToEvents(pool, [currentEvent]);
-      const event = await redactEventForPermissions(rowsWithScopes[0], req);
-      res.json({ event });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
   } catch (error: any) {
     console.error("[update-event] Error:", error);
