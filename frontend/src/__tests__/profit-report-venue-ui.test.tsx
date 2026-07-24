@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import FinancialDashboardPage from "@/app/hr/reports/profit/page";
 import { generateReportPdf } from "@/lib/pdf-report";
-import { getProfitReportExportUrl } from "@/lib/api";
+import { getProfitReport, getProfitReportExportUrl } from "@/lib/api";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => {
@@ -122,6 +122,7 @@ const { mockProfitReportData } = vi.hoisted(() => {
     total: 2,
     page: 1,
     limit: 10,
+    totalPages: 1,
   };
 
   return { mockEventsList: list, mockProfitReportData: reportData };
@@ -187,12 +188,12 @@ describe("Issue #193 - Profit Report Event Venue & Events View Frontend Test Sui
     expect(screen.getByText("Financial Dashboard & Reports")).toBeInTheDocument();
 
     // Check all tabs exist in order
-    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Events View" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Monthly View" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Event Type View" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Category View" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Proposal Variance View" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Events" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "Monthly View" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Event Type View" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Category View" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Proposal Variance View" })).toBeInTheDocument();
 
     // Default tab is Overview (Trend chart title is visible)
     expect(screen.getByText("Profit Trend")).toBeInTheDocument();
@@ -202,8 +203,9 @@ describe("Issue #193 - Profit Report Event Venue & Events View Frontend Test Sui
     render(<FinancialDashboardPage />);
 
     // Click Events View tab
-    const eventsTabBtn = screen.getByRole("button", { name: "Events View" });
+    const eventsTabBtn = screen.getByRole("tab", { name: "Events" });
     fireEvent.click(eventsTabBtn);
+    expect(eventsTabBtn).toHaveAttribute("aria-selected", "true");
 
     // Check venue values and event name
     expect(screen.getAllByText("Gala at Hilton").length).toBeGreaterThan(0);
@@ -214,6 +216,27 @@ describe("Issue #193 - Profit Report Event Venue & Events View Frontend Test Sui
 
     // Check missing category displays "Uncategorized"
     expect(screen.getAllByText("Uncategorized").length).toBeGreaterThan(0);
+  });
+
+  it("keeps mobile event details modal, traps focus, and restores focus on Escape", () => {
+    render(<FinancialDashboardPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Events" }));
+
+    const eventRow = document.getElementById("event-row-event-1") as HTMLButtonElement;
+    fireEvent.click(eventRow);
+
+    const dialog = screen.getByRole("dialog", { name: "Event details" });
+    const closeButton = screen.getByRole("button", { name: "Close" });
+    expect(dialog).toBeInTheDocument();
+    expect(closeButton).toHaveFocus();
+    expect(document.querySelector(".page-container-lg")).toHaveAttribute("inert");
+
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(closeButton).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Event details" })).not.toBeInTheDocument();
+    expect(eventRow).toHaveFocus();
   });
 
   it("should trigger PDF export with event section containing venue and missing fallbacks", async () => {
@@ -242,6 +265,54 @@ describe("Issue #193 - Profit Report Event Venue & Events View Frontend Test Sui
     expect(eventSection?.rows[1]).toContain("Uncategorized");
   });
 
+  it("fetches printable events in backend-supported pages instead of requesting an invalid limit", async () => {
+    const originalTotal = mockProfitReportData.total;
+    const originalTotalPages = mockProfitReportData.totalPages;
+    mockProfitReportData.total = 101;
+    mockProfitReportData.totalPages = 11;
+
+    const firstPageEvents = Array.from({ length: 100 }, (_, index) => ({
+      ...mockProfitReportData.events[0],
+      event_id: `print-event-${index + 1}`,
+      event_name: `Printable event ${index + 1}`,
+    }));
+    const lastPageEvent = {
+      ...mockProfitReportData.events[1],
+      event_id: "print-event-101",
+      event_name: "Printable event 101",
+    };
+
+    vi.mocked(getProfitReport)
+      .mockResolvedValueOnce({
+        ...mockProfitReportData,
+        events: firstPageEvents,
+        page: 1,
+        limit: 100,
+        totalPages: 2,
+      })
+      .mockResolvedValueOnce({
+        ...mockProfitReportData,
+        events: [lastPageEvent],
+        page: 2,
+        limit: 100,
+        totalPages: 2,
+      });
+
+    render(<FinancialDashboardPage />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Print Report" }));
+    });
+
+    await vi.waitFor(() => expect(generateReportPdf).toHaveBeenCalledTimes(1));
+    expect(getProfitReport).toHaveBeenNthCalledWith(1, expect.any(String), expect.any(String), expect.objectContaining({ page: 1, limit: 100 }));
+    expect(getProfitReport).toHaveBeenNthCalledWith(2, expect.any(String), expect.any(String), expect.objectContaining({ page: 2, limit: 100 }));
+    const eventSection = vi.mocked(generateReportPdf).mock.calls[0][0].sections.find((section) => section.title === "Event Profitability");
+    expect(eventSection?.rows).toHaveLength(101);
+
+    mockProfitReportData.total = originalTotal;
+    mockProfitReportData.totalPages = originalTotalPages;
+  });
+
   it("should trigger export CSV/XLSX using backend endpoint", () => {
     window.open = vi.fn();
     render(<FinancialDashboardPage />);
@@ -250,7 +321,7 @@ describe("Issue #193 - Profit Report Event Venue & Events View Frontend Test Sui
     const exportBtn = screen.getByRole("button", { name: "Export" });
     fireEvent.click(exportBtn);
 
-    const exportCsvBtn = screen.getByRole("button", { name: "Export CSV" });
+    const exportCsvBtn = screen.getByRole("menuitem", { name: "Export CSV" });
     fireEvent.click(exportCsvBtn);
 
     expect(getProfitReportExportUrl).toHaveBeenCalledWith(
@@ -261,4 +332,3 @@ describe("Issue #193 - Profit Report Event Venue & Events View Frontend Test Sui
     expect(window.open).toHaveBeenCalledWith("http://localhost:4000/events/reports/profit/export?format=csv", "_blank");
   });
 });
-

@@ -11,8 +11,7 @@ import {
   HiMagnifyingGlass,
   HiArrowPath,
   HiXMark,
-  HiChevronRight,
-  HiBuildingOffice2
+  HiChevronRight
 } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
@@ -108,7 +107,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Retry": "Retry",
     "Event details": "Event details",
     "Close": "Close",
-    "Event Profitability": "Event Profitability"
+    "Event Profitability": "Event Profitability",
+    "Profit report views": "Profit report views",
+    "None": "None",
+    "Search": "Search",
+    "Status": "Status",
+    "Event Type": "Event Type",
+    "Unable to prepare the complete printable report. Try again.": "Unable to prepare the complete printable report. Try again.",
+    "Printable reports are limited to 1,000 events. Narrow the filters and try again.": "Printable reports are limited to 1,000 events. Narrow the filters and try again."
   },
   am: {
     "Financial Dashboard & Reports": "የፋይናንስ ዳሽቦርድ እና ሪፖርቶች",
@@ -190,9 +196,31 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Retry": "እንደገና ሞክር",
     "Event details": "የዝግጅቱ ዝርዝር",
     "Close": "ዝጋ",
-    "Event Profitability": "የዝግጅቶች ትርፋማነት"
+    "Event Profitability": "የዝግጅቶች ትርፋማነት",
+    "Profit report views": "የትርፍ ሪፖርት እይታዎች",
+    "None": "የለም",
+    "Search": "ፍለጋ",
+    "Status": "ሁኔታ",
+    "Event Type": "የዝግጅት አይነት",
+    "Unable to prepare the complete printable report. Try again.": "ሙሉውን የሚታተም ሪፖርት ማዘጋጀት አልተቻለም። እንደገና ይሞክሩ።",
+    "Printable reports are limited to 1,000 events. Narrow the filters and try again.": "የሚታተሙ ሪፖርቶች እስከ 1,000 ዝግጅቶች የተገደቡ ናቸው። ማጣሪያዎቹን ያጥብቡና እንደገና ይሞክሩ።"
   }
 };
+
+type ReportTab = "overview" | "events" | "monthly" | "eventTypes" | "categories" | "variance";
+
+const REPORT_TABS: Array<{ id: ReportTab; label: string }> = [
+  { id: "overview", label: "Overview" },
+  { id: "events", label: "Events" },
+  { id: "monthly", label: "Monthly View" },
+  { id: "eventTypes", label: "Event Type View" },
+  { id: "categories", label: "Category View" },
+  { id: "variance", label: "Proposal Variance View" },
+];
+
+const EVENTS_PAGE_SIZE = 10;
+const PRINT_PAGE_SIZE = 100;
+const PRINT_EVENT_LIMIT = 1000;
 
 export default function FinancialDashboardPage() {
   const { lang } = useLanguage();
@@ -204,16 +232,21 @@ export default function FinancialDashboardPage() {
   const [eventTypeId, setEventTypeId] = useState("");
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "events" | "monthly" | "eventTypes" | "categories" | "variance">("overview");
+  const [activeTab, setActiveTab] = useState<ReportTab>("overview");
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [eventsPage, setEventsPage] = useState(1);
   const [aggregatePage, setAggregatePage] = useState(1);
   const [selectedMobileEvent, setSelectedMobileEvent] = useState<ProfitReportRow | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [sheetDragY, setSheetDragY] = useState(0);
+  const [isSheetDragging, setIsSheetDragging] = useState(false);
 
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const lastActiveElementRef = useRef<HTMLElement | null>(null);
+  const sheetPointerStartRef = useRef<number | null>(null);
 
-  const limit = 10;
+  const limit = EVENTS_PAGE_SIZE;
 
   // Retrieve permissions list from backend auth query
   const { data: authData, isLoading: authLoading } = useQuery({
@@ -249,26 +282,32 @@ export default function FinancialDashboardPage() {
     enabled: !!hasProfitAccess
   });
 
-  // Mobile Bottom Sheet Focus & Keydown Handler
   useEffect(() => {
     if (selectedMobileEvent) {
-      lastActiveElementRef.current = document.activeElement as HTMLElement;
-      window.setTimeout(() => {
-        closeButtonRef.current?.focus();
-      }, 50);
+      lastActiveElementRef.current ||= document.activeElement as HTMLElement;
+      closeButtonRef.current?.focus();
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === "Escape") {
           setSelectedMobileEvent(null);
+          return;
+        }
+        if (e.key === "Tab") {
+          e.preventDefault();
+          closeButtonRef.current?.focus();
         }
       };
       window.addEventListener("keydown", handleKeyDown);
       return () => {
         window.removeEventListener("keydown", handleKeyDown);
+        document.body.style.overflow = previousOverflow;
       };
     } else if (lastActiveElementRef.current) {
       lastActiveElementRef.current.focus();
       lastActiveElementRef.current = null;
+      setSheetDragY(0);
     }
   }, [selectedMobileEvent]);
 
@@ -276,40 +315,75 @@ export default function FinancialDashboardPage() {
     return `ETB ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const formatDate = (value: string) => {
+    const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat(lang === "am" ? "am-ET" : "en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+  };
+
   const handlePrint = async () => {
     if (!data) return;
     const s = data.summary;
+    setPrintError(null);
 
-    // Fetch all events for printing if needed, or use current response
-    let printEvents: ProfitReportRow[] = data.events || [];
-    if ((data.total || 0) > printEvents.length) {
-      try {
-        const fullReport = await getProfitReport(startDate, endDate, {
+    if (data.total > PRINT_EVENT_LIMIT) {
+      setPrintError(t("Printable reports are limited to 1,000 events. Narrow the filters and try again."));
+      return;
+    }
+
+    setIsPrinting(true);
+
+    try {
+      let printEvents = data.events;
+      if (data.total > printEvents.length) {
+        const firstPage = await getProfitReport(startDate, endDate, {
           event_type_id: eventTypeId || undefined,
           status: status || undefined,
           search: search || undefined,
           page: 1,
-          limit: 1000
+          limit: PRINT_PAGE_SIZE,
         });
-        if (fullReport.events) {
-          printEvents = fullReport.events;
-        }
-      } catch (err) {
-        console.error("Failed to fetch full events for PDF print:", err);
-      }
-    }
 
-    generateReportPdf({
-      title: t("Profit Report"),
-      subtitle: `${startDate} → ${endDate}`,
-      meta: [
-        `${t("Revenue")}: ${formatCurrency(s.totalRevenue)}   ${t("Expenses")}: ${formatCurrency(s.totalExpenses)}`,
-        `${t("Net Profit")}: ${formatCurrency(s.netProfit)}   ${t("Margin")}: ${s.profitMargin.toFixed(1)}%`,
-      ],
-      orientation: "l",
-      output: "print",
-      fileName: `profit-report-${startDate}_${endDate}.pdf`,
-      sections: [
+        printEvents = [...firstPage.events];
+        for (let page = 2; page <= firstPage.totalPages; page += 1) {
+          const reportPage = await getProfitReport(startDate, endDate, {
+            event_type_id: eventTypeId || undefined,
+            status: status || undefined,
+            search: search || undefined,
+            page,
+            limit: PRINT_PAGE_SIZE,
+          });
+          printEvents.push(...reportPage.events);
+        }
+
+        if (printEvents.length !== data.total) {
+          throw new Error("Incomplete profitability report event set");
+        }
+      }
+
+      const activeFilters = [
+        search ? `${t("Search")}: ${search}` : null,
+        eventTypeId ? `${t("Event Type")}: ${eventTypes.find((type) => type.id === eventTypeId)?.event_name || eventTypeId}` : null,
+        status ? `${t("Status")}: ${t(status)}` : null,
+      ].filter((value): value is string => Boolean(value));
+
+      generateReportPdf({
+        title: t("Profit Report"),
+        subtitle: `${formatDate(startDate)} → ${formatDate(endDate)}`,
+        meta: [
+          `${t("Filters")}: ${activeFilters.length > 0 ? activeFilters.join(" • ") : t("None")}`,
+          `${t("Revenue")}: ${formatCurrency(s.totalRevenue)}   ${t("Expenses")}: ${formatCurrency(s.totalExpenses)}`,
+          `${t("Net Profit")}: ${formatCurrency(s.netProfit)}   ${t("Margin")}: ${s.profitMargin.toFixed(1)}%`,
+        ],
+        orientation: "l",
+        output: "print",
+        fileName: `profit-report-${startDate}_${endDate}.pdf`,
+        sections: [
         {
           title: t("Monthly Trend"),
           columns: [t("Month"), t("Events"), t("Revenue"), t("Expenses"), t("Net Profit"), t("Margin")],
@@ -333,7 +407,7 @@ export default function FinancialDashboardPage() {
           columns: [t("Event"), t("Date"), t("Category"), t("Venue"), t("Revenue"), t("Expenses"), t("Net Profit"), t("Margin")],
           rows: printEvents.map((e) => [
             e.event_name,
-            e.start_date,
+            formatDate(e.start_date),
             e.event_type_name || t("Uncategorized"),
             e.venue_location && e.venue_location.trim() ? e.venue_location : t("Not recorded"),
             formatCurrency(e.revenue),
@@ -342,9 +416,15 @@ export default function FinancialDashboardPage() {
             `${e.margin_percentage.toFixed(1)}%`
           ]),
           columnStyles: { 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } },
-        }
-      ],
-    });
+          }
+        ],
+      });
+    } catch (error) {
+      console.error("Failed to prepare complete profit report PDF:", error);
+      setPrintError(t("Unable to prepare the complete printable report. Try again."));
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleExport = (format: "csv" | "xlsx") => {
@@ -370,7 +450,7 @@ export default function FinancialDashboardPage() {
     setAggregatePage(1);
   };
 
-  const handleTabChange = (tab: "overview" | "events" | "monthly" | "eventTypes" | "categories" | "variance") => {
+  const handleTabChange = (tab: ReportTab) => {
     setActiveTab(tab);
     setAggregatePage(1);
   };
@@ -451,7 +531,11 @@ export default function FinancialDashboardPage() {
 
   return (
     <AuthLayout>
-      <div className="page-container-lg space-y-6 px-4 sm:px-6 md:px-8 pt-4 md:py-8">
+      <>
+      <div
+        className="page-container-lg space-y-6 px-4 sm:px-6 md:px-8 pt-4 md:py-8"
+        inert={selectedMobileEvent ? true : undefined}
+      >
         {/* Screen Header */}
         <div className="flex flex-col gap-4 border-b border-border/50 pb-5 lg:flex-row lg:items-end lg:justify-between no-print">
           <div className="min-w-0">
@@ -466,12 +550,31 @@ export default function FinancialDashboardPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={handlePrint} variant="outline" className="flex items-center gap-2 font-bold cursor-pointer h-[44px]">
+            <Button
+              onClick={handlePrint}
+              variant="outline"
+              loading={isPrinting}
+              className="flex h-12 items-center gap-2 font-bold cursor-pointer"
+            >
               <HiPrinter className="h-4 w-4" />
               {t("Print Report")}
             </Button>
           </div>
         </div>
+
+        {printError && (
+          <div role="alert" className="no-print flex items-center justify-between gap-3 border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+            <span>{printError}</span>
+            <button
+              type="button"
+              onClick={() => setPrintError(null)}
+              aria-label={t("Close")}
+              className="flex size-12 shrink-0 items-center justify-center rounded-xl [@media(hover:hover)]:hover:bg-danger/10"
+            >
+              <HiXMark className="size-5" />
+            </button>
+          </div>
+        )}
 
         {/* Filters Toolbar Container */}
         <div className="toolbar-container bg-card border border-border rounded-2xl 2xl:rounded-4xl p-3.5 space-y-3.5 no-print">
@@ -561,20 +664,24 @@ export default function FinancialDashboardPage() {
               <div className="relative">
                 <button
                   onClick={() => setIsExportOpen(!isExportOpen)}
+                  aria-expanded={isExportOpen}
+                  aria-haspopup="menu"
                   className="flex items-center gap-1.5 px-3.5 h-[44px] text-xs font-black uppercase tracking-wider rounded-xl bg-card-alt border border-border text-muted [@media(hover:hover)]:hover:text-foreground cursor-pointer"
                 >
                   <HiArrowDownTray className="w-4 h-4" />
                   {t("Export")}
                 </button>
                 {isExportOpen && (
-                  <div className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-xl shadow-massive z-10 py-1">
+                  <div role="menu" className="absolute right-0 mt-1.5 w-40 bg-card border border-border rounded-xl z-10 py-1">
                     <button
+                      role="menuitem"
                       onClick={() => handleExport("csv")}
                       className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt cursor-pointer"
                     >
                       {t("Export CSV")}
                     </button>
                     <button
+                      role="menuitem"
                       onClick={() => handleExport("xlsx")}
                       className="w-full text-left px-4 py-2 text-xs font-black uppercase tracking-wider text-foreground [@media(hover:hover)]:hover:bg-card-alt cursor-pointer"
                     >
@@ -588,21 +695,28 @@ export default function FinancialDashboardPage() {
         </div>
 
         {/* View Tabs Switcher */}
-        <div className="tabs-container border-b border-border/50 pb-px flex flex-wrap gap-2 no-print">
-          {[
-            { id: "overview", label: t("Overview") },
-            { id: "events", label: t("Events View") },
-            { id: "monthly", label: t("Monthly View") },
-            { id: "eventTypes", label: t("Event Type View") },
-            { id: "categories", label: t("Category View") },
-            { id: "variance", label: t("Proposal Variance View") }
-          ].map((tab) => (
+        <div role="tablist" aria-label={t("Profit report views")} className="tabs-container border-b border-border/50 pb-px flex flex-wrap gap-2 no-print">
+          {REPORT_TABS.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => handleTabChange(tab.id as "overview" | "events" | "monthly" | "eventTypes" | "categories" | "variance")}
+              id={`${tab.id}-tab`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`${tab.id}-panel`}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              onClick={() => handleTabChange(tab.id)}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                event.preventDefault();
+                const currentIndex = REPORT_TABS.findIndex((item) => item.id === tab.id);
+                const direction = event.key === "ArrowRight" ? 1 : -1;
+                const nextTab = REPORT_TABS[(currentIndex + direction + REPORT_TABS.length) % REPORT_TABS.length];
+                handleTabChange(nextTab.id);
+                document.getElementById(`${nextTab.id}-tab`)?.focus();
+              }}
               className={`px-4 py-2.5 text-xs font-black uppercase tracking-wider border-b-2 transition-all cursor-pointer ${activeTab === tab.id ? "border-primary text-primary" : "border-transparent text-muted [@media(hover:hover)]:hover:text-foreground"}`}
             >
-              {tab.label}
+              {t(tab.label)}
             </button>
           ))}
         </div>
@@ -623,7 +737,12 @@ export default function FinancialDashboardPage() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div
+            id={`${activeTab}-panel`}
+            role="tabpanel"
+            aria-labelledby={`${activeTab}-tab`}
+            className="space-y-6"
+          >
 
             {/* KPI Cards Strip */}
             <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
@@ -762,16 +881,10 @@ export default function FinancialDashboardPage() {
 
             {/* Events View (Issue #193) */}
             {activeTab === "events" && (
-              <section className="rounded-2xl 2xl:rounded-4xl border border-border bg-card p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <HiBuildingOffice2 className="h-5 w-5 text-primary-dark" />
-                    <h2 className="text-xs font-black text-foreground uppercase tracking-wider">{t("Events View")}</h2>
-                  </div>
-                  <div className="text-xs text-muted font-medium">
-                    {eventsTotal} {t("Events")}
-                  </div>
-                </div>
+              <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
+                <p className="text-right text-xs font-medium tabular-nums text-muted">
+                  {eventsTotal} {t("Events")}
+                </p>
 
                 {events.length === 0 ? (
                   <div className="p-8 text-center text-sm space-y-2 border border-border/50 rounded-xl bg-card-alt/20">
@@ -780,7 +893,7 @@ export default function FinancialDashboardPage() {
                     {(search || eventTypeId || status || startDate !== `${currentYear}-01-01` || endDate !== `${currentYear}-12-31`) && (
                       <button
                         onClick={handleResetFilters}
-                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-card border border-border text-foreground hover:bg-card-alt cursor-pointer"
+                        className="mt-2 inline-flex min-h-12 items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-xs font-bold text-foreground [@media(hover:hover)]:hover:bg-card-alt cursor-pointer"
                       >
                         <HiArrowPath className="w-3.5 h-3.5" />
                         {t("Reset")}
@@ -790,7 +903,7 @@ export default function FinancialDashboardPage() {
                 ) : (
                   <div className="space-y-4">
                     {/* Desktop Dense Financial Table */}
-                    <div className="hidden md:block overflow-x-auto">
+                    <div className="hidden lg:block overflow-x-auto">
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>
                           <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.15em] text-muted font-black">
@@ -813,7 +926,7 @@ export default function FinancialDashboardPage() {
                                 <td className="px-4 py-3.5 font-bold max-w-[200px]" title={row.event_name}>
                                   <span className="truncate block">{row.event_name}</span>
                                 </td>
-                                <td className="px-4 py-3.5 font-mono text-muted text-[11px] whitespace-nowrap">{row.start_date}</td>
+                                <td className="px-4 py-3.5 text-muted text-[11px] whitespace-nowrap">{formatDate(row.start_date)}</td>
                                 <td className="px-4 py-3.5 text-muted">{categoryDisplay}</td>
                                 <td className="px-4 py-3.5 max-w-xs text-muted" title={venueDisplay}>
                                   <span className="line-clamp-2 break-words">{venueDisplay}</span>
@@ -823,7 +936,7 @@ export default function FinancialDashboardPage() {
                                 <td className={`px-4 py-3.5 text-right font-mono tabular-nums font-bold ${row.net_profit >= 0 ? "text-success" : "text-danger"}`}>
                                   {formatCurrency(row.net_profit)}
                                 </td>
-                                <td className={`px-4 py-3.5 text-right font-mono tabular-nums font-bold ${row.margin_percentage >= 25 ? "text-success" : "text-warning"}`}>
+                                <td className={`px-4 py-3.5 text-right font-mono tabular-nums font-bold ${row.margin_percentage >= 0 ? "text-success" : "text-danger"}`}>
                                   {row.margin_percentage.toFixed(1)}%
                                 </td>
                               </tr>
@@ -834,15 +947,18 @@ export default function FinancialDashboardPage() {
                     </div>
 
                     {/* Mobile Compact List (<768px) */}
-                    <div className="block md:hidden space-y-2.5">
+                    <div className="block lg:hidden space-y-2.5">
                       {events.map((row) => {
                         const venueDisplay = row.venue_location && row.venue_location.trim() ? row.venue_location : t("Not recorded");
                         return (
                           <button
                             key={row.event_id}
                             id={`event-row-${row.event_id}`}
-                            onClick={() => setSelectedMobileEvent(row)}
-                            className="w-full text-left p-3.5 rounded-xl border border-border/70 bg-card hover:bg-card-alt active:scale-[0.99] transition-all min-h-[48px] flex flex-col gap-1.5 cursor-pointer shadow-xs"
+                            onClick={(event) => {
+                              lastActiveElementRef.current = event.currentTarget;
+                              setSelectedMobileEvent(row);
+                            }}
+                            className="w-full text-left p-3.5 rounded-xl border border-border/70 bg-card [@media(hover:hover)]:hover:bg-card-alt active:scale-[0.99] transition-all min-h-[48px] flex flex-col gap-1.5 cursor-pointer"
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-bold text-sm text-foreground truncate max-w-[200px]">{row.event_name}</span>
@@ -851,8 +967,8 @@ export default function FinancialDashboardPage() {
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-xs text-muted">
-                              <span className="font-mono text-[11px]">{row.start_date}</span>
-                              <span className={`font-mono font-bold text-[11px] ${row.margin_percentage >= 25 ? "text-success" : "text-warning"}`}>
+                              <span className="text-[11px]">{formatDate(row.start_date)}</span>
+                              <span className={`font-mono font-bold text-[11px] ${row.margin_percentage >= 0 ? "text-success" : "text-danger"}`}>
                                 {row.margin_percentage.toFixed(1)}%
                               </span>
                             </div>
@@ -1078,10 +1194,12 @@ export default function FinancialDashboardPage() {
           </div>
         )}
 
-        {/* Mobile Detail Bottom Sheet Modal */}
+      </div>
+
+        {/* Mobile event detail bottom sheet */}
         {selectedMobileEvent && (
           <div
-            className="fixed inset-0 bg-black/60 z-50 flex justify-center items-end"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
             onClick={() => setSelectedMobileEvent(null)}
           >
             <div
@@ -1089,8 +1207,40 @@ export default function FinancialDashboardPage() {
               aria-modal="true"
               aria-labelledby="mobile-event-detail-title"
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-card border-t border-border rounded-t-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom duration-200"
+              style={{ transform: `translateY(${sheetDragY}px)` }}
+              className={`w-full max-w-lg overflow-y-auto rounded-t-2xl border-t border-border bg-card p-5 pt-2 max-h-[85vh] motion-reduce:transition-none ${isSheetDragging ? "transition-none" : "transition-transform duration-200 ease-out"}`}
             >
+              <div
+                aria-hidden="true"
+                className="flex h-10 touch-none cursor-grab items-center justify-center active:cursor-grabbing"
+                onPointerDown={(event) => {
+                  sheetPointerStartRef.current = event.clientY;
+                  setIsSheetDragging(true);
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  if (sheetPointerStartRef.current === null) return;
+                  setSheetDragY(Math.max(0, event.clientY - sheetPointerStartRef.current));
+                }}
+                onPointerUp={(event) => {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  const dragDistance = sheetPointerStartRef.current === null
+                    ? 0
+                    : Math.max(0, event.clientY - sheetPointerStartRef.current);
+                  sheetPointerStartRef.current = null;
+                  setIsSheetDragging(false);
+                  setSheetDragY(0);
+                  if (dragDistance >= 80) setSelectedMobileEvent(null);
+                }}
+                onPointerCancel={() => {
+                  sheetPointerStartRef.current = null;
+                  setIsSheetDragging(false);
+                  setSheetDragY(0);
+                }}
+              >
+                <span className="h-1 w-8 rounded-full bg-muted/40" />
+              </div>
+
               <div className="flex items-center justify-between border-b border-border/60 pb-3">
                 <h3 id="mobile-event-detail-title" className="text-sm font-black uppercase tracking-wider text-foreground">
                   {t("Event details")}
@@ -1099,7 +1249,7 @@ export default function FinancialDashboardPage() {
                   ref={closeButtonRef}
                   onClick={() => setSelectedMobileEvent(null)}
                   aria-label={t("Close")}
-                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-card-alt border border-border text-muted hover:text-foreground cursor-pointer"
+                  className="flex size-12 items-center justify-center rounded-xl border border-border bg-card-alt text-muted [@media(hover:hover)]:hover:text-foreground cursor-pointer"
                 >
                   <HiXMark className="w-5 h-5" />
                 </button>
@@ -1113,7 +1263,7 @@ export default function FinancialDashboardPage() {
 
                 <div className="flex justify-between items-center py-1.5 border-b border-border/30">
                   <span className="text-muted font-bold uppercase tracking-wider">{t("Date")}</span>
-                  <span className="font-mono text-foreground font-semibold">{selectedMobileEvent.start_date}</span>
+                  <span className="text-foreground font-semibold">{formatDate(selectedMobileEvent.start_date)}</span>
                 </div>
 
                 <div className="flex justify-between items-center py-1.5 border-b border-border/30">
@@ -1149,7 +1299,7 @@ export default function FinancialDashboardPage() {
 
                 <div className="flex justify-between items-center py-1.5">
                   <span className="text-muted font-bold uppercase tracking-wider">{t("Margin")}</span>
-                  <span className={`font-mono tabular-nums font-bold ${selectedMobileEvent.margin_percentage >= 25 ? "text-success" : "text-warning"}`}>
+                  <span className={`font-mono tabular-nums font-bold ${selectedMobileEvent.margin_percentage >= 0 ? "text-success" : "text-danger"}`}>
                     {selectedMobileEvent.margin_percentage.toFixed(1)}%
                   </span>
                 </div>
@@ -1157,7 +1307,7 @@ export default function FinancialDashboardPage() {
             </div>
           </div>
         )}
-      </div>
+      </>
     </AuthLayout>
   );
 }
