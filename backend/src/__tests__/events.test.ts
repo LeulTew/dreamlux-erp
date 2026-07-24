@@ -1109,7 +1109,6 @@ describe("Events API", () => {
   // Test creation
   test("POST /events creates a planned event with valid data", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // catalog check
     mockQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -1125,7 +1124,7 @@ describe("Events API", () => {
         },
       ],
       rowCount: 1,
-    });
+    }); // insert
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // attachServiceScopesToEvents
 

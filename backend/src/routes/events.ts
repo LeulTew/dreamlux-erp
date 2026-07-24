@@ -1832,31 +1832,6 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
       return String(val);
     };
 
-    for (const field of fieldsToTrack) {
-      if (updateData[field as keyof typeof updateData] !== undefined) {
-        const oldValue = formatForLog(field, currentEvent[field]);
-        const newValue = formatForLog(field, updateData[field as keyof typeof updateData]);
-
-        if (oldValue !== newValue) {
-          const logInsert = `
-            INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
-            VALUES ($1, $2, $3, $4, $5)
-          `;
-          logPromises.push(
-            pool.query(logInsert, [
-              id,
-              req.user?.id || null,
-              field,
-              oldValue || null,
-              newValue || null,
-            ])
-          );
-        }
-      }
-    }
-
-    await Promise.all(logPromises);
-
     // Build dynamic update query
     const setClauses: string[] = [];
     const updateParams: any[] = [];
@@ -1871,6 +1846,28 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+
+      // Identify changed fields and insert into event_logs atomically inside transaction
+      for (const field of fieldsToTrack) {
+        if (updateData[field as keyof typeof updateData] !== undefined) {
+          const oldValue = formatForLog(field, currentEvent[field]);
+          const newValue = formatForLog(field, updateData[field as keyof typeof updateData]);
+
+          if (oldValue !== newValue) {
+            const logInsert = `
+              INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
+              VALUES ($1, $2, $3, $4, $5)
+            `;
+            await client.query(logInsert, [
+              id,
+              req.user?.id || null,
+              field,
+              oldValue || null,
+              newValue || null,
+            ]);
+          }
+        }
+      }
 
       let updatedRow = currentEvent;
       if (setClauses.length > 0) {

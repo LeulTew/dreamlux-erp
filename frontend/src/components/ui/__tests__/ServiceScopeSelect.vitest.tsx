@@ -7,12 +7,14 @@ import { ServiceScopeSelect } from "../ServiceScopeSelect";
 import { ServiceScope } from "@/lib/types";
 import * as api from "@/lib/api";
 
+const mockLanguageState = { lang: "en" };
+
 vi.mock("@/lib/api", () => ({
   getServiceScopes: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-language", () => ({
-  useLanguage: () => ({ lang: "en", toggle: vi.fn() }),
+  useLanguage: () => ({ lang: mockLanguageState.lang, toggle: vi.fn() }),
 }));
 
 const mockScopes: ServiceScope[] = [
@@ -48,12 +50,13 @@ const mockScopes: ServiceScope[] = [
 describe("ServiceScopeSelect Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLanguageState.lang = "en";
     vi.mocked(api.getServiceScopes).mockResolvedValue({
       service_scopes: mockScopes,
     });
   });
 
-  it("renders trigger button and placeholder", async () => {
+  it("renders trigger button with 48px min-height and English placeholder", async () => {
     render(
       <ServiceScopeSelect
         selectedIds={[]}
@@ -62,11 +65,14 @@ describe("ServiceScopeSelect Component", () => {
       />
     );
 
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toBeInTheDocument();
+    expect(combobox).toHaveClass("min-h-[48px]");
     expect(screen.getByText("Select Service Scopes...")).toBeInTheDocument();
   });
 
-  it("displays selected scopes as badges", () => {
+  it("renders Amharic scope names and Amharic labels when lang is set to am", () => {
+    mockLanguageState.lang = "am";
     render(
       <ServiceScopeSelect
         selectedIds={["scope-1", "scope-2"]}
@@ -75,8 +81,23 @@ describe("ServiceScopeSelect Component", () => {
       />
     );
 
+    expect(screen.getByText("ሙሉ የዝግጅት ማኔጅመንት")).toBeInTheDocument();
+    expect(screen.getByText("የጀርባ ዲዛይን እና ዝግጅት ብቻ")).toBeInTheDocument();
+  });
+
+  it("displays selected scopes as badges with 48px remove button target", () => {
+    render(
+      <ServiceScopeSelect
+        selectedIds={["scope-1"]}
+        onChange={vi.fn()}
+        scopes={mockScopes}
+      />
+    );
+
     expect(screen.getByText("Full Event Management")).toBeInTheDocument();
-    expect(screen.getByText("Background Setup Only")).toBeInTheDocument();
+    const removeButton = screen.getByRole("button", { name: /Remove/i });
+    expect(removeButton).toHaveClass("min-h-[48px]");
+    expect(removeButton).toHaveClass("min-w-[48px]");
   });
 
   it("opens dropdown and toggles scope selection on click", async () => {
@@ -145,7 +166,7 @@ describe("ServiceScopeSelect Component", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
-  it("renders error state with retry button on API failure", async () => {
+  it("renders error state with 48px retry button on API failure", async () => {
     vi.mocked(api.getServiceScopes).mockRejectedValue(new Error("Network Error"));
 
     render(
@@ -159,6 +180,9 @@ describe("ServiceScopeSelect Component", () => {
       expect(screen.getByText("Network Error")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
+    const retryButton = screen.getByRole("button", { name: /Retry/i });
+    expect(retryButton).toBeInTheDocument();
+    expect(retryButton).toHaveClass("min-h-[48px]");
+    expect(retryButton).toHaveClass("min-w-[48px]");
   });
 });
