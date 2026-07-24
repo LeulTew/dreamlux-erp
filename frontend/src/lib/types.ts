@@ -192,7 +192,8 @@ export interface SalaryLevel {
 
 export interface EventType {
   id: string;
-  name: string;
+  event_name: string;
+  name?: string;
   description: string | null;
   created_at: string;
   updated_at: string;
