@@ -27,8 +27,8 @@ export function ServiceScopeSelect({
   error,
   label,
 }: ServiceScopeSelectProps) {
-  const { language } = useLanguage();
-  const isAmharic = language === "am";
+  const { lang } = useLanguage();
+  const isAmharic = lang === "am";
   const [availableScopes, setAvailableScopes] = useState<ServiceScope[]>(initialScopes || []);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);

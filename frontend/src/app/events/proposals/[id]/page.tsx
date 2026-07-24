@@ -133,6 +133,7 @@ export default function ProposalDetailPage() {
   const { id } = useParams() as { id: string };
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const isAmharic = lang === "am";
   const router = useRouter();
   const queryClient = useQueryClient();
 

@@ -225,6 +225,7 @@ const PRINT_EVENT_LIMIT = 1000;
 export default function FinancialDashboardPage() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const isAmharic = lang === "am";
 
   const currentYear = new Date().getFullYear();
   const [startDate, setStartDate] = useState(`${currentYear}-01-01`);
