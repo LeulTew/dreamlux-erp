@@ -26,6 +26,7 @@ DreamLux ERP is an integrated enterprise resource planning system managing event
 | **Run E2E Tests** | `bun run test:e2e` (inside `frontend/`) |
 | **Build Frontend** | `bun run build:frontend` |
 | **Build Backend** | `bun run build` (inside `backend/`) |
+| **GitHub CLI (`gh`)** | `wsl fish -c "gh <command>"` (authenticated under `LeulTew` in WSL Fish) |
 
 ---
 
@@ -42,4 +43,6 @@ DreamLux ERP is an integrated enterprise resource planning system managing event
 > - **Postgres & Database Changes**: When writing database operations, schema updates, or applying migrations, read [.claude/rules/database.md](file:///.claude/rules/database.md).
 > - **Tooling & Commands**: For dependency management and scripting, read [.claude/rules/tech-stack.md](file:///.claude/rules/tech-stack.md).
 > - **Senior & Staff PR Auditing**: Before finalizing, creating, or requesting approval on a PR, you MUST audit against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) and [STAFF_PR_REVIEW_PROMPT.md](file:///docs/STAFF_PR_REVIEW_PROMPT.md).
+> - **GitHub CLI Environment**: GitHub CLI (`gh`) authentication (`LeulTew`) is configured in WSL Fish (`Ubuntu 24.04` / `fish`). Always execute `gh` commands via `wsl fish -c "gh <command>"`. Never invoke host Windows `gh` directly.
+
 

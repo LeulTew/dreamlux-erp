@@ -12,3 +12,15 @@
 > - **Tooling & Commands**: For package manager standards (Bun), linting, and testing suites execution, you MUST read [.claude/rules/tech-stack.md](file:///.claude/rules/tech-stack.md).
 > - **Senior & Staff PR Auditing**: Before requesting PR merge approvals, you MUST audit the implementation against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) and [STAFF_PR_REVIEW_PROMPT.md](file:///docs/STAFF_PR_REVIEW_PROMPT.md).
 
+---
+
+## 🛠️ GitHub CLI & Environment Rules (WSL Fish)
+> [!CAUTION]
+> **WSL FISH MANDATE FOR GITHUB CLI (`gh`)**:
+> - GitHub CLI (`gh`) authentication, active tokens (`LeulTew`), and SSH keys reside ONLY inside the WSL Fish shell environment (`Ubuntu 24.04` / `fish`).
+> - Host Windows `pwsh` is NOT authenticated with GitHub.
+> - AI agents MUST ALWAYS execute all `gh` commands, GitHub API operations, issue workflows, and PR commands via WSL Fish using:
+>   `wsl fish -c "gh <command>"` (e.g., `wsl fish -c "gh issue list"` or `wsl fish -c "gh pr status"`).
+> - Never attempt to run `gh` directly from host Windows PowerShell.
+
+

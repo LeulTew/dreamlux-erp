@@ -18,3 +18,11 @@ These rules apply when installing dependencies, running local servers, linting, 
   - `bun run test` / `bun test` (execute unit/integration test suites)
   - `bun run test:e2e` (execute Playwright integration flows)
 - **CI / Static Checks**: Ensure that static checks (linting, type checking) are run at the project root before final E2E test runs to prevent test failures from syntax/compilation issues.
+
+---
+
+## 3. GitHub CLI & Environment Rules (WSL Fish)
+- **WSL Fish Mandate for `gh`**: GitHub CLI credentials, authentication tokens (`LeulTew`), and SSH keys are stored in the WSL Fish environment (`Ubuntu 24.04` / `fish`). Host Windows `pwsh` is NOT logged into GitHub.
+- **Execution Syntax**: AI agents MUST execute all `gh` CLI commands via WSL Fish:
+  `wsl fish -c "gh <command>"` (e.g., `wsl fish -c "gh issue list"` or `wsl fish -c "gh pr create"`).
+

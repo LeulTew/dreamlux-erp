@@ -21,12 +21,13 @@ These rules dictate general software development workflow patterns, tasks manage
 ## 3. Development Execution Pipeline
 For any code-changing task, you MUST follow this structured pipeline:
 1. **Plan**: Clarify the intended changes and trace architectural implications. If it's a major change, save a durable implementation plan in `plans/` or a temporary external note when requested.
-2. **Issue**: Ensure a GitHub issue exists and is set to "In Progress" on the Scrum board before starting.
+2. **Issue**: Ensure a GitHub issue exists and is set to "In Progress" on the Scrum board before starting (use `wsl fish -c "gh issue view ..."` or `wsl fish -c "gh issue edit ..."`).
 3. **Branch**: Branch from the latest `main` (the integration and production target) unless another branch is explicitly designated.
 4. **Implement**: Code the changes incrementally.
 5. **Secrets Check**: Review the diff and unstaged files before staging. Never stage local `.env` files, credentials, private keys, API keys, or build outputs.
 6. **Verify**: Run tests (unit/integration/E2E), linting, and compile checks.
-7. **Commit & PR**: Commit using standard prefixes and open a draft PR referencing the issue.
+7. **Commit & PR**: Commit using standard prefixes and open a draft PR referencing the issue via `wsl fish -c "gh pr create --draft ..."`.
+
 8. **Review & Merge**: Do not merge any PR unless the user explicitly authorizes it.
 9. **Deploy & Smoke Test**: If a deployment/release is required, deploy and perform production smoke testing.
 
