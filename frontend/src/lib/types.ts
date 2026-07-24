@@ -491,6 +491,7 @@ export interface ProfitReportRow {
   event_name: string;
   event_type_name: string | null;
   event_type_id: string | null;
+  venue_location?: string | null;
   start_date: string;
   status: string;
   revenue: number;
@@ -527,6 +528,10 @@ export interface ProfitReportSummary {
     netProfit: number;
     averageMargin: number;
   }[];
+  events?: ProfitReportRow[];
+  total?: number;
+  page?: number;
+  limit?: number;
   kpis: {
     mostProfitableEvent: ProfitReportRow | null;
     mostProfitableEventType: {
