@@ -14,7 +14,8 @@ import {
   HiOutlineCog6Tooth,
   HiArrowPath,
   HiPrinter,
-  HiMinus
+  HiMinus,
+  HiInformationCircle
 } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import AuthLayout from "@/components/AuthLayout";
