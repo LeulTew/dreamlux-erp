@@ -225,6 +225,7 @@ const PRINT_EVENT_LIMIT = 1000;
 export default function FinancialDashboardPage() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const isAmharic = lang === "am";
 
   const currentYear = new Date().getFullYear();
   const [startDate, setStartDate] = useState(`${currentYear}-01-01`);
@@ -404,19 +405,20 @@ export default function FinancialDashboardPage() {
         },
         {
           title: t("Event Profitability"),
-          columns: [t("Event"), t("Date"), t("Category"), t("Venue"), t("Revenue"), t("Expenses"), t("Net Profit"), t("Margin")],
+          columns: [t("Event"), t("Date"), t("Category"), t("Service Scopes"), t("Venue"), t("Revenue"), t("Expenses"), t("Net Profit"), t("Margin")],
           rows: printEvents.map((e) => [
             e.event_name,
             formatDate(e.start_date),
             e.event_type_name || t("Uncategorized"),
+            e.service_scopes && e.service_scopes.length > 0 ? e.service_scopes.map((s) => (isAmharic ? s.name_am : s.name_en)).join(", ") : "—",
             e.venue_location && e.venue_location.trim() ? e.venue_location : t("Not recorded"),
             formatCurrency(e.revenue),
             formatCurrency(e.approved_expenses),
             formatCurrency(e.net_profit),
             `${e.margin_percentage.toFixed(1)}%`
           ]),
-          columnStyles: { 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } },
-          }
+          columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" } },
+        }
         ],
       });
     } catch (error) {
@@ -910,6 +912,7 @@ export default function FinancialDashboardPage() {
                             <th className="px-4 py-3">{t("Event")}</th>
                             <th className="px-4 py-3">{t("Date")}</th>
                             <th className="px-4 py-3">{t("Category")}</th>
+                            <th className="px-4 py-3">{t("Service Scopes")}</th>
                             <th className="px-4 py-3">{t("Venue")}</th>
                             <th className="px-4 py-3 text-right">{t("Revenue")}</th>
                             <th className="px-4 py-3 text-right">{t("Expenses")}</th>
@@ -928,6 +931,19 @@ export default function FinancialDashboardPage() {
                                 </td>
                                 <td className="px-4 py-3.5 text-muted text-[11px] whitespace-nowrap">{formatDate(row.start_date)}</td>
                                 <td className="px-4 py-3.5 text-muted">{categoryDisplay}</td>
+                                <td className="px-4 py-3.5 max-w-[180px]">
+                                  {row.service_scopes && row.service_scopes.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {row.service_scopes.map((scope) => (
+                                        <span key={scope.id} className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
+                                          {isAmharic ? scope.name_am : scope.name_en}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted text-[11px]">—</span>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3.5 max-w-xs text-muted" title={venueDisplay}>
                                   <span className="line-clamp-2 break-words">{venueDisplay}</span>
                                 </td>

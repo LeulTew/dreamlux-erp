@@ -6,6 +6,7 @@ import { pool } from "../../db/pool";
 import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../../middleware/auth";
 import { hasPermissionSlug } from "../../lib/permissions";
 import { profitReportQuerySchema, profitReportExportQuerySchema } from "../../lib/validation";
+import { fetchEventServiceScopes, ServiceScopeSummary } from "../../lib/service-scopes";
 
 function hasPermission(req: AuthRequest, slug: string): boolean {
   return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), slug);
@@ -48,6 +49,7 @@ const PROFIT_REPORT_SORT_FIELDS: Record<string, string> = {
 const PROFIT_REPORT_EXPORT_COLUMNS = [
   { key: "event_name", header: "Event" },
   { key: "event_type_name", header: "Event Type" },
+  { key: "service_scopes_str", header: "Service Scopes" },
   { key: "start_date", header: "Date" },
   { key: "venue_location", header: "Venue / Address" },
   { key: "status", header: "Status" },
@@ -183,7 +185,10 @@ function buildProfitReportBaseQuery(options: ProfitReportQueryOptions): { sql: s
   return { sql, params };
 }
 
-function formatProfitReportRow(row: ProfitReportRow): ProfitReportRow {
+function formatProfitReportRow(row: ProfitReportRow, scopesMap?: Map<string, ServiceScopeSummary[]>): ProfitReportRow {
+  if (!row) return row;
+  const scopes = (scopesMap instanceof Map ? scopesMap.get(row.event_id) : null) || row.service_scopes || [];
+  const scopesStr = scopes.map((s: any) => s.name_en).join(", ");
   return {
     ...row,
     revenue: roundMoney(row.revenue),
@@ -199,11 +204,13 @@ function formatProfitReportRow(row: ProfitReportRow): ProfitReportRow {
     estimated_profit_variance: row.estimated_profit_variance === null || row.estimated_profit_variance === undefined
       ? null
       : roundMoney(row.estimated_profit_variance),
+    service_scopes: scopes,
+    service_scopes_str: scopesStr,
   };
 }
 
 function buildProfitAnalytics(rows: ProfitReportRow[]) {
-  const formattedRows = rows.map(formatProfitReportRow);
+  const formattedRows = rows.map((r) => formatProfitReportRow(r));
   const summary = formattedRows.reduce((acc, row) => {
     acc.totalEvents += 1;
     acc.totalRevenue += row.revenue;
@@ -364,7 +371,9 @@ export function createEventProfitReportsRouter(): Router {
         `${baseQuery.sql} ORDER BY ${sortSql} ${sortDirection}, profit_rows.event_id ASC`,
         baseQuery.params,
       );
-      const rows = result.rows.map(formatProfitReportRow);
+      const exportEventIds = result.rows.map((r: any) => r.event_id);
+      const exportScopesMap = await fetchEventServiceScopes(pool, exportEventIds);
+      const rows = result.rows.map((r: any) => formatProfitReportRow(r, exportScopesMap));
       const exportRows = rows.map((row) => {
         const out: Record<string, unknown> = {};
         for (const column of PROFIT_REPORT_EXPORT_COLUMNS) {
@@ -441,9 +450,12 @@ export function createEventProfitReportsRouter(): Router {
         `${baseQuery.sql} ORDER BY ${sortSql} ${sortDirection}, profit_rows.event_id ASC`,
         baseQuery.params,
       );
+      const allEventIds = allRowsResult.rows.map((r: any) => r.event_id);
+      const scopesMap = await fetchEventServiceScopes(pool, allEventIds);
+      const allFormattedRows = allRowsResult.rows.map((r: any) => formatProfitReportRow(r, scopesMap));
       const offset = (query.page - 1) * query.limit;
-      const pageRows = allRowsResult.rows.slice(offset, offset + query.limit).map(formatProfitReportRow);
-      const analytics = buildProfitAnalytics(allRowsResult.rows);
+      const pageRows = allFormattedRows.slice(offset, offset + query.limit);
+      const analytics = buildProfitAnalytics(allFormattedRows);
 
       res.json({
         ...analytics,

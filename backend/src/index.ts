@@ -10,6 +10,7 @@ import settingsRouter from "./routes/settings";
 import departmentsRouter from "./routes/departments";
 import salaryLevelsRouter from "./routes/salary-levels";
 import eventTypesRouter from "./routes/event-types";
+import serviceScopesRouter from "./routes/service-scopes";
 import payrollRouter from "./routes/payroll";
 import eventsRouter from "./routes/events";
 import positionsRouter from "./routes/positions";
@@ -130,6 +131,8 @@ app.use("/departments", requireAuth, departmentsRouter);
 app.use("/positions", requireAuth, positionsRouter);
 app.use("/salary-levels", requireAuth, requirePermissionSlugs(["salary-levels:manage"]), salaryLevelsRouter);
 app.use("/event-types", requireAuth, eventTypesRouter);
+app.use("/service-scopes", requireAuth, serviceScopesRouter);
+app.use("/events/service-scopes", requireAuth, serviceScopesRouter);
 
 app.use("/payroll", requireAuth, requirePermissionSlugs(["payroll:read", "payroll:write"]), payrollRouter);
 app.use("/events", requireAuth, eventsRouter);

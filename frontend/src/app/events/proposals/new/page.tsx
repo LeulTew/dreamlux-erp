@@ -9,6 +9,7 @@ import AuthLayout from "@/components/AuthLayout";
 import ForbiddenState from "@/components/ForbiddenState";
 import Select from "@/components/ui/Select";
 import DatePicker from "@/components/ui/DatePicker";
+import { ServiceScopeSelect } from "@/components/ui/ServiceScopeSelect";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -226,6 +227,7 @@ function NewProposalContent() {
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [eventTypeId, setEventTypeId] = useState("");
+  const [serviceScopeIds, setServiceScopeIds] = useState<string[]>([]);
   const [requestedBudget, setRequestedBudget] = useState<number>(0);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -268,11 +270,13 @@ function NewProposalContent() {
     };
 
     getEventProposal(cloneFromId)
-      .then((proposal) => {
+      .then((response) => {
+        const proposal = response.proposal;
         setName(proposal.name + " (Copy)");
         setClientName(proposal.client_name);
         setClientPhone(proposal.client_phone || "");
         setEventTypeId(proposal.event_type_id || "");
+        setServiceScopeIds(proposal.service_scope_ids || proposal.service_scopes?.map((scope: { id: string }) => scope.id) || []);
         setRequestedBudget(proposal.requested_budget);
         setStartDate(formatDateForInput(proposal.start_date));
         setEndDate(formatDateForInput(proposal.end_date));
@@ -413,6 +417,7 @@ function NewProposalContent() {
       client_name: clientName,
       client_phone: clientPhone || null,
       event_type_id: eventTypeId || null,
+      service_scope_ids: serviceScopeIds,
       requested_budget: requestedBudget,
       requested_start_date: startDate || null,
       requested_end_date: endDate || null,
@@ -440,6 +445,7 @@ function NewProposalContent() {
         client_name: clientName,
         client_phone: clientPhone || null,
         event_type_id: eventTypeId || null,
+        service_scope_ids: serviceScopeIds,
         requested_budget: requestedBudget,
         requested_start_date: startDate || null,
         requested_end_date: endDate || null,
@@ -673,8 +679,12 @@ function NewProposalContent() {
                   />
                 </div>
 
-                {/* Empty block to align grid */}
-                <div className="hidden sm:block" />
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <ServiceScopeSelect
+                    selectedIds={serviceScopeIds}
+                    onChange={setServiceScopeIds}
+                  />
+                </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-muted uppercase tracking-wider">{t("Start Date")}</label>

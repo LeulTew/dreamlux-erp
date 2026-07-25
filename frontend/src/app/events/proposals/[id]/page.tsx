@@ -30,6 +30,7 @@ import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { HiOutlineClock } from "react-icons/hi2";
+import { Layers } from "lucide-react";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -132,6 +133,7 @@ export default function ProposalDetailPage() {
   const { id } = useParams() as { id: string };
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const isAmharic = lang === "am";
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -272,6 +274,7 @@ export default function ProposalDetailPage() {
       meta: [
         `${t("Client")}: ${proposal.client_name}${proposal.client_phone ? ` · ${proposal.client_phone}` : ""}`,
         `${t("Venue")}: ${proposal.venue_location || "-"}   ${t("Status")}: ${proposal.status}`,
+        `Service Scopes: ${proposal.service_scopes?.map((s) => s.name_en).join(", ") || "None"}`,
         `${t("Requested Budget")}: ${etb(proposal.requested_budget)}   ${t("Estimated Cost")}: ${etb(proposal.estimated_total_cost)}`,
         `${t("Net Profit")}: ${etb(proposal.estimated_net_profit)}   ${t("Margin")}: ${proposal.estimated_margin_percentage}%`,
       ],
@@ -421,6 +424,25 @@ export default function ProposalDetailPage() {
                   </div>
                 )}
               </div>
+
+              {proposal.service_scopes && proposal.service_scopes.length > 0 && (
+                <div className="pt-2 border-t border-border/30">
+                  <span className="text-[10px] text-amber-400/90 block uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1">
+                    <Layers className="w-3.5 h-3.5 text-amber-400" />
+                    {isAmharic ? "የአገልግሎት ዓይነቶች (Service Scopes)" : "Service Scopes"}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {proposal.service_scopes.map((scope) => (
+                      <span
+                        key={scope.id}
+                        className="inline-flex items-center rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2.5 py-1 text-xs font-semibold shadow-xs"
+                      >
+                        {isAmharic ? scope.name_am : scope.name_en}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {proposal.notes && (
                 <div className="pt-2">
@@ -714,6 +736,22 @@ export default function ProposalDetailPage() {
                 {t("Convert Modal Details")}
               </p>
             </div>
+
+            {proposal.service_scopes && proposal.service_scopes.length > 0 && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-1.5">
+                <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  {isAmharic ? "የሚተላለፉ አገልግሎቶች (Transferred Service Scopes)" : "Transferred Service Scopes"}
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {proposal.service_scopes.map((scope) => (
+                    <span key={scope.id} className="text-xs bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded font-semibold border border-amber-500/30">
+                      {isAmharic ? scope.name_am : scope.name_en}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 border-t border-border pt-4">
               <button

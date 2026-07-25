@@ -193,10 +193,21 @@ export interface SalaryLevel {
 export interface EventType {
   id: string;
   event_name: string;
+  name?: string;
   description: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+}
+
+export interface ServiceScope {
+  id: string;
+  code: string;
+  name_en: string;
+  name_am: string;
+  description?: string | null;
+  display_order?: number;
+  is_active?: boolean;
 }
 
 export interface PayrollRunLineEvent {
@@ -299,6 +310,9 @@ export interface Event {
   contract_price: number;
   package_design_notes?: string | null;
   estimated_design_cost?: number | null;
+  service_scopes?: ServiceScope[];
+  service_scope_ids?: string[];
+  service_scopes_str?: string;
   status: "Planned" | "Ongoing" | "Completed";
   created_by: string | null;
   created_by_name?: string | null;
@@ -492,6 +506,8 @@ export interface ProfitReportRow {
   event_type_name: string | null;
   event_type_id: string | null;
   venue_location: string | null;
+  service_scopes?: ServiceScope[];
+  service_scopes_str?: string;
   start_date: string;
   status: string;
   revenue: number;
@@ -617,6 +633,8 @@ export interface EventProposal {
   venue_location: string | null;
   notes: string | null;
   package_design_notes: string | null;
+  service_scopes?: ServiceScope[];
+  service_scope_ids?: string[];
   cost_breakdown: {
     design?: ProposalEstimateLine[];
     team?: ProposalEstimateLine[];

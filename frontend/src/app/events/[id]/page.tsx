@@ -56,6 +56,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Select from "@/components/ui/Select";
+import { Layers } from "lucide-react";
 import { EVENT_ROLE_VALUES, isDriverEligible, suggestEventRole } from "@/lib/event-crew";
 import { calculateFuelCostPreviewLitersPerKm, FUEL_CONSUMPTION_UNIT, FUEL_CONSUMPTION_UNIT_LABEL, validateFuelConsumptionRateLitersPerKm } from "@/lib/fuel";
 
@@ -646,6 +647,7 @@ export default function EventWorkspacePage() {
   const eventId = params.id;
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const isAmharic = lang === "am";
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("details");
   const [itemSearch, setItemSearch] = useState("");
@@ -1059,6 +1061,24 @@ export default function EventWorkspacePage() {
                     <FieldRow label={t("Schedule")} value={schedule} icon={HiCalendarDays} />
                     {hasProfitAccess && event.contract_price !== undefined && (
                       <FieldRow label={t("Contract Price")} value={formatCurrency(event.contract_price)} icon={HiCheckCircle} />
+                    )}
+                    {event.service_scopes && event.service_scopes.length > 0 && (
+                      <div className="sm:col-span-2 pt-3 mt-1 border-t border-border/30">
+                        <span className="text-[11px] font-bold text-amber-400/90 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                          <Layers className="w-3.5 h-3.5 text-amber-400" />
+                          {isAmharic ? "የአገልግሎት ዓይነቶች (Service Scopes)" : "Service Scopes"}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {event.service_scopes.map((scope) => (
+                            <span
+                              key={scope.id}
+                              className="inline-flex items-center rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2.5 py-1 text-xs font-semibold shadow-xs"
+                            >
+                              {isAmharic ? scope.name_am : scope.name_en}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </section>

@@ -5,6 +5,13 @@ import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from ".
 import { NotificationsService } from "../../services/notifications-service";
 import { hasPermissionSlug } from "../../lib/permissions";
 import { eventProposalPayloadSchema, eventProposalListQuerySchema, eventProposalRejectSchema } from "../../lib/validation";
+import {
+  fetchProposalServiceScopes,
+  validateAndResolveServiceScopes,
+  setProposalServiceScopes,
+  copyProposalServiceScopesToEvent,
+  ServiceScopeSummary,
+} from "../../lib/service-scopes";
 
 function hasPermission(req: AuthRequest, slug: string): boolean {
   return hasPermissionSlug(getEffectivePermissionSlugsFromUser(req.user), slug);
@@ -150,11 +157,13 @@ function normalizeOptionalText(value: unknown): string | null {
   return String(value).trim();
 }
 
-function formatProposal(row: any) {
+function formatProposal(row: any, scopesMap?: Map<string, ServiceScopeSummary[]>) {
+  if (!row) return null;
   const budget = Number(row.requested_budget || 0);
   const estimatedTotalCost = Number(row.estimated_total_cost || 0);
   const estimatedNetProfit = Number(row.estimated_net_profit || 0);
   const estimatedMarginPercentage = Number(row.estimated_margin_percentage || 0);
+  const scopes = (scopesMap instanceof Map ? scopesMap.get(row.id) : null) || row.service_scopes || [];
   return {
     ...row,
     requested_budget: budget,
@@ -165,6 +174,8 @@ function formatProposal(row: any) {
     estimated_total_cost: estimatedTotalCost,
     estimated_net_profit: estimatedNetProfit,
     estimated_margin_percentage: estimatedMarginPercentage,
+    service_scopes: scopes,
+    service_scope_ids: scopes.map((s: any) => s.id),
   };
 }
 
@@ -320,8 +331,10 @@ export function createEventProposalsRouter(): Router {
         queryParams,
       );
 
+      const proposalIds = result.rows.map((r: any) => r.id);
+      const scopesMap = await fetchProposalServiceScopes(pool, proposalIds);
       res.json({
-        proposals: result.rows.map(formatProposal),
+        proposals: result.rows.map((r: any) => formatProposal(r, scopesMap)),
         total,
         page,
         limit,
@@ -353,6 +366,10 @@ export function createEventProposalsRouter(): Router {
       const client = await pool.connect();
 
       try {
+        const resolvedScopeIds = await validateAndResolveServiceScopes(
+          client,
+          req.body.service_scope_ids || req.body.service_scopes,
+        );
         await client.query("BEGIN");
         const result = await client.query(
           `
@@ -392,9 +409,14 @@ export function createEventProposalsRouter(): Router {
             req.user?.id || null,
           ],
         );
-        await insertProposalAuditLog(client, result.rows[0].id, req.user?.id || null, "proposal_created", null, "Draft");
+        const newProposalId = result.rows[0].id;
+        if (resolvedScopeIds.length > 0) {
+          await setProposalServiceScopes(client, newProposalId, resolvedScopeIds);
+        }
+        await insertProposalAuditLog(client, newProposalId, req.user?.id || null, "proposal_created", null, "Draft");
         await client.query("COMMIT");
-        res.status(201).json({ proposal: formatProposal(result.rows[0]) });
+        const scopesMap = resolvedScopeIds.length > 0 ? await fetchProposalServiceScopes(client, [newProposalId]) : undefined;
+        res.status(201).json({ proposal: formatProposal(result.rows[0], scopesMap) });
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -445,7 +467,7 @@ export function createEventProposalsRouter(): Router {
       );
 
       const total = Number(countResult.rows[0]?.count || 0);
-      res.json({ proposals: result.rows.map(formatProposal), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
+      res.json({ proposals: result.rows.map((r) => formatProposal(r)), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
     } catch (error: any) {
       console.error("[event-proposals-trash-list] Error:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
@@ -567,9 +589,182 @@ export function createEventProposalsRouter(): Router {
         `SELECT * FROM event_proposal_logs WHERE proposal_id = $1 ORDER BY created_at ASC`,
         [req.params.proposalId],
       );
-      res.json({ proposal: formatProposal(result.rows[0]), logs: logsResult.rows });
+      const scopesMap = await fetchProposalServiceScopes(pool, [result.rows[0].id]);
+      res.json({ proposal: formatProposal(result.rows[0], scopesMap), logs: logsResult.rows });
     } catch (error: any) {
       console.error("[event-proposals-detail] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // PUT /events/proposals/:proposalId - Update draft or editable proposal
+  router.put("/proposals/:proposalId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!canWriteEventProposals(req)) {
+        res.status(403).json({ error: "Forbidden: Missing event proposal write permission" });
+        return;
+      }
+
+      const validationResult = eventProposalPayloadSchema.innerType().partial().safeParse(req.body);
+      if (!validationResult.success) {
+        res.status(400).json({ error: validationResult.error.errors[0].message });
+        return;
+      }
+
+      const payload = validationResult.data;
+      const client = await pool.connect();
+
+      try {
+        await client.query("BEGIN");
+        const existingResult = await client.query(
+          `SELECT * FROM event_proposals WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+          [req.params.proposalId],
+        );
+        if (existingResult.rowCount === 0) {
+          await client.query("ROLLBACK");
+          res.status(404).json({ error: "Event proposal not found" });
+          return;
+        }
+
+        const existing = existingResult.rows[0];
+        if (["Converted", "Canceled"].includes(existing.status)) {
+          await client.query("ROLLBACK");
+          res.status(409).json({ error: `Cannot edit proposal in ${existing.status} status` });
+          return;
+        }
+
+        const name = payload.name ?? existing.name;
+        const client_name = payload.client_name ?? existing.client_name;
+        const client_phone = payload.client_phone !== undefined ? normalizeOptionalText(payload.client_phone) : existing.client_phone;
+        const event_type_id = payload.event_type_id !== undefined ? normalizeOptionalText(payload.event_type_id) : existing.event_type_id;
+        const requested_budget = payload.requested_budget !== undefined ? payload.requested_budget : Number(existing.requested_budget);
+        const requested_start_date = payload.requested_start_date !== undefined ? normalizeOptionalText(payload.requested_start_date) : existing.requested_start_date;
+        const requested_end_date = payload.requested_end_date !== undefined ? normalizeOptionalText(payload.requested_end_date) : existing.requested_end_date;
+        const requested_start_time = payload.requested_start_time !== undefined ? normalizeOptionalText(payload.requested_start_time) : existing.requested_start_time;
+        const requested_end_time = payload.requested_end_time !== undefined ? normalizeOptionalText(payload.requested_end_time) : existing.requested_end_time;
+        const venue_location = payload.venue_location !== undefined ? normalizeOptionalText(payload.venue_location) : existing.venue_location;
+        const notes = payload.notes !== undefined ? normalizeOptionalText(payload.notes) : existing.notes;
+        const package_design_notes = payload.package_design_notes !== undefined ? normalizeOptionalText(payload.package_design_notes) : existing.package_design_notes;
+
+        const costBreakdown = payload.cost_breakdown ? normalizeProposalCostBreakdown(payload.cost_breakdown) : existing.cost_breakdown;
+        const financials = calculateProposalFinancials(requested_budget, costBreakdown);
+
+        const updateResult = await client.query(
+          `
+            UPDATE event_proposals
+            SET name = $1, client_name = $2, client_phone = $3, event_type_id = $4,
+                requested_budget = $5, requested_start_date = $6, requested_end_date = $7,
+                requested_start_time = $8, requested_end_time = $9, venue_location = $10,
+                notes = $11, package_design_notes = $12, cost_breakdown = $13,
+                estimated_design_cost = $14, estimated_team_cost = $15, estimated_trip_cost = $16,
+                estimated_other_cost = $17, estimated_total_cost = $18, estimated_net_profit = $19,
+                estimated_margin_percentage = $20, updated_at = NOW()
+            WHERE id = $21
+            RETURNING *
+          `,
+          [
+            name, client_name, client_phone, event_type_id, requested_budget,
+            requested_start_date, requested_end_date, requested_start_time, requested_end_time,
+            venue_location, notes, package_design_notes, JSON.stringify(costBreakdown),
+            financials.estimatedDesignCost, financials.estimatedTeamCost, financials.estimatedTripCost,
+            financials.estimatedOtherCost, financials.estimatedTotalCost, financials.estimatedNetProfit,
+            financials.estimatedMarginPercentage, req.params.proposalId,
+          ],
+        );
+
+        if (req.body.service_scope_ids !== undefined || req.body.service_scopes !== undefined) {
+          const resolvedScopeIds = await validateAndResolveServiceScopes(
+            client,
+            req.body.service_scope_ids || req.body.service_scopes,
+          );
+          await setProposalServiceScopes(client, req.params.proposalId, resolvedScopeIds);
+        }
+
+        await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_updated", existing.status, existing.status);
+        await client.query("COMMIT");
+
+        const scopesMap = await fetchProposalServiceScopes(pool, [req.params.proposalId]);
+        res.json({ proposal: formatProposal(updateResult.rows[0], scopesMap) });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error: any) {
+      console.error("[event-proposals-update] Error:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // POST /events/proposals/:proposalId/clone - Clone an existing proposal
+  router.post("/proposals/:proposalId/clone", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!canWriteEventProposals(req)) {
+        res.status(403).json({ error: "Forbidden: Missing event proposal write permission" });
+        return;
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const existingResult = await client.query(
+          `SELECT * FROM event_proposals WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+          [req.params.proposalId],
+        );
+        if (existingResult.rowCount === 0) {
+          await client.query("ROLLBACK");
+          res.status(404).json({ error: "Event proposal not found" });
+          return;
+        }
+
+        const source = existingResult.rows[0];
+        const cloneName = `${source.name} (Copy)`;
+
+        const cloneResult = await client.query(
+          `
+            INSERT INTO event_proposals (
+              name, client_name, client_phone, event_type_id, requested_budget,
+              requested_start_date, requested_end_date, requested_start_time, requested_end_time,
+              venue_location, notes, package_design_notes, cost_breakdown,
+              estimated_design_cost, estimated_team_cost, estimated_trip_cost, estimated_other_cost,
+              estimated_total_cost, estimated_net_profit, estimated_margin_percentage, status, created_by
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+              $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'Draft', $21
+            )
+            RETURNING *
+          `,
+          [
+            cloneName, source.client_name, source.client_phone, source.event_type_id,
+            source.requested_budget, source.requested_start_date, source.requested_end_date,
+            source.requested_start_time, source.requested_end_time, source.venue_location,
+            source.notes, source.package_design_notes, JSON.stringify(source.cost_breakdown),
+            source.estimated_design_cost, source.estimated_team_cost, source.estimated_trip_cost,
+            source.estimated_other_cost, source.estimated_total_cost, source.estimated_net_profit,
+            source.estimated_margin_percentage, req.user?.id || null,
+          ],
+        );
+
+        const newProposalId = cloneResult.rows[0].id;
+        const sourceScopesMap = await fetchProposalServiceScopes(client, [source.id]);
+        const sourceScopes = sourceScopesMap.get(source.id) || [];
+        const sourceScopeIds = sourceScopes.map((s) => s.id);
+
+        await setProposalServiceScopes(client, newProposalId, sourceScopeIds);
+        await insertProposalAuditLog(client, newProposalId, req.user?.id || null, "proposal_cloned", null, "Draft", `Cloned from proposal ${source.id}`);
+        await client.query("COMMIT");
+
+        const scopesMap = await fetchProposalServiceScopes(pool, [newProposalId]);
+        res.status(201).json({ proposal: formatProposal(cloneResult.rows[0], scopesMap) });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error: any) {
+      console.error("[event-proposals-clone] Error:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
     }
   });
@@ -833,6 +1028,8 @@ export function createEventProposalsRouter(): Router {
         return;
       }
 
+      await copyProposalServiceScopesToEvent(client, proposal.id, eventResult.rows[0].id);
+
       await insertProposalAuditLog(client, proposal.id, req.user?.id || null, "proposal_converted", proposal.status, "Converted", eventResult.rows[0].id);
       await insertEventAuditLog(client, eventResult.rows[0].id, req.user?.id || null, "event_created_from_proposal", null, proposal.id);
       await client.query("COMMIT");
@@ -861,7 +1058,8 @@ export function createEventProposalsRouter(): Router {
         action_url: `/events/${eventResult.rows[0].id}`,
       });
 
-      res.status(201).json({ proposal: formatProposal(updatedProposal.rows[0]), event: eventResult.rows[0] });
+      const finalProposalRow = updatedProposal.rows && updatedProposal.rows.length > 0 ? updatedProposal.rows[0] : proposal;
+      res.status(201).json({ proposal: formatProposal(finalProposalRow), event: eventResult.rows[0] });
     } catch (error: any) {
       await client.query("ROLLBACK");
       console.error("[event-proposals-convert] Error:", error);
