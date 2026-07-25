@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import EventWorkspacePage from "../app/events/[id]/page";
 
@@ -63,6 +63,7 @@ type AssignmentFixture = {
   role: string;
   commission_amount: number;
   attended: boolean | null;
+  attendance_marked_at?: string | null;
 };
 
 const workspaceData = vi.hoisted(() => ({
@@ -532,53 +533,86 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
   });
 
   // Issue #197: an assignment schedules an employee; it never asserts that they showed up.
-  describe("staff attendance verification", () => {
+  // Issue #203: attendance is three-state. A checkbox could only express two, which made a
+  // genuine no-show indistinguishable from "not decided yet" and deadlocked event completion.
+  describe("staff attendance resolution", () => {
     const openSchedulingTab = (permissions = ["events:read", "event_assignments:write"]) => {
       mockPermissions = permissions;
       render(<EventWorkspacePage />);
       fireEvent.click(screen.getByRole("button", { name: /Team & Vehicles/i }));
     };
 
-    const attendanceBox = () => screen.getByRole("checkbox", { name: /Verify attendance Abebe/i });
+    const attendedBtn = (name = "Abebe") => screen.getByRole("radio", { name: new RegExp("^Attended " + name + "$", "i") });
+    const absentBtn = (name = "Abebe") => screen.getByRole("radio", { name: new RegExp("^Absent " + name + "$", "i") });
 
-    it("renders a new assignment as attendance-unverified with the box unchecked", () => {
+    const assignment = (over: Partial<AssignmentFixture> = {}): AssignmentFixture => ({
+      id: "asg-1",
+      employee_id: "emp-1",
+      employee_name: "Abebe",
+      role: "Decorator",
+      commission_amount: 5000,
+      attended: false,
+      attendance_marked_at: null,
+      ...over,
+    });
+
+    it("renders a new assignment as unresolved with neither option selected", () => {
       openSchedulingTab();
 
       expect(screen.getByText("ATTENDANCE_UNVERIFIED")).toBeInTheDocument();
-      expect(screen.queryByText("ATTENDED")).toBeNull();
-      expect(attendanceBox()).not.toBeChecked();
+      expect(attendedBtn()).toHaveAttribute("aria-checked", "false");
+      expect(absentBtn()).toHaveAttribute("aria-checked", "false");
     });
 
-    it("treats a legacy null attendance as unverified rather than attended", () => {
-      workspaceData.assignments = [
-        { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000, attended: null },
-      ];
+    it("treats a legacy null attendance as unresolved rather than attended", () => {
+      workspaceData.assignments = [assignment({ attended: null })];
       openSchedulingTab();
 
       expect(screen.getByText("ATTENDANCE_UNVERIFIED")).toBeInTheDocument();
-      expect(attendanceBox()).not.toBeChecked();
+      expect(attendedBtn()).toHaveAttribute("aria-checked", "false");
     });
 
-    it("shows a verified assignment as attended with the box checked", () => {
-      workspaceData.assignments = [
-        { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000, attended: true },
-      ];
+    it("shows a verified assignment as attended", () => {
+      workspaceData.assignments = [assignment({ attended: true, attendance_marked_at: "2026-07-10T10:00:00.000Z" })];
       openSchedulingTab();
 
       expect(screen.getByText("ATTENDED")).toBeInTheDocument();
-      expect(attendanceBox()).toBeChecked();
+      expect(attendedBtn()).toHaveAttribute("aria-checked", "true");
+      expect(absentBtn()).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("shows an explicitly recorded no-show as absent, not as unresolved", () => {
+      workspaceData.assignments = [assignment({ attended: false, attendance_marked_at: "2026-07-10T10:00:00.000Z" })];
+      openSchedulingTab();
+
+      expect(screen.getByText("ABSENT")).toBeInTheDocument();
+      expect(screen.queryByText("ATTENDANCE_UNVERIFIED")).toBeNull();
+      expect(absentBtn()).toHaveAttribute("aria-checked", "true");
+      expect(attendedBtn()).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("treats a legacy attended row with no marker stamp as resolved", () => {
+      workspaceData.assignments = [assignment({ attended: true, attendance_marked_at: null })];
+      openSchedulingTab();
+
+      expect(screen.getByText("ATTENDED")).toBeInTheDocument();
+      expect(attendedBtn()).toHaveAttribute("aria-checked", "true");
     });
 
     it("renders mixed attendance states accurately", () => {
       workspaceData.assignments = [
-        { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000, attended: true },
-        { id: "asg-2", employee_id: "emp-2", employee_name: "Kebede", role: "Assistant", commission_amount: 1000, attended: false },
+        assignment({ attended: true, attendance_marked_at: "2026-07-10T10:00:00.000Z" }),
+        assignment({ id: "asg-2", employee_id: "emp-2", employee_name: "Kebede", commission_amount: 1000, attended: false, attendance_marked_at: "2026-07-10T10:05:00.000Z" }),
+        assignment({ id: "asg-3", employee_id: "emp-3", employee_name: "Sara", commission_amount: 800 }),
       ];
       openSchedulingTab();
 
-      expect(screen.getByRole("checkbox", { name: /Verify attendance Abebe/i })).toBeChecked();
-      expect(screen.getByRole("checkbox", { name: /Verify attendance Kebede/i })).not.toBeChecked();
+      expect(attendedBtn("Abebe")).toHaveAttribute("aria-checked", "true");
+      expect(absentBtn("Kebede")).toHaveAttribute("aria-checked", "true");
+      expect(attendedBtn("Sara")).toHaveAttribute("aria-checked", "false");
+      expect(absentBtn("Sara")).toHaveAttribute("aria-checked", "false");
       expect(screen.getByText("ATTENDED")).toBeInTheDocument();
+      expect(screen.getByText("ABSENT")).toBeInTheDocument();
       expect(screen.getByText("ATTENDANCE_UNVERIFIED")).toBeInTheDocument();
     });
 
@@ -590,26 +624,21 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       fireEvent.click(screen.getByRole("button", { name: /^Assign$/i }));
 
       if (apiMocks.createEmployeeAssignment.mock.calls.length > 0) {
-        const payload = apiMocks.createEmployeeAssignment.mock.calls[0][1];
-        expect(payload).not.toHaveProperty("attended");
+        expect(apiMocks.createEmployeeAssignment.mock.calls[0][1]).not.toHaveProperty("attended");
       }
-      // The row the server returns is what drives the badge; the UI never pre-marks attendance.
       expect(screen.getByText("ATTENDANCE_UNVERIFIED")).toBeInTheDocument();
     });
 
-    it("sends an explicit verification request when the box is ticked", () => {
+    it("sends attended=true when Attended is chosen", () => {
       openSchedulingTab();
-      fireEvent.click(attendanceBox());
+      fireEvent.click(attendedBtn());
 
       expect(apiMocks.updateEmployeeAttendance).toHaveBeenCalledWith("event-123", "emp-1", true);
     });
 
-    it("sends an explicit clear request when the box is unticked", () => {
-      workspaceData.assignments = [
-        { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000, attended: true },
-      ];
+    it("sends attended=false when Absent is chosen", () => {
       openSchedulingTab();
-      fireEvent.click(attendanceBox());
+      fireEvent.click(absentBtn());
 
       expect(apiMocks.updateEmployeeAttendance).toHaveBeenCalledWith("event-123", "emp-1", false);
     });
@@ -617,19 +646,18 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     it("shows a read-only user the attendance state without a mutation control", () => {
       openSchedulingTab(["events:read"]);
 
-      // Disabled is the real gate: browsers do not dispatch click to a disabled input.
-      // (fireEvent.click would bypass that in jsdom, so asserting on it would test the test
-      // harness, not the product. Server-side rejection is covered in the backend suite.)
-      expect(attendanceBox()).toBeDisabled();
+      // Disabled is the real gate: browsers do not dispatch click to a disabled button.
+      expect(attendedBtn()).toBeDisabled();
+      expect(absentBtn()).toBeDisabled();
       expect(screen.getByText("ATTENDANCE_UNVERIFIED")).toBeInTheDocument();
-      expect(screen.getByText("Read-only view. You do not have permission to assign staff.")).toBeInTheDocument();
     });
 
     it("locks attendance on a completed event without the override permission", () => {
       workspaceData.event.status = "Completed";
       openSchedulingTab();
 
-      expect(attendanceBox()).toBeDisabled();
+      expect(attendedBtn()).toBeDisabled();
+      expect(absentBtn()).toBeDisabled();
       expect(screen.getByText("Attendance is locked after the event is completed.")).toBeInTheDocument();
     });
 
@@ -637,15 +665,17 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       workspaceData.event.status = "Completed";
       openSchedulingTab(["events:read", "event_assignments:write", "events:override_completed"]);
 
-      expect(attendanceBox()).toBeEnabled();
+      expect(attendedBtn()).toBeEnabled();
+      expect(absentBtn()).toBeEnabled();
       expect(screen.queryByText("Attendance is locked after the event is completed.")).toBeNull();
     });
 
-    it("disables the control while a verification is in flight", () => {
+    it("disables the control while a change is in flight", () => {
       mockMutationsPending = true;
       openSchedulingTab();
 
-      expect(attendanceBox()).toBeDisabled();
+      expect(attendedBtn()).toBeDisabled();
+      expect(absentBtn()).toBeDisabled();
     });
 
     it("surfaces a backend error and leaves the state recoverable", async () => {
@@ -653,81 +683,85 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
         response: { data: { error: "Completed event assignments cannot be modified" } },
       });
       openSchedulingTab();
-      fireEvent.click(attendanceBox());
+      fireEvent.click(attendedBtn());
 
       await waitFor(() =>
         expect(toastMocks.error).toHaveBeenCalledWith("Completed event assignments cannot be modified"),
       );
-      expect(attendanceBox()).not.toBeChecked();
+      expect(attendedBtn()).toHaveAttribute("aria-checked", "false");
     });
 
-    it("refreshes workspace, profit, and payroll eligibility caches after verifying", async () => {
+    it("refreshes workspace, profit, and payroll eligibility caches after a change", async () => {
       openSchedulingTab();
-      fireEvent.click(attendanceBox());
+      fireEvent.click(attendedBtn());
 
       await waitFor(() => expect(toastMocks.success).toHaveBeenCalledWith("Attendance updated"));
-      const keys = invalidateQueriesMock.mock.calls.map((call) =>
-        JSON.stringify((call[0] as { queryKey: unknown[] }).queryKey),
+      const keys = invalidateQueriesMock.mock.calls.map(
+        (call: [{ queryKey: unknown[] }]) => JSON.stringify(call[0].queryKey),
       );
       expect(keys).toContain(JSON.stringify(["event-workspace", "event-123"]));
       expect(keys).toContain(JSON.stringify(["event-profit", "event-123"]));
       expect(keys).toContain(JSON.stringify(["eligible-payroll-commissions"]));
     });
 
-    it("blocks labor generation and explains the unverified-attendance prerequisite", () => {
+    it("blocks labor generation while any assignment is unresolved", () => {
       workspaceData.event.status = "Completed";
+      workspaceData.assignments = [
+        assignment({ attended: true, attendance_marked_at: "2026-07-10T10:00:00.000Z" }),
+        assignment({ id: "asg-2", employee_id: "emp-2", employee_name: "Kebede", commission_amount: 1000 }),
+      ];
       mockPermissions = ["events:read", "event_assignments:write", "expenses:write", "expenses:labor_generate", "reports:profit:read"];
       render(<EventWorkspacePage />);
       fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
 
       expect(
-        screen.getByText("Prerequisite: Verify attendance for every assigned employee before generating labor."),
+        screen.getByText("Prerequisite: Mark every assigned employee attended or absent before generating labor."),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Generate Labor Expense/i })).toBeDisabled();
     });
 
-    it("enables labor generation once attendance is verified", () => {
+    it("enables labor generation when a no-show is explicitly recorded as absent", () => {
       workspaceData.event.status = "Completed";
       workspaceData.assignments = [
-        { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000, attended: true },
+        assignment({ attended: true, attendance_marked_at: "2026-07-10T10:00:00.000Z" }),
+        // Kebede did not show up and that decision was recorded - no longer a blocker.
+        assignment({ id: "asg-2", employee_id: "emp-2", employee_name: "Kebede", commission_amount: 1000, attended: false, attendance_marked_at: "2026-07-10T10:05:00.000Z" }),
       ];
       mockPermissions = ["events:read", "event_assignments:write", "expenses:write", "expenses:labor_generate", "reports:profit:read"];
       render(<EventWorkspacePage />);
       fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
 
       expect(screen.getByRole("button", { name: /Generate Labor Expense/i })).toBeEnabled();
+      // Only the attended employee's commission is billed.
+      expect(screen.getByText(/ETB 5,000/)).toBeInTheDocument();
     });
 
-    it("refuses partial labor generation while one of several assignments is unverified", () => {
-      workspaceData.event.status = "Completed";
-      workspaceData.assignments = [
-        { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000, attended: true },
-        { id: "asg-2", employee_id: "emp-2", employee_name: "Kebede", role: "Assistant", commission_amount: 1000, attended: false },
-      ];
-      mockPermissions = ["events:read", "event_assignments:write", "expenses:write", "expenses:labor_generate", "reports:profit:read"];
-      render(<EventWorkspacePage />);
-      fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
-
-      expect(screen.getByRole("button", { name: /Generate Labor Expense/i })).toBeDisabled();
-      expect(screen.getByText("Prerequisite: Verify attendance for every assigned employee before generating labor.")).toBeInTheDocument();
-    });
-
-    it("renders the Amharic verification label", () => {
+    it("renders the Amharic attendance options", () => {
       mockLang = "am";
       mockPermissions = ["events:read", "event_assignments:write"];
       render(<EventWorkspacePage />);
       fireEvent.click(screen.getByRole("button", { name: /ቡድን እና ተሽከርካሪዎች/ }));
 
-      expect(screen.getByRole("checkbox", { name: /መገኘትን አረጋግጥ Abebe/ })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /^ተገኝቷል Abebe$/ })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /^አልተገኘም Abebe$/ })).toBeInTheDocument();
     });
 
-    it("gives the attendance control a 48px-safe touch target", () => {
+    it("gives both attendance options a 48px-safe touch target", () => {
       openSchedulingTab();
 
-      const label = attendanceBox().closest("label");
-      expect(label?.className).toContain("min-h-12");
+      expect(attendedBtn().className).toContain("min-h-12");
+      expect(absentBtn().className).toContain("min-h-12");
+    });
+
+    it("groups the attendance options for assistive technology", () => {
+      openSchedulingTab();
+
+      const group = screen.getByRole("radiogroup", { name: /Attendance Abebe/i });
+      expect(group).toBeInTheDocument();
+      expect(within(group).getAllByRole("radio")).toHaveLength(2);
     });
   });
+
 
   it("shows L/km fuel preview formula and submits trip data unchanged", () => {
     mockPermissions = ["events:read", "trips:create", "reports:profit:read"];

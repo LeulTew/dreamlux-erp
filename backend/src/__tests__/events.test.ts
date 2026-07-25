@@ -2627,10 +2627,10 @@ describe("Events API", () => {
         .set("Authorization", `Bearer ${getToken()}`);
 
       expect(res.status).toBe(409);
-      expect(res.body.error).toContain("Attendance must be verified before labor can be generated");
+      expect(res.body.error).toContain("Attendance must be resolved before labor can be generated");
       expect(res.body.unverified_count).toBe(3);
 
-      const unverifiedCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("attended IS NOT TRUE"));
+      const unverifiedCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("attendance_marked_at IS NULL"));
       expect(unverifiedCall).toBeDefined();
       expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO expenses"))).toBe(false);
     });
@@ -2666,6 +2666,81 @@ describe("Events API", () => {
       const sumCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("SUM(commission_amount)"));
       // Unverified and NULL attendance must both fall outside the money calculation.
       expect(String(sumCall![0])).toContain("attended IS TRUE");
+    });
+
+    // Issue #203: PR #202 blocked completion and labor on "attended IS NOT TRUE", but false is
+    // also the default, so a genuine no-show was indistinguishable from "not decided yet" and
+    // the event could never be completed. Recording an absence must resolve the row.
+    test("an explicitly recorded absence resolves the assignment and does not block completion", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", status: "Ongoing", name: "Gala" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // status audit
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", status: "Completed", name: "Gala" }],
+        rowCount: 1,
+      }); // UPDATE events
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      // One attended (1000), one explicitly marked absent -> zero unresolved.
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1000", unverified: 0 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // no existing labor expense
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "exp-1", amount: "1000" }], rowCount: 1 }); // INSERT
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // labor audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .put("/events/event-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ status: "Completed" });
+
+      expect(res.status).toBe(200);
+      // The absent employee contributes nothing; only the attended 1000 is billed.
+      const insertCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO expenses"));
+      expect(insertCall![1][1]).toBe(1000);
+    });
+
+    test("the unresolved predicate excludes recorded absences and legacy attended rows", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1000", unverified: 0 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "exp-1" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      await request(app)
+        .post("/events/event-1/expenses/generate-labor")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      const aggregateCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("AS unverified"));
+      const sql = String(aggregateCall![0]);
+      // Unresolved means: not attended AND nobody stamped a decision.
+      expect(sql).toContain("attended IS NOT TRUE AND attendance_marked_at IS NULL");
+      // Money still only ever counts explicit attendance.
+      expect(sql).toContain("FILTER (WHERE attended IS TRUE)");
+    });
+
+    test("recording an absence stamps the marker columns so the decision is durable", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Ongoing" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: false }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: false }], rowCount: 1 }); // UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT (no transition -> no audit)
+
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ attended: false });
+
+      expect(res.status).toBe(200);
+      const updateCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("UPDATE event_assignments"));
+      const sql = String(updateCall![0]);
+      // Previously this NULLed the stamp on false, which is what erased the absence decision.
+      expect(sql).toContain("attendance_marked_at = NOW()");
+      expect(sql).not.toContain("CASE WHEN");
+      expect(updateCall![1]).toEqual([false, "event-1", "emp-1", "user-1"]);
     });
 
     test("labor generation refuses a partial expense while any attendance is unverified", async () => {
