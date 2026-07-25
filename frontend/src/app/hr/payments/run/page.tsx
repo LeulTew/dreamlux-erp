@@ -118,7 +118,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "COMMISSION ONLY": "COMMISSION ONLY",
     "Zero base salary": "Zero base salary",
     "Event(s)": "Event(s)",
-    "Verified attendance commissions are automatically calculated from approved event work.": "Verified attendance commissions are automatically calculated from approved event work.",
+    "Verified attendance commissions are automatically calculated from attended event assignments.": "Verified attendance commissions are automatically calculated from attended event assignments.",
     "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.": "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments."
   },
   am: {
@@ -185,7 +185,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "COMMISSION ONLY": "ኮሚሽን ብቻ",
     "Zero base salary": "መሠረታዊ ደመወዝ የለውም",
     "Event(s)": "ክስተት(ቶች)",
-    "Verified attendance commissions are automatically calculated from approved event work.": "የተረጋገጡ የክስተት ኮሚሽኖች ከተፈቀዱ የክስተት ስራዎች በራስ-ሰር ይሰላሉ።",
+    "Verified attendance commissions are automatically calculated from attended event assignments.": "የተረጋገጡ የክስተት ኮሚሽኖች ሰራተኛው ከተገኘባቸው የዝግጅት ምደባዎች በራስ-ሰር ይሰላሉ።",
     "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.": "የደመወዝ ክፍያ በክፍያ ዓይነት ይወሰናል። ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች 0 ETB መሠረታዊ ደመወዝ የሚያገኙ ሲሆን የተረጋገጡ የዝግጅት ኮሚሽኖች ከተገኙበት ስራ ይሰላሉ።"
   }
 };
@@ -1123,7 +1123,7 @@ function PaymentRunProcessPageContent() {
                     })
                   )}
                   <p className="text-[10px] text-muted-foreground italic px-1 pt-1">
-                    {t("Verified attendance commissions are automatically calculated from approved event work.")}
+                    {t("Verified attendance commissions are automatically calculated from attended event assignments.")}
                   </p>
                 </div>
 

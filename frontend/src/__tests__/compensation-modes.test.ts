@@ -22,9 +22,9 @@ describe("employee compensation modes", () => {
     ])).toEqual({
       "employee-1": [{
         event_type_id: "wedding",
-        quantity: 1,
-        price_override: 3500,
-        override_reason: "Verified attendance across 2 event(s)",
+        quantity: 2,
+        price_override: 1750,
+        override_reason: "Verified attended event assignments",
       }],
     });
   });

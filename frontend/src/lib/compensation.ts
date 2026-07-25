@@ -26,11 +26,13 @@ export function mapEligibleCommissions(lines: Array<{
 }>): Record<string, PayrollEventLine[]> {
   const mapped: Record<string, PayrollEventLine[]> = {};
   for (const line of lines) {
+    const quantity = Math.max(1, Number(line.quantity));
+    const commissionTotal = Number(line.commission_total);
     (mapped[line.employee_id] ??= []).push({
       event_type_id: line.event_type_id,
-      quantity: 1,
-      price_override: line.commission_total,
-      override_reason: `Verified attendance across ${line.quantity} event(s)`,
+      quantity,
+      price_override: commissionTotal / quantity,
+      override_reason: "Verified attended event assignments",
     });
   }
   return mapped;
