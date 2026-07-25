@@ -736,6 +736,20 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       expect(screen.getByText(/ETB 5,000/)).toBeInTheDocument();
     });
 
+    it("explains that no labor expense is required when every employee is absent", () => {
+      workspaceData.event.status = "Completed";
+      workspaceData.assignments = [
+        assignment({ attended: false, attendance_marked_at: "2026-07-10T10:05:00.000Z" }),
+      ];
+      mockPermissions = ["events:read", "expenses:write", "expenses:labor_generate", "reports:profit:read"];
+      render(<EventWorkspacePage />);
+      fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
+
+      expect(screen.getByRole("button", { name: /Generate Labor Expense/i })).toBeDisabled();
+      expect(screen.getByText("No attended employees. No labor expense is required.")).toBeInTheDocument();
+      expect(screen.queryByText(/Ready to generate labor expense/)).not.toBeInTheDocument();
+    });
+
     it("renders the Amharic attendance options", () => {
       mockLang = "am";
       mockPermissions = ["events:read", "event_assignments:write"];
