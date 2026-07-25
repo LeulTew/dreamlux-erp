@@ -34,6 +34,7 @@ import {
   eventExportQuerySchema,
   eventImportPayloadSchema,
   updateEventAllocationDispatchSchema,
+  updateEventAllocationSchema,
 } from "../lib/validation";
 
 async function attachServiceScopesToEvents(client: PoolClient | Pool, rows: any[]): Promise<any[]> {
@@ -2538,6 +2539,196 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
     }
   } catch (error: any) {
     console.error("[post-event-allocation] Error:", error);
+    res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
+// PATCH /events/:id/allocations/:allocationId - Correct quantity/notes on an active allocation (issue #196)
+//
+// Storekeepers previously had to release and re-create an allocation to fix a mistyped
+// quantity, which destroyed the row's continuity and was impossible once the load had
+// departed. Everything below runs in one transaction so a concurrent PATCH/POST cannot
+// squeeze past the availability check and over-allocate the item:
+//   event (FOR UPDATE) -> allocation (FOR UPDATE) -> item (FOR UPDATE) -> availability -> update -> audit
+// The lock order matches returns.ts (allocation before item) to avoid deadlocking with it.
+router.patch("/:id/allocations/:allocationId", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id, allocationId } = req.params;
+    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
+      res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
+      return;
+    }
+
+    const validationResult = updateEventAllocationSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+
+    const { quantity_allocated, notes } = validationResult.data;
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const eventResult = await client.query(
+        "SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        [id],
+      );
+      if (eventResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+
+      const currentEvent = eventResult.rows[0];
+      if (currentEvent.status === "Completed" && !canOverrideCompleted(req)) {
+        await client.query("ROLLBACK");
+        res.status(403).json({
+          error: "Completed events cannot be edited except by administrators or accountants",
+        });
+        return;
+      }
+
+      // Scoped by event_id as well as allocation id: an allocation belonging to a
+      // different event must not be reachable by pairing it with a visible event (BOLA).
+      const allocationResult = await client.query(
+        `
+          SELECT id, event_id, item_id, quantity_allocated, notes, status, departed_at, returned_at,
+                 returned_good_quantity, returned_damaged_quantity,
+                 returned_lost_quantity, returned_repair_quantity
+          FROM event_allocations
+          WHERE id = $1 AND event_id = $2
+          FOR UPDATE
+        `,
+        [allocationId, id],
+      );
+      if (allocationResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Allocation not found" });
+        return;
+      }
+
+      const allocation = allocationResult.rows[0];
+      const returnedTotal =
+        Number(allocation.returned_good_quantity || 0) +
+        Number(allocation.returned_damaged_quantity || 0) +
+        Number(allocation.returned_lost_quantity || 0) +
+        Number(allocation.returned_repair_quantity || 0);
+
+      if (allocation.status === "Returned" || allocation.returned_at || returnedTotal > 0) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Returned allocations cannot be edited" });
+        return;
+      }
+
+      if (allocation.departed_at) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Departed allocations cannot be edited" });
+        return;
+      }
+
+      const currentQuantity = Number(allocation.quantity_allocated);
+      const nextQuantity = quantity_allocated ?? currentQuantity;
+
+      // Only re-check stock when the reservation actually grows. A decrease frees stock
+      // immediately (availability is derived from the allocation rows themselves) and a
+      // notes-only edit does not touch the item at all.
+      if (nextQuantity > currentQuantity) {
+        const itemResult = await client.query(
+          "SELECT * FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [allocation.item_id],
+        );
+        if (itemResult.rowCount === 0) {
+          await client.query("ROLLBACK");
+          res.status(404).json({ error: "Inventory item not found" });
+          return;
+        }
+
+        const item = itemResult.rows[0];
+
+        // Exclude this allocation from the outstanding sum, otherwise its current
+        // reservation would be counted twice and a 10 -> 20 correction would be
+        // treated as if it needed 20 fresh units instead of 10.
+        const otherAllocationsResult = await client.query(
+          `
+            SELECT COALESCE(SUM(quantity_allocated
+              - returned_good_quantity - returned_damaged_quantity
+              - returned_lost_quantity - returned_repair_quantity), 0) as total_allocated
+            FROM event_allocations
+            WHERE item_id = $1 AND status != 'Returned' AND id <> $2
+          `,
+          [allocation.item_id, allocationId],
+        );
+        const otherAllocated = parseInt(otherAllocationsResult.rows[0].total_allocated, 10);
+
+        const availableForThisAllocation = Number(item.quantity)
+          - Number(item.unavailable_damaged_quantity || 0)
+          - Number(item.unavailable_repair_quantity || 0)
+          - otherAllocated;
+
+        if (nextQuantity > availableForThisAllocation) {
+          await client.query("ROLLBACK");
+          res.status(409).json({
+            error: "Requested quantity exceeds available stock",
+            available_quantity: Math.max(availableForThisAllocation, 0),
+          });
+          return;
+        }
+      }
+
+      const nextNotes = notes === undefined ? allocation.notes : notes || null;
+
+      // The lifecycle predicates are repeated in the WHERE clause as a final guard so a
+      // racing depart/return that committed between the SELECT and here cannot be overwritten.
+      const updateResult = await client.query(
+        `
+          UPDATE event_allocations
+          SET quantity_allocated = $3, notes = $4, updated_at = NOW()
+          WHERE id = $1
+            AND event_id = $2
+            AND status <> 'Returned'
+            AND departed_at IS NULL
+          RETURNING *
+        `,
+        [allocationId, id, nextQuantity, nextNotes],
+      );
+
+      if (updateResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Allocation is no longer editable" });
+        return;
+      }
+
+      await insertEventAuditLog(
+        client,
+        id,
+        req.user?.id || null,
+        "allocation_update",
+        JSON.stringify({
+          allocation_id: allocationId,
+          item_id: allocation.item_id,
+          quantity_allocated: currentQuantity,
+          notes: allocation.notes ?? null,
+        }),
+        JSON.stringify({
+          allocation_id: allocationId,
+          item_id: allocation.item_id,
+          quantity_allocated: nextQuantity,
+          notes: nextNotes,
+        }),
+      );
+
+      await client.query("COMMIT");
+      res.json(updateResult.rows[0]);
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    console.error("[patch-event-allocation] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
   }
 });
