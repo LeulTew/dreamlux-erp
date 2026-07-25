@@ -65,6 +65,21 @@ export async function runStartupMigrations() {
       // Ignore if event_allocations has not been created yet.
     });
 
+    // Issue #197: an assignment is a schedule, not a presence record. Flip the default so new
+    // rows start attendance-unverified. Historical rows are deliberately NOT rewritten - see
+    // migrations/event_assignment_attendance.sql for the full data policy. NULL is normalized
+    // to FALSE because every financial query already excludes NULL, so it changes no money.
+    await client.query(`
+      ALTER TABLE event_assignments
+        ADD COLUMN IF NOT EXISTS attendance_marked_at TIMESTAMP DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS attendance_marked_by UUID REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE event_assignments ALTER COLUMN attended SET DEFAULT FALSE;
+      UPDATE event_assignments SET attended = FALSE WHERE attended IS NULL;
+      ALTER TABLE event_assignments ALTER COLUMN attended SET NOT NULL;
+    `).catch(() => {
+      // Ignore if event_assignments has not been created yet.
+    });
+
     // Add Event Service Scopes catalog and junction tables
     await client.query(`
       CREATE TABLE IF NOT EXISTS event_service_scopes (

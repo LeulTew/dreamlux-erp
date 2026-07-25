@@ -671,7 +671,12 @@ CREATE TABLE IF NOT EXISTS event_assignments (
   employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   role TEXT NOT NULL,
   commission_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  attended BOOLEAN DEFAULT TRUE,
+  -- Issue #197: assignment means SCHEDULED, not present. Attendance must be verified by an
+  -- explicit authorized action, so a new row starts unverified. Labor expense and payroll
+  -- commission both require attended = TRUE.
+  attended BOOLEAN NOT NULL DEFAULT FALSE,
+  attendance_marked_at TIMESTAMP DEFAULT NULL,
+  attendance_marked_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE (event_id, employee_id)
 );

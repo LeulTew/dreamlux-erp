@@ -40,6 +40,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     READY: "Ready",
     DEPARTED: "Departed",
     RESTRICTED: "Restricted",
+    ATTENDED: "Attended",
+    ATTENDANCE_UNVERIFIED: "Attendance unverified",
   },
   am: {
     ARCHIVED: "በማህደር የተያዘ",
@@ -65,6 +67,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     READY: "ዝግጁ",
     DEPARTED: "ተነስቷል",
     RESTRICTED: "የተገደበ",
+    ATTENDED: "ተገኝቷል",
+    ATTENDANCE_UNVERIFIED: "መገኘት አልተረጋገጠም",
   }
 };
 
@@ -81,6 +85,7 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
     case "FINALIZED":
     case "RETURNED":
     case "DEPARTED":
+    case "ATTENDED":
       variant = "success";
       break;
     case "PULLED":
@@ -90,6 +95,7 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
     case "DRAFT":
     case "PENDING":
     case "OVERDUE":
+    case "ATTENDANCE_UNVERIFIED":
       variant = "warning";
       break;
     case "REJECTED":
