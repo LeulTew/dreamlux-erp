@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { v4 as uuidv4 } from "uuid";
 import { fromBuffer } from "file-type";
 import { supabase } from "../db/supabase";
+import { pool } from "../db/pool";
 import { uploadImage, deleteImage, getPublicUrl, downloadImage } from "../storage/storage";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { ActivityService } from "../services/activity-service";
@@ -13,6 +14,7 @@ import {
   createEmployeeSchema,
   updateEmployeeSchema,
   employeePaginationSchema,
+  employeeImportSchema,
 } from "../lib/validation";
 import { generateNextEmployeeId } from "../lib/id-generator";
 import { ZodError } from "zod";
@@ -44,6 +46,7 @@ interface EmployeeRow {
   salary_level: string | null;
   salary_level_id: string | null;
   event_prices: Record<string, number> | null;
+  compensation_mode: "regular" | "commission_only";
   stores?: { name: string } | null;
   salary_levels?: { amount_etb: number } | null;
 }
@@ -110,6 +113,55 @@ const cpUpload = upload.fields([
   { name: "profile_photo", maxCount: 1 },
 ]);
 
+// POST /employees/import — bounded, transactional bulk upsert used by CSV/XLSX parsers.
+router.post("/import", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
+  const parsed = employeeImportSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed", details: parsed.error.issues.map((issue) => issue.message) });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `WITH incoming AS (
+         SELECT * FROM jsonb_to_recordset($1::jsonb) AS row(
+           employee_id text, full_name text, phone text, email text,
+           salary_level text, compensation_mode text, event_prices jsonb
+         )
+       )
+       INSERT INTO employees (
+         employee_id, full_name, phone, email, salary_level, compensation_mode, event_prices
+       )
+       SELECT employee_id, full_name, NULLIF(phone, ''), NULLIF(email, ''),
+              NULLIF(salary_level, ''), compensation_mode, COALESCE(event_prices, '{}'::jsonb)
+       FROM incoming
+       ON CONFLICT (employee_id) DO UPDATE SET
+         full_name = EXCLUDED.full_name,
+         phone = EXCLUDED.phone,
+         email = EXCLUDED.email,
+         salary_level = EXCLUDED.salary_level,
+         compensation_mode = EXCLUDED.compensation_mode,
+         event_prices = EXCLUDED.event_prices,
+         updated_at = NOW()
+       RETURNING id, employee_id, full_name, compensation_mode`,
+      [JSON.stringify(parsed.data.rows)],
+    );
+
+    ActivityService.logActivity({
+      entity_type: "employee",
+      entity_id: "bulk-import",
+      user_id: req.user?.id ?? null,
+      action: "bulk_import",
+      note: `Imported or updated ${result.rows.length} employee records.`,
+    });
+
+    res.status(201).json({ imported: result.rows.length, employees: result.rows });
+  } catch (error) {
+    console.error("[Employees] Bulk import failed:", error);
+    res.status(500).json({ error: "Employee import failed" });
+  }
+});
+
 // POST /employees — create employee with images
 router.post(
   "/",
@@ -129,7 +181,7 @@ router.post(
         return;
       }
 
-      const { full_name, employee_id, department_id, office_id, phone, email, commission, salary_level, event_prices } = parsed.data;
+      const { full_name, employee_id, department_id, office_id, phone, email, commission, salary_level, compensation_mode, event_prices } = parsed.data;
       const salaryLevelId = salary_level && salary_level !== "" ? await resolveSalaryLevelIdByCode(salary_level) : null;
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
@@ -255,6 +307,7 @@ router.post(
         commission: commission ?? 0,
         salary_level: salary_level ?? null,
         salary_level_id: salaryLevelId,
+        compensation_mode,
         event_prices: parsedEventPrices ?? {},
       };
 
@@ -617,7 +670,7 @@ router.patch(
         return;
       }
 
-      const { full_name, employee_id, department_id, office_id, phone, email, commission, salary_level, event_prices } = parsed.data;
+      const { full_name, employee_id, department_id, office_id, phone, email, commission, salary_level, compensation_mode, event_prices } = parsed.data;
       let parsedEventPrices: Record<string, number> | undefined;
       if (event_prices !== undefined) {
         if (typeof event_prices === "string") {
@@ -662,6 +715,7 @@ router.patch(
         email,
         commission: commission ? Number(commission) : undefined,
         salary_level: salary_level || null,
+        compensation_mode,
         event_prices: parsedEventPrices,
         updated_at: new Date().toISOString()
       };

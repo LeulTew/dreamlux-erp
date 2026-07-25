@@ -354,6 +354,7 @@ CREATE TABLE IF NOT EXISTS employees (
   salary_level TEXT, -- Level 1, 2, 3, 4 (optional)
   gender TEXT,
   employment_type TEXT CHECK (employment_type IN ('full-time', 'part-time', 'event-based')) DEFAULT 'full-time',
+  compensation_mode TEXT NOT NULL DEFAULT 'regular' CHECK (compensation_mode IN ('regular', 'commission_only')),
   group_name TEXT,
   bank_name TEXT,
   bank_account TEXT,
@@ -440,6 +441,7 @@ CREATE TABLE IF NOT EXISTS payroll_run_employee_lines (
   employee_code_snapshot TEXT,
   employee_name_snapshot TEXT,
   salary_level_snapshot TEXT,
+  compensation_mode_snapshot TEXT NOT NULL DEFAULT 'regular' CHECK (compensation_mode_snapshot IN ('regular', 'commission_only')),
   base_salary_snapshot NUMERIC(15,2) DEFAULT 0,
   commission_total_snapshot NUMERIC(15,2) DEFAULT 0,
   employee_total_snapshot NUMERIC(15,2) DEFAULT 0,

@@ -176,7 +176,10 @@ describe("Monthly net profit statement", () => {
     expect(res.status).toBe(200);
     expect(res.body.period.closed).toBe(true);
     expect(res.body.treatment.investments).toBe("shown_below_operating_profit");
-    expect(res.body.treatment.payroll).toBe("finalized_payroll_runs_deducted_staff_payment_overheads_excluded");
+    expect(res.body.treatment.payroll).toBe("finalized_payroll_base_salary_deducted_event_commission_already_in_event_labor_staff_payment_overheads_excluded");
+    const payrollSql = mockQuery.mock.calls.map((call) => String(call[0])).find((sql) => sql.includes("run_count"));
+    expect(payrollSql).toContain("SUM(line.base_salary_snapshot)");
+    expect(payrollSql).not.toContain("SUM(line.employee_total_snapshot)");
 
     expect(res.body.totals.eventRevenue).toBe(140000);
     expect(res.body.totals.approvedEventExpenses).toBe(36000);

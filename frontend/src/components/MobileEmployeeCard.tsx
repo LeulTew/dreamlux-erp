@@ -13,6 +13,7 @@ interface MobileEmployeeCardProps {
   selected?: boolean;
   onSelect?: (id: string) => void;
   selectMode?: boolean;
+  compensationLabel?: string;
 }
 
 export default function MobileEmployeeCard({
@@ -26,6 +27,7 @@ export default function MobileEmployeeCard({
   selected,
   onSelect,
   selectMode,
+  compensationLabel,
 }: MobileEmployeeCardProps) {
   return (
     <div
@@ -152,7 +154,7 @@ export default function MobileEmployeeCard({
                         <HiPhone className="w-3 h-3" /> {employee.phone}
                       </span>
                     )}
-                     {employee.salary_level && (
+                    {employee.salary_level && (
                       <div className="flex items-center gap-1 bg-accent/10 px-1.5 py-0.5 rounded shrink min-w-0">
                         <span className="text-accent-dark font-bold tracking-wider text-[10px] whitespace-nowrap">
                           {employee.salary_level}
@@ -164,6 +166,9 @@ export default function MobileEmployeeCard({
                         ) : null}
                       </div>
                     )}
+                    <span className="whitespace-nowrap text-[10px] font-semibold text-foreground">
+                      {compensationLabel ?? (employee.compensation_mode === "commission_only" ? "Commission only" : "Regular · salary + commission")}
+                    </span>
                   </div>
                   <div className="flex gap-2 ml-auto">
                     <button

@@ -932,6 +932,16 @@ export const createEmployee = (formData: FormData) =>
     })
     .then((r) => r.data);
 
+export const importEmployees = (rows: Array<{
+  employee_id: string;
+  full_name: string;
+  phone?: string | null;
+  email?: string | null;
+  salary_level?: string | null;
+  compensation_mode?: "regular" | "commission_only";
+  event_prices?: Record<string, number>;
+}>) => api.post("/employees/import", { rows }).then((r) => r.data);
+
 export const updateEmployee = (id: string, data: FormData | Record<string, unknown>) => {
   if (data instanceof FormData) {
     return api
@@ -1346,6 +1356,8 @@ export const updatePayrollRunStatus = (id: string, status: "DRAFT" | "FINALIZED"
 export const deletePayrollRun = (id: string) => api.delete(`/payroll/runs/${id}`).then(res => res.data);
 export const permanentlyDeletePayrollRun = (id: string) => api.delete(`/payroll/runs/${id}/permanent`).then(res => res.data);
 export const previewPayrollRun = (data: Record<string, unknown>) => api.post("/payroll/preview", data).then(res => res.data);
+export const getEligiblePayrollCommissions = (periodStart: string, periodEnd: string) =>
+  api.get("/payroll/eligible-commissions", { params: { period_start: periodStart, period_end: periodEnd } }).then((res) => res.data);
 export const savePayrollDraft = (data: Record<string, unknown>) => api.post("/payroll/drafts", data).then(res => res.data);
 export const finalizePayrollRun = (data: Record<string, unknown>) => api.post("/payroll/runs", data).then(res => res.data);
 

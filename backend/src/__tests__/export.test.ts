@@ -200,6 +200,7 @@ describe("Export — GET /export/employees/csv", () => {
           phone: "+251900000000",
           email: "demo@company.test",
           salary_level: "L2",
+          compensation_mode: "commission_only",
           commission: "1000",
           event_prices: { evt_wedding: 1200, evt_mels: 800 },
           created_at: "2026-01-01T00:00:00.000Z",
@@ -222,6 +223,8 @@ describe("Export — GET /export/employees/csv", () => {
     expect(res.text).toContain("Event: Wedding (ETB)");
     expect(res.text).toContain("Event: Mels (ETB)");
     expect(res.text).toContain("Demo Employee");
+    expect(res.text).toContain("Compensation Mode");
+    expect(res.text).toContain("commission_only");
     expect(res.text).toContain("1200");
     expect(res.text).toContain("800");
   });

@@ -56,6 +56,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Creating duplicate of": "Creating duplicate of",
     "Employee duplicated successfully!": "Employee duplicated successfully!",
     "Failed to duplicate employee": "Failed to duplicate employee",
+    "Compensation Mode": "Compensation Mode",
+    "Regular (salary + commission)": "Regular (salary + commission)",
+    "Commission only": "Commission only",
+    "Commission-only employees always receive zero base salary.": "Commission-only employees always receive zero base salary.",
   },
   am: {
     "Edit Employee": "የሰራተኛ መረጃ ማስተካከያ",
@@ -96,6 +100,10 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Creating duplicate of": "ቅጂ በማዘጋጀት ላይ ለ",
     "Employee duplicated successfully!": "ሰራተኛ ቅጂ በተሳካ ሁኔታ ተፈጥሯል!",
     "Failed to duplicate employee": "ቅጂ መፍጠር አልተቻለም",
+    "Compensation Mode": "የክፍያ ዓይነት",
+    "Regular (salary + commission)": "መደበኛ (ደመወዝ + ኮሚሽን)",
+    "Commission only": "ኮሚሽን ብቻ",
+    "Commission-only employees always receive zero base salary.": "ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች መሠረታዊ ደመወዝ አያገኙም።",
   }
 };
 
@@ -141,6 +149,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
     phone: employee.phone || "",
     email: employee.email || "",
     salary_level: employee.salary_level || "",
+    compensation_mode: employee.compensation_mode || "regular",
     office_id: employee.office_id || "",
   });
   const [eventPrices, setEventPrices] = useState<Record<string, number>>(employee.event_prices || {});
@@ -154,6 +163,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       phone: employee.phone || "",
       email: employee.email || "",
       salary_level: employee.salary_level || "",
+      compensation_mode: employee.compensation_mode || "regular",
       office_id: employee.office_id || "",
     });
     setEventPrices(employee.event_prices || {});
@@ -726,6 +736,21 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               </div>
 
               {/* Base Salary */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-semibold text-muted-foreground/90 px-1">{t("Compensation Mode")}</label>
+                <Select
+                  className="[&>button]:min-h-12"
+                  options={[
+                    { id: "regular", label: t("Regular (salary + commission)") },
+                    { id: "commission_only", label: t("Commission only") },
+                  ]}
+                  value={formData.compensation_mode}
+                  onChange={(val) => setFormData({ ...formData, compensation_mode: val as "regular" | "commission_only" })}
+                  placeholder={t("Compensation Mode")}
+                />
+                <p className="text-[11px] text-muted px-1">{t("Commission-only employees always receive zero base salary.")}</p>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Base Salary")}</label>
                 <Select

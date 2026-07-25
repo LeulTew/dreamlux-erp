@@ -33,6 +33,7 @@ import {
   getPayrollRuns,
   getPayrollRun,
   getPayrollCycleSettings,
+  getEligiblePayrollCommissions,
 } from "@/lib/api";
 import { 
   Employee, 
@@ -43,6 +44,7 @@ import {
   PayrollEmployeeLine, 
   PayrollRunLineEvent 
 } from "@/lib/types";
+import { mapEligibleCommissions, resolvePayrollBaseSalary } from "@/lib/compensation";
 import { useAuth } from "@/hooks/useAuth";
 import { fuzzySearch } from "@/lib/fuzzy-search";
 import toast from "@/lib/toast";
@@ -188,6 +190,7 @@ type PreviewResponse = {
   employee_lines: Array<{
     employee_id: string;
     employee_name_snapshot: string;
+    compensation_mode_snapshot: "regular" | "commission_only";
     snapshot_base_salary: number;
     total_events_value: number;
     total_line_pay: number;
@@ -418,6 +421,14 @@ function PaymentRunProcessPageContent() {
     return { start, end, kind };
   }, [selectedMonth, periodType, settings]);
 
+  const { data: eligibleCommissions } = useQuery<{
+    lines: Array<{ employee_id: string; event_type_id: string; quantity: number; commission_total: number }>;
+  }>({
+    queryKey: ["eligible-payroll-commissions", activeDates.start, activeDates.end],
+    queryFn: () => getEligiblePayrollCommissions(activeDates.start, activeDates.end),
+    enabled: hasPayrollWrite && Boolean(activeDates.start && activeDates.end),
+  });
+
   const existingDraft = useMemo(() => {
     return findRunForPeriod(runsHistory, "DRAFT", 0, 0, periodType, activeDates.start, activeDates.end);
   }, [runsHistory, periodType, activeDates]);
@@ -425,6 +436,11 @@ function PaymentRunProcessPageContent() {
   const existingFinalized = useMemo(() => {
     return findRunForPeriod(runsHistory, "FINALIZED", 0, 0, periodType, activeDates.start, activeDates.end);
   }, [runsHistory, periodType, activeDates]);
+
+  useEffect(() => {
+    if (!eligibleCommissions || existingDraft || isDraftDirty) return;
+    setEventLinesByEmployee(mapEligibleCommissions(eligibleCommissions.lines));
+  }, [eligibleCommissions, existingDraft, isDraftDirty]);
 
   const periodOptions = useMemo(() => {
     const cycle = settings?.payroll_cycle || "weekly";
@@ -543,8 +559,7 @@ function PaymentRunProcessPageContent() {
 
   const computeEmployeeTotals = useCallback((employee: Employee) => {
     const level = employee.salary_level ? salaryLevelMap.get(employee.salary_level) : undefined;
-    const baseSalaryVal = level ? Number(level.base_salary ?? 0) : Number(employee.base_salary ?? 0);
-    const baseSalary = Number.isNaN(baseSalaryVal) ? 0 : baseSalaryVal;
+    const baseSalary = resolvePayrollBaseSalary(employee, level ? Number(level.base_salary ?? 0) : undefined);
     const lines = eventLinesByEmployee[employee.id] ?? [];
 
     const commission = lines.reduce((sum, line) => {
