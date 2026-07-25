@@ -31,6 +31,10 @@ export async function getAuthoritativePayrollInputLines(
   employeeIds: string[],
 ): Promise<PayrollInputLine[]> {
   const rows = await getEligibleCommissionRows(start, end);
+  return mapEligibleCommissionRows(rows, employeeIds);
+}
+
+export function mapEligibleCommissionRows(rows: EligibleCommissionRow[], employeeIds: string[]): PayrollInputLine[] {
   const eventsByEmployee = new Map<string, PayrollInputLine["events"]>();
 
   for (const row of rows) {

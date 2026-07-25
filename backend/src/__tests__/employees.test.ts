@@ -261,7 +261,7 @@ describe("Employees API", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.imported).toBe(2);
-    const bulkQueries = mockQuery.mock.calls.filter((call) => String(call[0]).includes("jsonb_to_recordset"));
+    const bulkQueries = mockQuery.mock.calls.filter((call) => String((call as unknown[])[0]).includes("jsonb_to_recordset"));
     expect(bulkQueries).toHaveLength(1);
   });
 

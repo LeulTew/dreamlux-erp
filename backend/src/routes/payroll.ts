@@ -647,7 +647,7 @@ router.post("/preview", async (req: AuthRequest, res) => {
     const authoritativeLines = await getAuthoritativePayrollInputLines(
       period.bounds.start,
       period.bounds.end,
-      (employees ?? []).map((employee) => employee.id),
+      (employees ?? []).map((employee: { id: string }) => employee.id),
     );
     const { totalPayrollValue, lines: processedLines } = buildPayrollLines({
       employeeLineEvents: authoritativeLines,
@@ -726,7 +726,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
-    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee) => employee.id));
+    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee: { id: string }) => employee.id));
     const { lines: processedLines } = buildPayrollLines({
       employeeLineEvents: authoritativeLines,
       eventTypes: eventsMaster ?? [],
@@ -899,7 +899,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
-    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee) => employee.id));
+    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee: { id: string }) => employee.id));
     const { lines: processedLines } = buildPayrollLines({
       employeeLineEvents: authoritativeLines,
       eventTypes: eventsMaster ?? [],
