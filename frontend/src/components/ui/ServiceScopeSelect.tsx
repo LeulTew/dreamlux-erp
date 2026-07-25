@@ -53,9 +53,9 @@ export function ServiceScopeSelect({
       if (res?.service_scopes) {
         setAvailableScopes(res.service_scopes);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ServiceScopeSelect] Failed to load scopes:", err);
-      setFetchError(err.message || (isAmharic ? "የአገልግሎት ዓይነቶችን መጫን አልተቻለም" : "Failed to load service scopes"));
+      setFetchError(err instanceof Error && err.message ? err.message : (isAmharic ? "የአገልግሎት ዓይነቶችን መጫን አልተቻለም" : "Failed to load service scopes"));
     } finally {
       setLoading(false);
     }

@@ -270,12 +270,13 @@ function NewProposalContent() {
     };
 
     getEventProposal(cloneFromId)
-      .then((proposal) => {
+      .then((response) => {
+        const proposal = response.proposal;
         setName(proposal.name + " (Copy)");
         setClientName(proposal.client_name);
         setClientPhone(proposal.client_phone || "");
         setEventTypeId(proposal.event_type_id || "");
-        setServiceScopeIds(proposal.service_scope_ids || proposal.service_scopes?.map((s: any) => s.id) || []);
+        setServiceScopeIds(proposal.service_scope_ids || proposal.service_scopes?.map((scope: { id: string }) => scope.id) || []);
         setRequestedBudget(proposal.requested_budget);
         setStartDate(formatDateForInput(proposal.start_date));
         setEndDate(formatDateForInput(proposal.end_date));

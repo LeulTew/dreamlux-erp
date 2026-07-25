@@ -76,7 +76,7 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
   });
 
   test("1. create proposal form submission with multi-select service scopes (FULL, SETUP)", async ({ page }) => {
-    let submittedPayload: any = null;
+    let submittedPayload: { service_scope_ids?: string[] } | null = null;
 
     await page.route("**/events/proposals", (route) => {
       if (route.request().method() === "POST") {
@@ -129,14 +129,14 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
     await submitBtn.click();
 
     expect(submittedPayload).not.toBeNull();
-    expect(submittedPayload.service_scope_ids).toContain("scope-1");
-    expect(submittedPayload.service_scope_ids).toContain("scope-3");
+    expect(submittedPayload!.service_scope_ids).toContain("scope-1");
+    expect(submittedPayload!.service_scope_ids).toContain("scope-3");
   });
 
   test("2. proposal submit workflow (Draft -> Submitted)", async ({ page }) => {
     let submitApiCalled = false;
 
-    await page.route("**/events/proposals/prop-194/submit", (route) => {
+    await page.route("**/api/events/proposals/prop-194/submit", (route) => {
       submitApiCalled = true;
       return fulfillJson(route, {
         proposal: {
@@ -148,7 +148,7 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       });
     });
 
-    await page.route("**/events/proposals/prop-194", (route) => {
+    await page.route("**/api/events/proposals/prop-194", (route) => {
       if (route.request().url().endsWith("/submit")) {
         return route.continue();
       }
@@ -183,7 +183,7 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
   test("3. proposal approval workflow (Submitted -> Approved)", async ({ page }) => {
     let approveApiCalled = false;
 
-    await page.route("**/events/proposals/prop-194/approve", (route) => {
+    await page.route("**/api/events/proposals/prop-194/approve", (route) => {
       approveApiCalled = true;
       return fulfillJson(route, {
         proposal: {
@@ -195,7 +195,7 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       });
     });
 
-    await page.route("**/events/proposals/prop-194", (route) => {
+    await page.route("**/api/events/proposals/prop-194", (route) => {
       if (route.request().url().endsWith("/approve")) {
         return route.continue();
       }
@@ -230,7 +230,7 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
   test("4. proposal conversion workflow (Approved -> Converted with scope copy assertion)", async ({ page }) => {
     let convertApiCalled = false;
 
-    await page.route("**/events/proposals/prop-194/convert", (route) => {
+    await page.route("**/api/events/proposals/prop-194/convert", (route) => {
       convertApiCalled = true;
       return fulfillJson(route, {
         proposal: {
@@ -255,7 +255,7 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
       }, 201);
     });
 
-    await page.route("**/events/proposals/prop-194", (route) => {
+    await page.route("**/api/events/proposals/prop-194", (route) => {
       if (route.request().url().endsWith("/convert")) {
         return route.continue();
       }
@@ -294,7 +294,7 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
   });
 
   test("5. converted event detail displays copied service scopes", async ({ page }) => {
-    await page.route("**/events/evt-194", (route) => {
+    await page.route("**/api/events/evt-194/workspace", (route) => {
       if (route.request().method() === "GET") {
         return fulfillJson(route, {
           event: {
@@ -310,18 +310,25 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
             status: "Planned",
             service_scopes: [authoritativeScopes[0], authoritativeScopes[2]],
           },
+          allocations: [],
+          checklist: [],
+          employees: [],
+          vehicles: [],
+          expenses: [],
+          trips: [],
         });
       }
       return route.continue();
     });
 
     await page.goto("/events/evt-194");
-    await expect(page.locator("body")).toContainText("Full");
-    await expect(page.locator("body")).toContainText("Setup");
+    await expect(page.getByRole("heading", { name: "Grand Sheraton Wedding" })).toBeVisible();
+    await expect(page.getByText("Full", { exact: true })).toBeVisible();
+    await expect(page.getByText("Setup", { exact: true })).toBeVisible();
   });
 
   test("6. clone proposal preserves service scope selections", async ({ page }) => {
-    await page.route("**/events/proposals/prop-194", (route) => {
+    await page.route("**/api/events/proposals/prop-194", (route) => {
       if (route.request().method() === "GET") {
         return fulfillJson(route, {
           proposal: {
@@ -352,35 +359,36 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
     await expect(page.locator('div[role="combobox"] span:has-text("Setup")').first()).toBeVisible();
   });
 
-  test("7. event edit form updates service scope selections and sends PUT payload", async ({ page }) => {
-    await page.route("**/events/evt-edit-1", (route) => {
-      if (route.request().method() === "GET") {
-        return fulfillJson(route, {
-          event: {
-            id: "evt-edit-1",
-            name: "Corporate Gala",
-            client_name: "TechCorp",
-            event_type_id: "et-corporate",
-            event_type_name: "Corporate",
-            start_date: "2026-10-01",
-            end_date: "2026-10-02",
-            venue_location: "Hilton Addis",
-            contract_price: 500000,
-            status: "Planned",
-            service_scopes: [authoritativeScopes[1], authoritativeScopes[3]],
-          },
-        });
+  test("7. event registration sends exact multi-select service scope payload", async ({ page }) => {
+    let createPayload: { service_scope_ids?: string[] } | null = null;
+    await page.route("**/api/events", (route) => {
+      if (route.request().method() === "POST") {
+        createPayload = JSON.parse(route.request().postData() || "{}");
+        return fulfillJson(route, { event: { id: "evt-created-194" } }, 201);
       }
-      return route.continue();
+      return fulfillJson(route, { events: [], total: 0, page: 1, limit: 20, totalPages: 1 });
     });
 
-    await page.goto("/events/evt-edit-1");
-    await expect(page.locator("body")).toContainText("Background");
-    await expect(page.locator("body")).toContainText("Table Setup");
+    await page.goto("/events");
+    await page.getByRole("button", { name: "Add Event" }).click();
+    await expect(page.getByRole("heading", { name: "Create Event" })).toBeVisible();
+    await page.locator('input[placeholder="e.g. Betty\'s Wedding"]').fill("Corporate Gala");
+    await page.locator('input[placeholder="e.g. Betty Hailu"]').fill("TechCorp");
+    await page.locator('input[placeholder="e.g. Sheraton Ballroom / CMC Residence"]').fill("Hilton Addis");
+    await page.locator('input[type="number"]').fill("500000");
+    await page.locator('input[type="date"]').nth(0).fill("2026-10-01");
+    await page.locator('input[type="date"]').nth(1).fill("2026-10-02");
+    const scopeSelect = page.locator('div[role="combobox"]').first();
+    await scopeSelect.click();
+    await page.getByRole("option", { name: /Background/ }).click();
+    await page.getByRole("option", { name: /Table Setup/ }).click();
+    await page.getByRole("button", { name: "Create Event" }).click();
+    await expect.poll(() => createPayload).not.toBeNull();
+    expect(createPayload!.service_scope_ids).toEqual(["scope-2", "scope-4"]);
   });
 
   test("8. category independence: form submits category and service scopes without cross-filtering", async ({ page }) => {
-    let postPayload: any = null;
+    let postPayload: { service_scope_ids?: string[] } | null = null;
 
     await page.route("**/events/proposals", (route) => {
       if (route.request().method() === "POST") {
@@ -423,11 +431,11 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
     await submitBtn.click();
 
     expect(postPayload).not.toBeNull();
-    expect(postPayload.service_scope_ids).toContain("scope-2");
-    expect(postPayload.service_scope_ids).toContain("scope-4");
+    expect(postPayload!.service_scope_ids).toContain("scope-2");
+    expect(postPayload!.service_scope_ids).toContain("scope-4");
   });
 
-  test("9. profitability report export (CSV/XLSX) contains service scope columns", async ({ page }) => {
+  test("9. profitability report Events view renders service scope columns", async ({ page }) => {
     await page.route("**/events/reports/profit**", (route) =>
       fulfillJson(route, {
         events: [
@@ -450,10 +458,11 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
         summary: { totalEvents: 1, totalRevenue: 300000, totalExpenses: 50000, netProfit: 250000, profitMargin: 83.3, pendingExpenseExposure: 0 },
         kpis: { mostProfitableEvent: null, highestMarginEventType: null },
         categoryBreakdown: [],
+        eventTypePerformance: [],
         proposalVariance: { averageVariance: 0, events: [] },
         monthlyData: [],
         page: 1,
-        pageSize: 10,
+        limit: 10,
         total: 1,
         totalPages: 1,
       })
@@ -462,13 +471,14 @@ test.describe("Issue 194 — multi-select event service scopes complete E2E suit
     await page.goto("/hr/reports/profit");
     
     // Switch to the Events tab to display event row details
-    const eventsTab = page.locator('button:has-text("Events")').first();
+    const eventsTab = page.getByRole("tab", { name: "Events", exact: true });
     await expect(eventsTab).toBeVisible();
     await eventsTab.click();
 
     await expect(page.locator("body")).toContainText("Grand Sheraton Wedding");
     await expect(page.locator("body")).toContainText("Full");
     await expect(page.locator("body")).toContainText("Setup");
+
   });
 
   test("10. mobile viewport: 48px touch targets, badge remove target size, and zero overflow", async ({ page }) => {
