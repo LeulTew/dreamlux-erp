@@ -111,7 +111,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Week 4 (22 - 28)": "Week 4 (22 - 28)",
     "Week 5 (29 - End)": "Week 5 (29 - End)",
     "Full Month": "Full Month",
-    "Manual Period": "Manual Period"
+    "Manual Period": "Manual Period",
+    "Commission only": "Commission only",
+    "Regular (salary + commission)": "Regular (salary + commission)",
+    "COMMISSION ONLY": "COMMISSION ONLY",
+    "Zero base salary": "Zero base salary",
+    "Event(s)": "Event(s)",
+    "Verified attendance commissions are automatically calculated from approved event work.": "Verified attendance commissions are automatically calculated from approved event work.",
+    "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.": "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments."
   },
   am: {
     "Salary & Event Disbursement": "የደመወዝ እና ክስተት ክፍያ ማስተላለፊያ",
@@ -171,7 +178,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Week 4 (22 - 28)": "ሳምንት 4 (ከ22 - 28)",
     "Week 5 (29 - End)": "ሳምንት 5 (ከ29 - መጨረሻ)",
     "Full Month": "ሙሉ ወር",
-    "Manual Period": "በእጅ የተመረጠ ጊዜ"
+    "Manual Period": "በእጅ የተመረጠ ጊዜ",
+    "Commission only": "ኮሚሽን ብቻ",
+    "Regular (salary + commission)": "መደበኛ (ደመወዝ + ኮሚሽን)",
+    "COMMISSION ONLY": "ኮሚሽን ብቻ",
+    "Zero base salary": "መሠረታዊ ደመወዝ የለውም",
+    "Event(s)": "ክስተት(ቶች)",
+    "Verified attendance commissions are automatically calculated from approved event work.": "የተረጋገጡ የክስተት ኮሚሽኖች ከተፈቀዱ የክስተት ስራዎች በራስ-ሰር ይሰላሉ።",
+    "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.": "የደመወዝ ክፍያ በክፍያ ዓይነት ይወሰናል። ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች 0 ETB መሠረታዊ ደመወዝ የሚያገኙ ሲሆን የተረጋገጡ የዝግጅት ኮሚሽኖች ከተገኙበት ስራ ይሰላሉ።"
   }
 };
 
@@ -1028,6 +1042,14 @@ function PaymentRunProcessPageContent() {
           </div>
         )}
 
+        {/* Contextual explanation banner */}
+        <div className="rounded-2xl border border-border/50 bg-card-alt/60 p-4 flex items-start gap-3 text-xs text-muted-foreground shadow-sm">
+          <HiInformationCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            {t("Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.")}
+          </p>
+        </div>
+
         <div className="grid gap-4">
           {paginatedEmployees.map((employee: Employee) => {
             const lines = eventLinesByEmployee[employee.id] ?? [];
@@ -1078,97 +1100,30 @@ function PaymentRunProcessPageContent() {
                     <p className="text-xs text-muted-foreground italic">{t("No events added for this employee yet.")}</p>
                   ) : (
                     lines.map((line, index) => {
+                      const eventType = eventTypes?.find((et) => et.id === line.event_type_id);
                       const rawUnitPrice = line.price_override != null ? Number(line.price_override) : getEmployeeEventPrice(employee, line.event_type_id);
                       const unitPrice = Number.isNaN(rawUnitPrice) ? 0 : rawUnitPrice;
                       const rawLineTotal = unitPrice * Math.max(1, Number(line.quantity || 1));
                       const lineTotal = Number.isNaN(rawLineTotal) ? 0 : rawLineTotal;
 
                       return (
-                        <div key={`${employee.id}-${index}`} className="flex flex-col gap-2 p-2.5 border border-border/40 rounded-xl bg-card-alt/50 mb-2">
-                          {/* Row 1: Event dropdown */}
-                          <div className="grid gap-2">
-                            <Select
-                              options={(eventTypes ?? []).map((eventType) => ({
-                                id: eventType.id,
-                                label: eventType.event_name,
-                              }))}
-                              value={line.event_type_id}
-                              onChange={(val) => {
-                                const defaults = getDefaultLinePatch(employee.id, val);
-                                updateEventLine(employee.id, index, { event_type_id: val, ...defaults });
-                              }}
-                              placeholder={t("Select event")}
-                              className="w-full"
-                            />
+                        <div key={`${employee.id}-${index}`} className="flex items-center justify-between p-3 border border-border/50 rounded-xl bg-card-alt/40">
+                          <div>
+                            <p className="text-xs font-bold text-foreground">{eventType?.event_name ?? t("Select event")}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">
+                              {line.quantity || 1} {t("Event(s)")} × ETB {unitPrice.toLocaleString()}
+                            </p>
                           </div>
-
-                          {/* Row 2: Qty stepper + editable price + delete */}
-                          <div className="flex items-center gap-2">
-                            {/* - / + Stepper */}
-                            <div className="flex items-center rounded-xl border border-border overflow-hidden shrink-0">
-                              <button
-                                onClick={() => updateEventLine(employee.id, index, { quantity: Math.max(1, (line.quantity || 1) - 1) })}
-                                className="min-w-[48px] min-h-[48px] text-foreground hover:bg-muted transition-colors flex items-center justify-center cursor-pointer"
-                                title={t("Decrease")}
-                              >
-                                <HiMinus className="w-4 h-4" />
-                              </button>
-                              <span className="px-3 py-2 text-sm font-bold min-w-8 text-center select-none">{line.quantity || 1}</span>
-                              <button
-                                onClick={() => updateEventLine(employee.id, index, { quantity: (line.quantity || 1) + 1 })}
-                                className="min-w-[48px] min-h-[48px] text-foreground hover:bg-muted transition-colors flex items-center justify-center cursor-pointer"
-                                title={t("Increase")}
-                              >
-                                <HiOutlinePlus className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            {/* Editable unit price (acts as override) */}
-                            <div className="relative flex-1">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-bold pointer-events-none">ETB</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={line.price_override ?? getEmployeeEventPrice(employee, line.event_type_id)}
-                                onChange={(e) => {
-                                  const val = Math.max(0, Number(e.target.value));
-                                  const basePrice = getEmployeeEventPrice(employee, line.event_type_id);
-                                  updateEventLine(employee.id, index, {
-                                    price_override: val !== basePrice ? val : null,
-                                  });
-                                }}
-                                className="w-full rounded-xl border border-border bg-background text-foreground pl-9 pr-2 min-h-[48px] text-sm font-bold text-right"
-                              />
-                            </div>
-
-                            {/* Line total */}
-                            {(line.quantity > 1 || line.price_override != null) && (
-                              <div className="text-xs font-bold text-muted-foreground shrink-0 whitespace-nowrap">
-                                = ETB {lineTotal.toLocaleString()}
-                              </div>
-                            )}
-
-                            {/* Delete */}
-                            <button
-                              onClick={() => removeEventLine(employee.id, index)}
-                              className="min-w-[48px] min-h-[48px] rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-                              title={t("Remove Event")}
-                            >
-                              <HiOutlineTrash className="w-4 h-4" />
-                            </button>
-                          </div>
+                          <p className="text-xs font-black text-foreground font-mono">
+                            ETB {lineTotal.toLocaleString()}
+                          </p>
                         </div>
                       );
                     })
                   )}
-
-                  <button
-                    onClick={() => addEventLine(employee.id)}
-                    className="w-full min-h-[48px] rounded-xl border border-dashed border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <HiOutlinePlus className="w-4 h-4" />
-                    {t("Add Event")}
-                  </button>
+                  <p className="text-[10px] text-muted-foreground italic px-1 pt-1">
+                    {t("Verified attendance commissions are automatically calculated from approved event work.")}
+                  </p>
                 </div>
 
                 <div className="rounded-2xl bg-card-alt border border-border/50 p-4 flex flex-col justify-center shadow-sm">

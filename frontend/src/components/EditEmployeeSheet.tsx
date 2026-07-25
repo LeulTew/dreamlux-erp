@@ -741,7 +741,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-semibold text-muted-foreground/90 px-1">{t("Compensation Mode")}</label>
                 <Select
-                  className="[&>button]:min-h-12"
+                  className="[&>button]:min-h-[48px]"
                   options={[
                     { id: "regular", label: t("Regular (salary + commission)") },
                     { id: "commission_only", label: t("Commission only") },
@@ -756,6 +756,8 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/90 mb-1.5 px-1">{t("Base Salary")}</label>
                 <Select
+                  className="[&>button]:min-h-[48px]"
+                  disabled={formData.compensation_mode === "commission_only"}
                   options={salaryLevels.map((level) => ({
                     id: level.level_name,
                     label: `${level.level_name} - ETB ${Number(level.base_salary).toLocaleString()}`
@@ -765,9 +767,11 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                   placeholder={t("Select Level")}
                 />
                 <p className="text-[10px] font-semibold text-muted-foreground/80 px-1 mt-1">
-                  {selectedSalaryLevel
-                    ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
-                    : t("Select a salary level to view the amount")}
+                  {formData.compensation_mode === "commission_only"
+                    ? t("Fixed at ETB 0 for commission-only mode.")
+                    : selectedSalaryLevel
+                      ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
+                      : t("Select a salary level to view the amount")}
                 </p>
               </div>
 

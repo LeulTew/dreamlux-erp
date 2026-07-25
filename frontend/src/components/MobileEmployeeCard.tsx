@@ -180,7 +180,7 @@ export default function MobileEmployeeCard({
                         e.stopPropagation();
                         onTap?.(employee);
                       }}
-                      className="min-w-[48px] min-h-[48px] rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all active:scale-95 shadow-md flex items-center justify-center cursor-pointer"
+                      className="min-w-[48px] min-h-[48px] rounded-xl bg-indigo-600 text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-indigo-700 transition-all active:scale-95 shadow-md flex items-center justify-center cursor-pointer"
                       title="Edit Employee"
                     >
                       <HiPencilSquare className="w-5 h-5" />
@@ -190,7 +190,7 @@ export default function MobileEmployeeCard({
                         e.stopPropagation();
                         onDelete?.(employee);
                       }}
-                      className="min-w-[48px] min-h-[48px] rounded-xl border border-border/60 hover:bg-red-50 text-muted hover:text-danger transition-all flex items-center justify-center cursor-pointer"
+                      className="min-w-[48px] min-h-[48px] rounded-xl border border-border/60 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-red-50 text-muted [@media(hover:hover)_and_(pointer:fine)]:hover:text-danger transition-all flex items-center justify-center cursor-pointer"
                       title="Move to Trash"
                     >
                       <HiTrash className="w-5 h-5" />
