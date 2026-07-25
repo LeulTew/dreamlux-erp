@@ -539,6 +539,24 @@ export const createEventAllocationSchema = z.object({
 export const updateEventAllocationDispatchSchema = z.object({
   dispatch_checked: z.boolean({ required_error: "dispatch_checked is required" }),
 });
+
+// Issue #196: correct an active allocation in place instead of release-and-recreate.
+// Both fields are optional so notes can be edited without touching reserved stock,
+// but at least one must be present so a no-op request is rejected rather than
+// producing an empty audit entry.
+export const updateEventAllocationSchema = z
+  .object({
+    quantity_allocated: z.coerce
+      .number()
+      .int("Quantity must be a whole number")
+      .min(1, "Quantity must be at least 1")
+      .max(1_000_000, "Quantity too large")
+      .optional(),
+    notes: z.string().trim().max(1000, "Allocation notes too long").optional().nullable(),
+  })
+  .refine((data) => data.quantity_allocated !== undefined || data.notes !== undefined, {
+    message: "Provide quantity_allocated or notes to update",
+  });
 // Issue #173: one immutable return receipt line. Quantities are whole numbers;
 // at least one condition quantity must be positive.
 const returnQuantitySchema = z.coerce
@@ -601,6 +619,7 @@ export const updateEventChecklistItemSchema = createEventChecklistItemSchema.par
 export type UpdateEventDesignInput = z.infer<typeof updateEventDesignSchema>;
 export type CreateEventAllocationInput = z.infer<typeof createEventAllocationSchema>;
 export type UpdateEventAllocationDispatchInput = z.infer<typeof updateEventAllocationDispatchSchema>;
+export type UpdateEventAllocationInput = z.infer<typeof updateEventAllocationSchema>;
 export type CreateEventChecklistItemInput = z.infer<typeof createEventChecklistItemSchema>;
 export type UpdateEventChecklistItemInput = z.infer<typeof updateEventChecklistItemSchema>;
 

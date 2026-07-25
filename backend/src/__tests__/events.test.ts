@@ -1622,6 +1622,353 @@ describe("Events API", () => {
     expect(res.body.success).toBe(true);
   });
 
+  // Issue #196 - PATCH /events/:id/allocations/:allocationId
+  //
+  // The route runs entirely inside one transaction, so the mocked query queue is:
+  //   BEGIN -> event FOR UPDATE -> allocation FOR UPDATE
+  //   [-> item FOR UPDATE -> other-allocation sum]   (quantity increases only)
+  //   -> UPDATE -> audit INSERT -> COMMIT
+  describe("PATCH /events/:id/allocations/:allocationId (issue #196)", () => {
+    const ACTIVE_ALLOCATION = {
+      id: "alloc-1",
+      event_id: "event-1",
+      item_id: "item-1",
+      quantity_allocated: 10,
+      notes: "Front hall",
+      status: "Reserved",
+      departed_at: null,
+      returned_at: null,
+      returned_good_quantity: 0,
+      returned_damaged_quantity: 0,
+      returned_lost_quantity: 0,
+      returned_repair_quantity: 0,
+    };
+
+    function mockPreamble(event: Record<string, unknown> = { id: "event-1", status: "Planned" }) {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [event], rowCount: 1 }); // event FOR UPDATE
+    }
+
+    function mockAllocation(allocation: Record<string, unknown> | null = ACTIVE_ALLOCATION) {
+      mockQuery.mockResolvedValueOnce(
+        allocation ? { rows: [allocation], rowCount: 1 } : { rows: [], rowCount: 0 },
+      );
+    }
+
+    test("increases quantity when the extra units are available", async () => {
+      mockPreamble();
+      mockAllocation();
+      // item FOR UPDATE: 100 physical units, none damaged/in repair
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "item-1", quantity: 100, unavailable_damaged_quantity: 0, unavailable_repair_quantity: 0 }],
+        rowCount: 1,
+      });
+      // Other active allocations hold 70. Availability for THIS row is 100 - 70 = 30,
+      // so growing 10 -> 20 must succeed (it only needs 10 more units).
+      mockQuery.mockResolvedValueOnce({ rows: [{ total_allocated: "70" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...ACTIVE_ALLOCATION, quantity_allocated: 20 }],
+        rowCount: 1,
+      }); // UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 20 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.quantity_allocated).toBe(20);
+
+      const calls = mockQuery.mock.calls.map((call: any[]) => String(call[0]));
+      expect(calls.some((sql) => sql.includes("FROM event_allocations") && sql.includes("FOR UPDATE"))).toBe(true);
+      expect(calls.some((sql) => sql.includes("FROM items") && sql.includes("FOR UPDATE"))).toBe(true);
+      expect(calls.at(-1)).toBe("COMMIT");
+    });
+
+    test("availability check excludes the allocation being edited", async () => {
+      mockPreamble();
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "item-1", quantity: 100, unavailable_damaged_quantity: 0, unavailable_repair_quantity: 0 }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total_allocated: "70" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...ACTIVE_ALLOCATION, quantity_allocated: 20 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 20 });
+
+      const sumCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("total_allocated"));
+      expect(sumCall).toBeDefined();
+      // Self-exclusion is what stops the current 10 units from being counted twice.
+      expect(String(sumCall![0])).toContain("id <> $2");
+      expect(sumCall![1]).toEqual(["item-1", "alloc-1"]);
+    });
+
+    test("rejects an increase that exceeds available stock with 409", async () => {
+      mockPreamble();
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "item-1", quantity: 100, unavailable_damaged_quantity: 0, unavailable_repair_quantity: 0 }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total_allocated: "95" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 20 });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain("exceeds available stock");
+      expect(res.body.available_quantity).toBe(5);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]) === "ROLLBACK")).toBe(true);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("UPDATE event_allocations"))).toBe(false);
+    });
+
+    test("decreases quantity without re-checking item stock", async () => {
+      mockPreamble();
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...ACTIVE_ALLOCATION, quantity_allocated: 4 }], rowCount: 1 }); // UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 4 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.quantity_allocated).toBe(4);
+      // Freed stock falls out of the availability sum automatically; no item lock needed.
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("FROM items"))).toBe(false);
+    });
+
+    test("updates notes only and leaves quantity untouched", async () => {
+      mockPreamble();
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...ACTIVE_ALLOCATION, notes: "Moved to back hall" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ notes: "Moved to back hall" });
+
+      expect(res.status).toBe(200);
+      const updateCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("UPDATE event_allocations"));
+      // Params: [allocationId, eventId, quantity, notes] - quantity stays at the current 10.
+      expect(updateCall![1]).toEqual(["alloc-1", "event-1", 10, "Moved to back hall"]);
+    });
+
+    test("clears notes when an explicit null is sent", async () => {
+      mockPreamble();
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...ACTIVE_ALLOCATION, notes: null }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ notes: null });
+
+      expect(res.status).toBe(200);
+      const updateCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("UPDATE event_allocations"));
+      expect(updateCall![1][3]).toBeNull();
+    });
+
+    test("writes an audit entry carrying the old and new values", async () => {
+      mockPreamble();
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...ACTIVE_ALLOCATION, quantity_allocated: 6, notes: "Back hall" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 6, notes: "Back hall" });
+
+      const auditCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"));
+      expect(auditCall).toBeDefined();
+      const [eventId, userId, field, oldValue, newValue] = auditCall![1];
+      expect(eventId).toBe("event-1");
+      expect(userId).toBe("user-1");
+      expect(field).toBe("allocation_update");
+      expect(JSON.parse(oldValue)).toEqual({
+        allocation_id: "alloc-1",
+        item_id: "item-1",
+        quantity_allocated: 10,
+        notes: "Front hall",
+      });
+      expect(JSON.parse(newValue)).toEqual({
+        allocation_id: "alloc-1",
+        item_id: "item-1",
+        quantity_allocated: 6,
+        notes: "Back hall",
+      });
+    });
+
+    test("rolls back the whole transaction when the audit insert fails", async () => {
+      mockPreamble();
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...ACTIVE_ALLOCATION, quantity_allocated: 6 }], rowCount: 1 }); // UPDATE
+      mockQuery.mockRejectedValueOnce(new Error("audit log write failed")); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 6 });
+
+      expect(res.status).toBe(500);
+      const sqls = mockQuery.mock.calls.map((call: any[]) => String(call[0]));
+      expect(sqls).toContain("ROLLBACK");
+      expect(sqls).not.toContain("COMMIT");
+    });
+
+    test("rejects an allocation that belongs to another event (BOLA)", async () => {
+      mockPreamble();
+      mockAllocation(null); // event-scoped lookup finds nothing
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-from-other-event")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe("Allocation not found");
+      const lookupCall = mockQuery.mock.calls.find((call: any[]) =>
+        String(call[0]).includes("FROM event_allocations") && String(call[0]).includes("FOR UPDATE"),
+      );
+      expect(lookupCall![1]).toEqual(["alloc-from-other-event", "event-1"]);
+    });
+
+    test("blocks editing a departed allocation", async () => {
+      mockPreamble();
+      mockAllocation({ ...ACTIVE_ALLOCATION, departed_at: "2026-07-01T11:00:00.000Z", status: "Pulled" });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe("Departed allocations cannot be edited");
+    });
+
+    test("blocks editing a returned allocation", async () => {
+      mockPreamble();
+      mockAllocation({ ...ACTIVE_ALLOCATION, status: "Returned", returned_at: "2026-07-02T09:00:00.000Z", returned_good_quantity: 10 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe("Returned allocations cannot be edited");
+    });
+
+    test("blocks editing on a completed event without the override permission", async () => {
+      mockPreamble({ id: "event-1", status: "Completed" });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        // INVENTORY_CONTROLLER holds event_allocations:write but not events:override_completed.
+        .set("Authorization", `Bearer ${getToken("INVENTORY_CONTROLLER")}`)
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("Completed events cannot be edited");
+    });
+
+    test("allows an override-authorized user to edit on a completed event", async () => {
+      mockPreamble({ id: "event-1", status: "Completed" });
+      mockAllocation();
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...ACTIVE_ALLOCATION, quantity_allocated: 5 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`) // SUPER_ADMIN holds events:override_completed
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(200);
+    });
+
+    test("returns 409 when a racing depart makes the row unwritable", async () => {
+      mockPreamble();
+      mockAllocation();
+      // The lifecycle predicates in the UPDATE WHERE clause match nothing.
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe("Allocation is no longer editable");
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"))).toBe(false);
+    });
+
+    test("rejects unauthenticated requests", async () => {
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(401);
+    });
+
+    test("rejects users without inventory allocation permission", async () => {
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`)
+        .send({ quantity_allocated: 5 });
+
+      expect(res.status).toBe(403);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]) === "BEGIN")).toBe(false);
+    });
+
+    test.each([
+      [{ quantity_allocated: 0 }, "at least 1"],
+      [{ quantity_allocated: -3 }, "at least 1"],
+      [{ quantity_allocated: 2.5 }, "whole number"],
+      [{ quantity_allocated: "abc" }, "Expected number"],
+      [{ quantity_allocated: 5_000_000 }, "too large"],
+      [{ notes: "x".repeat(1001) }, "too long"],
+      [{}, "Provide quantity_allocated or notes"],
+    ])("rejects invalid payload %j", async (payload, expectedMessage) => {
+      const res = await request(app)
+        .patch("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send(payload);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain(expectedMessage);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]) === "BEGIN")).toBe(false);
+    });
+  });
+
   // Checklist - Create
   test("POST /events/:id/checklist adds checklist item", async () => {
     // Event check

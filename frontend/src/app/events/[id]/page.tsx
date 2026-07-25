@@ -15,6 +15,7 @@ import {
   HiMapPin,
   HiMinusCircle,
   HiPaintBrush,
+  HiPencilSquare,
   HiPhone,
   HiPlus,
   HiTruck,
@@ -33,6 +34,7 @@ import {
   createEventAllocation,
   createEventChecklistItem,
   deleteEventAllocation,
+  updateEventAllocation,
   markEventDispatchDeparted,
   updateEventAllocationDispatchCheck,
   getEventWorkspace,
@@ -92,6 +94,15 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Allocation exceeds available stock.": "Allocation exceeds available stock.",
     "Allocation saved": "Allocation saved",
     "Allocation released": "Allocation released",
+    Edit: "Edit",
+    Save: "Save",
+    Cancel: "Cancel",
+    "Edit Allocation": "Edit Allocation",
+    "Allocation updated": "Allocation updated",
+    "Update allocation failed": "Update allocation failed",
+    "Enter a whole quantity of 1 or more.": "Enter a whole quantity of 1 or more.",
+    "Locked after departure": "Locked after departure",
+    "Locked after return": "Locked after return",
     "Dispatch Checklist": "Dispatch Checklist",
     "Ready": "Ready",
     "Departed": "Departed",
@@ -229,6 +240,15 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Allocation exceeds available stock.": "ምደባው ካለው ክምችት በላይ ነው።",
     "Allocation saved": "ምደባ ተቀምጧል",
     "Allocation released": "ምደባ ተለቋል",
+    Edit: "አስተካክል",
+    Save: "አስቀምጥ",
+    Cancel: "ሰርዝ",
+    "Edit Allocation": "ምደባ አስተካክል",
+    "Allocation updated": "ምደባ ተዘምኗል",
+    "Update allocation failed": "ምደባን ማዘመን አልተሳካም",
+    "Enter a whole quantity of 1 or more.": "ከ1 ወይም ከዚያ በላይ ሙሉ ቁጥር ያስገቡ።",
+    "Locked after departure": "ከተነሳ በኋላ ተቆልፏል",
+    "Locked after return": "ከተመለሰ በኋላ ተቆልፏል",
     "Dispatch Checklist": "የመላኪያ ማረጋገጫ",
     "Ready": "ዝግጁ",
     "Departed": "ተነስቷል",
@@ -654,6 +674,11 @@ export default function EventWorkspacePage() {
   const [selectedItemId, setSelectedItemId] = useState("");
   const [allocationQty, setAllocationQty] = useState("1");
   const [allocationNotes, setAllocationNotes] = useState("");
+  // Issue #196: inline allocation correction. Only one row is editable at a time so the
+  // draft quantity/notes never leak between rows.
+  const [editingAllocationId, setEditingAllocationId] = useState<string | null>(null);
+  const [editAllocationQty, setEditAllocationQty] = useState("");
+  const [editAllocationNotes, setEditAllocationNotes] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskOwner, setTaskOwner] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
@@ -712,6 +737,29 @@ export default function EventWorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
     },
     onError: () => toast.error(t("Allocation exceeds available stock.")),
+  });
+
+  const updateAllocationMutation = useMutation({
+    mutationFn: (payload: { allocationId: string; quantity_allocated: number; notes: string | null }) =>
+      updateEventAllocation(eventId, payload.allocationId, {
+        quantity_allocated: payload.quantity_allocated,
+        notes: payload.notes,
+      }),
+    onSuccess: () => {
+      toast.success(t("Allocation updated"));
+      setEditingAllocationId(null);
+      setEditAllocationQty("");
+      setEditAllocationNotes("");
+      // Quantity changes move stock, so the item picker's availability figures and the
+      // dispatch/readiness counters derived from the workspace must both be refetched.
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["event-allocation-items"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["event-dispatch-queue"] });
+    },
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      toast.error(err.response?.data?.error || err.message || t("Update allocation failed"));
+    },
   });
 
   const releaseMutation = useMutation({
@@ -969,6 +1017,31 @@ export default function EventWorkspacePage() {
     Number(allocationQty) > 0 &&
     Number(allocationQty) <= selectedAvailable &&
     !allocationMutation.isPending;
+  // Issue #196: mirrors the backend lifecycle guard. A completed event is only editable by
+  // holders of events:override_completed, so anyone else sees no Edit action rather than a
+  // control that always 403s.
+  const canOverrideCompletedEvent = hasPermission("events:override_completed");
+  const allocationEditLockReason = (allocation: { status: string; departed_at: string | null }): string | null => {
+    if (allocation.status === "Returned") return t("Locked after return");
+    if (allocation.departed_at) return t("Locked after departure");
+    return null;
+  };
+  const canEditAllocations = canWriteAllocations && (!isEventCompleted || canOverrideCompletedEvent);
+  const editQtyValue = Number(editAllocationQty);
+  const isEditQtyValid = Number.isInteger(editQtyValue) && editQtyValue >= 1;
+
+  const startEditingAllocation = (allocation: { id: string; quantity_allocated: number; notes: string | null }) => {
+    setEditingAllocationId(allocation.id);
+    setEditAllocationQty(String(allocation.quantity_allocated));
+    setEditAllocationNotes(allocation.notes || "");
+  };
+
+  const cancelEditingAllocation = () => {
+    setEditingAllocationId(null);
+    setEditAllocationQty("");
+    setEditAllocationNotes("");
+  };
+
   const activeDispatchAllocations = allocations.filter((allocation) => allocation.status !== "Returned");
   const checkedDispatchCount = activeDispatchAllocations.filter((allocation) => allocation.dispatch_checked_at).length;
   const departedDispatchCount = activeDispatchAllocations.filter((allocation) => allocation.departed_at).length;
@@ -1187,8 +1260,13 @@ export default function EventWorkspacePage() {
                     <div className="p-8 text-center text-sm text-muted">{t("No allocations yet. Reserve inventory before event setup begins.")}</div>
                   ) : (
                     <div className="divide-y divide-border">
-                      {allocations.map((allocation) => (
-                        <div key={allocation.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                      {allocations.map((allocation) => {
+                        const lockReason = allocationEditLockReason(allocation);
+                        const isEditing = editingAllocationId === allocation.id;
+                        const isSavingRow = isEditing && updateAllocationMutation.isPending;
+                        return (
+                        <div key={allocation.id} className="p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <label className={`flex min-w-0 items-start gap-3 select-none ${(!canWriteAllocations || Boolean(allocation.departed_at) || dispatchCheckMutation.isPending) ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}>
                             <input
                               type="checkbox"
@@ -1205,7 +1283,7 @@ export default function EventWorkspacePage() {
                             <div className="mt-1 text-xs text-muted flex flex-wrap items-center gap-2">
                               <span>{allocation.store_name || "-"}</span>
                               <span className="opacity-40">|</span>
-                              <span>{t("Allocated")}: {allocation.quantity_allocated}</span>
+                              <span>{t("Allocated")}: <span className="tabular-nums font-semibold text-foreground">{allocation.quantity_allocated}</span></span>
                               <span className="opacity-40">|</span>
                               <StatusBadge status={allocation.status} />
                               <span className="opacity-40">|</span>
@@ -1213,23 +1291,121 @@ export default function EventWorkspacePage() {
                             </div>
                             {allocation.notes && <div className="mt-1 text-xs text-muted">{allocation.notes}</div>}
                             {allocation.departed_at && <div className="mt-1 text-xs font-semibold text-muted">{t("Departed")}: {formatDate(allocation.departed_at)}</div>}
+                            {canEditAllocations && lockReason && (
+                              <div className="mt-1 text-xs font-semibold text-muted">{lockReason}</div>
+                            )}
                             </div>
                           </label>
-                          {canWriteAllocations && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => releaseMutation.mutate(allocation.id)}
-                              loading={releaseMutation.isPending}
-                              disabled={Boolean(allocation.departed_at)}
+                          {canWriteAllocations && !isEditing && (
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                              {canEditAllocations && !lockReason && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="min-h-12"
+                                  aria-label={`${t("Edit Allocation")} ${allocation.item_name}`}
+                                  onClick={() => startEditingAllocation(allocation)}
+                                >
+                                  <HiPencilSquare className="h-4 w-4" />
+                                  {t("Edit")}
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="min-h-12"
+                                onClick={() => releaseMutation.mutate(allocation.id)}
+                                loading={releaseMutation.isPending}
+                                disabled={Boolean(allocation.departed_at)}
+                              >
+                                <HiMinusCircle className="h-4 w-4" />
+                                {t("Release")}
+                              </Button>
+                            </div>
+                          )}
+                          </div>
+                          {isEditing && (
+                            <form
+                              aria-label={`${t("Edit Allocation")} ${allocation.item_name}`}
+                              onSubmit={(formEvent) => {
+                                formEvent.preventDefault();
+                                if (!isEditQtyValid || updateAllocationMutation.isPending) return;
+                                updateAllocationMutation.mutate({
+                                  allocationId: allocation.id,
+                                  quantity_allocated: editQtyValue,
+                                  notes: editAllocationNotes.trim() ? editAllocationNotes.trim() : null,
+                                });
+                              }}
+                              className="mt-3 grid gap-3 rounded-lg border border-border bg-card-alt/50 p-3 sm:grid-cols-[7rem_1fr_auto] sm:items-end"
                             >
-                              <HiMinusCircle className="h-4 w-4" />
-                              {t("Release")}
-                            </Button>
+                              <div className="min-w-0">
+                                <label htmlFor={`alloc-qty-${allocation.id}`} className="mb-1 block text-[11px] font-semibold text-muted">
+                                  {t("Quantity")}
+                                </label>
+                                <Input
+                                  id={`alloc-qty-${allocation.id}`}
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  inputMode="numeric"
+                                  className="h-12 tabular-nums"
+                                  value={editAllocationQty}
+                                  disabled={isSavingRow}
+                                  aria-invalid={!isEditQtyValid}
+                                  aria-describedby={!isEditQtyValid ? `alloc-qty-error-${allocation.id}` : undefined}
+                                  onChange={(inputEvent) => setEditAllocationQty(inputEvent.target.value)}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <label htmlFor={`alloc-notes-${allocation.id}`} className="mb-1 block text-[11px] font-semibold text-muted">
+                                  {t("Notes")}
+                                </label>
+                                <Input
+                                  id={`alloc-notes-${allocation.id}`}
+                                  className="h-12"
+                                  value={editAllocationNotes}
+                                  disabled={isSavingRow}
+                                  maxLength={1000}
+                                  onChange={(inputEvent) => setEditAllocationNotes(inputEvent.target.value)}
+                                />
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                  type="submit"
+                                  size="sm"
+                                  className="min-h-12"
+                                  loading={isSavingRow}
+                                  disabled={!isEditQtyValid || updateAllocationMutation.isPending}
+                                >
+                                  {t("Save")}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="min-h-12"
+                                  disabled={isSavingRow}
+                                  onClick={cancelEditingAllocation}
+                                >
+                                  {t("Cancel")}
+                                </Button>
+                              </div>
+                              {!isEditQtyValid && (
+                                <p
+                                  id={`alloc-qty-error-${allocation.id}`}
+                                  role="alert"
+                                  className="text-xs font-semibold text-danger sm:col-span-3"
+                                >
+                                  {t("Enter a whole quantity of 1 or more.")}
+                                </p>
+                              )}
+                            </form>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                   {canWriteAllocations && allocations.length > 0 && (

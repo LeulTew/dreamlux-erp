@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import EventWorkspacePage from "../app/events/[id]/page";
 
@@ -14,10 +14,22 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock useLanguage
+let mockLang = "en";
 vi.mock("@/hooks/use-language", () => ({
   useLanguage: () => ({
-    lang: "en",
+    get lang() {
+      return mockLang;
+    },
   }),
+}));
+
+const toastMocks = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock("@/lib/toast", () => ({
+  __esModule: true,
+  default: toastMocks,
 }));
 
 // Mock api
@@ -28,7 +40,19 @@ const apiMocks = vi.hoisted(() => ({
   updateEventAllocationDispatchCheck: vi.fn().mockResolvedValue({}),
   markEventDispatchDeparted: vi.fn().mockResolvedValue({ success: true }),
   createEventTripLog: vi.fn().mockResolvedValue({}),
+  updateEventAllocation: vi.fn().mockResolvedValue({}),
 }));
+
+type AllocationFixture = {
+  id: string;
+  item_id: string;
+  item_name: string;
+  status: string;
+  quantity_allocated: number;
+  notes: string | null;
+  dispatch_checked_at: string | null;
+  departed_at: string | null;
+};
 
 const workspaceData = vi.hoisted(() => ({
   event: {
@@ -46,10 +70,11 @@ const workspaceData = vi.hoisted(() => ({
       item_name: "Gold Chairs",
       status: "Reserved",
       quantity_allocated: 50,
+      notes: "Front hall",
       dispatch_checked_at: null,
       departed_at: null,
     },
-  ],
+  ] as AllocationFixture[],
   checklist: [
     { id: "task-1", title: "Stage Setup", status: "Pending" },
   ],
@@ -70,6 +95,7 @@ vi.mock("@/lib/api", () => ({
   getAvailableVehicles: apiMocks.getAvailableVehicles,
   createEventAllocation: vi.fn(),
   deleteEventAllocation: vi.fn(),
+  updateEventAllocation: apiMocks.updateEventAllocation,
   updateEventAllocationDispatchCheck: apiMocks.updateEventAllocationDispatchCheck,
   markEventDispatchDeparted: apiMocks.markEventDispatchDeparted,
   createEventChecklistItem: vi.fn(),
@@ -101,17 +127,38 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false };
   },
-  useMutation: (options: { mutationFn?: (payload?: unknown) => unknown; onSuccess?: () => void }) => ({
+  useMutation: (options: {
+    mutationFn?: (payload?: unknown) => unknown;
+    onSuccess?: () => void;
+    onError?: (error: unknown) => void;
+  }) => ({
     mutate: vi.fn((payload?: unknown) => {
-      options.mutationFn?.(payload);
+      let result: unknown;
+      try {
+        result = options.mutationFn?.(payload);
+      } catch (error) {
+        options.onError?.(error);
+        return;
+      }
+      // Only route through the promise when the mocked api fn actually returned one,
+      // so existing tests keep their synchronous onSuccess behaviour.
+      if (result && typeof (result as Promise<unknown>).then === "function") {
+        return (result as Promise<unknown>).then(
+          () => options.onSuccess?.(),
+          (error) => options.onError?.(error),
+        );
+      }
       options.onSuccess?.();
     }),
-    isPending: false,
+    isPending: mockMutationsPending,
   }),
   useQueryClient: () => ({
-    invalidateQueries: vi.fn(),
+    invalidateQueries: invalidateQueriesMock,
   }),
 }));
+
+let mockMutationsPending = false;
+const invalidateQueriesMock = vi.hoisted(() => vi.fn());
 
 let mockUser = { full_name: "Admin User", role: "ADMIN", role_name: "ADMIN" };
 let mockPermissions: string[] = [];
@@ -137,7 +184,28 @@ vi.mock("@/components/AuthLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="auth-layout">{children}</div>,
 }));
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) => <button onClick={onClick} disabled={disabled}>{children}</button>,
+  // `loading` is swallowed on purpose: the real Button consumes it, and forwarding it to
+  // the DOM would emit React unknown-prop warnings.
+  Button: ({
+    children,
+    onClick,
+    disabled,
+    className,
+    type,
+    "aria-label": ariaLabel,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    loading?: boolean;
+    className?: string;
+    type?: "button" | "submit" | "reset";
+    "aria-label"?: string;
+  }) => (
+    <button onClick={onClick} disabled={disabled} className={className} type={type} aria-label={ariaLabel}>
+      {children}
+    </button>
+  ),
 }));
 vi.mock("@/components/ui/input", () => ({
   Input: (props: React.ComponentPropsWithoutRef<"input">) => <input {...props} />,
@@ -170,6 +238,8 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     apiMocks.updateEventAllocationDispatchCheck.mockClear();
     apiMocks.markEventDispatchDeparted.mockClear();
     apiMocks.createEventTripLog.mockClear();
+    mockLang = "en";
+    mockMutationsPending = false;
     workspaceData.allocations = [
       {
         id: "alloc-1",
@@ -177,11 +247,13 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
         item_name: "Gold Chairs",
         status: "Reserved",
         quantity_allocated: 50,
+        notes: "Front hall",
         dispatch_checked_at: null,
         departed_at: null,
       },
     ];
     vi.clearAllMocks();
+    apiMocks.updateEventAllocation.mockResolvedValue({});
   });
 
   it("redacts contract price if user lacks reports:profit:read", () => {
@@ -238,6 +310,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
         item_name: "Gold Chairs",
         status: "Pulled",
         quantity_allocated: 50,
+        notes: null,
         dispatch_checked_at: "2026-07-01T10:00:00.000Z",
         departed_at: null,
       },
@@ -247,6 +320,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
         item_name: "Silver Stands",
         status: "Pulled",
         quantity_allocated: 10,
+        notes: null,
         dispatch_checked_at: "2026-07-01T10:01:00.000Z",
         departed_at: "2026-07-01T11:00:00.000Z",
       },
@@ -257,6 +331,186 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
 
     expect(screen.getByRole("button", { name: /Mark Departed/i })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: /Dispatch Checklist Silver Stands/i })).toBeDisabled();
+  });
+
+  // Issue #196: storekeepers correct an active allocation in place instead of
+  // releasing and re-creating it.
+  describe("inline allocation editing", () => {
+    const openInventoryTab = (permissions = ["events:read", "event_allocations:write"]) => {
+      mockPermissions = permissions;
+      render(<EventWorkspacePage />);
+      fireEvent.click(screen.getByRole("button", { name: /^Inventory Allocation$/i }));
+    };
+
+    it("exposes an Edit action on an eligible allocation", () => {
+      openInventoryTab();
+
+      expect(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i })).toBeEnabled();
+    });
+
+    it("hides the Edit action for read-only users", () => {
+      openInventoryTab(["events:read"]);
+
+      expect(screen.queryByRole("button", { name: /Edit Allocation Gold Chairs/i })).toBeNull();
+    });
+
+    it("does not expose Edit on a departed allocation and explains why", () => {
+      workspaceData.allocations = [
+        {
+          id: "alloc-1",
+          item_id: "item-1",
+          item_name: "Gold Chairs",
+          status: "Pulled",
+          quantity_allocated: 50,
+          notes: null,
+          dispatch_checked_at: "2026-07-01T10:00:00.000Z",
+          departed_at: "2026-07-01T11:00:00.000Z",
+        },
+      ];
+      openInventoryTab();
+
+      expect(screen.queryByRole("button", { name: /Edit Allocation Gold Chairs/i })).toBeNull();
+      expect(screen.getByText("Locked after departure")).toBeInTheDocument();
+    });
+
+    it("does not expose Edit on a returned allocation", () => {
+      workspaceData.allocations = [
+        {
+          id: "alloc-1",
+          item_id: "item-1",
+          item_name: "Gold Chairs",
+          status: "Returned",
+          quantity_allocated: 50,
+          notes: null,
+          dispatch_checked_at: "2026-07-01T10:00:00.000Z",
+          departed_at: null,
+        },
+      ];
+      openInventoryTab();
+
+      expect(screen.queryByRole("button", { name: /Edit Allocation Gold Chairs/i })).toBeNull();
+      expect(screen.getByText("Locked after return")).toBeInTheDocument();
+    });
+
+    it("initializes the form from the allocation's current quantity and notes", () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+
+      expect(screen.getByLabelText("Quantity")).toHaveValue(50);
+      expect(screen.getByLabelText("Notes")).toHaveValue("Front hall");
+    });
+
+    it("restores the row without mutating anything when Cancel is pressed", () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+      fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "12" } });
+      fireEvent.click(screen.getByRole("button", { name: /^Cancel$/i }));
+
+      expect(apiMocks.updateEventAllocation).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText("Quantity")).toBeNull();
+      // Re-opening starts from the server value again, not the abandoned draft.
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+      expect(screen.getByLabelText("Quantity")).toHaveValue(50);
+    });
+
+    it("sends the corrected quantity and notes to the PATCH endpoint", async () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+      fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "35" } });
+      fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Back hall" } });
+      fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+
+      expect(apiMocks.updateEventAllocation).toHaveBeenCalledWith("event-123", "alloc-1", {
+        quantity_allocated: 35,
+        notes: "Back hall",
+      });
+    });
+
+    it("sends null when the notes field is cleared", () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+      fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "   " } });
+      fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+
+      expect(apiMocks.updateEventAllocation).toHaveBeenCalledWith("event-123", "alloc-1", {
+        quantity_allocated: 50,
+        notes: null,
+      });
+    });
+
+    it("blocks submission and surfaces an accessible error for an invalid quantity", () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+      fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "0" } });
+
+      const quantityInput = screen.getByLabelText("Quantity");
+      expect(quantityInput).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByRole("alert")).toHaveTextContent("Enter a whole quantity of 1 or more.");
+      expect(quantityInput).toHaveAttribute("aria-describedby", "alloc-qty-error-alloc-1");
+      expect(screen.getByRole("button", { name: /^Save$/i })).toBeDisabled();
+
+      fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+      expect(apiMocks.updateEventAllocation).not.toHaveBeenCalled();
+    });
+
+    it("disables Save while a submission is in flight so it cannot be sent twice", () => {
+      mockMutationsPending = true;
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+
+      expect(screen.getByRole("button", { name: /^Save$/i })).toBeDisabled();
+      expect(screen.getByLabelText("Quantity")).toBeDisabled();
+    });
+
+    it("renders the backend stock conflict message", async () => {
+      apiMocks.updateEventAllocation.mockRejectedValueOnce({
+        response: { data: { error: "Requested quantity exceeds available stock" } },
+      });
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+      fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "9999" } });
+      fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+
+      await waitFor(() =>
+        expect(toastMocks.error).toHaveBeenCalledWith("Requested quantity exceeds available stock"),
+      );
+    });
+
+    it("refreshes workspace, item availability, inventory, and dispatch caches after success", async () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+
+      await waitFor(() => expect(toastMocks.success).toHaveBeenCalledWith("Allocation updated"));
+      const invalidatedKeys = invalidateQueriesMock.mock.calls.map(
+        (call: [{ queryKey: unknown[] }]) => JSON.stringify(call[0].queryKey),
+      );
+      expect(invalidatedKeys).toContain(JSON.stringify(["event-workspace", "event-123"]));
+      expect(invalidatedKeys).toContain(JSON.stringify(["event-allocation-items"]));
+      expect(invalidatedKeys).toContain(JSON.stringify(["items"]));
+      expect(invalidatedKeys).toContain(JSON.stringify(["event-dispatch-queue"]));
+    });
+
+    it("renders Amharic labels for the edit flow", () => {
+      mockLang = "am";
+      mockPermissions = ["events:read", "event_allocations:write"];
+      render(<EventWorkspacePage />);
+      fireEvent.click(screen.getByRole("button", { name: /የዕቃ ምደባ/ }));
+
+      fireEvent.click(screen.getByRole("button", { name: /ምደባ አስተካክል Gold Chairs/ }));
+      expect(screen.getByRole("button", { name: /^አስቀምጥ$/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^ሰርዝ$/ })).toBeInTheDocument();
+      expect(screen.getByLabelText("ብዛት")).toHaveValue(50);
+    });
+
+    it("gives the edit controls a 48px-safe touch height", () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /Edit Allocation Gold Chairs/i }));
+
+      expect(screen.getByRole("button", { name: /^Save$/i }).className).toContain("min-h-12");
+      expect(screen.getByRole("button", { name: /^Cancel$/i }).className).toContain("min-h-12");
+      expect(screen.getByLabelText("Quantity").className).toContain("h-12");
+    });
   });
 
   it("shows L/km fuel preview formula and submits trip data unchanged", () => {

@@ -12,6 +12,7 @@ import {
   ReconcileRunDetail,
   ReconcileRun,
   EventWorkspace,
+  EventInventoryAllocation,
   EventChecklistItem,
   EventExpense,
   EventProfitSummary,
@@ -1433,6 +1434,15 @@ export const createEventAllocation = (
   id: string,
   data: { item_id: string; quantity_allocated: number; notes?: string | null }
 ) => api.post(`/events/${id}/allocations`, data).then((r) => r.data);
+
+// Issue #196: correct an active allocation in place. Omitted fields are left untouched
+// by the backend, so notes can be edited without re-sending the quantity.
+export const updateEventAllocation = (
+  eventId: string,
+  allocationId: string,
+  data: { quantity_allocated?: number; notes?: string | null }
+): Promise<EventInventoryAllocation> =>
+  api.patch(`/events/${eventId}/allocations/${allocationId}`, data).then((r) => r.data);
 
 export const deleteEventAllocation = (eventId: string, allocationId: string) =>
   api.delete(`/events/${eventId}/allocations/${allocationId}`).then((r) => r.data);
