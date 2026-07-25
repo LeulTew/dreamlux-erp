@@ -527,24 +527,18 @@ async function generateLaborExpenseFromAssignments(
   if (eventResult.rows[0].status !== "Completed") return { status: "event_not_completed" };
 
   const assignmentResult = await client.query(
-    "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
+    `SELECT COALESCE(SUM(commission_amount) FILTER (WHERE attended IS TRUE), 0) AS total,
+            COUNT(*) FILTER (WHERE attended IS NOT TRUE)::int AS unverified
+       FROM event_assignments
+      WHERE event_id = $1`,
     [eventId],
   );
   const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
-  if (laborTotal <= 0) {
-    // Issue #197: distinguish "nobody was scheduled / nobody earns commission" from "people
-    // were scheduled but their attendance was never verified". Only the second case is a
-    // fixable prerequisite, and reporting it as a generic "no labor" would hide the real
-    // reason. This extra query is deliberately inside the zero branch so the happy path
-    // keeps its existing query sequence.
-    const unverifiedResult = await client.query(
-      "SELECT COUNT(*)::int AS unverified FROM event_assignments WHERE event_id = $1 AND attended IS NOT TRUE",
-      [eventId],
-    );
-    const unverifiedCount = Number(unverifiedResult.rows[0]?.unverified || 0);
-    if (unverifiedCount > 0) return { status: "attendance_unverified", unverifiedCount };
-    return { status: "no_labor", laborTotal };
-  }
+  const unverifiedCount = Number(assignmentResult.rows[0]?.unverified || 0);
+  // Labor is generated once per event. Refuse a partial expense while any assignment is
+  // unresolved, otherwise a later attendance verification could never add the omitted pay.
+  if (unverifiedCount > 0) return { status: "attendance_unverified", unverifiedCount };
+  if (laborTotal <= 0) return { status: "no_labor", laborTotal };
 
   const existingResult = await client.query(
     "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status != 'Rejected'",
@@ -1900,6 +1894,14 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 
         if (shouldGenerateLaborOnCompletion) {
           const generationResult = await generateLaborExpenseFromAssignments(client, id, req.user?.id || null);
+          if (generationResult.status === "attendance_unverified") {
+            await client.query("ROLLBACK");
+            res.status(409).json({
+              error: "Attendance must be verified for every assigned employee before the event can be completed.",
+              unverified_count: generationResult.unverifiedCount,
+            });
+            return;
+          }
           await auditLaborGenerationOutcome(client, id, req.user?.id || null, generationResult, "event_completion");
         }
       }

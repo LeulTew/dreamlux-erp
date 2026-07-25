@@ -1282,6 +1282,32 @@ describe("Events API", () => {
     expect(res.body.event.status).toBe("Completed");
   });
 
+  test("PUT /events/:id refuses completion while any assignment attendance is unverified", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Ongoing", name: "Corporate Gala" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // status audit
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Completed", name: "Corporate Gala" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500", unverified: 1 }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+    const res = await request(app)
+      .put("/events/event-1")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({ status: "Completed" });
+
+    expect(res.status).toBe(409);
+    expect(res.body.unverified_count).toBe(1);
+    expect(res.body.error).toContain("before the event can be completed");
+    expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO expenses"))).toBe(false);
+  });
+
   test("PUT /events/:id allows sequential status transitions", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "event-1", status: "Planned", name: "Wedding" }],
@@ -2593,8 +2619,7 @@ describe("Events API", () => {
     test("labor generation explains unverified attendance instead of reporting no labor", async () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
       mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "0" }], rowCount: 1 }); // attended sum
-      mockQuery.mockResolvedValueOnce({ rows: [{ unverified: 3 }], rowCount: 1 }); // unverified count
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "0", unverified: 3 }], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
 
       const res = await request(app)
@@ -2613,8 +2638,7 @@ describe("Events API", () => {
     test("labor generation still reports no labor when nobody is assigned at all", async () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "0" }], rowCount: 1 });
-      mockQuery.mockResolvedValueOnce({ rows: [{ unverified: 0 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "0", unverified: 0 }], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
 
       const res = await request(app)
@@ -2628,7 +2652,7 @@ describe("Events API", () => {
     test("labor aggregation counts only explicitly attended assignments", async () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500", unverified: 0 }], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // no existing expense
       mockQuery.mockResolvedValueOnce({ rows: [{ id: "exp-1", amount: "1500", category: "Labor" }], rowCount: 1 });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
@@ -2641,7 +2665,22 @@ describe("Events API", () => {
       expect(res.status).toBe(201);
       const sumCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("SUM(commission_amount)"));
       // Unverified and NULL attendance must both fall outside the money calculation.
-      expect(String(sumCall![0])).toContain("attended = true");
+      expect(String(sumCall![0])).toContain("attended IS TRUE");
+    });
+
+    test("labor generation refuses a partial expense while any attendance is unverified", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500", unverified: 1 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .post("/events/event-1/expenses/generate-labor")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.unverified_count).toBe(1);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO expenses"))).toBe(false);
     });
   });
 

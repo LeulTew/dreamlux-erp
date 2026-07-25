@@ -155,6 +155,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Did not attend": "Did not attend",
     "Verify attendance": "Verify attendance",
     "Attendance is locked after the event is completed.": "Attendance is locked after the event is completed.",
+    "Prerequisite: Verify attendance for every assigned employee before generating labor.": "Prerequisite: Verify attendance for every assigned employee before generating labor.",
     "Remove Assignment": "Remove Assignment",
     "Staff assigned": "Staff assigned",
     "Vehicle assigned": "Vehicle assigned",
@@ -303,6 +304,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Did not attend": "አልተገኝም",
     "Verify attendance": "መገኘትን አረጋግጥ",
     "Attendance is locked after the event is completed.": "ዝግጅቱ ከተጠናቀቀ በኋላ መገኘት ተቆልፏል።",
+    "Prerequisite: Verify attendance for every assigned employee before generating labor.": "የሰራተኛ ወጪ ከመፍጠርዎ በፊት የተመደቡትን ሠራተኞች ሁሉ መገኘት ያረጋግጡ።",
     "Remove Assignment": "ምደባን ሰርዝ",
     "Staff assigned": "ሠራተኛ ተመድቧል",
     "Vehicle assigned": "ተሽከርካሪ ተመድቧል",
@@ -845,6 +847,7 @@ export default function EventWorkspacePage() {
 
   const isEventCompleted = event?.status === "Completed";
   const hasAttendedLabor = assignments.some((asg: EventAssignment) => asg.attended === true);
+  const hasUnverifiedAttendance = assignments.some((asg: EventAssignment) => asg.attended !== true);
   const totalLaborCost = assignments.reduce((sum: number, asg: EventAssignment) => sum + (asg.attended ? Number(asg.commission_amount || 0) : 0), 0);
 
   const isDriverRole =
@@ -1846,7 +1849,7 @@ export default function EventWorkspacePage() {
                           className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
                           loading={generateLaborMutation.isPending}
                           onClick={() => generateLaborMutation.mutate()}
-                          disabled={!isEventCompleted || !hasAttendedLabor}
+                          disabled={!isEventCompleted || !hasAttendedLabor || hasUnverifiedAttendance}
                         >
                           {t("Generate Labor Expense")}
                         </Button>
@@ -1854,9 +1857,9 @@ export default function EventWorkspacePage() {
                           <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
                             {t("Prerequisite: Event status must be Completed to generate labor expense.")}
                           </div>
-                        ) : !hasAttendedLabor ? (
+                        ) : hasUnverifiedAttendance ? (
                           <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
-                            {t("Prerequisite: No employee is marked as Attended. Mark attendance in the Scheduling tab first.")}
+                            {t("Prerequisite: Verify attendance for every assigned employee before generating labor.")}
                           </div>
                         ) : (
                           <div className="text-[11px] text-success/80 bg-success/5 border border-success/20 p-2.5 rounded-lg leading-snug">

@@ -500,8 +500,8 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
 
       await waitFor(() => expect(toastMocks.success).toHaveBeenCalledWith("Allocation updated"));
-      const invalidatedKeys = invalidateQueriesMock.mock.calls.map(
-        (call: [{ queryKey: unknown[] }]) => JSON.stringify(call[0].queryKey),
+      const invalidatedKeys = invalidateQueriesMock.mock.calls.map((call) =>
+        JSON.stringify((call[0] as { queryKey: unknown[] }).queryKey),
       );
       expect(invalidatedKeys).toContain(JSON.stringify(["event-workspace", "event-123"]));
       expect(invalidatedKeys).toContain(JSON.stringify(["event-allocation-items"]));
@@ -666,8 +666,8 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       fireEvent.click(attendanceBox());
 
       await waitFor(() => expect(toastMocks.success).toHaveBeenCalledWith("Attendance updated"));
-      const keys = invalidateQueriesMock.mock.calls.map(
-        (call: [{ queryKey: unknown[] }]) => JSON.stringify(call[0].queryKey),
+      const keys = invalidateQueriesMock.mock.calls.map((call) =>
+        JSON.stringify((call[0] as { queryKey: unknown[] }).queryKey),
       );
       expect(keys).toContain(JSON.stringify(["event-workspace", "event-123"]));
       expect(keys).toContain(JSON.stringify(["event-profit", "event-123"]));
@@ -681,7 +681,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
 
       expect(
-        screen.getByText("Prerequisite: No employee is marked as Attended. Mark attendance in the Scheduling tab first."),
+        screen.getByText("Prerequisite: Verify attendance for every assigned employee before generating labor."),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Generate Labor Expense/i })).toBeDisabled();
     });
@@ -696,6 +696,20 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
 
       expect(screen.getByRole("button", { name: /Generate Labor Expense/i })).toBeEnabled();
+    });
+
+    it("refuses partial labor generation while one of several assignments is unverified", () => {
+      workspaceData.event.status = "Completed";
+      workspaceData.assignments = [
+        { id: "asg-1", employee_id: "emp-1", employee_name: "Abebe", role: "Decorator", commission_amount: 5000, attended: true },
+        { id: "asg-2", employee_id: "emp-2", employee_name: "Kebede", role: "Assistant", commission_amount: 1000, attended: false },
+      ];
+      mockPermissions = ["events:read", "event_assignments:write", "expenses:write", "expenses:labor_generate", "reports:profit:read"];
+      render(<EventWorkspacePage />);
+      fireEvent.click(screen.getByRole("button", { name: /Expenses & Trips/i }));
+
+      expect(screen.getByRole("button", { name: /Generate Labor Expense/i })).toBeDisabled();
+      expect(screen.getByText("Prerequisite: Verify attendance for every assigned employee before generating labor.")).toBeInTheDocument();
     });
 
     it("renders the Amharic verification label", () => {

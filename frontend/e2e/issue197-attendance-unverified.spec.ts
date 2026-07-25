@@ -113,7 +113,7 @@ test.describe("Issue 197 staff assignments start attendance-unverified", () => {
     await page.getByRole("button", { name: /Expenses & Trips/i }).click();
 
     await expect(
-      page.getByText("Prerequisite: No employee is marked as Attended. Mark attendance in the Scheduling tab first."),
+      page.getByText("Prerequisite: Verify attendance for every assigned employee before generating labor."),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: /Generate Labor Expense/i })).toBeDisabled();
   });

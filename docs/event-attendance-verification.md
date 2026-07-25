@@ -111,16 +111,18 @@ found for this event"*, which hid the actual reason. The helper now distinguishe
 The extra count query lives inside the zero branch so the happy path keeps its existing query
 sequence.
 
-**Mixed attendance policy:** labor is generated from the verified subset, and unresolved
-assignments remain visible and correctable. Generation is not blocked until every assignment is
-resolved. This matches the existing workflow — the duplicate-protection index
-(`idx_expenses_auto_labor_once_per_event`) means labor is generated once, so blocking on stragglers
-would risk an event being finalized with no labor at all rather than with partial labor.
+**Mixed attendance policy:** labor generation is blocked until every assignment is verified.
+The generated labor expense is unique per event, so creating it from only the verified subset
+would permanently omit anyone verified later. The API returns `attendance_unverified` with the
+unresolved count, and the workspace keeps the generation action disabled until all assignments
+are resolved.
 
 **Ordering note:** labor requires the event to be `Completed`, but attendance is locked once the
 event is `Completed` for anyone without `events:override_completed`. The intended sequence is
-therefore **verify attendance → complete the event → generate labor**. If an event is completed
-with attendance still unverified, an override-authorized user must correct it.
+therefore **verify attendance → complete the event → generate labor**. A normal transition to
+`Completed` is rejected while any assignment remains unverified, preventing an event from entering
+a state where ordinary users can no longer resolve attendance. Historical completed events with
+unresolved attendance still require an override-authorized correction.
 
 ## Payroll
 
