@@ -157,6 +157,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Absent: "Absent",
     "Attendance is locked after the event is completed.": "Attendance is locked after the event is completed.",
     "Prerequisite: Mark every assigned employee attended or absent before generating labor.": "Prerequisite: Mark every assigned employee attended or absent before generating labor.",
+    "No attended employees. No labor expense is required.": "No attended employees. No labor expense is required.",
     "Remove Assignment": "Remove Assignment",
     "Staff assigned": "Staff assigned",
     "Vehicle assigned": "Vehicle assigned",
@@ -307,6 +308,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Absent: "አልተገኘም",
     "Attendance is locked after the event is completed.": "ዝግጅቱ ከተጠናቀቀ በኋላ መገኘት ተቆልፏል።",
     "Prerequisite: Mark every assigned employee attended or absent before generating labor.": "የሰራተኛ ወጪ ከመፍጠርዎ በፊት እያንዳንዱን የተመደበ ሠራተኛ ተገኝቷል ወይም አልተገኘም ብለው ይመዝግቡ።",
+    "No attended employees. No labor expense is required.": "የተገኘ ሠራተኛ የለም። የሰራተኛ ወጪ መፍጠር አያስፈልግም።",
     "Remove Assignment": "ምደባን ሰርዝ",
     "Staff assigned": "ሠራተኛ ተመድቧል",
     "Vehicle assigned": "ተሽከርካሪ ተመድቧል",
@@ -1671,7 +1673,7 @@ export default function EventWorkspacePage() {
                                         className={`min-h-12 px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                                           selected
                                             ? "bg-primary text-on-primary"
-                                            : "bg-card text-muted md:hover:bg-card-alt"
+                                            : "bg-card text-muted [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt"
                                         }`}
                                       >
                                         {option.label}
@@ -1896,6 +1898,10 @@ export default function EventWorkspacePage() {
                         ) : hasUnresolvedAttendance ? (
                           <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
                             {t("Prerequisite: Mark every assigned employee attended or absent before generating labor.")}
+                          </div>
+                        ) : !hasAttendedLabor ? (
+                          <div className="text-[11px] text-muted bg-card-alt border border-border p-2.5 rounded-lg leading-snug">
+                            {t("No attended employees. No labor expense is required.")}
                           </div>
                         ) : (
                           <div className="text-[11px] text-success/80 bg-success/5 border border-success/20 p-2.5 rounded-lg leading-snug">
