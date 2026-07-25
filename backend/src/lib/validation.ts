@@ -84,6 +84,7 @@ export const createEmployeeSchema = z.object({
   commission: optionalText(100, "Commission too long"),
   commission_type: z.enum(["percent", "etb"]).optional().default("percent"),
   salary_level: optionalText(100, "Salary level code too long"),
+  compensation_mode: z.enum(["regular", "commission_only"]).optional().default("regular"),
   office_id: optionalUuid("Invalid office ID"),
   event_prices: z
     .record(z.string(), z.coerce.number().min(0, "Event price cannot be negative"))
@@ -107,6 +108,18 @@ export const employeePaginationSchema = z.object({
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 export type EmployeePaginationInput = z.infer<typeof employeePaginationSchema>;
+
+export const employeeImportSchema = z.object({
+  rows: z.array(z.object({
+    employee_id: z.string().trim().min(1).max(100),
+    full_name: z.string().trim().min(1).max(500),
+    phone: z.string().trim().max(50).optional().nullable(),
+    email: z.string().trim().email().max(200).optional().nullable(),
+    salary_level: z.string().trim().max(100).optional().nullable(),
+    compensation_mode: z.enum(["regular", "commission_only"]).default("regular"),
+    event_prices: z.record(z.string(), z.coerce.number().min(0)).optional().default({}),
+  })).min(1).max(1000),
+});
 
 // HR / Payroll / Events Schema Additions
 

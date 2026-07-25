@@ -5,6 +5,7 @@ import "./setup";
 
 // ─── Local mock wiring ───────────────────────────────────────────────────────
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
+let eligibleCommissionRows: any[] = [];
 
 const fakeChain = (isSingle = false): any => {
   const chain: any = {
@@ -47,6 +48,21 @@ mock.module("../db/supabase", () => ({
   supabase: { from: () => fakeChain() },
 }));
 
+mock.module("../lib/eligible-payroll-commissions", () => ({
+  getEligibleCommissionRows: mock(async () => eligibleCommissionRows),
+  getAuthoritativePayrollInputLines: mock(async (_start: string, _end: string, employeeIds: string[]) =>
+    employeeIds.map((employeeId) => ({
+      employee_id: employeeId,
+      events: eligibleCommissionRows.filter((row) => row.employee_id === employeeId).map((row) => ({
+        event_type_id: row.event_type_id,
+        quantity: Number(row.quantity),
+        price_override: Number(row.commission_total) / Number(row.quantity),
+        override_reason: "Verified attended event assignments",
+      })),
+    })),
+  ),
+}));
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 const AUTH = () => `Bearer ${getToken()}`;
 const EMPLOYEE_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -62,11 +78,15 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-beforeEach(() => mockQuery.mockReset());
+beforeEach(() => {
+  mockQuery.mockReset();
+  eligibleCommissionRows = [];
+});
 
-describe("Decentralized Pricing Logic (Manual > Employee Price > 0)", () => {
+describe("Authoritative verified-attendance payroll pricing", () => {
   
-  test("Priority 1: Manual Override should win", async () => {
+  test("ignores a client override and uses the recorded attended commission", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 5000 }];
     mockQuery
       // event_types (metadata only)
       .mockResolvedValueOnce({
@@ -116,7 +136,8 @@ describe("Decentralized Pricing Logic (Manual > Employee Price > 0)", () => {
     expect(res.body.total_payroll_value).toBe(10000);
   });
 
-  test("Priority 2: Employee-Specific Price should win over 0", async () => {
+  test("uses the attended assignment total rather than the employee rate", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 3500 }];
     mockQuery
       // event_types
       .mockResolvedValueOnce({
@@ -166,7 +187,7 @@ describe("Decentralized Pricing Logic (Manual > Employee Price > 0)", () => {
     expect(res.body.total_payroll_value).toBe(11500);
   });
 
-  test("Priority 3: Default Price 0 strictly enforced when no rates set", async () => {
+  test("excludes commission when no attended assignment is recorded", async () => {
     mockQuery
       // event_types
       .mockResolvedValueOnce({
@@ -209,7 +230,8 @@ describe("Decentralized Pricing Logic (Manual > Employee Price > 0)", () => {
     expect(res.body.total_payroll_value).toBe(5000);
   });
 
-  test("Finalize route correctly persists the employee price in snapshot", async () => {
+  test("finalize persists the verified assignment commission snapshot", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 2500 }];
     mockQuery
       .mockResolvedValueOnce({ rows: [] }) // 1. Duplicate check
       .mockResolvedValueOnce({

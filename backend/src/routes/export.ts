@@ -337,6 +337,7 @@ function buildEmployeeExportRow(
     phone: String(employee.phone ?? ""),
     email: String(employee.email ?? ""),
     salary_level: String(employee.salary_level ?? ""),
+    compensation_mode: String(employee.compensation_mode ?? "regular"),
     commission: employee.commission == null ? "" : String(employee.commission),
     event_prices_json: JSON.stringify(eventPrices),
     created_at: String(employee.created_at ?? ""),
@@ -374,6 +375,7 @@ router.get("/employees/csv", requirePermissionSlugs(["exports:read", "hr:read"])
         { key: "phone", header: "Phone" },
         { key: "email", header: "Email" },
         { key: "salary_level", header: "Salary Level" },
+        { key: "compensation_mode", header: "Compensation Mode" },
         { key: "commission", header: "Commission" },
         ...eventColumns.map((column) => ({ key: column.key, header: column.header })),
         { key: "event_prices_json", header: "Event Prices (JSON)" },
@@ -412,6 +414,7 @@ router.get("/employees/xlsx", requirePermissionSlugs(["exports:read", "hr:read"]
       { header: "Phone", key: "phone", width: 20 },
       { header: "Email", key: "email", width: 30 },
       { header: "Salary Level", key: "salary_level", width: 16 },
+      { header: "Compensation Mode", key: "compensation_mode", width: 20 },
       { header: "Commission", key: "commission", width: 14 },
       ...eventColumns.map((column) => ({ header: column.header, key: column.key, width: 18 })),
       { header: "Event Prices (JSON)", key: "event_prices_json", width: 40 },
@@ -495,6 +498,7 @@ router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:
 
     const csvData = lines.map((line: any) => ({
       employee_name: line.employee_name_snapshot,
+      compensation_mode: line.compensation_mode_snapshot ?? "regular",
       base_salary: Number(line.base_salary_snapshot).toFixed(2),
       events_total: Number(line.commission_total_snapshot).toFixed(2),
       total_pay: Number(line.employee_total_snapshot).toFixed(2)
@@ -502,6 +506,7 @@ router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:
 
     csvData.push({
       employee_name: "TOTAL",
+      compensation_mode: "",
       base_salary: totals.base.toFixed(2),
       events_total: totals.events.toFixed(2),
       total_pay: totals.total.toFixed(2),
@@ -511,6 +516,7 @@ router.get("/payroll/:id/csv", requirePermissionSlugs(["exports:read", "payroll:
       header: true,
       columns: [
         { key: "employee_name", header: "Employee" },
+        { key: "compensation_mode", header: "Compensation Mode" },
         { key: "base_salary", header: "Base Salary" },
         { key: "events_total", header: "Events Total" },
         { key: "total_pay", header: "Total Paid" }
@@ -559,6 +565,7 @@ router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll
 
     sheet.columns = [
       { header: "Employee", key: "employee_name", width: 35 },
+      { header: "Compensation Mode", key: "compensation_mode", width: 20 },
       { header: "Base Salary", key: "base_salary", width: 20 },
       { header: "Events Total", key: "events_total", width: 20 },
       { header: "Total Paid", key: "total_pay", width: 20 }
@@ -584,6 +591,7 @@ router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll
 
         const row = sheet.addRow({
           employee_name: line.employee_name_snapshot,
+          compensation_mode: line.compensation_mode_snapshot ?? "regular",
           base_salary: baseSalary.toFixed(2),
           events_total: eventsTotal.toFixed(2),
           total_pay: totalPay.toFixed(2)
@@ -598,6 +606,7 @@ router.get("/payroll/:id/xlsx", requirePermissionSlugs(["exports:read", "payroll
 
     const totalRow = sheet.addRow({
       employee_name: "TOTAL",
+      compensation_mode: "",
       base_salary: totals.base.toFixed(2),
       events_total: totals.events.toFixed(2),
       total_pay: totals.total.toFixed(2),

@@ -67,6 +67,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "ID": "ID",
     "Department": "Department",
     "Base Salary": "Base Salary",
+    "Compensation Mode": "Compensation Mode",
+    "Regular (salary + commission)": "Regular (salary + commission)",
+    "Commission only": "Commission only",
     "Actions": "Actions",
     "Restore": "Restore",
     "Trash is empty": "Trash is empty",
@@ -103,6 +106,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "ID": "መታወቂያ",
     "Department": "ክፍል",
     "Base Salary": "መሰረታዊ ደመወዝ",
+    "Compensation Mode": "የክፍያ ዓይነት",
+    "Regular (salary + commission)": "መደበኛ (ደመወዝ + ኮሚሽን)",
+    "Commission only": "ኮሚሽን ብቻ",
     "Actions": "ክንውኖች",
     "Restore": "መልስ",
     "Trash is empty": "የቆሻሻ መጣያው ባዶ ነው",
@@ -292,6 +298,33 @@ function buildColumns(
           </span>
         ),
       size: 140,
+    }),
+    columnHelper.accessor("compensation_mode", {
+      header: t("Compensation Mode"),
+      cell: ({ row, getValue }) => editMode ? (
+        <Select
+          className="[&>button]:min-h-[48px]"
+          options={[
+            { id: "regular", label: t("Regular (salary + commission)") },
+            { id: "commission_only", label: t("Commission only") },
+          ]}
+          value={getValue() || "regular"}
+          onChange={(value) => debouncedUpdate(row.original.id, "compensation_mode", value)}
+        />
+      ) : (
+        <div className="flex items-center">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${
+              getValue() === "commission_only"
+                ? "bg-muted/50 text-foreground border-border/70"
+                : "bg-primary/10 text-primary border-primary/20"
+            }`}
+          >
+            {getValue() === "commission_only" ? t("Commission only") : t("Regular (salary + commission)")}
+          </span>
+        </div>
+      ),
+      size: 180,
     }),
     columnHelper.display({
       id: "actions",
@@ -941,6 +974,7 @@ function EmployeesPageInner() {
                 selected={selectedIds.has(emp.id)}
                 onSelect={toggleSelection}
                 selectMode={selectMode}
+                compensationLabel={emp.compensation_mode === "commission_only" ? t("Commission only") : t("Regular (salary + commission)")}
               />
             ))}
           </div>

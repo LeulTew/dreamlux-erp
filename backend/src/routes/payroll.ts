@@ -4,6 +4,7 @@ import { generatePayrollPreviewSchema, finalizePayrollRunSchema, savePayrollDraf
 import { getMonthlyBounds, getHalfMonthBounds, getWeeklyBounds } from "../utils/payroll-utils";
 import { getPublicUrl } from "../storage/storage";
 import { buildPayrollLines, toPayrollEventPayloads, toPayrollLinePayloads } from "../lib/payroll-generation";
+import { getAuthoritativePayrollInputLines, getEligibleCommissionRows } from "../lib/eligible-payroll-commissions";
 import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
 import { NotificationsService } from "../services/notifications-service";
 import { ActivityService } from "../services/activity-service";
@@ -170,6 +171,34 @@ router.get("/settings", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Error fetching payroll settings:", error);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /payroll/eligible-commissions — authoritative attended work for a period.
+router.get("/eligible-commissions", async (req: AuthRequest, res) => {
+  if (!requirePayrollRead(req, res)) return;
+  const start = String(req.query.period_start ?? "");
+  const end = String(req.query.period_end ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) {
+    return res.status(400).json({ error: "Valid period_start and period_end are required" });
+  }
+
+  try {
+    const rows = await getEligibleCommissionRows(start, end);
+
+    res.json({
+      period_start: start,
+      period_end: end,
+      lines: rows.map((row) => ({
+        employee_id: row.employee_id,
+        event_type_id: row.event_type_id,
+        quantity: Number(row.quantity),
+        commission_total: Number(row.commission_total),
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching eligible payroll commissions:", error);
+    res.status(500).json({ error: "Failed to load verified attendance commissions" });
   }
 });
 
@@ -379,7 +408,7 @@ router.get("/runs/:id", async (req: AuthRequest, res) => {
 
     const { data: lines, error: linesError } = await supabase
       .from("payroll_run_employee_lines")
-      .select("id, employee_id, employee_name_snapshot, base_salary_snapshot, commission_total_snapshot, employee_total_snapshot")
+      .select("id, employee_id, employee_name_snapshot, compensation_mode_snapshot, base_salary_snapshot, commission_total_snapshot, employee_total_snapshot")
       .eq("run_id", id)
       .order("employee_name_snapshot", { ascending: true });
 
@@ -429,6 +458,7 @@ router.get("/runs/:id", async (req: AuthRequest, res) => {
       id: line.id,
       employee_id: line.employee_id,
       employee_name_snapshot: line.employee_name_snapshot,
+      compensation_mode_snapshot: line.compensation_mode_snapshot ?? "regular",
       profile_photo_url: profilePhotoKeyByEmployeeId.get(line.employee_id)
         ? getPublicUrl(profilePhotoKeyByEmployeeId.get(line.employee_id) as string)
         : null,
@@ -596,22 +626,8 @@ router.post("/preview", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, period_end, employeeLineEvents } = result.data;
-
-    const finalMonth = month || new Date().getUTCMonth() + 1;
-    const finalYear = year || new Date().getUTCFullYear();
-
-    if (period_kind === "half_month" && month && year) {
-      // Check if it's first or second half based on start date if provided, default to first
-      const isSecondHalf = period_start ? new Date(period_start).getUTCDate() > 15 : false;
-      getHalfMonthBounds(year, month, isSecondHalf);
-    } else if (period_kind === "range" && period_start && period_end) {
-      // Bounds logic kept for structural consistency even if not heavily used in basic preview
-    } else if (month && year) {
-      getMonthlyBounds(year, month);
-    } else {
-      getMonthlyBounds(finalYear, finalMonth);
-    }
+    const { month, year, period_kind, period_start, period_end } = result.data;
+    const period = resolvePersistedPayrollPeriod({ month, year, periodKind: period_kind, periodStart: period_start, periodEnd: period_end });
 
     const { data: eventsMaster } = await supabase
       .from("event_types")
@@ -620,7 +636,7 @@ router.post("/preview", async (req: AuthRequest, res) => {
 
     const { data: employees } = await supabase
       .from("employees")
-      .select("id, full_name, salary_level, base_salary, profile_photo_key, event_prices")
+      .select("id, full_name, salary_level, base_salary, profile_photo_key, event_prices, compensation_mode")
       .is("deleted_at", null);
 
     const { data: salaryLevels } = await supabase
@@ -628,8 +644,13 @@ router.post("/preview", async (req: AuthRequest, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
+    const authoritativeLines = await getAuthoritativePayrollInputLines(
+      period.bounds.start,
+      period.bounds.end,
+      (employees ?? []).map((employee: { id: string }) => employee.id),
+    );
     const { totalPayrollValue, lines: processedLines } = buildPayrollLines({
-      employeeLineEvents: employeeLineEvents ?? [],
+      employeeLineEvents: authoritativeLines,
       eventTypes: eventsMaster ?? [],
       employees: employees ?? [],
       salaryLevels: salaryLevels ?? [],
@@ -657,7 +678,8 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, period_end, employeeLineEvents, created_by_user_id } = result.data;
+    const { month, year, period_kind, period_start, period_end } = result.data;
+    const actorUserId = req.user?.id ?? null;
 
     let period;
     try {
@@ -696,7 +718,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
 
     const { data: employees } = await supabase
       .from("employees")
-      .select("id, full_name, salary_level, base_salary, event_prices")
+      .select("id, full_name, salary_level, base_salary, event_prices, compensation_mode")
       .is("deleted_at", null);
 
     const { data: salaryLevels } = await supabase
@@ -704,8 +726,9 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
+    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee: { id: string }) => employee.id));
     const { lines: processedLines } = buildPayrollLines({
-      employeeLineEvents: employeeLineEvents ?? [],
+      employeeLineEvents: authoritativeLines,
       eventTypes: eventsMaster ?? [],
       employees: employees ?? [],
       salaryLevels: salaryLevels ?? [],
@@ -717,7 +740,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       period_start: bounds.start,
       period_end: bounds.end,
       status: "draft",
-      created_by: created_by_user_id || null,
+      created_by: actorUserId,
     };
 
     const updatePayload: Record<string, unknown> = {
@@ -731,8 +754,8 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       finalized_at: null,
     };
 
-    if (created_by_user_id) {
-      updatePayload.created_by = created_by_user_id;
+    if (actorUserId) {
+      updatePayload.created_by = actorUserId;
     }
 
     const { data: runData, error: runError } = existingDraft
@@ -786,7 +809,7 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       const totalPayrollValue = processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0);
       await insertPayrollAuditLog({
         payrollRunId: runId,
-        userId: created_by_user_id,
+        userId: actorUserId,
         action: "draft_saved",
         periodStart: bounds.start,
         periodEnd: bounds.end,
@@ -823,7 +846,8 @@ router.post("/runs", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, period_end, employeeLineEvents, created_by_user_id } = result.data;
+    const { month, year, period_kind, period_start, period_end } = result.data;
+    const actorUserId = req.user?.id ?? null;
 
     let period;
     try {
@@ -867,7 +891,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
 
     const { data: employees } = await supabase
       .from("employees")
-      .select("id, full_name, salary_level, base_salary, event_prices")
+      .select("id, full_name, salary_level, base_salary, event_prices, compensation_mode")
       .is("deleted_at", null);
 
     const { data: salaryLevels } = await supabase
@@ -875,8 +899,9 @@ router.post("/runs", async (req: AuthRequest, res) => {
       .select("id, code, amount_etb")
       .is("deleted_at", null);
 
+    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee: { id: string }) => employee.id));
     const { lines: processedLines } = buildPayrollLines({
-      employeeLineEvents: employeeLineEvents ?? [],
+      employeeLineEvents: authoritativeLines,
       eventTypes: eventsMaster ?? [],
       employees: employees ?? [],
       salaryLevels: salaryLevels ?? [],
@@ -892,7 +917,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
         period_end: bounds.end,
         status: "finalized",
         finalized_at: new Date().toISOString(),
-        created_by: created_by_user_id || null,
+        created_by: actorUserId,
       })
       .select("id")
       .single();
@@ -933,7 +958,7 @@ router.post("/runs", async (req: AuthRequest, res) => {
       const totalPayrollValue = processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0);
       await insertPayrollAuditLog({
         payrollRunId: runId,
-        userId: created_by_user_id,
+        userId: actorUserId,
         action: "finalized",
         periodStart: bounds.start,
         periodEnd: bounds.end,

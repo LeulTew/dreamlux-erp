@@ -54,7 +54,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Phone Error Hint": "Invalid phone number",
     "Phone Hint": "e.g. 0911...",
     "Full Name Placeholder": "e.g. John Doe",
-    "Employee ID Placeholder": "e.g. EMP-001"
+    "Employee ID Placeholder": "e.g. EMP-001",
+    "Compensation Mode": "Compensation Mode",
+    "Regular (salary + commission)": "Regular (salary + commission)",
+    "Commission only": "Commission only",
+    "Commission-only employees always receive zero base salary.": "Commission-only employees always receive zero base salary.",
+    "Fixed at ETB 0 for commission-only mode.": "Fixed at ETB 0 for commission-only mode.",
   },
   am: {
     "Add Employee": "ሰራተኛ መዝግብ",
@@ -95,7 +100,12 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Phone Error Hint": "የስልክ ቁጥሩ ትክክል አይደለም",
     "Phone Hint": "ምሳሌ 0911...",
     "Full Name Placeholder": "ምሳሌ፡ ዮሐንስ አበበ",
-    "Employee ID Placeholder": "ምሳሌ፡ EMP-001"
+    "Employee ID Placeholder": "ምሳሌ፡ EMP-001",
+    "Compensation Mode": "የክፍያ ዓይነት",
+    "Regular (salary + commission)": "መደበኛ (ደመወዝ + ኮሚሽን)",
+    "Commission only": "ኮሚሽን ብቻ",
+    "Commission-only employees always receive zero base salary.": "ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች መሠረታዊ ደመወዝ አያገኙም።",
+    "Fixed at ETB 0 for commission-only mode.": "ለኮሚሽን ብቻ ክፍያ መሠረታዊ ደመወዝ በ 0 ETB የተወሰነ ነው።",
   }
 };
 
@@ -128,6 +138,7 @@ export default function InsertEmployeePage() {
     phone: "",
     email: "",
     salary_level: "",
+    compensation_mode: "regular" as "regular" | "commission_only",
     office_id: "",
   });
   const [eventPrices, setEventPrices] = useState<Record<string, number>>({});
@@ -197,6 +208,7 @@ export default function InsertEmployeePage() {
       phone: "",
       email: "",
       salary_level: "",
+      compensation_mode: "regular" as "regular" | "commission_only",
       office_id: "",
     });
     queryClient.invalidateQueries({ queryKey: ["nextEmployeeId"] });
@@ -707,8 +719,24 @@ export default function InsertEmployeePage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
                   <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-muted px-1">{t("Compensation Mode")}</label>
+                    <Select
+                      className="[&>button]:min-h-[48px]"
+                      options={[
+                        { id: "regular", label: t("Regular (salary + commission)") },
+                        { id: "commission_only", label: t("Commission only") },
+                      ]}
+                      value={formData.compensation_mode}
+                      onChange={(val) => setFormData({ ...formData, compensation_mode: val as "regular" | "commission_only" })}
+                      placeholder={t("Compensation Mode")}
+                    />
+                    <p className="text-[11px] text-muted px-1">{t("Commission-only employees always receive zero base salary.")}</p>
+                  </div>
+                  <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Base Salary")}</label>
                     <Select
+                      className="[&>button]:min-h-[48px]"
+                      disabled={formData.compensation_mode === "commission_only"}
                       options={salaryLevels.map((level) => ({
                         id: level.level_name,
                         label: `${level.level_name} - ETB ${Number(level.base_salary).toLocaleString()}`
@@ -718,9 +746,11 @@ export default function InsertEmployeePage() {
                       placeholder={t("Select Level")}
                     />
                     <p className="text-[10px] font-bold text-muted px-1">
-                      {selectedSalaryLevel
-                        ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
-                        : t("Select a salary level to view the amount")}
+                      {formData.compensation_mode === "commission_only"
+                        ? t("Fixed at ETB 0 for commission-only mode.")
+                        : selectedSalaryLevel
+                          ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
+                          : t("Select a salary level to view the amount")}
                     </p>
                   </div>
                 </div>

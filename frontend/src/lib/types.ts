@@ -73,6 +73,7 @@ export interface Employee {
   base_salary?: number;
   gender: string | null;
   employment_type: string | null;
+  compensation_mode: "regular" | "commission_only";
   group_name: string | null;
   bank_name: string | null;
   bank_account: string | null;
@@ -228,6 +229,7 @@ export interface PayrollEmployeeLine {
   employee_id: string;
   employee_name_snapshot: string;
   profile_photo_url?: string | null;
+  compensation_mode_snapshot: "regular" | "commission_only";
   snapshot_base_salary: number;
   total_events_value: number;
   total_line_pay: number;

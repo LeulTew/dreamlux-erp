@@ -135,7 +135,7 @@ export async function buildMonthlyNetProfitStatement(
       [monthStart],
     ),
     db.query(
-      `SELECT COALESCE(SUM(line.employee_total_snapshot), 0)::numeric AS amount,
+      `SELECT COALESCE(SUM(line.base_salary_snapshot), 0)::numeric AS amount,
               COUNT(DISTINCT run.id)::int AS run_count,
               COUNT(line.id)::int AS employee_line_count
        FROM payroll_runs run
@@ -149,7 +149,7 @@ export async function buildMonthlyNetProfitStatement(
     db.query(
       `SELECT run.id, run.title, to_char(run.period_start, 'YYYY-MM-DD') AS period_start,
               to_char(run.period_end, 'YYYY-MM-DD') AS period_end,
-              COALESCE(SUM(line.employee_total_snapshot), 0)::numeric AS total
+              COALESCE(SUM(line.base_salary_snapshot), 0)::numeric AS total
        FROM payroll_runs run
        JOIN payroll_run_employee_lines line ON line.run_id = run.id
        WHERE run.deleted_at IS NULL
@@ -252,7 +252,7 @@ export async function buildMonthlyNetProfitStatement(
     treatment: {
       investments: includeInvestmentsInNet ? "deducted_below_operating_profit" : "shown_below_operating_profit",
       payroll: payrollRunCount > 0
-        ? "finalized_payroll_runs_deducted_staff_payment_overheads_excluded"
+        ? "finalized_payroll_base_salary_deducted_event_commission_already_in_event_labor_staff_payment_overheads_excluded"
         : "no_finalized_payroll_staff_payment_overheads_included",
     },
     totals: {

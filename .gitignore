@@ -1,10 +1,12 @@
 node_modules/
+**/node_modules/
 dist/
 .next/
 .env
 .env.local
 bun.lockb
 *.log
+frontend/*.pdf
 .DS_Store
 backups/
 ux-polish-tracking.md

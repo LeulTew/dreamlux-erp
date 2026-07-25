@@ -14,7 +14,8 @@ import {
   HiOutlineCog6Tooth,
   HiArrowPath,
   HiPrinter,
-  HiMinus
+  HiMinus,
+  HiInformationCircle
 } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import AuthLayout from "@/components/AuthLayout";
@@ -33,6 +34,7 @@ import {
   getPayrollRuns,
   getPayrollRun,
   getPayrollCycleSettings,
+  getEligiblePayrollCommissions,
 } from "@/lib/api";
 import { 
   Employee, 
@@ -43,6 +45,7 @@ import {
   PayrollEmployeeLine, 
   PayrollRunLineEvent 
 } from "@/lib/types";
+import { mapEligibleCommissions, resolvePayrollBaseSalary } from "@/lib/compensation";
 import { useAuth } from "@/hooks/useAuth";
 import { fuzzySearch } from "@/lib/fuzzy-search";
 import toast from "@/lib/toast";
@@ -109,7 +112,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Week 4 (22 - 28)": "Week 4 (22 - 28)",
     "Week 5 (29 - End)": "Week 5 (29 - End)",
     "Full Month": "Full Month",
-    "Manual Period": "Manual Period"
+    "Manual Period": "Manual Period",
+    "Commission only": "Commission only",
+    "Regular (salary + commission)": "Regular (salary + commission)",
+    "COMMISSION ONLY": "COMMISSION ONLY",
+    "Zero base salary": "Zero base salary",
+    "Event(s)": "Event(s)",
+    "Verified attendance commissions are automatically calculated from attended event assignments.": "Verified attendance commissions are automatically calculated from attended event assignments.",
+    "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.": "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments."
   },
   am: {
     "Salary & Event Disbursement": "የደመወዝ እና ክስተት ክፍያ ማስተላለፊያ",
@@ -169,7 +179,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Week 4 (22 - 28)": "ሳምንት 4 (ከ22 - 28)",
     "Week 5 (29 - End)": "ሳምንት 5 (ከ29 - መጨረሻ)",
     "Full Month": "ሙሉ ወር",
-    "Manual Period": "በእጅ የተመረጠ ጊዜ"
+    "Manual Period": "በእጅ የተመረጠ ጊዜ",
+    "Commission only": "ኮሚሽን ብቻ",
+    "Regular (salary + commission)": "መደበኛ (ደመወዝ + ኮሚሽን)",
+    "COMMISSION ONLY": "ኮሚሽን ብቻ",
+    "Zero base salary": "መሠረታዊ ደመወዝ የለውም",
+    "Event(s)": "ክስተት(ቶች)",
+    "Verified attendance commissions are automatically calculated from attended event assignments.": "የተረጋገጡ የክስተት ኮሚሽኖች ሰራተኛው ከተገኘባቸው የዝግጅት ምደባዎች በራስ-ሰር ይሰላሉ።",
+    "Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.": "የደመወዝ ክፍያ በክፍያ ዓይነት ይወሰናል። ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች 0 ETB መሠረታዊ ደመወዝ የሚያገኙ ሲሆን የተረጋገጡ የዝግጅት ኮሚሽኖች ከተገኙበት ስራ ይሰላሉ።"
   }
 };
 
@@ -188,6 +205,7 @@ type PreviewResponse = {
   employee_lines: Array<{
     employee_id: string;
     employee_name_snapshot: string;
+    compensation_mode_snapshot: "regular" | "commission_only";
     snapshot_base_salary: number;
     total_events_value: number;
     total_line_pay: number;
@@ -418,6 +436,14 @@ function PaymentRunProcessPageContent() {
     return { start, end, kind };
   }, [selectedMonth, periodType, settings]);
 
+  const { data: eligibleCommissions } = useQuery<{
+    lines: Array<{ employee_id: string; event_type_id: string; quantity: number; commission_total: number }>;
+  }>({
+    queryKey: ["eligible-payroll-commissions", activeDates.start, activeDates.end],
+    queryFn: () => getEligiblePayrollCommissions(activeDates.start, activeDates.end),
+    enabled: hasPayrollWrite && Boolean(activeDates.start && activeDates.end),
+  });
+
   const existingDraft = useMemo(() => {
     return findRunForPeriod(runsHistory, "DRAFT", 0, 0, periodType, activeDates.start, activeDates.end);
   }, [runsHistory, periodType, activeDates]);
@@ -425,6 +451,11 @@ function PaymentRunProcessPageContent() {
   const existingFinalized = useMemo(() => {
     return findRunForPeriod(runsHistory, "FINALIZED", 0, 0, periodType, activeDates.start, activeDates.end);
   }, [runsHistory, periodType, activeDates]);
+
+  useEffect(() => {
+    if (!eligibleCommissions || existingDraft || isDraftDirty) return;
+    setEventLinesByEmployee(mapEligibleCommissions(eligibleCommissions.lines));
+  }, [eligibleCommissions, existingDraft, isDraftDirty]);
 
   const periodOptions = useMemo(() => {
     const cycle = settings?.payroll_cycle || "weekly";
@@ -543,8 +574,7 @@ function PaymentRunProcessPageContent() {
 
   const computeEmployeeTotals = useCallback((employee: Employee) => {
     const level = employee.salary_level ? salaryLevelMap.get(employee.salary_level) : undefined;
-    const baseSalaryVal = level ? Number(level.base_salary ?? 0) : Number(employee.base_salary ?? 0);
-    const baseSalary = Number.isNaN(baseSalaryVal) ? 0 : baseSalaryVal;
+    const baseSalary = resolvePayrollBaseSalary(employee, level ? Number(level.base_salary ?? 0) : undefined);
     const lines = eventLinesByEmployee[employee.id] ?? [];
 
     const commission = lines.reduce((sum, line) => {
@@ -1013,6 +1043,14 @@ function PaymentRunProcessPageContent() {
           </div>
         )}
 
+        {/* Contextual explanation banner */}
+        <div className="rounded-2xl border border-border/50 bg-card-alt/60 p-4 flex items-start gap-3 text-xs text-muted-foreground shadow-sm">
+          <HiInformationCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            {t("Payroll derives base salary by compensation mode. Commission-only employees receive ETB 0 base salary; verified event commissions are earned from attended assignments.")}
+          </p>
+        </div>
+
         <div className="grid gap-4">
           {paginatedEmployees.map((employee: Employee) => {
             const lines = eventLinesByEmployee[employee.id] ?? [];
@@ -1030,15 +1068,29 @@ function PaymentRunProcessPageContent() {
                       imageUrl={employee.profile_photo_url}
                       sizeClassName="w-10 h-10"
                     />
-                    <p className="text-base font-black tracking-tight">{employee.full_name}</p>
+                    <div>
+                      <p className="text-base font-black tracking-tight">{employee.full_name}</p>
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        {employee.compensation_mode === "commission_only" ? t("Commission only") : t("Regular (salary + commission)")}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="rounded-xl border border-border/50 bg-card-alt px-3 py-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-black">{t("Base Salary")}</span>
-                      <span className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-lg bg-indigo-600/10 text-indigo-800 dark:text-indigo-200 border border-indigo-600/20 shadow-sm">{employeeTotals.levelName === "NO LEVEL" ? t("NO LEVEL") : employeeTotals.levelName}</span>
+                      <span className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-lg bg-indigo-600/10 text-indigo-800 dark:text-indigo-200 border border-indigo-600/20 shadow-sm">
+                        {employee.compensation_mode === "commission_only" ? t("COMMISSION ONLY") : employeeTotals.levelName === "NO LEVEL" ? t("NO LEVEL") : employeeTotals.levelName}
+                      </span>
                     </div>
-                    <p className="text-sm font-bold mt-1">ETB {employeeTotals.baseSalary.toLocaleString()}</p>
+                    <p className="text-sm font-bold mt-1">
+                      ETB {employeeTotals.baseSalary.toLocaleString()}
+                      {employee.compensation_mode === "commission_only" && (
+                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                          ({t("Zero base salary")})
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
 
@@ -1049,97 +1101,30 @@ function PaymentRunProcessPageContent() {
                     <p className="text-xs text-muted-foreground italic">{t("No events added for this employee yet.")}</p>
                   ) : (
                     lines.map((line, index) => {
+                      const eventType = eventTypes?.find((et) => et.id === line.event_type_id);
                       const rawUnitPrice = line.price_override != null ? Number(line.price_override) : getEmployeeEventPrice(employee, line.event_type_id);
                       const unitPrice = Number.isNaN(rawUnitPrice) ? 0 : rawUnitPrice;
                       const rawLineTotal = unitPrice * Math.max(1, Number(line.quantity || 1));
                       const lineTotal = Number.isNaN(rawLineTotal) ? 0 : rawLineTotal;
 
                       return (
-                        <div key={`${employee.id}-${index}`} className="flex flex-col gap-2 p-2.5 border border-border/40 rounded-xl bg-card-alt/50 mb-2">
-                          {/* Row 1: Event dropdown */}
-                          <div className="grid gap-2">
-                            <Select
-                              options={(eventTypes ?? []).map((eventType) => ({
-                                id: eventType.id,
-                                label: eventType.event_name,
-                              }))}
-                              value={line.event_type_id}
-                              onChange={(val) => {
-                                const defaults = getDefaultLinePatch(employee.id, val);
-                                updateEventLine(employee.id, index, { event_type_id: val, ...defaults });
-                              }}
-                              placeholder={t("Select event")}
-                              className="w-full"
-                            />
+                        <div key={`${employee.id}-${index}`} className="flex items-center justify-between p-3 border border-border/50 rounded-xl bg-card-alt/40">
+                          <div>
+                            <p className="text-xs font-bold text-foreground">{eventType?.event_name ?? t("Select event")}</p>
+                            <p className="text-[10px] text-muted-foreground font-medium">
+                              {line.quantity || 1} {t("Event(s)")} × ETB {unitPrice.toLocaleString()}
+                            </p>
                           </div>
-
-                          {/* Row 2: Qty stepper + editable price + delete */}
-                          <div className="flex items-center gap-2">
-                            {/* - / + Stepper */}
-                            <div className="flex items-center rounded-lg border border-border overflow-hidden shrink-0">
-                              <button
-                                onClick={() => updateEventLine(employee.id, index, { quantity: Math.max(1, (line.quantity || 1) - 1) })}
-                                className="px-2.5 py-2 text-foreground hover:bg-muted transition-colors"
-                                title={t("Decrease")}
-                              >
-                                <HiMinus className="w-3.5 h-3.5" />
-                              </button>
-                              <span className="px-3 py-2 text-sm font-bold min-w-8 text-center select-none">{line.quantity || 1}</span>
-                              <button
-                                onClick={() => updateEventLine(employee.id, index, { quantity: (line.quantity || 1) + 1 })}
-                                className="px-2.5 py-2 text-foreground hover:bg-muted transition-colors"
-                                title={t("Increase")}
-                              >
-                                <HiOutlinePlus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* Editable unit price (acts as override) */}
-                            <div className="relative flex-1">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-bold pointer-events-none">ETB</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={line.price_override ?? getEmployeeEventPrice(employee, line.event_type_id)}
-                                onChange={(e) => {
-                                  const val = Math.max(0, Number(e.target.value));
-                                  const basePrice = getEmployeeEventPrice(employee, line.event_type_id);
-                                  updateEventLine(employee.id, index, {
-                                    price_override: val !== basePrice ? val : null,
-                                  });
-                                }}
-                                className="w-full rounded-lg border border-border bg-background text-foreground pl-9 pr-2 py-2 text-sm font-bold text-right"
-                              />
-                            </div>
-
-                            {/* Line total */}
-                            {(line.quantity > 1 || line.price_override != null) && (
-                              <div className="text-xs font-bold text-muted-foreground shrink-0 whitespace-nowrap">
-                                = ETB {lineTotal.toLocaleString()}
-                              </div>
-                            )}
-
-                            {/* Delete */}
-                            <button
-                              onClick={() => removeEventLine(employee.id, index)}
-                              className="w-8 h-8 rounded-full border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center shrink-0"
-                              title={t("Remove Event")}
-                            >
-                              <HiOutlineTrash className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          <p className="text-xs font-black text-foreground font-mono">
+                            ETB {lineTotal.toLocaleString()}
+                          </p>
                         </div>
                       );
                     })
                   )}
-
-                  <button
-                    onClick={() => addEventLine(employee.id)}
-                    className="w-full py-2 rounded-xl border border-dashed border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2"
-                  >
-                    <HiOutlinePlus className="w-3.5 h-3.5" />
-                    {t("Add Event")}
-                  </button>
+                  <p className="text-[10px] text-muted-foreground italic px-1 pt-1">
+                    {t("Verified attendance commissions are automatically calculated from attended event assignments.")}
+                  </p>
                 </div>
 
                 <div className="rounded-2xl bg-card-alt border border-border/50 p-4 flex flex-col justify-center shadow-sm">

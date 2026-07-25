@@ -7,6 +7,7 @@ import "./setup";
 // ─── Local mock wiring ───────────────────────────────────────────────────────
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
 let insertPayloads: unknown[] = [];
+let eligibleCommissionRows: any[] = [];
 
 mock.module("../db/pool", () => ({
   pool: {
@@ -18,6 +19,23 @@ mock.module("../db/pool", () => ({
       })
     ),
   },
+}));
+
+mock.module("../lib/eligible-payroll-commissions", () => ({
+  getEligibleCommissionRows: mock(async () => eligibleCommissionRows),
+  getAuthoritativePayrollInputLines: mock(async (_start: string, _end: string, employeeIds: string[]) =>
+    employeeIds.map((employeeId) => ({
+      employee_id: employeeId,
+      events: eligibleCommissionRows
+        .filter((row) => row.employee_id === employeeId)
+        .map((row) => ({
+          event_type_id: row.event_type_id,
+          quantity: Number(row.quantity),
+          price_override: Number(row.commission_total) / Number(row.quantity),
+          override_reason: "Verified attended event assignments",
+        })),
+    })),
+  ),
 }));
 
 const fakeChain = (isSingle = false): any => {
@@ -117,6 +135,7 @@ beforeAll(async () => {
 beforeEach(() => mockQuery.mockReset());
 beforeEach(() => {
   insertPayloads = [];
+  eligibleCommissionRows = [];
 });
 
 // ─── Unit Tests: Zod Validation Schema ───────────────────────────────────────
@@ -708,8 +727,28 @@ describe("Payroll API > PATCH /payroll/runs/:id/status", () => {
 });
 
 // ─── Integration Tests: POST /payroll/preview ────────────────────────────────
+describe("Payroll API > GET /payroll/eligible-commissions", () => {
+  test("returns grouped verified attendance commissions", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: "2500.00" }];
+    const res = await request(app)
+      .get("/payroll/eligible-commissions?period_start=2026-04-01&period_end=2026-04-30")
+      .set("Authorization", AUTH());
+    expect(res.status).toBe(200);
+    expect(res.body.lines[0]).toEqual(expect.objectContaining({ quantity: 2, commission_total: 2500 }));
+  });
+
+  test("rejects reversed periods without querying", async () => {
+    const res = await request(app)
+      .get("/payroll/eligible-commissions?period_start=2026-05-01&period_end=2026-04-01")
+      .set("Authorization", AUTH());
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
 describe("Payroll API > POST /payroll/preview", () => {
   test("returns preview with correct totals for default price", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 3000 }];
     mockQuery
       // event_types
       .mockResolvedValueOnce({
@@ -752,7 +791,8 @@ describe("Payroll API > POST /payroll/preview", () => {
     expect(res.body.employee_lines[0].total_events_value).toBe(3000);
   });
 
-  test("price_override replaces default_price in calculation", async () => {
+  test("uses verified commission instead of trusting the submitted override", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 999 }];
     mockQuery
       .mockResolvedValueOnce({ rows: [{ id: EVENT_TYPE_ID, name: "Birthday" }] })
       .mockResolvedValueOnce({ rows: [{ 
@@ -894,6 +934,7 @@ describe("Payroll API > POST /payroll/drafts", () => {
   }
 
   test("creates a draft run and returns id", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 1900 }];
     mockDraftCreateSequence();
 
     const res = await request(app)
@@ -1057,6 +1098,7 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   });
 
   test("creates a finalized run and returns id", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 3800 }];
     // 1. Check duplicate -> returns empty
     mockQuery.mockResolvedValueOnce({ rows: [] });
     // 2. Mock the rest of the sequence
@@ -1160,7 +1202,8 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
     expect(res.status).toBe(201);
   });
 
-  test("stores level suffix in event_name_snapshot when selected_level_id is provided", async () => {
+  test("does not let a submitted salary-level suffix alter the verified commission snapshot", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 1900 }];
     mockQuery.mockResolvedValueOnce({ rows: [] });
     mockFinalizeSequence();
 
@@ -1190,10 +1233,12 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
 
     const serializedPayloads = insertPayloads.map((payload) => JSON.stringify(payload)).join("\n");
 
-    expect(serializedPayloads).toContain("Birthday L2");
+    expect(serializedPayloads).toContain('"event_name_snapshot":"Birthday"');
+    expect(serializedPayloads).not.toContain("Birthday L2");
   });
 
-  test("stores level-based unit_price_snapshot and line_total_snapshot", async () => {
+  test("stores verified unit-price and line-total snapshots", async () => {
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 3800 }];
     mockQuery.mockResolvedValueOnce({ rows: [] });
     mockFinalizeSequence();
 

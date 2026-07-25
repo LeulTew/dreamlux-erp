@@ -28,6 +28,7 @@ export type PayrollGeneratedLine = {
   employee_name_snapshot: string;
   salary_level_snapshot: string;
   profile_photo_url: string | null;
+  compensation_mode_snapshot: "regular" | "commission_only";
   snapshot_base_salary: number;
   total_events_value: number;
   total_line_pay: number;
@@ -41,6 +42,7 @@ type EmployeeRow = {
   base_salary?: number | string | null;
   profile_photo_key?: string | null;
   event_prices?: Record<string, number> | null;
+  compensation_mode?: "regular" | "commission_only" | null;
 };
 
 type EventTypeRow = {
@@ -83,7 +85,10 @@ export function buildPayrollLines(input: {
     if (!employee) continue;
 
     const levelData = salaryLevelByCode.get(employee.salary_level ?? "");
-    let baseSalary = levelData?.amount ?? Number(employee.base_salary ?? 0);
+    const compensationMode = employee.compensation_mode === "commission_only" ? "commission_only" : "regular";
+    let baseSalary = compensationMode === "commission_only"
+      ? 0
+      : levelData?.amount ?? Number(employee.base_salary ?? 0);
     if (Number.isNaN(baseSalary)) baseSalary = 0;
 
     const levelCode = levelData?.code ?? employee.salary_level ?? "";
@@ -121,6 +126,7 @@ export function buildPayrollLines(input: {
       employee_name_snapshot: employee.full_name,
       salary_level_snapshot: levelCode,
       profile_photo_url: employee.profile_photo_key ? getPublicUrl(employee.profile_photo_key) : null,
+      compensation_mode_snapshot: compensationMode,
       snapshot_base_salary: baseSalary,
       total_events_value: eventsTotal,
       total_line_pay: totalLinePay,
@@ -137,6 +143,7 @@ export function toPayrollLinePayloads(runId: string, lines: PayrollGeneratedLine
     employee_id: line.employee_id,
     employee_name_snapshot: line.employee_name_snapshot,
     salary_level_snapshot: line.salary_level_snapshot,
+    compensation_mode_snapshot: line.compensation_mode_snapshot,
     base_salary_snapshot: line.snapshot_base_salary,
     commission_total_snapshot: line.total_events_value,
     employee_total_snapshot: line.total_line_pay,

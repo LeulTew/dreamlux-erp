@@ -13,6 +13,7 @@ interface MobileEmployeeCardProps {
   selected?: boolean;
   onSelect?: (id: string) => void;
   selectMode?: boolean;
+  compensationLabel?: string;
 }
 
 export default function MobileEmployeeCard({
@@ -26,6 +27,7 @@ export default function MobileEmployeeCard({
   selected,
   onSelect,
   selectMode,
+  compensationLabel,
 }: MobileEmployeeCardProps) {
   return (
     <div
@@ -146,14 +148,14 @@ export default function MobileEmployeeCard({
                 </button>
              ) : (
                 <>
-                  <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     {employee.phone && (
                       <span className="flex items-center gap-1">
-                        <HiPhone className="w-3 h-3" /> {employee.phone}
+                        <HiPhone className="w-3.5 h-3.5 text-muted-foreground/70" /> {employee.phone}
                       </span>
                     )}
-                     {employee.salary_level && (
-                      <div className="flex items-center gap-1 bg-accent/10 px-1.5 py-0.5 rounded shrink min-w-0">
+                    {employee.salary_level && employee.compensation_mode !== "commission_only" && (
+                      <div className="flex items-center gap-1 bg-accent/10 px-2 py-0.5 rounded shrink min-w-0">
                         <span className="text-accent-dark font-bold tracking-wider text-[10px] whitespace-nowrap">
                           {employee.salary_level}
                         </span>
@@ -164,26 +166,34 @@ export default function MobileEmployeeCard({
                         ) : null}
                       </div>
                     )}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                      employee.compensation_mode === "commission_only"
+                        ? "bg-muted/50 text-foreground border-border/70"
+                        : "bg-primary/10 text-primary border-primary/20"
+                    }`}>
+                      {compensationLabel ?? (employee.compensation_mode === "commission_only" ? "Commission only" : "Regular · salary + commission")}
+                    </span>
                   </div>
-                  <div className="flex gap-2 ml-auto">
+                  <div className="flex gap-2 ml-auto shrink-0">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onTap?.(employee);
                       }}
-                      className="p-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-500/10"
+                      className="min-w-[48px] min-h-[48px] rounded-xl bg-indigo-600 text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-indigo-700 transition-all active:scale-95 shadow-md flex items-center justify-center cursor-pointer"
+                      title="Edit Employee"
                     >
-                      <HiPencilSquare className="w-4 h-4" />
+                      <HiPencilSquare className="w-5 h-5" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onDelete?.(employee);
                       }}
-                      className="p-2 rounded-lg hover:bg-red-50 text-muted hover:text-danger transition-all"
+                      className="min-w-[48px] min-h-[48px] rounded-xl border border-border/60 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-red-50 text-muted [@media(hover:hover)_and_(pointer:fine)]:hover:text-danger transition-all flex items-center justify-center cursor-pointer"
                       title="Move to Trash"
                     >
-                      <HiTrash className="w-4 h-4" />
+                      <HiTrash className="w-5 h-5" />
                     </button>
                   </div>
                 </>

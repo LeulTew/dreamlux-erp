@@ -10,6 +10,10 @@ import { NotificationsService } from "../services/notifications-service";
 
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
 
+mock.module("../db/pool", () => ({
+  pool: { query: mockQuery, connect: mock(() => Promise.resolve({ release: mock(() => {}), query: mockQuery })) },
+}));
+
 export const fakeChain = (isSingle = false): any => {
   const chain: any = {
     select: () => fakeChain(isSingle),
@@ -213,6 +217,74 @@ describe("Employees API", () => {
     } finally {
       NotificationsService.emitNotificationToRoleOrPermission = originalEmit;
     }
+  });
+
+  test("POST /employees accepts commission-only compensation mode", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "new-id", full_name: "Event Worker", employee_id: "EMP-C", compensation_mode: "commission_only" }],
+    });
+
+    const res = await request(app)
+      .post("/employees")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .field("full_name", "Event Worker")
+      .field("employee_id", "EMP-C")
+      .field("compensation_mode", "commission_only");
+
+    expect(res.status).toBe(201);
+    expect(res.body.compensation_mode).toBe("commission_only");
+  });
+
+  test("POST /employees rejects unknown compensation modes", async () => {
+    const res = await request(app)
+      .post("/employees")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .field("full_name", "Invalid Worker")
+      .field("employee_id", "EMP-X")
+      .field("compensation_mode", "salary_only");
+
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("POST /employees/import bulk upserts validated employees in one query", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [
+      { id: "employee-db-1", employee_id: "EMP-101", full_name: "Regular Worker", compensation_mode: "regular" },
+      { id: "employee-db-2", employee_id: "EMP-102", full_name: "Event Worker", compensation_mode: "commission_only" },
+    ] });
+    const res = await request(app).post("/employees/import")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .send({ rows: [
+        { employee_id: "EMP-101", full_name: "Regular Worker" },
+        { employee_id: "EMP-102", full_name: "Event Worker", compensation_mode: "commission_only", event_prices: { wedding: 2500 } },
+      ] });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imported).toBe(2);
+    const bulkQueries = mockQuery.mock.calls.filter((call) => String((call as unknown[])[0]).includes("jsonb_to_recordset"));
+    expect(bulkQueries).toHaveLength(1);
+  });
+
+  test("POST /employees/import rejects more than 1000 rows before querying", async () => {
+    const rows = Array.from({ length: 1001 }, (_, index) => ({ employee_id: `EMP-${index}`, full_name: `Worker ${index}` }));
+    const res = await request(app).post("/employees/import").set("Authorization", `Bearer ${getToken()}`).send({ rows });
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test("POST /employees/import returns a stable error when the bulk query fails", async () => {
+    mockQuery.mockRejectedValueOnce(new Error("database unavailable"));
+    const res = await request(app).post("/employees/import").set("Authorization", `Bearer ${getToken()}`)
+      .send({ rows: [{ employee_id: "EMP-101", full_name: "Worker" }] });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toBe("Employee import failed");
+  });
+
+  test("POST /employees/import denies unauthenticated callers before querying", async () => {
+    const res = await request(app).post("/employees/import")
+      .send({ rows: [{ employee_id: "EMP-101", full_name: "Worker" }] });
+    expect(res.status).toBe(401);
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   test("GET /employees/:id returns 404 for deleted or non-existent", async () => {
