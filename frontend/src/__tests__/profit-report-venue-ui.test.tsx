@@ -255,7 +255,7 @@ describe("Issue #193 - Profit Report Event Venue & Events View Frontend Test Sui
     // Check sections included Event Profitability
     const eventSection = pdfOptions.sections.find((s) => s.title === "Event Profitability");
     expect(eventSection).toBeDefined();
-    expect(eventSection?.columns).toEqual(["Event", "Date", "Category", "Venue", "Revenue", "Expenses", "Net Profit", "Margin"]);
+    expect(eventSection?.columns).toEqual(["Event", "Date", "Category", "Service Scopes", "Venue", "Revenue", "Expenses", "Net Profit", "Margin"]);
 
     // Check row content in PDF section
     expect(eventSection?.rows[0]).toContain("Gala at Hilton");
