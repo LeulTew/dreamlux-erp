@@ -26,6 +26,7 @@ import {
   createEventChecklistItemSchema,
   updateEventChecklistItemSchema,
   createEventAssignmentSchema,
+  updateEventAssignmentAttendanceSchema,
   createVehicleAssignmentSchema,
   createEventExpenseSchema,
   reviewEventExpenseSchema,
@@ -513,6 +514,7 @@ type LaborGenerationResult =
   | { status: "already_exists"; expenseId: string | null }
   | { status: "event_not_found" }
   | { status: "event_not_completed" }
+  | { status: "attendance_unverified"; unverifiedCount: number }
   | { status: "no_labor"; laborTotal: number };
 
 async function generateLaborExpenseFromAssignments(
@@ -525,10 +527,17 @@ async function generateLaborExpenseFromAssignments(
   if (eventResult.rows[0].status !== "Completed") return { status: "event_not_completed" };
 
   const assignmentResult = await client.query(
-    "SELECT COALESCE(SUM(commission_amount), 0) AS total FROM event_assignments WHERE event_id = $1 AND attended = true",
+    `SELECT COALESCE(SUM(commission_amount) FILTER (WHERE attended IS TRUE), 0) AS total,
+            COUNT(*) FILTER (WHERE attended IS NOT TRUE)::int AS unverified
+       FROM event_assignments
+      WHERE event_id = $1`,
     [eventId],
   );
   const laborTotal = Number(assignmentResult.rows[0]?.total || 0);
+  const unverifiedCount = Number(assignmentResult.rows[0]?.unverified || 0);
+  // Labor is generated once per event. Refuse a partial expense while any assignment is
+  // unresolved, otherwise a later attendance verification could never add the omitted pay.
+  if (unverifiedCount > 0) return { status: "attendance_unverified", unverifiedCount };
   if (laborTotal <= 0) return { status: "no_labor", laborTotal };
 
   const existingResult = await client.query(
@@ -1885,6 +1894,14 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 
         if (shouldGenerateLaborOnCompletion) {
           const generationResult = await generateLaborExpenseFromAssignments(client, id, req.user?.id || null);
+          if (generationResult.status === "attendance_unverified") {
+            await client.query("ROLLBACK");
+            res.status(409).json({
+              error: "Attendance must be verified for every assigned employee before the event can be completed.",
+              unverified_count: generationResult.unverifiedCount,
+            });
+            return;
+          }
           await auditLaborGenerationOutcome(client, id, req.user?.id || null, generationResult, "event_completion");
         }
       }
@@ -3068,7 +3085,7 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
       return;
     }
 
-    const { employee_id, role, commission_amount, attended } = validationResult.data;
+    const { employee_id, role, commission_amount } = validationResult.data;
 
     const client = await pool.connect();
     try {
@@ -3112,11 +3129,15 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
         return;
       }
 
+      // Issue #197: scheduling never asserts attendance. The literal FALSE (rather than the
+      // column default) makes this independent of the deployed schema, and re-assigning an
+      // employee to change their role or commission deliberately leaves an already-verified
+      // attendance alone instead of resetting it.
       const insertQuery = `
         INSERT INTO event_assignments (event_id, employee_id, role, commission_amount, attended)
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, FALSE)
         ON CONFLICT (event_id, employee_id) DO UPDATE
-        SET role = EXCLUDED.role, commission_amount = EXCLUDED.commission_amount, attended = EXCLUDED.attended
+        SET role = EXCLUDED.role, commission_amount = EXCLUDED.commission_amount
         RETURNING *
       `;
       const result = await client.query(insertQuery, [
@@ -3124,8 +3145,22 @@ router.post("/:id/assignments/employees", requireAuth, async (req: AuthRequest, 
         employee_id,
         role,
         commission_amount,
-        attended,
       ]);
+
+      await insertEventAuditLog(
+        client,
+        id,
+        req.user?.id || null,
+        "event_assignment_scheduled",
+        null,
+        JSON.stringify({
+          assignment_id: result.rows[0]?.id ?? null,
+          employee_id,
+          role,
+          commission_amount,
+          attended: result.rows[0]?.attended ?? false,
+        }),
+      );
 
       await client.query("COMMIT");
 
@@ -3375,52 +3410,108 @@ router.delete("/:id/assignments/vehicles/:vehicleId", requireAuth, async (req: A
   }
 });
 
-// PATCH /events/:id/assignments/employees/:employeeId/attendance - Toggle attendance
+// PATCH /events/:id/assignments/employees/:employeeId/attendance - Verify or clear attendance
+//
+// Issue #197: this is the ONLY way attendance becomes true, and it directly creates labor
+// expense and payroll commission liability, so it is transactional, strictly validated,
+// scoped to the event, and audited with the old and new value.
 router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, employeeId } = req.params;
-    if (!hasAnyPermission(req, ["event_assignments:write", "vehicle_assignments:write"])) {
-      res.status(403).json({ error: "Forbidden: Insufficient privileges" });
+    // Tightened from the previous [event_assignments:write, vehicle_assignments:write] pair:
+    // verifying staff attendance is a payroll-affecting action and must not be reachable with
+    // only a fleet permission (BFLA). Every seeded role holding vehicle_assignments:write
+    // (ops_manager, event_manager) also holds event_assignments:write, so no role loses access.
+    if (!hasPermission(req, "event_assignments:write")) {
+      res.status(403).json({ error: "Forbidden: Insufficient assignment privileges" });
       return;
     }
 
-    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
-    const eventResult = await pool.query(eventQuery, [id]);
-    if (eventResult.rowCount === 0) {
-      res.status(404).json({ error: "Event not found" });
+    const validationResult = updateEventAssignmentAttendanceSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
       return;
     }
 
-    const event = eventResult.rows[0];
+    const { attended } = validationResult.data;
 
-    // Enforce completed-event locking
-    if (event.status === "Completed" && !canOverrideCompleted(req)) {
-      res.status(400).json({
-        error: "Completed event assignments cannot be modified except by administrators or accountants",
-      });
-      return;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const eventResult = await client.query(
+        "SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        [id],
+      );
+      if (eventResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+
+      const event = eventResult.rows[0];
+
+      // Enforce completed-event locking
+      if (event.status === "Completed" && !canOverrideCompleted(req)) {
+        await client.query("ROLLBACK");
+        res.status(400).json({
+          error: "Completed event assignments cannot be modified except by administrators or accountants",
+        });
+        return;
+      }
+
+      // Scoped by event_id as well as employee_id so an assignment on another event is not
+      // reachable by pairing it with a visible event id (BOLA).
+      const assignmentResult = await client.query(
+        "SELECT id, attended FROM event_assignments WHERE event_id = $1 AND employee_id = $2 FOR UPDATE",
+        [id, employeeId],
+      );
+      if (assignmentResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Assignment not found" });
+        return;
+      }
+
+      const previousAttended = assignmentResult.rows[0].attended === true;
+
+      const result = await client.query(
+        `
+          UPDATE event_assignments
+          SET attended = $1,
+              attendance_marked_at = CASE WHEN $1::boolean THEN NOW() ELSE NULL END,
+              attendance_marked_by = CASE WHEN $1::boolean THEN $4 ELSE NULL END
+          WHERE event_id = $2 AND employee_id = $3
+          RETURNING *
+        `,
+        [attended, id, employeeId, req.user?.id || null],
+      );
+
+      // Idempotent: re-sending the same value is accepted, but only a real transition is
+      // worth an audit row.
+      if (previousAttended !== attended) {
+        await insertEventAuditLog(
+          client,
+          id,
+          req.user?.id || null,
+          "event_assignment_attendance",
+          JSON.stringify({ assignment_id: assignmentResult.rows[0].id, employee_id: employeeId, attended: previousAttended }),
+          JSON.stringify({
+            assignment_id: assignmentResult.rows[0].id,
+            employee_id: employeeId,
+            attended,
+            completed_event_override: event.status === "Completed",
+          }),
+        );
+      }
+
+      await client.query("COMMIT");
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const { attended } = req.body;
-    if (attended === undefined) {
-      res.status(400).json({ error: "Attended field is required" });
-      return;
-    }
-
-    const updateQuery = `
-      UPDATE event_assignments
-      SET attended = $1
-      WHERE event_id = $2 AND employee_id = $3
-      RETURNING *
-    `;
-    const result = await pool.query(updateQuery, [attended, id, employeeId]);
-
-    if (result.rowCount === 0) {
-      res.status(404).json({ error: "Assignment not found" });
-      return;
-    }
-
-    res.json(result.rows[0]);
   } catch (error: any) {
     console.error("[patch-employee-attendance] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
@@ -3633,6 +3724,16 @@ router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest
       if (generationResult.status === "event_not_completed") {
         await client.query("ROLLBACK");
         res.status(400).json({ error: "Labor expense can only be generated after event completion" });
+        return;
+      }
+      if (generationResult.status === "attendance_unverified") {
+        await client.query("ROLLBACK");
+        res.status(409).json({
+          error: "Attendance must be verified before labor can be generated. "
+            + `${generationResult.unverifiedCount} assigned employee${generationResult.unverifiedCount === 1 ? "" : "s"} `
+            + "still have unverified attendance.",
+          unverified_count: generationResult.unverifiedCount,
+        });
         return;
       }
       if (generationResult.status === "no_labor") {

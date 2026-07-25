@@ -42,7 +42,10 @@ CREATE TABLE IF NOT EXISTS event_assignments (
   employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
   role TEXT NOT NULL, -- e.g. Event Manager, Supervisor, Team Leader, etc.
   commission_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-  attended BOOLEAN DEFAULT TRUE,
+  -- Issue #197: scheduled != present. New assignments start attendance-unverified.
+  attended BOOLEAN NOT NULL DEFAULT FALSE,
+  attendance_marked_at TIMESTAMP DEFAULT NULL,
+  attendance_marked_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE (event_id, employee_id)
 );

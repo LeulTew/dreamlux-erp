@@ -153,6 +153,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Attendance": "Attendance",
     "Attended": "Attended",
     "Did not attend": "Did not attend",
+    "Verify attendance": "Verify attendance",
+    "Attendance is locked after the event is completed.": "Attendance is locked after the event is completed.",
+    "Prerequisite: Verify attendance for every assigned employee before generating labor.": "Prerequisite: Verify attendance for every assigned employee before generating labor.",
     "Remove Assignment": "Remove Assignment",
     "Staff assigned": "Staff assigned",
     "Vehicle assigned": "Vehicle assigned",
@@ -299,6 +302,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Attendance": "መገኘት",
     "Attended": "ተገኝቷል",
     "Did not attend": "አልተገኝም",
+    "Verify attendance": "መገኘትን አረጋግጥ",
+    "Attendance is locked after the event is completed.": "ዝግጅቱ ከተጠናቀቀ በኋላ መገኘት ተቆልፏል።",
+    "Prerequisite: Verify attendance for every assigned employee before generating labor.": "የሰራተኛ ወጪ ከመፍጠርዎ በፊት የተመደቡትን ሠራተኞች ሁሉ መገኘት ያረጋግጡ።",
     "Remove Assignment": "ምደባን ሰርዝ",
     "Staff assigned": "ሠራተኛ ተመድቧል",
     "Vehicle assigned": "ተሽከርካሪ ተመድቧል",
@@ -841,6 +847,7 @@ export default function EventWorkspacePage() {
 
   const isEventCompleted = event?.status === "Completed";
   const hasAttendedLabor = assignments.some((asg: EventAssignment) => asg.attended === true);
+  const hasUnverifiedAttendance = assignments.some((asg: EventAssignment) => asg.attended !== true);
   const totalLaborCost = assignments.reduce((sum: number, asg: EventAssignment) => sum + (asg.attended ? Number(asg.commission_amount || 0) : 0), 0);
 
   const isDriverRole =
@@ -948,7 +955,11 @@ export default function EventWorkspacePage() {
       updateEmployeeAttendance(eventId, payload.employeeId, payload.attended),
     onSuccess: () => {
       toast.success(t("Attendance updated"));
+      // Attendance drives labor readiness, event profit, and payroll commission eligibility,
+      // so every derived view must be refetched rather than left on a stale total.
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["event-profit", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["eligible-payroll-commissions"] });
     },
     onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
       toast.error(err.response?.data?.error || err.message || t("Update failed"));
@@ -1027,6 +1038,9 @@ export default function EventWorkspacePage() {
     return null;
   };
   const canEditAllocations = canWriteAllocations && (!isEventCompleted || canOverrideCompletedEvent);
+  // Issue #197: verifying attendance creates payroll/labor liability, so it mirrors the backend
+  // gate exactly - assignment write permission plus the completed-event override rule.
+  const canVerifyAttendance = canWriteAssignments && (!isEventCompleted || canOverrideCompletedEvent);
   const editQtyValue = Number(editAllocationQty);
   const isEditQtyValid = Number.isInteger(editQtyValue) && editQtyValue >= 1;
 
@@ -1609,18 +1623,32 @@ export default function EventWorkspacePage() {
                               <div className="mt-1 text-xs text-muted tabular-nums">
                                 {t(asg.role)}{canViewOperations && asg.commission_amount !== undefined && ` | ${formatCurrency(asg.commission_amount)}`}
                               </div>
-                              <div className="mt-2 flex items-center gap-3">
-                                <label className="flex items-center gap-1.5 text-xs font-semibold text-muted cursor-pointer">
+                              {/* Issue #197: an assignment is a schedule. The badge states the
+                                  attendance fact; the checkbox is the explicit verification
+                                  action, so its checked state means "verified attended" only. */}
+                              <div className="mt-2 flex flex-wrap items-center gap-3">
+                                <StatusBadge status={asg.attended === true ? "ATTENDED" : "ATTENDANCE_UNVERIFIED"} />
+                                <label
+                                  className={`flex min-h-12 items-center gap-2 text-xs font-semibold text-muted ${
+                                    canVerifyAttendance ? "cursor-pointer" : "cursor-not-allowed opacity-80"
+                                  }`}
+                                >
                                   <input
                                     type="checkbox"
-                                    checked={asg.attended}
-                                    disabled={!canWriteAssignments}
+                                    aria-label={`${t("Verify attendance")} ${asg.employee_name || ""}`.trim()}
+                                    checked={asg.attended === true}
+                                    disabled={!canVerifyAttendance || toggleAttendanceMutation.isPending}
                                     onChange={(e) => toggleAttendanceMutation.mutate({ employeeId: asg.employee_id, attended: e.target.checked })}
-                                    className="rounded border-border focus:ring-0 cursor-pointer disabled:opacity-50"
+                                    className="h-5 w-5 rounded border-border text-primary focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                   />
-                                  <span>{t("Attended")}</span>
+                                  <span>{t("Verify attendance")}</span>
                                 </label>
                               </div>
+                              {canWriteAssignments && isEventCompleted && !canOverrideCompletedEvent && (
+                                <div className="mt-1 text-xs font-semibold text-muted">
+                                  {t("Attendance is locked after the event is completed.")}
+                                </div>
+                              )}
                             </div>
                             {canWriteAssignments && (
                               <Button
@@ -1821,7 +1849,7 @@ export default function EventWorkspacePage() {
                           className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
                           loading={generateLaborMutation.isPending}
                           onClick={() => generateLaborMutation.mutate()}
-                          disabled={!isEventCompleted || !hasAttendedLabor}
+                          disabled={!isEventCompleted || !hasAttendedLabor || hasUnverifiedAttendance}
                         >
                           {t("Generate Labor Expense")}
                         </Button>
@@ -1829,9 +1857,9 @@ export default function EventWorkspacePage() {
                           <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
                             {t("Prerequisite: Event status must be Completed to generate labor expense.")}
                           </div>
-                        ) : !hasAttendedLabor ? (
+                        ) : hasUnverifiedAttendance ? (
                           <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
-                            {t("Prerequisite: No employee is marked as Attended. Mark attendance in the Scheduling tab first.")}
+                            {t("Prerequisite: Verify attendance for every assigned employee before generating labor.")}
                           </div>
                         ) : (
                           <div className="text-[11px] text-success/80 bg-success/5 border border-success/20 p-2.5 rounded-lg leading-snug">

@@ -635,7 +635,17 @@ export const createEventAssignmentSchema = z.object({
     "Store Keeper"
   ], { errorMap: () => ({ message: "Invalid role selected" }) }),
   commission_amount: z.coerce.number().min(0, "Commission cannot be negative"),
-  attended: z.boolean().optional().default(true),
+});
+
+// Issue #197: attendance is NOT part of the create contract. Scheduling an employee and
+// verifying that they showed up are two distinct, separately audited actions, so a create
+// payload can no longer assert attendance - an attended key sent here is stripped by zod
+// and the row is always inserted unverified.
+export const updateEventAssignmentAttendanceSchema = z.object({
+  attended: z.boolean({
+    required_error: "Attended field is required",
+    invalid_type_error: "Attended must be a boolean",
+  }),
 });
 
 export const createVehicleAssignmentSchema = z.object({
@@ -669,6 +679,7 @@ export const createTripLogSchema = z.object({
 });
 
 export type CreateEventAssignmentInput = z.infer<typeof createEventAssignmentSchema>;
+export type UpdateEventAssignmentAttendanceInput = z.infer<typeof updateEventAssignmentAttendanceSchema>;
 export type CreateVehicleAssignmentInput = z.infer<typeof createVehicleAssignmentSchema>;
 export type CreateEventExpenseInput = z.infer<typeof createEventExpenseSchema>;
 export type ReviewEventExpenseInput = z.infer<typeof reviewEventExpenseSchema>;

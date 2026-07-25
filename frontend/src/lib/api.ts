@@ -1475,7 +1475,9 @@ export const getAvailableVehicles = (eventId: string) =>
 
 export const createEmployeeAssignment = (
   eventId: string,
-  data: { employee_id: string; role: string; commission_amount: number; attended?: boolean }
+  // Issue #197: scheduling cannot assert attendance. The server always inserts the row
+  // attendance-unverified; use updateEmployeeAttendance to verify it explicitly.
+  data: { employee_id: string; role: string; commission_amount: number }
 ) => api.post(`/events/${eventId}/assignments/employees`, data).then((r) => r.data);
 
 export const deleteEmployeeAssignment = (eventId: string, employeeId: string) =>

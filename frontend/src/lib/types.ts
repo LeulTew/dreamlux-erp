@@ -373,7 +373,12 @@ export interface EventAssignment {
   employee_phone?: string;
   role: string;
   commission_amount: number;
-  attended: boolean;
+  // Issue #197: true only after an authorized user explicitly verified attendance. New
+  // assignments are always false. Legacy rows written before the NOT NULL migration may
+  // still arrive as null, so read this with an explicit `=== true` check.
+  attended: boolean | null;
+  attendance_marked_at?: string | null;
+  attendance_marked_by?: string | null;
   created_at: string;
 }
 

@@ -1282,6 +1282,32 @@ describe("Events API", () => {
     expect(res.body.event.status).toBe("Completed");
   });
 
+  test("PUT /events/:id refuses completion while any assignment attendance is unverified", async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Ongoing", name: "Corporate Gala" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // status audit
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: "event-1", status: "Completed", name: "Corporate Gala" }],
+      rowCount: 1,
+    });
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500", unverified: 1 }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+    const res = await request(app)
+      .put("/events/event-1")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+      .send({ status: "Completed" });
+
+    expect(res.status).toBe(409);
+    expect(res.body.unverified_count).toBe(1);
+    expect(res.body.error).toContain("before the event can be completed");
+    expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO expenses"))).toBe(false);
+  });
+
   test("PUT /events/:id allows sequential status transitions", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "event-1", status: "Planned", name: "Wedding" }],
@@ -2321,16 +2347,15 @@ describe("Events API", () => {
 
   // Scheduling - Toggle Attendance
   test("PATCH /events/:id/assignments/employees/:employeeId/attendance updates attended field", async () => {
-    // Event check
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "event-1", status: "Planned" }],
-      rowCount: 1,
-    });
-    // Update query
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 }); // event FOR UPDATE
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: true }], rowCount: 1 }); // assignment FOR UPDATE
     mockQuery.mockResolvedValueOnce({
       rows: [{ event_id: "event-1", employee_id: "emp-1", attended: false }],
       rowCount: 1,
-    });
+    }); // UPDATE
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
 
     const res = await request(app)
       .patch("/events/event-1/assignments/employees/emp-1/attendance")
@@ -2339,6 +2364,324 @@ describe("Events API", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.attended).toBe(false);
+  });
+
+  // Issue #197: assignment means SCHEDULED. Attendance must be verified explicitly, because
+  // it is what creates labor expense and payroll commission liability.
+  describe("event assignment attendance defaults (issue #197)", () => {
+    test("scheduling an employee inserts the row attendance-unverified", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Gala", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+        rowCount: 1,
+      }); // event FOR UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "emp-1" }], rowCount: 1 }); // employee FOR UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 }); // team conflict check
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 }); // driver conflict check
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "asg-1", event_id: "event-1", employee_id: "emp-1", attended: false }],
+        rowCount: 1,
+      }); // INSERT
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .post("/events/event-1/assignments/employees")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({
+          employee_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+          role: "Assistant",
+          commission_amount: 500,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.attended).toBe(false);
+
+      const insertCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_assignments"));
+      // The literal FALSE is in the SQL, so the row is unverified regardless of the deployed
+      // column default, and attendance is absent from the parameter list entirely.
+      expect(String(insertCall![0])).toContain("VALUES ($1, $2, $3, $4, FALSE)");
+      expect(insertCall![1]).toEqual(["event-1", "7891594c-ecc0-4f66-a51f-a29d530587a2", "Assistant", 500]);
+    });
+
+    test("a create payload claiming attended: true cannot bypass explicit verification", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Gala", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "emp-1" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "asg-1", event_id: "event-1", employee_id: "emp-1", attended: false }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .post("/events/event-1/assignments/employees")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({
+          employee_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+          role: "Assistant",
+          commission_amount: 500,
+          attended: true,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.attended).toBe(false);
+      const insertCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_assignments"));
+      expect(insertCall![1]).not.toContain(true);
+    });
+
+    test("re-assigning an employee does not reset an already verified attendance", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Gala", start_date: "2026-06-20", end_date: "2026-06-22", status: "Planned" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "emp-1" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: "0" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: true }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      await request(app)
+        .post("/events/event-1/assignments/employees")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({
+          employee_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+          role: "Supervisor",
+          commission_amount: 900,
+        });
+
+      const insertCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_assignments"));
+      // Changing role/commission must not clear a verified presence record.
+      expect(String(insertCall![0])).toContain("SET role = EXCLUDED.role, commission_amount = EXCLUDED.commission_amount");
+      expect(String(insertCall![0])).not.toContain("attended = EXCLUDED.attended");
+    });
+
+    test("verifying attendance stamps the marker columns and audits the transition", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Ongoing" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: false }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: true }], rowCount: 1 }); // UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ attended: true });
+
+      expect(res.status).toBe(200);
+
+      const updateCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("UPDATE event_assignments"));
+      expect(String(updateCall![0])).toContain("attendance_marked_at");
+      expect(String(updateCall![0])).toContain("attendance_marked_by");
+      expect(updateCall![1]).toEqual([true, "event-1", "emp-1", "user-1"]);
+
+      const auditCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"));
+      expect(auditCall).toBeDefined();
+      const [eventId, userId, field, oldValue, newValue] = auditCall![1];
+      expect(eventId).toBe("event-1");
+      expect(userId).toBe("user-1");
+      expect(field).toBe("event_assignment_attendance");
+      expect(JSON.parse(oldValue).attended).toBe(false);
+      expect(JSON.parse(newValue).attended).toBe(true);
+      expect(mockQuery.mock.calls.at(-1)![0]).toBe("COMMIT");
+    });
+
+    test("re-sending the same attendance value is idempotent and writes no audit row", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Ongoing" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: true }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: true }], rowCount: 1 }); // UPDATE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ attended: true });
+
+      expect(res.status).toBe(200);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"))).toBe(false);
+    });
+
+    test("rolls back the attendance transition when the audit insert fails", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Ongoing" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: false }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: true }], rowCount: 1 });
+      mockQuery.mockRejectedValueOnce(new Error("audit log write failed"));
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ attended: true });
+
+      expect(res.status).toBe(500);
+      const sqls = mockQuery.mock.calls.map((call: any[]) => String(call[0]));
+      expect(sqls).toContain("ROLLBACK");
+      expect(sqls).not.toContain("COMMIT");
+    });
+
+    test("rejects an assignment belonging to another event without leaking existence", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Ongoing" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // event-scoped lookup misses
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-from-other-event/attendance")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send({ attended: true });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe("Assignment not found");
+      const lookupCall = mockQuery.mock.calls.find((call: any[]) =>
+        String(call[0]).includes("FROM event_assignments") && String(call[0]).includes("FOR UPDATE"),
+      );
+      expect(lookupCall![1]).toEqual(["event-1", "emp-from-other-event"]);
+    });
+
+    test("locks attendance on a completed event without the override permission", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken("event_manager")}`)
+        .send({ attended: true });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain("Completed event assignments cannot be modified");
+    });
+
+    test("allows an override-authorized correction on a completed event and records it", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: true }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1", attended: false }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken()}`) // SUPER_ADMIN holds events:override_completed
+        .send({ attended: false });
+
+      expect(res.status).toBe(200);
+      const auditCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"));
+      expect(JSON.parse(auditCall![1][4]).completed_event_override).toBe(true);
+    });
+
+    test("rejects attendance changes from a fleet-only permission holder (BFLA)", async () => {
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken("viewer", { id: "vehicle-only", permission_slugs: ["vehicle_assignments:write"] })}`)
+        .send({ attended: true });
+
+      expect(res.status).toBe(403);
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+
+    test("rejects unauthenticated attendance changes", async () => {
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .send({ attended: true });
+
+      expect(res.status).toBe(401);
+    });
+
+    test.each([
+      [{}, "Attended field is required"],
+      [{ attended: null }, "Attended must be a boolean"],
+      [{ attended: "true" }, "Attended must be a boolean"],
+      [{ attended: 1 }, "Attended must be a boolean"],
+    ])("rejects invalid attendance payload %j", async (payload, expectedMessage) => {
+      const res = await request(app)
+        .patch("/events/event-1/assignments/employees/emp-1/attendance")
+        .set("Authorization", `Bearer ${getToken()}`)
+        .send(payload);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe(expectedMessage);
+      // Validation happens before any connection is taken.
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+
+    test("labor generation explains unverified attendance instead of reporting no labor", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "0", unverified: 3 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .post("/events/event-1/expenses/generate-labor")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain("Attendance must be verified before labor can be generated");
+      expect(res.body.unverified_count).toBe(3);
+
+      const unverifiedCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("attended IS NOT TRUE"));
+      expect(unverifiedCall).toBeDefined();
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO expenses"))).toBe(false);
+    });
+
+    test("labor generation still reports no labor when nobody is assigned at all", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "0", unverified: 0 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .post("/events/event-1/expenses/generate-labor")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe("No attended labor assignments found for this event");
+    });
+
+    test("labor aggregation counts only explicitly attended assignments", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500", unverified: 0 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // no existing expense
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "exp-1", amount: "1500", category: "Labor" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .post("/events/event-1/expenses/generate-labor")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(201);
+      const sumCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("SUM(commission_amount)"));
+      // Unverified and NULL attendance must both fall outside the money calculation.
+      expect(String(sumCall![0])).toContain("attended IS TRUE");
+    });
+
+    test("labor generation refuses a partial expense while any attendance is unverified", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500", unverified: 1 }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .post("/events/event-1/expenses/generate-labor")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.unverified_count).toBe(1);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO expenses"))).toBe(false);
+    });
   });
 
   test("POST /events/:id/expenses creates pending manual expense", async () => {
