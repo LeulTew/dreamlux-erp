@@ -50,4 +50,20 @@ describe("StatusBadge attendance statuses (issue #197)", () => {
     const verified = render(<StatusBadge status="ATTENDED" />);
     expect(verified.container.firstChild).toHaveClass("text-success");
   });
+
+  // Issue #203: an explicitly recorded no-show is a settled outcome, distinct from
+  // "nobody has decided yet" - it must not keep nagging as a warning.
+  it("renders the recorded-absence status in both languages as a settled state", () => {
+    mockLang = "en";
+    const { container } = render(<StatusBadge status="ABSENT" />);
+    expect(screen.getByText("Absent")).toBeInTheDocument();
+    expect(container.firstChild).toHaveClass("text-muted");
+
+    cleanup();
+    mockLang = "am";
+    render(<StatusBadge status="ABSENT" />);
+    expect(screen.queryByText("Absent")).toBeNull();
+    expect(screen.queryByText("ABSENT")).toBeNull();
+    expect(screen.getByText("አልተገኘም")).toBeInTheDocument();
+  });
 });

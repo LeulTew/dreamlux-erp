@@ -10,10 +10,38 @@ every new assignment was inserted as attended. Labor expense and payroll commiss
 `attended`, so the system could create real financial liability for people whose presence was
 never confirmed.
 
-## Chosen model: boolean, default FALSE
+## Chosen model: three states derived from two columns
 
-Attendance stays a **boolean**, now `NOT NULL DEFAULT FALSE`, rather than becoming a
-`scheduled | attended | absent` enum.
+> **Revised by issue #203.** The original #197 design kept a plain boolean and documented the
+> ambiguity of `false` as an accepted limitation. That held only while nothing depended on the
+> distinction. When #202 began *blocking event completion and labor* on unresolved attendance,
+> the ambiguity became load-bearing and deadlocked a normal workflow: a genuine no-show is
+> honestly recorded by leaving the box unticked, but that was indistinguishable from "nobody has
+> decided yet", so the event could never be completed and its labor could never be generated.
+> There was no override bypass, and the only escapes were paying a no-show or deleting the
+> assignment. Attendance therefore now has three states.
+
+Attendance is `attended BOOLEAN NOT NULL DEFAULT FALSE` **plus** the `attendance_marked_at` /
+`attendance_marked_by` marker columns, which together express three states without a new column,
+a new enum, or any backfill:
+
+| State | Data | Meaning | Paid? | Blocks completion/labor? |
+| :--- | :--- | :--- | :---: | :---: |
+| Unresolved | `attended = false`, `attendance_marked_at IS NULL` | Nobody has decided yet | No | **Yes** |
+| Attended | `attended = true` | Verified present | **Yes** | No |
+| Absent | `attended = false`, `attendance_marked_at IS NOT NULL` | Explicitly recorded no-show | No | No |
+
+The authoritative predicate, identical in the backend SQL and the UI:
+
+```
+resolved   = attended IS TRUE OR attendance_marked_at IS NOT NULL
+unresolved = attended IS NOT TRUE AND attendance_marked_at IS NULL
+```
+
+`attended IS TRUE` counts as resolved on its own so that legacy rows written before the marker
+columns existed are never reinterpreted as unresolved - no backfill is required.
+
+Money logic is untouched: only `attended IS TRUE` is ever paid, by either labor or payroll.
 
 Why:
 
@@ -25,11 +53,9 @@ Why:
   either `absent` or `unverified` would fabricate a fact the database does not contain.
 - The smallest safe model that fixes the reported bug is the right one.
 
-**Known limitation, accepted deliberately:** `false` means "not verified", which covers both *not
-yet checked* and *did not show up*. The UI therefore says **"Attendance unverified"** and never
-claims the employee was absent. If the business later needs genuine absence reporting (for example
-to deduct pay or to flag no-shows), that is a follow-up issue requiring a real status column and a
-deliberate backfill policy — not an inference from this boolean.
+**Remaining limitation:** absence is recorded as a fact but carries no reason code. If the
+business later needs to distinguish an excused absence from a no-show, or to deduct pay for one,
+that needs a real reason column - it cannot be inferred from what is stored today.
 
 ## Historical data policy
 
@@ -111,17 +137,19 @@ found for this event"*, which hid the actual reason. The helper now distinguishe
 The extra count query lives inside the zero branch so the happy path keeps its existing query
 sequence.
 
-**Mixed attendance policy:** labor generation is blocked until every assignment is verified.
-The generated labor expense is unique per event, so creating it from only the verified subset
-would permanently omit anyone verified later. The API returns `attendance_unverified` with the
-unresolved count, and the workspace keeps the generation action disabled until all assignments
-are resolved.
+**Mixed attendance policy:** labor generation is blocked until every assignment is **resolved**
+(attended or explicitly absent) - not until every assignment is *attended*. The generated labor
+expense is unique per event, so creating it from only the verified subset would permanently omit
+anyone verified later. The API returns `attendance_unverified` with the unresolved count, and the
+workspace keeps the generation action disabled until every assignment is resolved. A recorded
+absence resolves the row and contributes zero.
 
 **Ordering note:** labor requires the event to be `Completed`, but attendance is locked once the
 event is `Completed` for anyone without `events:override_completed`. The intended sequence is
 therefore **verify attendance → complete the event → generate labor**. A normal transition to
-`Completed` is rejected while any assignment remains unverified, preventing an event from entering
-a state where ordinary users can no longer resolve attendance. Historical completed events with
+`Completed` is rejected while any assignment remains **unresolved**, preventing an event from
+entering a state where ordinary users can no longer resolve attendance. Because absence is
+recordable, this gate can always be satisfied honestly. Historical completed events with
 unresolved attendance still require an override-authorized correction.
 
 ## Payroll
@@ -135,11 +163,12 @@ Finalized payroll snapshots remain immutable; a later attendance correction does
 
 In the Event Workspace → Team & Vehicles tab each assignment shows:
 
-- a **status badge** — `Attendance unverified` (warning) or `Attended` (success) — which carries
-  the fact, so state is never communicated by a checkbox alone;
-- a **"Verify attendance" checkbox** whose checked state means verified attendance only, with an
-  accessible name including the employee, a 48px-safe target, and disabled states for read-only
-  users, in-flight requests, and completed events;
+- a **status badge** - `Attendance unverified` (warning), `Attended` (success), or `Absent`
+  (neutral, because a recorded no-show is a settled outcome rather than an outstanding action);
+- an **Attended / Absent radiogroup**. A checkbox cannot express three states, so it was replaced:
+  neither option is selected while the row is unresolved, `aria-checked` reflects the recorded
+  fact only, each option is a 48px-safe target with an accessible name including the employee,
+  and both are disabled for read-only users, in-flight requests, and completed events;
 - a localized explanation when the control is locked by event completion.
 
 There is no optimistic update: the box reflects the server's value and only flips after the

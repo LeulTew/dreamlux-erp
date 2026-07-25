@@ -154,8 +154,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Attended": "Attended",
     "Did not attend": "Did not attend",
     "Verify attendance": "Verify attendance",
+    Absent: "Absent",
     "Attendance is locked after the event is completed.": "Attendance is locked after the event is completed.",
-    "Prerequisite: Verify attendance for every assigned employee before generating labor.": "Prerequisite: Verify attendance for every assigned employee before generating labor.",
+    "Prerequisite: Mark every assigned employee attended or absent before generating labor.": "Prerequisite: Mark every assigned employee attended or absent before generating labor.",
     "Remove Assignment": "Remove Assignment",
     "Staff assigned": "Staff assigned",
     "Vehicle assigned": "Vehicle assigned",
@@ -303,8 +304,9 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Attended": "ተገኝቷል",
     "Did not attend": "አልተገኝም",
     "Verify attendance": "መገኘትን አረጋግጥ",
+    Absent: "አልተገኘም",
     "Attendance is locked after the event is completed.": "ዝግጅቱ ከተጠናቀቀ በኋላ መገኘት ተቆልፏል።",
-    "Prerequisite: Verify attendance for every assigned employee before generating labor.": "የሰራተኛ ወጪ ከመፍጠርዎ በፊት የተመደቡትን ሠራተኞች ሁሉ መገኘት ያረጋግጡ።",
+    "Prerequisite: Mark every assigned employee attended or absent before generating labor.": "የሰራተኛ ወጪ ከመፍጠርዎ በፊት እያንዳንዱን የተመደበ ሠራተኛ ተገኝቷል ወይም አልተገኘም ብለው ይመዝግቡ።",
     "Remove Assignment": "ምደባን ሰርዝ",
     "Staff assigned": "ሠራተኛ ተመድቧል",
     "Vehicle assigned": "ተሽከርካሪ ተመድቧል",
@@ -373,6 +375,19 @@ const tabs: Array<{ id: TabKey; label: string; icon: typeof HiUser }> = [
   { id: "expenses", label: "Expenses & Trips", icon: HiCurrencyDollar },
   { id: "profit", label: "Profit", icon: HiArrowTrendingUp },
 ];
+
+// Issue #203: attendance is a three-state fact derived from two columns, and the same rule
+// is enforced server-side. Attended is inherently resolved (it is the paid state, and legacy
+// rows predate the marker columns). Otherwise a marker stamp means someone explicitly recorded
+// an absence; no stamp means nobody has decided yet.
+function isAttendanceResolved(assignment: EventAssignment): boolean {
+  return assignment.attended === true || Boolean(assignment.attendance_marked_at);
+}
+
+function attendanceStatus(assignment: EventAssignment): string {
+  if (assignment.attended === true) return "ATTENDED";
+  return isAttendanceResolved(assignment) ? "ABSENT" : "ATTENDANCE_UNVERIFIED";
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "-";
@@ -847,7 +862,10 @@ export default function EventWorkspacePage() {
 
   const isEventCompleted = event?.status === "Completed";
   const hasAttendedLabor = assignments.some((asg: EventAssignment) => asg.attended === true);
-  const hasUnverifiedAttendance = assignments.some((asg: EventAssignment) => asg.attended !== true);
+  // Issue #203: mirrors the backend predicate. A row is resolved once someone decided - either
+  // attended, or explicitly marked absent (false with a marker stamp). A legacy attended = true
+  // row predating the marker columns is inherently resolved.
+  const hasUnresolvedAttendance = assignments.some((asg: EventAssignment) => !isAttendanceResolved(asg));
   const totalLaborCost = assignments.reduce((sum: number, asg: EventAssignment) => sum + (asg.attended ? Number(asg.commission_amount || 0) : 0), 0);
 
   const isDriverRole =
@@ -1623,26 +1641,44 @@ export default function EventWorkspacePage() {
                               <div className="mt-1 text-xs text-muted tabular-nums">
                                 {t(asg.role)}{canViewOperations && asg.commission_amount !== undefined && ` | ${formatCurrency(asg.commission_amount)}`}
                               </div>
-                              {/* Issue #197: an assignment is a schedule. The badge states the
-                                  attendance fact; the checkbox is the explicit verification
-                                  action, so its checked state means "verified attended" only. */}
+                              {/* Issue #203: attendance has three states. A checkbox can only
+                                  express two, which left a genuine no-show indistinguishable
+                                  from "not decided yet" and deadlocked event completion. This
+                                  is a radiogroup: nothing is selected until someone decides. */}
                               <div className="mt-2 flex flex-wrap items-center gap-3">
-                                <StatusBadge status={asg.attended === true ? "ATTENDED" : "ATTENDANCE_UNVERIFIED"} />
-                                <label
-                                  className={`flex min-h-12 items-center gap-2 text-xs font-semibold text-muted ${
-                                    canVerifyAttendance ? "cursor-pointer" : "cursor-not-allowed opacity-80"
-                                  }`}
+                                <StatusBadge status={attendanceStatus(asg)} />
+                                <div
+                                  role="radiogroup"
+                                  aria-label={`${t("Attendance")} ${asg.employee_name || ""}`.trim()}
+                                  className="inline-flex overflow-hidden rounded-lg border border-border"
                                 >
-                                  <input
-                                    type="checkbox"
-                                    aria-label={`${t("Verify attendance")} ${asg.employee_name || ""}`.trim()}
-                                    checked={asg.attended === true}
-                                    disabled={!canVerifyAttendance || toggleAttendanceMutation.isPending}
-                                    onChange={(e) => toggleAttendanceMutation.mutate({ employeeId: asg.employee_id, attended: e.target.checked })}
-                                    className="h-5 w-5 rounded border-border text-primary focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                  />
-                                  <span>{t("Verify attendance")}</span>
-                                </label>
+                                  {([
+                                    { value: true, label: t("Attended") },
+                                    { value: false, label: t("Absent") },
+                                  ] as const).map((option) => {
+                                    const selected = isAttendanceResolved(asg) && asg.attended === option.value;
+                                    return (
+                                      <button
+                                        key={String(option.value)}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={selected}
+                                        aria-label={`${option.label} ${asg.employee_name || ""}`.trim()}
+                                        disabled={!canVerifyAttendance || toggleAttendanceMutation.isPending}
+                                        onClick={() =>
+                                          toggleAttendanceMutation.mutate({ employeeId: asg.employee_id, attended: option.value })
+                                        }
+                                        className={`min-h-12 px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                          selected
+                                            ? "bg-primary text-on-primary"
+                                            : "bg-card text-muted md:hover:bg-card-alt"
+                                        }`}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                               {canWriteAssignments && isEventCompleted && !canOverrideCompletedEvent && (
                                 <div className="mt-1 text-xs font-semibold text-muted">
@@ -1849,7 +1885,7 @@ export default function EventWorkspacePage() {
                           className="w-full h-11 px-5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-card-alt active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border border-border"
                           loading={generateLaborMutation.isPending}
                           onClick={() => generateLaborMutation.mutate()}
-                          disabled={!isEventCompleted || !hasAttendedLabor || hasUnverifiedAttendance}
+                          disabled={!isEventCompleted || !hasAttendedLabor || hasUnresolvedAttendance}
                         >
                           {t("Generate Labor Expense")}
                         </Button>
@@ -1857,9 +1893,9 @@ export default function EventWorkspacePage() {
                           <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
                             {t("Prerequisite: Event status must be Completed to generate labor expense.")}
                           </div>
-                        ) : hasUnverifiedAttendance ? (
+                        ) : hasUnresolvedAttendance ? (
                           <div className="text-[11px] text-danger/80 bg-danger/5 border border-danger/20 p-2.5 rounded-lg leading-snug">
-                            {t("Prerequisite: Verify attendance for every assigned employee before generating labor.")}
+                            {t("Prerequisite: Mark every assigned employee attended or absent before generating labor.")}
                           </div>
                         ) : (
                           <div className="text-[11px] text-success/80 bg-success/5 border border-success/20 p-2.5 rounded-lg leading-snug">

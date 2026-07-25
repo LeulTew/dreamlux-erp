@@ -527,8 +527,13 @@ async function generateLaborExpenseFromAssignments(
   if (eventResult.rows[0].status !== "Completed") return { status: "event_not_completed" };
 
   const assignmentResult = await client.query(
+    // Issue #203: an assignment is UNRESOLVED only when nobody has decided yet. Recording a
+    // genuine no-show (attended = false with a marker stamp) is a decision, so it resolves
+    // the row and contributes zero - otherwise an honest no-show would block the event
+    // forever, because `false` on its own also means "not decided yet".
+    // A legacy attended = true row predating the marker columns counts as resolved.
     `SELECT COALESCE(SUM(commission_amount) FILTER (WHERE attended IS TRUE), 0) AS total,
-            COUNT(*) FILTER (WHERE attended IS NOT TRUE)::int AS unverified
+            COUNT(*) FILTER (WHERE attended IS NOT TRUE AND attendance_marked_at IS NULL)::int AS unverified
        FROM event_assignments
       WHERE event_id = $1`,
     [eventId],
@@ -1897,7 +1902,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
           if (generationResult.status === "attendance_unverified") {
             await client.query("ROLLBACK");
             res.status(409).json({
-              error: "Attendance must be verified for every assigned employee before the event can be completed.",
+              error: "Attendance must be resolved for every assigned employee before the event can be completed. Mark each employee as attended or absent.",
               unverified_count: generationResult.unverifiedCount,
             });
             return;
@@ -3478,8 +3483,8 @@ router.patch("/:id/assignments/employees/:employeeId/attendance", requireAuth, a
         `
           UPDATE event_assignments
           SET attended = $1,
-              attendance_marked_at = CASE WHEN $1::boolean THEN NOW() ELSE NULL END,
-              attendance_marked_by = CASE WHEN $1::boolean THEN $4 ELSE NULL END
+              attendance_marked_at = NOW(),
+              attendance_marked_by = $4
           WHERE event_id = $2 AND employee_id = $3
           RETURNING *
         `,
@@ -3729,9 +3734,9 @@ router.post("/:id/expenses/generate-labor", requireAuth, async (req: AuthRequest
       if (generationResult.status === "attendance_unverified") {
         await client.query("ROLLBACK");
         res.status(409).json({
-          error: "Attendance must be verified before labor can be generated. "
+          error: "Attendance must be resolved before labor can be generated. "
             + `${generationResult.unverifiedCount} assigned employee${generationResult.unverifiedCount === 1 ? "" : "s"} `
-            + "still have unverified attendance.",
+            + "still need to be marked attended or absent.",
           unverified_count: generationResult.unverifiedCount,
         });
         return;

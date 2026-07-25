@@ -42,6 +42,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     RESTRICTED: "Restricted",
     ATTENDED: "Attended",
     ATTENDANCE_UNVERIFIED: "Attendance unverified",
+    ABSENT: "Absent",
   },
   am: {
     ARCHIVED: "በማህደር የተያዘ",
@@ -69,6 +70,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     RESTRICTED: "የተገደበ",
     ATTENDED: "ተገኝቷል",
     ATTENDANCE_UNVERIFIED: "መገኘት አልተረጋገጠም",
+    ABSENT: "አልተገኘም",
   }
 };
 
@@ -110,6 +112,7 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
     case "RESTRICTED":
       variant = "info";
       break;
+    case "ABSENT":
     case "ARCHIVED":
     case "CANCELED":
     case "CANCELLED":
