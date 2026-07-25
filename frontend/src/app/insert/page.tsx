@@ -59,6 +59,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Regular (salary + commission)": "Regular (salary + commission)",
     "Commission only": "Commission only",
     "Commission-only employees always receive zero base salary.": "Commission-only employees always receive zero base salary.",
+    "Fixed at ETB 0 for commission-only mode.": "Fixed at ETB 0 for commission-only mode.",
   },
   am: {
     "Add Employee": "ሰራተኛ መዝግብ",
@@ -104,6 +105,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Regular (salary + commission)": "መደበኛ (ደመወዝ + ኮሚሽን)",
     "Commission only": "ኮሚሽን ብቻ",
     "Commission-only employees always receive zero base salary.": "ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች መሠረታዊ ደመወዝ አያገኙም።",
+    "Fixed at ETB 0 for commission-only mode.": "ለኮሚሽን ብቻ ክፍያ መሠረታዊ ደመወዝ በ 0 ETB የተወሰነ ነው።",
   }
 };
 
@@ -719,7 +721,7 @@ export default function InsertEmployeePage() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-muted px-1">{t("Compensation Mode")}</label>
                     <Select
-                      className="[&>button]:min-h-12"
+                      className="[&>button]:min-h-[48px]"
                       options={[
                         { id: "regular", label: t("Regular (salary + commission)") },
                         { id: "commission_only", label: t("Commission only") },
@@ -733,6 +735,8 @@ export default function InsertEmployeePage() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase text-muted tracking-tight px-1">{t("Base Salary")}</label>
                     <Select
+                      className="[&>button]:min-h-[48px]"
+                      disabled={formData.compensation_mode === "commission_only"}
                       options={salaryLevels.map((level) => ({
                         id: level.level_name,
                         label: `${level.level_name} - ETB ${Number(level.base_salary).toLocaleString()}`
@@ -742,9 +746,11 @@ export default function InsertEmployeePage() {
                       placeholder={t("Select Level")}
                     />
                     <p className="text-[10px] font-bold text-muted px-1">
-                      {selectedSalaryLevel
-                        ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
-                        : t("Select a salary level to view the amount")}
+                      {formData.compensation_mode === "commission_only"
+                        ? t("Fixed at ETB 0 for commission-only mode.")
+                        : selectedSalaryLevel
+                          ? `${t("Base Salary Amount")}: ETB ${Number(selectedSalaryLevel.base_salary).toLocaleString()}`
+                          : t("Select a salary level to view the amount")}
                     </p>
                   </div>
                 </div>

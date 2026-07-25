@@ -1045,15 +1045,29 @@ function PaymentRunProcessPageContent() {
                       imageUrl={employee.profile_photo_url}
                       sizeClassName="w-10 h-10"
                     />
-                    <p className="text-base font-black tracking-tight">{employee.full_name}</p>
+                    <div>
+                      <p className="text-base font-black tracking-tight">{employee.full_name}</p>
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        {employee.compensation_mode === "commission_only" ? t("Commission only") : t("Regular (salary + commission)")}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="rounded-xl border border-border/50 bg-card-alt px-3 py-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-black">{t("Base Salary")}</span>
-                      <span className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-lg bg-indigo-600/10 text-indigo-800 dark:text-indigo-200 border border-indigo-600/20 shadow-sm">{employeeTotals.levelName === "NO LEVEL" ? t("NO LEVEL") : employeeTotals.levelName}</span>
+                      <span className="text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-lg bg-indigo-600/10 text-indigo-800 dark:text-indigo-200 border border-indigo-600/20 shadow-sm">
+                        {employee.compensation_mode === "commission_only" ? t("COMMISSION ONLY") : employeeTotals.levelName === "NO LEVEL" ? t("NO LEVEL") : employeeTotals.levelName}
+                      </span>
                     </div>
-                    <p className="text-sm font-bold mt-1">ETB {employeeTotals.baseSalary.toLocaleString()}</p>
+                    <p className="text-sm font-bold mt-1">
+                      ETB {employeeTotals.baseSalary.toLocaleString()}
+                      {employee.compensation_mode === "commission_only" && (
+                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                          ({t("Zero base salary")})
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
 
@@ -1091,21 +1105,21 @@ function PaymentRunProcessPageContent() {
                           {/* Row 2: Qty stepper + editable price + delete */}
                           <div className="flex items-center gap-2">
                             {/* - / + Stepper */}
-                            <div className="flex items-center rounded-lg border border-border overflow-hidden shrink-0">
+                            <div className="flex items-center rounded-xl border border-border overflow-hidden shrink-0">
                               <button
                                 onClick={() => updateEventLine(employee.id, index, { quantity: Math.max(1, (line.quantity || 1) - 1) })}
-                                className="px-2.5 py-2 text-foreground hover:bg-muted transition-colors"
+                                className="min-w-[48px] min-h-[48px] text-foreground hover:bg-muted transition-colors flex items-center justify-center cursor-pointer"
                                 title={t("Decrease")}
                               >
-                                <HiMinus className="w-3.5 h-3.5" />
+                                <HiMinus className="w-4 h-4" />
                               </button>
                               <span className="px-3 py-2 text-sm font-bold min-w-8 text-center select-none">{line.quantity || 1}</span>
                               <button
                                 onClick={() => updateEventLine(employee.id, index, { quantity: (line.quantity || 1) + 1 })}
-                                className="px-2.5 py-2 text-foreground hover:bg-muted transition-colors"
+                                className="min-w-[48px] min-h-[48px] text-foreground hover:bg-muted transition-colors flex items-center justify-center cursor-pointer"
                                 title={t("Increase")}
                               >
-                                <HiOutlinePlus className="w-3.5 h-3.5" />
+                                <HiOutlinePlus className="w-4 h-4" />
                               </button>
                             </div>
 
@@ -1123,7 +1137,7 @@ function PaymentRunProcessPageContent() {
                                     price_override: val !== basePrice ? val : null,
                                   });
                                 }}
-                                className="w-full rounded-lg border border-border bg-background text-foreground pl-9 pr-2 py-2 text-sm font-bold text-right"
+                                className="w-full rounded-xl border border-border bg-background text-foreground pl-9 pr-2 min-h-[48px] text-sm font-bold text-right"
                               />
                             </div>
 
@@ -1137,10 +1151,10 @@ function PaymentRunProcessPageContent() {
                             {/* Delete */}
                             <button
                               onClick={() => removeEventLine(employee.id, index)}
-                              className="w-8 h-8 rounded-full border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center shrink-0"
+                              className="min-w-[48px] min-h-[48px] rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
                               title={t("Remove Event")}
                             >
-                              <HiOutlineTrash className="w-3.5 h-3.5" />
+                              <HiOutlineTrash className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -1150,9 +1164,9 @@ function PaymentRunProcessPageContent() {
 
                   <button
                     onClick={() => addEventLine(employee.id)}
-                    className="w-full py-2 rounded-xl border border-dashed border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2"
+                    className="w-full min-h-[48px] rounded-xl border border-dashed border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <HiOutlinePlus className="w-3.5 h-3.5" />
+                    <HiOutlinePlus className="w-4 h-4" />
                     {t("Add Event")}
                   </button>
                 </div>

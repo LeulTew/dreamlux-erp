@@ -60,6 +60,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Regular (salary + commission)": "Regular (salary + commission)",
     "Commission only": "Commission only",
     "Commission-only employees always receive zero base salary.": "Commission-only employees always receive zero base salary.",
+    "Fixed at ETB 0 for commission-only mode.": "Fixed at ETB 0 for commission-only mode.",
   },
   am: {
     "Edit Employee": "የሰራተኛ መረጃ ማስተካከያ",
@@ -104,6 +105,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Regular (salary + commission)": "መደበኛ (ደመወዝ + ኮሚሽን)",
     "Commission only": "ኮሚሽን ብቻ",
     "Commission-only employees always receive zero base salary.": "ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች መሠረታዊ ደመወዝ አያገኙም።",
+    "Fixed at ETB 0 for commission-only mode.": "ለኮሚሽን ብቻ ክፍያ መሠረታዊ ደመወዝ በ 0 ETB የተወሰነ ነው።",
   }
 };
 

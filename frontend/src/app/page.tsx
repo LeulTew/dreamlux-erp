@@ -303,7 +303,7 @@ function buildColumns(
       header: t("Compensation Mode"),
       cell: ({ row, getValue }) => editMode ? (
         <Select
-          className="[&>button]:min-h-12"
+          className="[&>button]:min-h-[48px]"
           options={[
             { id: "regular", label: t("Regular (salary + commission)") },
             { id: "commission_only", label: t("Commission only") },
@@ -312,9 +312,17 @@ function buildColumns(
           onChange={(value) => debouncedUpdate(row.original.id, "compensation_mode", value)}
         />
       ) : (
-        <span className="text-sm font-medium text-foreground whitespace-nowrap">
-          {getValue() === "commission_only" ? t("Commission only") : t("Regular (salary + commission)")}
-        </span>
+        <div className="flex items-center">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap border ${
+              getValue() === "commission_only"
+                ? "bg-muted/50 text-foreground border-border/70"
+                : "bg-primary/10 text-primary border-primary/20"
+            }`}
+          >
+            {getValue() === "commission_only" ? t("Commission only") : t("Regular (salary + commission)")}
+          </span>
+        </div>
       ),
       size: 180,
     }),
