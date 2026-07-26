@@ -28,6 +28,7 @@ const args = process.argv.slice(2);
 const isApply = args.includes("--apply");
 const isVerify = args.includes("--verify");
 const isCleanup = args.includes("--cleanup");
+const confirmTarget = args.find((arg) => arg.startsWith("--confirm-target="))?.slice("--confirm-target=".length);
 
 async function main() {
   const client = new Client({
@@ -49,6 +50,12 @@ async function main() {
         console.log("  bun run seed:demo:additive -- --cleanup --apply");
         console.log("================================================================================");
         return;
+      }
+
+      const target = await runDryRun(client);
+      const expectedTarget = `${target.targetDatabase}@${target.serverHost}`;
+      if (confirmTarget !== expectedTarget) {
+        throw new Error(`Cleanup requires --confirm-target=${expectedTarget}`);
       }
 
       console.log(`Executing targeted cleanup for seed key: ${DEMO_SEED_KEY}...`);
@@ -89,24 +96,24 @@ async function main() {
         }
       }
       console.log("--------------------------------------------------------------------------------");
-      console.log("PROPOSED SEED MANIFEST (records to insert):");
-      console.log(`  - Employees          : ${report.manifest.employeesToInsert}`);
-      console.log(`  - Inventory Items    : ${report.manifest.itemsToInsert}`);
-      console.log(`  - Proposals          : ${report.manifest.proposalsToInsert}`);
-      console.log(`  - Events             : ${report.manifest.eventsToInsert}`);
-      console.log(`  - Allocations        : ${report.manifest.allocationsToInsert}`);
-      console.log(`  - Expenses           : ${report.manifest.expensesToInsert}`);
-      console.log(`  - Capital Investment : ${report.manifest.capitalToInsert}`);
-      console.log(`  - Payroll Runs       : ${report.manifest.payrollToInsert}`);
+      console.log("SEED MANIFEST (expected / present / missing):");
+      for (const [entity, counts] of Object.entries(report.manifest)) {
+        console.log(`  - ${entity.padEnd(22)} : ${counts.expected} / ${counts.present} / ${counts.missing}`);
+      }
       console.log("--------------------------------------------------------------------------------");
       console.log("SAFETY NOTICE:");
       console.log("  ✓ ZERO database mutations were performed (Dry-run mode).");
-      console.log("  ✓ To apply this additive seed, run: bun run seed:demo:additive -- --apply");
+      console.log(`  ✓ To apply, rerun with --apply --confirm-target=${report.targetDatabase}@${report.serverHost}`);
       console.log("================================================================================");
       return;
     }
 
     // Apply mode
+    const target = await runDryRun(client);
+    const expectedTarget = `${target.targetDatabase}@${target.serverHost}`;
+    if (confirmTarget !== expectedTarget) {
+      throw new Error(`Apply requires --confirm-target=${expectedTarget}`);
+    }
     console.log("================================================================================");
     console.log("       DREAMLUX ERP — APPLYING ADDITIVE DEMO SEED");
     console.log("================================================================================");

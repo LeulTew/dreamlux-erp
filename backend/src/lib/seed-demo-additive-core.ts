@@ -70,18 +70,53 @@ export interface DryRunReport {
     serviceScopes: string[];
     roles: string[];
   };
-  manifest: {
-    employeesToInsert: number;
-    itemsToInsert: number;
-    proposalsToInsert: number;
-    eventsToInsert: number;
-    allocationsToInsert: number;
-    expensesToInsert: number;
-    capitalToInsert: number;
-    payrollToInsert: number;
-  };
+  manifest: Record<SeedEntity, { expected: number; present: number; missing: number }>;
   isAlreadyApplied: boolean;
   mutationsMade: number;
+}
+
+const SEED_EXPECTED = {
+  employees: 5, items: 4, proposals: 3, proposalScopes: 5, events: 3,
+  eventScopes: 5, assignments: 3, allocations: 3, expenses: 6,
+  capitalInvestments: 1, inventoryMovements: 1, payrollRuns: 2,
+  payrollLines: 4, payrollLineEvents: 1, eventLogs: 4,
+} as const;
+type SeedEntity = keyof typeof SEED_EXPECTED;
+
+async function getSeedPresence(client: Queryable): Promise<Record<SeedEntity, number>> {
+  const result = await client.query(`
+    SELECT
+      (SELECT count(*)::int FROM employees WHERE id = ANY($1::uuid[])) AS employees,
+      (SELECT count(*)::int FROM items WHERE id = ANY($2::uuid[])) AS items,
+      (SELECT count(*)::int FROM event_proposals WHERE id = ANY($3::uuid[])) AS proposals,
+      (SELECT count(*)::int FROM proposal_service_scopes WHERE proposal_id = ANY($3::uuid[])) AS "proposalScopes",
+      (SELECT count(*)::int FROM events WHERE id = ANY($4::uuid[])) AS events,
+      (SELECT count(*)::int FROM event_service_scope_links WHERE event_id = ANY($4::uuid[])) AS "eventScopes",
+      (SELECT count(*)::int FROM event_assignments WHERE id = ANY($5::uuid[])) AS assignments,
+      (SELECT count(*)::int FROM event_allocations WHERE id = ANY($6::uuid[])) AS allocations,
+      (SELECT count(*)::int FROM expenses WHERE id = ANY($7::uuid[])) AS expenses,
+      (SELECT count(*)::int FROM capital_investments WHERE id = $8) AS "capitalInvestments",
+      (SELECT count(*)::int FROM inventory_movements WHERE id = $9) AS "inventoryMovements",
+      (SELECT count(*)::int FROM payroll_runs WHERE id = ANY($10::uuid[])) AS "payrollRuns",
+      (SELECT count(*)::int FROM payroll_run_employee_lines WHERE id = ANY($11::uuid[])) AS "payrollLines",
+      (SELECT count(*)::int FROM payroll_run_line_events WHERE id = $12) AS "payrollLineEvents",
+      (SELECT count(*)::int FROM event_logs WHERE id = ANY($13::uuid[])) AS "eventLogs"
+  `, [
+    [DEMO_EMP_REGULAR_ID, DEMO_EMP_COMMISSION_ONLY_ID, DEMO_EMP_KEEPER_ID, DEMO_EMP_COORDINATOR_ID, DEMO_EMP_DRIVER_ID],
+    [DEMO_ITEM_CHAIR_ID, DEMO_ITEM_STAGE_ID, DEMO_ITEM_UPLIGHT_ID, DEMO_ITEM_TRUSS_ID],
+    [DEMO_PROP_DRAFT_ID, DEMO_PROP_APPROVED_ID, DEMO_PROP_CONVERTED_ID],
+    [DEMO_EVENT_PLANNED_ID, DEMO_EVENT_ACTIVE_ID, DEMO_EVENT_COMPLETED_ID],
+    [DEMO_ASSIGN_UPCOMING_ID, DEMO_ASSIGN_ATTENDED_ID, DEMO_ASSIGN_ABSENT_ID],
+    [DEMO_ALLOC_ACTIVE_ID, DEMO_ALLOC_DISPATCHED_ID, DEMO_ALLOC_RETURNED_ID],
+    [DEMO_EXP_LABOR_ID, DEMO_EXP_FUEL_ID, DEMO_EXP_CONSUMABLES_ID, DEMO_EXP_RENTAL_ID, DEMO_EXP_TRANS_ID, DEMO_EXP_OTHER_ID],
+    DEMO_CAPITAL_ID, DEMO_MOVEMENT_CAPITAL_ID,
+    [DEMO_PAYROLL_FINALIZED_ID, DEMO_PAYROLL_DRAFT_ID],
+    [DEMO_PAYROLL_LINE_REG_FIN_ID, DEMO_PAYROLL_LINE_COMM_FIN_ID, DEMO_PAYROLL_LINE_REG_DRAFT_ID, DEMO_PAYROLL_LINE_COMM_DRAFT_ID],
+    DEMO_PAYROLL_EVENT_1_ID,
+    [DEMO_LOG_1_ID, DEMO_LOG_2_ID, DEMO_LOG_3_ID, DEMO_LOG_4_ID],
+  ]);
+  const row = result.rows[0] ?? {};
+  return Object.fromEntries(Object.keys(SEED_EXPECTED).map((key) => [key, Number(row[key] ?? 0)])) as Record<SeedEntity, number>;
 }
 
 export async function runDryRun(client: Queryable): Promise<DryRunReport> {
@@ -98,49 +133,22 @@ export async function runDryRun(client: Queryable): Promise<DryRunReport> {
     "payroll_runs", "payroll_run_employee_lines", "payroll_run_line_events", "event_logs"
   ];
 
-  const tableCounts: Record<string, number> = {};
-  for (const t of trackedTables) {
-    try {
-      const res = await client.query(`SELECT count(*)::int as cnt FROM "${t}"`);
-      tableCounts[t] = res.rows[0]?.cnt ?? 0;
-    } catch {
-      tableCounts[t] = -1;
-    }
-  }
+  const countResult = await client.query(`SELECT ${trackedTables.map((t) => `(SELECT count(*)::int FROM "${t}") AS "${t}"`).join(", ")}`);
+  const tableCounts = Object.fromEntries(trackedTables.map((t) => [t, Number(countResult.rows[0]?.[t] ?? 0)]));
 
   // Catalog checks
-  let stores: string[] = [];
-  try {
-    const storesRes = await client.query("SELECT name FROM stores ORDER BY name");
-    stores = storesRes.rows.map(r => r.name);
-  } catch { /* empty */ }
-
-  let eventTypes: string[] = [];
-  try {
-    const eventTypesRes = await client.query("SELECT name FROM event_types ORDER BY name");
-    eventTypes = eventTypesRes.rows.map(r => r.name);
-  } catch { /* empty */ }
-
-  let serviceScopes: string[] = [];
-  try {
-    const serviceScopesRes = await client.query("SELECT code FROM event_service_scopes ORDER BY code");
-    serviceScopes = serviceScopesRes.rows.map(r => r.code);
-  } catch { /* empty */ }
-
-  let roles: string[] = [];
-  try {
-    const rolesRes = await client.query("SELECT name FROM roles ORDER BY name");
-    roles = rolesRes.rows.map(r => r.name);
-  } catch { /* empty */ }
-
-  // Check if seed is already applied
-  let isAlreadyApplied = false;
-  try {
-    const existingEmpRes = await client.query("SELECT count(*)::int as cnt FROM employees WHERE id IN ($1, $2, $3, $4, $5)", [
-      DEMO_EMP_REGULAR_ID, DEMO_EMP_COMMISSION_ONLY_ID, DEMO_EMP_KEEPER_ID, DEMO_EMP_COORDINATOR_ID, DEMO_EMP_DRIVER_ID
-    ]);
-    isAlreadyApplied = (existingEmpRes.rows[0]?.cnt ?? 0) === 5;
-  } catch { /* empty */ }
+  const [storesRes, eventTypesRes, serviceScopesRes, rolesRes] = await Promise.all([
+    client.query("SELECT name FROM stores ORDER BY name"),
+    client.query("SELECT name FROM event_types ORDER BY name"),
+    client.query("SELECT code FROM event_service_scopes ORDER BY code"),
+    client.query("SELECT name FROM roles ORDER BY name"),
+  ]);
+  const presence = await getSeedPresence(client);
+  const manifest = Object.fromEntries(Object.entries(SEED_EXPECTED).map(([key, expected]) => {
+    const present = presence[key as SeedEntity];
+    return [key, { expected, present, missing: Math.max(0, expected - present) }];
+  })) as DryRunReport["manifest"];
+  const isAlreadyApplied = Object.values(manifest).every(({ missing }) => missing === 0);
 
   return {
     targetDatabase,
@@ -148,90 +156,67 @@ export async function runDryRun(client: Queryable): Promise<DryRunReport> {
     serverHost,
     tableCounts,
     catalogChecks: {
-      stores,
-      eventTypes,
-      serviceScopes,
-      roles,
+      stores: storesRes.rows.map(r => r.name),
+      eventTypes: eventTypesRes.rows.map(r => r.name),
+      serviceScopes: serviceScopesRes.rows.map(r => r.code),
+      roles: rolesRes.rows.map(r => r.name),
     },
-    manifest: {
-      employeesToInsert: isAlreadyApplied ? 0 : 5,
-      itemsToInsert: isAlreadyApplied ? 0 : 4,
-      proposalsToInsert: isAlreadyApplied ? 0 : 3,
-      eventsToInsert: isAlreadyApplied ? 0 : 3,
-      allocationsToInsert: isAlreadyApplied ? 0 : 3,
-      expensesToInsert: isAlreadyApplied ? 0 : 6,
-      capitalToInsert: isAlreadyApplied ? 0 : 1,
-      payrollToInsert: isAlreadyApplied ? 0 : 2,
-    },
+    manifest,
     isAlreadyApplied,
     mutationsMade: 0,
   };
 }
 
 export async function applySeed(client: Queryable): Promise<{ applied: boolean; insertedCount: number }> {
-  // Acquire Postgres transaction advisory lock
-  await client.query("SELECT pg_advisory_xact_lock($1)", [ADVISORY_LOCK_ID]);
   await client.query("BEGIN");
 
   try {
-    // 0. Ensure catalog defaults exist safely if tables are empty
-    await client.query("INSERT INTO stores (name) VALUES ('Bole HQ'), ('Haya Arat') ON CONFLICT (name) DO NOTHING");
-    await client.query("INSERT INTO event_types (name) VALUES ('Wedding'), ('Corporate Event'), ('Photo Shoot') ON CONFLICT (name) DO NOTHING");
-    
-    // Ensure event_service_scopes exists and has codes
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS event_service_scopes (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        code TEXT UNIQUE NOT NULL,
-        name_en TEXT NOT NULL,
-        name_am TEXT NOT NULL,
-        description TEXT,
-        display_order INT NOT NULL DEFAULT 0,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-      INSERT INTO event_service_scopes (code, name_en, name_am, display_order)
-      VALUES ('FULL', 'Full', 'ሙሉ', 1), ('BACKGROUND', 'Background', 'ባክግራውንድ', 2), ('SETUP', 'Setup', 'ሴታፕ', 3), ('TABLE_SETUP', 'Table Setup', 'ጠረጴዛ ሴታፕ', 4)
-      ON CONFLICT (code) DO NOTHING;
-    `).catch(() => {});
-
-    // Ensure junction tables exist
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS proposal_service_scopes (
-        proposal_id UUID NOT NULL REFERENCES event_proposals(id) ON DELETE CASCADE,
-        service_scope_id UUID NOT NULL REFERENCES event_service_scopes(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (proposal_id, service_scope_id)
-      );
-      CREATE TABLE IF NOT EXISTS event_service_scope_links (
-        event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-        service_scope_id UUID NOT NULL REFERENCES event_service_scopes(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (event_id, service_scope_id)
-      );
-    `).catch(() => {});
+    // Transaction-scoped locks only remain held when acquired after BEGIN.
+    await client.query("SELECT pg_advisory_xact_lock($1)", [ADVISORY_LOCK_ID]);
+    const before = await getSeedPresence(client);
 
     // 1. Resolve catalog IDs
     const { rows: stores } = await client.query("SELECT id, name FROM stores");
     const { rows: eventTypes } = await client.query("SELECT id, name FROM event_types");
     const { rows: serviceScopes } = await client.query("SELECT id, code FROM event_service_scopes");
-    const { rows: users } = await client.query("SELECT id, username FROM users LIMIT 5");
+    const { rows: users } = await client.query(
+      "SELECT id, username FROM users WHERE username IN ('admin', 'ceo') ORDER BY CASE username WHEN 'admin' THEN 0 ELSE 1 END",
+    );
 
-    const boleHQ = stores.find(s => s.name === "Bole HQ") || stores[0];
-    const hayaArat = stores.find(s => s.name === "Haya Arat") || stores[0];
+    const boleHQ = stores.find(s => s.name === "Bole HQ");
+    const hayaArat = stores.find(s => s.name === "Haya Arat");
 
-    const weddingType = eventTypes.find(e => e.name === "Wedding" || e.name === "wedding") || eventTypes[0];
-    const corpType = eventTypes.find(e => e.name === "Corporate Event") || eventTypes[0];
-    const photoType = eventTypes.find(e => e.name === "Photo Shoot") || eventTypes[0];
+    const weddingType = eventTypes.find(e => e.name === "Wedding" || e.name === "wedding");
+    const corpType = eventTypes.find(e => e.name === "Corporate Event");
+    const photoType = eventTypes.find(e => e.name === "Photo Shoot");
 
-    const fullScope = serviceScopes.find(s => s.code === "FULL") || serviceScopes[0];
-    const bgScope = serviceScopes.find(s => s.code === "BACKGROUND") || serviceScopes[0];
-    const setupScope = serviceScopes.find(s => s.code === "SETUP") || serviceScopes[0];
-    const tableScope = serviceScopes.find(s => s.code === "TABLE_SETUP") || serviceScopes[0];
+    const fullScope = serviceScopes.find(s => s.code === "FULL");
+    const bgScope = serviceScopes.find(s => s.code === "BACKGROUND");
+    const setupScope = serviceScopes.find(s => s.code === "SETUP");
+    const tableScope = serviceScopes.find(s => s.code === "TABLE_SETUP");
 
     const adminUser = users.find(u => u.username === "admin" || u.username === "ceo") || users[0];
     const userId = adminUser?.id || null;
+
+    const missingDependencies = [
+      !boleHQ && "store:Bole HQ",
+      !hayaArat && "store:Haya Arat",
+      !weddingType && "event_type:Wedding",
+      !corpType && "event_type:Corporate Event",
+      !photoType && "event_type:Photo Shoot",
+      !fullScope && "service_scope:FULL",
+      !bgScope && "service_scope:BACKGROUND",
+      !setupScope && "service_scope:SETUP",
+      !tableScope && "service_scope:TABLE_SETUP",
+      !adminUser && "user:admin-or-ceo",
+    ].filter(Boolean);
+    if (missingDependencies.length > 0) {
+      throw new Error(`Missing authoritative seed dependencies: ${missingDependencies.join(", ")}`);
+    }
+    if (!boleHQ || !hayaArat || !weddingType || !corpType || !photoType
+      || !fullScope || !bgScope || !setupScope || !tableScope || !adminUser) {
+      throw new Error("Seed dependency validation failed");
+    }
 
     // 2. Insert Employees (5)
     await client.query(`
@@ -244,10 +229,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         ($3, '[DEMO 2026Q3] Dawit Haile', 'D26-003', 'Logistics & Inventory', 'Inventory Storekeeper', '+251911990003', 'dawit.demo@dreamlux.com', 'L3', 9000.00, $6, 'Male', 'full-time', 'Office', 'Dashen', '5544332211', '2026-01-15', 'Active', 'regular'),
         ($4, '[DEMO 2026Q3] Mesfin Tadesse', 'D26-004', 'Events Operations', 'OPS Manager', '+251911990004', 'mesfin.demo@dreamlux.com', 'L5', 16000.00, $7, 'Male', 'full-time', 'Office', 'Zemen Bank', '1122334455', '2025-11-01', 'Active', 'regular'),
         ($5, '[DEMO 2026Q3] Kassahun Bekele', 'D26-005', 'Logistics & Inventory', 'Lead Driver', '+251911990005', 'kassahun.demo@dreamlux.com', 'L2', 7000.00, $7, 'Male', 'full-time', 'Redat', 'CBE', '100088776655', '2026-03-01', 'Active', 'regular')
-      ON CONFLICT (id) DO UPDATE SET
-        full_name = EXCLUDED.full_name,
-        compensation_mode = EXCLUDED.compensation_mode,
-        base_salary = EXCLUDED.base_salary;
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_EMP_REGULAR_ID, DEMO_EMP_COMMISSION_ONLY_ID, DEMO_EMP_KEEPER_ID, DEMO_EMP_COORDINATOR_ID, DEMO_EMP_DRIVER_ID,
       boleHQ.id, hayaArat.id
@@ -262,9 +244,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         ($2, '[DEMO 2026Q3] Velvet Backdrop Stage', 5, 'Heavy velvet modular backdrop frame set', $5, 'Props', 'Royal Blue', 'set', '2026-04-15', 8500.00, 'Good'),
         ($3, '[DEMO 2026Q3] Wireless LED Uplights', 30, 'Rechargeable RGBW ambient stage lights', $6, 'Lighting', 'RGBW', 'pcs', '2026-06-01', 3200.00, 'Good'),
         ($4, '[DEMO 2026Q3] Aluminum Stage Trusses', 10, 'Heavy-duty 3m square aluminum lighting trusses', $6, 'Props', 'Silver', 'pcs', '2026-07-01', 4500.00, 'Good')
-      ON CONFLICT (id) DO UPDATE SET
-        name = EXCLUDED.name,
-        quantity = EXCLUDED.quantity;
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_ITEM_CHAIR_ID, DEMO_ITEM_STAGE_ID, DEMO_ITEM_UPLIGHT_ID, DEMO_ITEM_TRUSS_ID,
       boleHQ.id, hayaArat.id
@@ -278,14 +258,12 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
       ) VALUES
         ($1, 'PROP-D26-001', '[DEMO 2026Q3] Proposed Luxury Gala 2026', 'Solomon & Associates', '+251911887766', 'solomon@gala.com', $4, 'Hilton Addis Ababa', '2026-08-25', 400, 150000.00, 90000.00, 'draft', NULL, $7),
         ($2, 'PROP-D26-002', '[DEMO 2026Q3] Diplomatic Reception', 'Embassy Cultural Affairs', '+251911776655', 'cultural@embassy.gov', $5, 'Ethiopian Skylight Hotel', '2026-08-30', 250, 80000.00, 70000.00, 'approved', NULL, $7),
-        ($3, 'PROP-D26-003', '[DEMO 2026Q3] Yared & Bethlehem Wedding Intake', 'Yared Tadesse', '+251911665544', 'yared@wedding.com', $6, 'Hilton Addis Ababa', '2026-07-20', 500, 250000.00, 175000.00, 'converted', $8, $7)
-      ON CONFLICT (id) DO UPDATE SET
-        title = EXCLUDED.title,
-        status = EXCLUDED.status;
+        ($3, 'PROP-D26-003', '[DEMO 2026Q3] Yared & Bethlehem Wedding Intake', 'Yared Tadesse', '+251911665544', 'yared@wedding.com', $6, 'Hilton Addis Ababa', '2026-07-20', 500, 250000.00, 175000.00, 'converted', NULL, $7)
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_PROP_DRAFT_ID, DEMO_PROP_APPROVED_ID, DEMO_PROP_CONVERTED_ID,
       corpType.id, photoType.id, weddingType.id,
-      userId, DEMO_EVENT_COMPLETED_ID
+      userId
     ]);
 
     // 4b. Proposal Service Scopes
@@ -308,15 +286,17 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         ($1, 'EVT-D26-001', '[DEMO 2026Q3] Annual Tech Summit', 'TechEthio Forum', '+251911554433', $4, '2026-08-15', '2026-08-15', '09:00:00', '17:00:00', 'Hilton Addis Ababa', 120000.00, 'Planned', $7),
         ($2, 'EVT-D26-002', '[DEMO 2026Q3] Commercial Launch Gala', 'Ethio Telecom Agency', '+251911443322', $5, '2026-08-01', '2026-08-01', '18:00:00', '23:00:00', 'Ethiopian Skylight Hotel', 95000.00, 'In Progress', $7),
         ($3, 'EVT-D26-003', '[DEMO 2026Q3] Yared & Bethlehem Wedding', 'Yared Tadesse', '+251911665544', $6, '2026-07-20', '2026-07-20', '10:00:00', '22:00:00', NULL, 250000.00, 'Completed', $7)
-      ON CONFLICT (id) DO UPDATE SET
-        name = EXCLUDED.name,
-        status = EXCLUDED.status,
-        venue_location = EXCLUDED.venue_location;
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_EVENT_PLANNED_ID, DEMO_EVENT_ACTIVE_ID, DEMO_EVENT_COMPLETED_ID,
       corpType.id, photoType.id, weddingType.id,
       userId
     ]);
+
+    await client.query(
+      "UPDATE event_proposals SET converted_event_id = $1 WHERE id = $2 AND converted_event_id IS NULL",
+      [DEMO_EVENT_COMPLETED_ID, DEMO_PROP_CONVERTED_ID],
+    );
 
     // 5b. Event Service Scopes Links
     if (fullScope && bgScope && setupScope && tableScope) {
@@ -340,9 +320,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         ($1, $4, $7, 'Lead Coordinator', 2000.00, FALSE, NULL, NULL),
         ($2, $6, $7, 'Lead Coordinator', 2500.00, TRUE, '2026-07-20 10:00:00', $9),
         ($3, $6, $8, 'Stage Assistant', 1500.00, FALSE, '2026-07-20 10:00:00', $9)
-      ON CONFLICT (id) DO UPDATE SET
-        attended = EXCLUDED.attended,
-        attendance_marked_at = EXCLUDED.attendance_marked_at;
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_ASSIGN_UPCOMING_ID, DEMO_ASSIGN_ATTENDED_ID, DEMO_ASSIGN_ABSENT_ID,
       DEMO_EVENT_PLANNED_ID, DEMO_EVENT_ACTIVE_ID, DEMO_EVENT_COMPLETED_ID,
@@ -358,9 +336,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         ($1, $4, $7, 50, 'Active', NULL, NULL, '[DEMO 2026Q3] Reserved for tech summit banquet', $10),
         ($2, $5, $8, 20, 'Dispatched', '2026-08-01 08:00:00', NULL, '[DEMO 2026Q3] Dispatched for launch gala', $10),
         ($3, $6, $9, 2, 'Returned', '2026-07-20 07:00:00', '2026-07-21 18:00:00', '[DEMO 2026Q3] Returned safely post-wedding', $10)
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        quantity_allocated = EXCLUDED.quantity_allocated;
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_ALLOC_ACTIVE_ID, DEMO_ALLOC_DISPATCHED_ID, DEMO_ALLOC_RETURNED_ID,
       DEMO_EVENT_PLANNED_ID, DEMO_EVENT_ACTIVE_ID, DEMO_EVENT_COMPLETED_ID,
@@ -379,9 +355,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         ($4, $8, 'Equipment Rental', 4000.00, '[DEMO 2026Q3] Heavy rigging crane hire', 'Approved', $9),
         ($5, $7, 'Transportation', 2000.00, '[DEMO 2026Q3] Extra truck hire for lighting rig', 'Pending', $9),
         ($6, $6, 'Other', 1500.00, '[DEMO 2026Q3] Site clearance fee', 'Approved', $9)
-      ON CONFLICT (id) DO UPDATE SET
-        amount = EXCLUDED.amount,
-        status = EXCLUDED.status;
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_EXP_LABOR_ID, DEMO_EXP_FUEL_ID, DEMO_EXP_CONSUMABLES_ID, DEMO_EXP_RENTAL_ID, DEMO_EXP_TRANS_ID, DEMO_EXP_OTHER_ID,
       DEMO_EVENT_PLANNED_ID, DEMO_EVENT_ACTIVE_ID, DEMO_EVENT_COMPLETED_ID,
@@ -394,9 +368,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         id, asset_name, amount, category, funding_source, investor_name, investment_date, notes, status, linked_inventory_item_id, stock_applied, created_by
       ) VALUES
         ($1, '[DEMO 2026Q3] Stage Trusses Acquisition', 45000.00, 'Equipment', 'Company Reserve', 'Dream Lux PLC', '2026-07-01', '[DEMO 2026Q3] Acquired 10 aluminum stage trusses', 'Approved', $2, TRUE, $3)
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        stock_applied = EXCLUDED.stock_applied;
+      ON CONFLICT (id) DO NOTHING;
     `, [DEMO_CAPITAL_ID, DEMO_ITEM_TRUSS_ID, userId]);
 
     await client.query(`
@@ -414,9 +386,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
       ) VALUES
         ($1, 'Payroll Run — July 2026 [DEMO 2026Q3]', 'month', '2026-07-01', '2026-07-31', 'finalized', '2026-07-31 17:00:00', $3, $3, 'Demonstrates regular vs commission-only compensation.'),
         ($2, 'Payroll Run — August 2026 [DEMO 2026Q3]', 'month', '2026-08-01', '2026-08-31', 'draft', NULL, $3, NULL, 'Draft payroll period for August 2026.')
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        finalized_at = EXCLUDED.finalized_at;
+      ON CONFLICT (id) DO NOTHING;
     `, [DEMO_PAYROLL_FINALIZED_ID, DEMO_PAYROLL_DRAFT_ID, userId]);
 
     // 10b. Payroll Employee Lines (4)
@@ -429,9 +399,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         ($2, $5, $8, 'D26-002', '[DEMO 2026Q3] Tigist Alemu', 'L3', 0.00, 0.00, 0.00, $9, 'Events Operations', 'commission_only'),
         ($3, $6, $7, 'D26-001', '[DEMO 2026Q3] Abebe Demissie', 'L4', 12000.00, 0.00, 12000.00, $9, 'Events Operations', 'regular'),
         ($4, $6, $8, 'D26-002', '[DEMO 2026Q3] Tigist Alemu', 'L3', 0.00, 0.00, 0.00, $9, 'Events Operations', 'commission_only')
-      ON CONFLICT (id) DO UPDATE SET
-        employee_total_snapshot = EXCLUDED.employee_total_snapshot,
-        commission_total_snapshot = EXCLUDED.commission_total_snapshot;
+      ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_PAYROLL_LINE_REG_FIN_ID, DEMO_PAYROLL_LINE_COMM_FIN_ID, DEMO_PAYROLL_LINE_REG_DRAFT_ID, DEMO_PAYROLL_LINE_COMM_DRAFT_ID,
       DEMO_PAYROLL_FINALIZED_ID, DEMO_PAYROLL_DRAFT_ID,
@@ -445,8 +413,7 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
         id, employee_line_id, event_type_id, event_name_snapshot, unit_price_snapshot, quantity, line_total_snapshot
       ) VALUES
         ($1, $2, $3, '[DEMO 2026Q3] Yared & Bethlehem Wedding', 2500.00, 1, 2500.00)
-      ON CONFLICT (id) DO UPDATE SET
-        line_total_snapshot = EXCLUDED.line_total_snapshot;
+      ON CONFLICT (id) DO NOTHING;
     `, [DEMO_PAYROLL_EVENT_1_ID, DEMO_PAYROLL_LINE_REG_FIN_ID, weddingType.id]);
 
     // 11. Insert Audit Event Logs (4)
@@ -465,8 +432,13 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
       userId
     ]);
 
+    const verification = await verifySeed(client);
+    if (!verification.success) {
+      throw new Error(`Seed verification failed before commit: ${verification.details.join("; ")}`);
+    }
     await client.query("COMMIT");
-    return { applied: true, insertedCount: 28 };
+    const insertedCount = Object.keys(SEED_EXPECTED).reduce((sum, key) => sum + Math.max(0, SEED_EXPECTED[key as SeedEntity] - before[key as SeedEntity]), 0);
+    return { applied: true, insertedCount };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -476,6 +448,11 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
 export async function verifySeed(client: Queryable): Promise<{ success: boolean; checks: Record<string, boolean>; details: string[] }> {
   const checks: Record<string, boolean> = {};
   const details: string[] = [];
+
+  const presence = await getSeedPresence(client);
+  for (const [entity, expected] of Object.entries(SEED_EXPECTED)) {
+    checks[`${entity}_complete`] = presence[entity as SeedEntity] === expected;
+  }
 
   // Check 1: Employees inserted correctly
   const empRes = await client.query("SELECT id, full_name, compensation_mode, base_salary FROM employees WHERE id IN ($1, $2, $3, $4, $5)", [
@@ -509,6 +486,32 @@ export async function verifySeed(client: Queryable): Promise<{ success: boolean;
   const itemRes = await client.query("SELECT quantity FROM items WHERE id = $1", [DEMO_ITEM_TRUSS_ID]);
   checks["capital_investment_applied_and_stock_incremented"] = capitalRes.rows[0]?.stock_applied === true && itemRes.rows[0]?.quantity === 10;
 
+  const movementRes = await client.query(
+    "SELECT item_id, quantity, reference_id, reference_type FROM inventory_movements WHERE id = $1",
+    [DEMO_MOVEMENT_CAPITAL_ID],
+  );
+  const movement = movementRes.rows[0];
+  checks["capital_movement_matches_owned_item_without_double_counting"] = movement?.item_id === DEMO_ITEM_TRUSS_ID
+    && Number(movement?.quantity) === 10
+    && movement?.reference_id === DEMO_CAPITAL_ID
+    && movement?.reference_type === "capital_investment"
+    && Number(itemRes.rows[0]?.quantity) === 10;
+
+  const convertedRes = await client.query(
+    "SELECT converted_event_id FROM event_proposals WHERE id = $1",
+    [DEMO_PROP_CONVERTED_ID],
+  );
+  checks["converted_proposal_links_to_completed_event"] = convertedRes.rows[0]?.converted_event_id === DEMO_EVENT_COMPLETED_ID;
+
+  const reportMathRes = await client.query(`
+    SELECT e.contract_price,
+      COALESCE((SELECT sum(x.amount) FROM expenses x WHERE x.event_id = e.id AND x.status = 'Approved'), 0) AS approved_expenses
+    FROM events e WHERE e.id = $1
+  `, [DEMO_EVENT_COMPLETED_ID]);
+  const revenue = Number(reportMathRes.rows[0]?.contract_price);
+  const approvedExpenses = Number(reportMathRes.rows[0]?.approved_expenses);
+  checks["completed_event_report_math"] = revenue === 250000 && approvedExpenses === 11200 && revenue - approvedExpenses === 238800;
+
   // Check 5: Foreign key integrity across all tables
   const fkCheckRes = await client.query(`
     SELECT count(*)::int as orphan_count
@@ -519,12 +522,6 @@ export async function verifySeed(client: Queryable): Promise<{ success: boolean;
   `, [DEMO_ASSIGN_UPCOMING_ID, DEMO_ASSIGN_ATTENDED_ID, DEMO_ASSIGN_ABSENT_ID]);
   checks["foreign_key_integrity_valid"] = (fkCheckRes.rows[0]?.orphan_count ?? 0) === 0;
 
-  // Check 6: Non-demo preservation
-  const nonDemoEmpRes = await client.query("SELECT count(*)::int as cnt FROM employees WHERE id NOT IN ($1, $2, $3, $4, $5)", [
-    DEMO_EMP_REGULAR_ID, DEMO_EMP_COMMISSION_ONLY_ID, DEMO_EMP_KEEPER_ID, DEMO_EMP_COORDINATOR_ID, DEMO_EMP_DRIVER_ID
-  ]);
-  checks["non_demo_records_unmodified"] = (nonDemoEmpRes.rows[0]?.cnt ?? 0) >= 0;
-
   const allPassed = Object.values(checks).every(v => v === true);
   for (const [k, v] of Object.entries(checks)) {
     details.push(`- ${k.padEnd(50)}: ${v ? '✓ PASS' : '❌ FAIL'}`);
@@ -534,10 +531,11 @@ export async function verifySeed(client: Queryable): Promise<{ success: boolean;
 }
 
 export async function cleanupSeed(client: Queryable): Promise<{ cleaned: boolean; deletedCount: number }> {
-  await client.query("SELECT pg_advisory_xact_lock($1)", [ADVISORY_LOCK_ID]);
   await client.query("BEGIN");
 
   try {
+    await client.query("SELECT pg_advisory_xact_lock($1)", [ADVISORY_LOCK_ID]);
+    const before = await getSeedPresence(client);
     // Delete in reverse foreign-key order
     await client.query("DELETE FROM event_logs WHERE id IN ($1, $2, $3, $4)", [DEMO_LOG_1_ID, DEMO_LOG_2_ID, DEMO_LOG_3_ID, DEMO_LOG_4_ID]);
     await client.query("DELETE FROM payroll_run_line_events WHERE id = $1", [DEMO_PAYROLL_EVENT_1_ID]);
@@ -562,7 +560,7 @@ export async function cleanupSeed(client: Queryable): Promise<{ cleaned: boolean
     ]);
 
     await client.query("COMMIT");
-    return { cleaned: true, deletedCount: 28 };
+    return { cleaned: true, deletedCount: Object.values(before).reduce((sum, count) => sum + count, 0) };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
