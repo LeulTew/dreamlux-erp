@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fork Isolation Safety"
+  short_description: "Prevent fork access to legacy infrastructure"
+  default_prompt: "Use $fork-isolation-safety to audit and plan a fully isolated product fork before any connection or migration."

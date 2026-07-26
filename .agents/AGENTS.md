@@ -11,6 +11,7 @@
 > - **Postgres & Database Changes**: For migration setups, query loop warnings, tenant scoping, and transaction wrap blocks, you MUST read [.claude/rules/database.md](file:///.claude/rules/database.md).
 > - **Tooling & Commands**: For package manager standards (Bun), linting, and testing suites execution, you MUST read [.claude/rules/tech-stack.md](file:///.claude/rules/tech-stack.md).
 > - **Senior & Staff PR Auditing**: Before requesting PR merge approvals, you MUST audit the implementation against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) and [STAFF_PR_REVIEW_PROMPT.md](file:///docs/STAFF_PR_REVIEW_PROMPT.md).
+> - **Forks, Clones & Environment Migrations**: Before auditing, planning, creating, running, migrating, or deploying a fork/clone/white-label instance, read and follow [.agents/skills/fork-isolation-safety/SKILL.md](file:///.agents/skills/fork-isolation-safety/SKILL.md). Fork quarantine forbids database, Supabase, MCP, migration, seed, backup, keep-alive, and deployment connections until target attestation and explicit authorization.
 
 ---
 

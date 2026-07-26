@@ -44,6 +44,7 @@ DreamLux ERP is an integrated enterprise resource planning system managing event
 > - **Postgres & Database Changes**: When writing database operations, schema updates, or applying migrations, read [.claude/rules/database.md](file:///.claude/rules/database.md).
 > - **Tooling & Commands**: For dependency management and scripting, read [.claude/rules/tech-stack.md](file:///.claude/rules/tech-stack.md).
 > - **Senior & Staff PR Auditing**: Before finalizing, creating, or requesting approval on a PR, you MUST audit against [SENIOR_ISSUE_REVIEW_PROMPT.md](file:///docs/SENIOR_ISSUE_REVIEW_PROMPT.md) and [STAFF_PR_REVIEW_PROMPT.md](file:///docs/STAFF_PR_REVIEW_PROMPT.md).
+> - **Forks, Clones & Environment Migrations**: Before auditing, planning, creating, running, migrating, or deploying a fork/clone/white-label instance, read and follow [.agents/skills/fork-isolation-safety/SKILL.md](file:///.agents/skills/fork-isolation-safety/SKILL.md). Its quarantine rules override remote-database instructions until a new target is attested and explicitly authorized.
 > - **GitHub CLI Environment**: GitHub CLI (`gh`) authentication (`LeulTew`) is configured in WSL Fish (`Ubuntu 24.04` / `fish`). Always execute `gh` commands via `wsl fish -c "gh <command>"`. Never invoke host Windows `gh` directly.
 
 
