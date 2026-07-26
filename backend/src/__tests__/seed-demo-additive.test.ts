@@ -248,4 +248,41 @@ describe("Additive Demo Dataset Seed Engine (dreamlux-demo-2026q3-v1)", () => {
     expect(cleanupRes.cleaned).toBe(true);
     expect(mockClient.getTableCount("employees")).toBe(0);
   });
+
+  test("Error Resilience: Transaction rolls back cleanly if database query fails during apply", async () => {
+    let rollbackExecuted = false;
+    const failingClient = {
+      query: async (sql: string) => {
+        const norm = sql.trim().toUpperCase();
+        if (norm === "ROLLBACK") {
+          rollbackExecuted = true;
+          return { rows: [] };
+        }
+        if (norm.startsWith("SELECT ID, NAME FROM STORES")) {
+          return { rows: [{ id: "store-1", name: "Bole HQ" }] };
+        }
+        if (norm.startsWith("SELECT ID, NAME FROM EVENT_TYPES")) {
+          return { rows: [{ id: "et-1", name: "Wedding" }] };
+        }
+        if (norm.startsWith("SELECT ID, CODE FROM EVENT_SERVICE_SCOPES")) {
+          return { rows: [{ id: "ss-1", code: "FULL" }] };
+        }
+        if (norm.startsWith("INSERT INTO EMPLOYEES")) {
+          throw new Error("Simulated database constraint violation");
+        }
+        return { rows: [] };
+      }
+    } as any;
+
+    await expect(applySeed(failingClient)).rejects.toThrow("Simulated database constraint violation");
+    expect(rollbackExecuted).toBe(true);
+  });
+
+  test("Deterministic ID & Code Parity: Employees D26-001 through D26-005 maintain constant UUIDs", () => {
+    expect(DEMO_EMP_REGULAR_ID).toBe("d2600000-0000-4000-8000-000000000001");
+    expect(DEMO_EMP_COMMISSION_ONLY_ID).toBe("d2600000-0000-4000-8000-000000000002");
+    expect(DEMO_ASSIGN_UPCOMING_ID).toBe("d2600000-0000-4000-8000-000000000040");
+    expect(DEMO_EXP_LABOR_ID).toBe("d2600000-0000-4000-8000-000000000060");
+    expect(DEMO_CAPITAL_ID).toBe("d2600000-0000-4000-8000-000000000070");
+  });
 });
