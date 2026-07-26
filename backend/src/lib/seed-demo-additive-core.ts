@@ -261,12 +261,12 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
       ) VALUES
         ($1, '[DEMO 2026Q3] Proposed Luxury Gala 2026', 'Solomon & Associates', '+251911887766', $4, 'Hilton Addis Ababa', '2026-08-25', '2026-08-25', 150000.00, 50000.00, 25000.00, 10000.00, 5000.00, 90000.00, 60000.00, 40.00, 'Draft', NULL, $7),
         ($2, '[DEMO 2026Q3] Diplomatic Reception', 'Embassy Cultural Affairs', '+251911776655', $5, 'Ethiopian Skylight Hotel', '2026-08-30', '2026-08-30', 80000.00, 40000.00, 20000.00, 5000.00, 5000.00, 70000.00, 10000.00, 12.50, 'Approved', NULL, $7),
-        ($3, '[DEMO 2026Q3] Yared & Bethlehem Wedding Intake', 'Yared Tadesse', '+251911665544', $6, 'Hilton Addis Ababa', '2026-07-20', '2026-07-20', 250000.00, 100000.00, 50000.00, 15000.00, 10000.00, 175000.00, 75000.00, 30.00, 'Converted', $8, $7)
+        ($3, '[DEMO 2026Q3] Yared & Bethlehem Wedding Intake', 'Yared Tadesse', '+251911665544', $6, 'Hilton Addis Ababa', '2026-07-20', '2026-07-20', 250000.00, 100000.00, 50000.00, 15000.00, 10000.00, 175000.00, 75000.00, 30.00, 'Converted', NULL, $7)
       ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_PROP_DRAFT_ID, DEMO_PROP_APPROVED_ID, DEMO_PROP_CONVERTED_ID,
       corpType.id, photoType.id, weddingType.id,
-      userId, DEMO_EVENT_COMPLETED_ID
+      userId
     ]);
 
     // 4b. Proposal Service Scopes
