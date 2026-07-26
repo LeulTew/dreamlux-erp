@@ -253,17 +253,20 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
     // 4. Insert Proposals (3)
     await client.query(`
       INSERT INTO event_proposals (
-        id, proposal_code, title, client_name, client_phone, client_email, event_type_id, venue_location,
-        event_date, estimated_attendees, budget_etb, estimated_cost_etb, status, converted_event_id, created_by
+        id, name, client_name, client_phone, event_type_id, venue_location,
+        requested_start_date, requested_end_date, requested_budget,
+        estimated_design_cost, estimated_team_cost, estimated_trip_cost, estimated_other_cost,
+        estimated_total_cost, estimated_net_profit, estimated_margin_percentage,
+        status, converted_event_id, created_by
       ) VALUES
-        ($1, 'PROP-D26-001', '[DEMO 2026Q3] Proposed Luxury Gala 2026', 'Solomon & Associates', '+251911887766', 'solomon@gala.com', $4, 'Hilton Addis Ababa', '2026-08-25', 400, 150000.00, 90000.00, 'draft', NULL, $7),
-        ($2, 'PROP-D26-002', '[DEMO 2026Q3] Diplomatic Reception', 'Embassy Cultural Affairs', '+251911776655', 'cultural@embassy.gov', $5, 'Ethiopian Skylight Hotel', '2026-08-30', 250, 80000.00, 70000.00, 'approved', NULL, $7),
-        ($3, 'PROP-D26-003', '[DEMO 2026Q3] Yared & Bethlehem Wedding Intake', 'Yared Tadesse', '+251911665544', 'yared@wedding.com', $6, 'Hilton Addis Ababa', '2026-07-20', 500, 250000.00, 175000.00, 'converted', NULL, $7)
+        ($1, '[DEMO 2026Q3] Proposed Luxury Gala 2026', 'Solomon & Associates', '+251911887766', $4, 'Hilton Addis Ababa', '2026-08-25', '2026-08-25', 150000.00, 50000.00, 25000.00, 10000.00, 5000.00, 90000.00, 60000.00, 40.00, 'Draft', NULL, $7),
+        ($2, '[DEMO 2026Q3] Diplomatic Reception', 'Embassy Cultural Affairs', '+251911776655', $5, 'Ethiopian Skylight Hotel', '2026-08-30', '2026-08-30', 80000.00, 40000.00, 20000.00, 5000.00, 5000.00, 70000.00, 10000.00, 12.50, 'Approved', NULL, $7),
+        ($3, '[DEMO 2026Q3] Yared & Bethlehem Wedding Intake', 'Yared Tadesse', '+251911665544', $6, 'Hilton Addis Ababa', '2026-07-20', '2026-07-20', 250000.00, 100000.00, 50000.00, 15000.00, 10000.00, 175000.00, 75000.00, 30.00, 'Converted', $8, $7)
       ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_PROP_DRAFT_ID, DEMO_PROP_APPROVED_ID, DEMO_PROP_CONVERTED_ID,
       corpType.id, photoType.id, weddingType.id,
-      userId
+      userId, DEMO_EVENT_COMPLETED_ID
     ]);
 
     // 4b. Proposal Service Scopes
