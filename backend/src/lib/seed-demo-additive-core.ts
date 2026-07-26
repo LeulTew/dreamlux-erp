@@ -283,12 +283,12 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
     // 5. Insert Events (3)
     await client.query(`
       INSERT INTO events (
-        id, event_code, name, client_name, client_phone, event_type_id, start_date, end_date, start_time, end_time,
+        id, name, client_name, client_phone, event_type_id, start_date, end_date, start_time, end_time,
         venue_location, contract_price, status, created_by
       ) VALUES
-        ($1, 'EVT-D26-001', '[DEMO 2026Q3] Annual Tech Summit', 'TechEthio Forum', '+251911554433', $4, '2026-08-15', '2026-08-15', '09:00:00', '17:00:00', 'Hilton Addis Ababa', 120000.00, 'Planned', $7),
-        ($2, 'EVT-D26-002', '[DEMO 2026Q3] Commercial Launch Gala', 'Ethio Telecom Agency', '+251911443322', $5, '2026-08-01', '2026-08-01', '18:00:00', '23:00:00', 'Ethiopian Skylight Hotel', 95000.00, 'In Progress', $7),
-        ($3, 'EVT-D26-003', '[DEMO 2026Q3] Yared & Bethlehem Wedding', 'Yared Tadesse', '+251911665544', $6, '2026-07-20', '2026-07-20', '10:00:00', '22:00:00', NULL, 250000.00, 'Completed', $7)
+        ($1, '[DEMO 2026Q3] Annual Tech Summit', 'TechEthio Forum', '+251911554433', $4, '2026-08-15', '2026-08-15', '09:00:00', '17:00:00', 'Hilton Addis Ababa', 120000.00, 'Planned', $7),
+        ($2, '[DEMO 2026Q3] Commercial Launch Gala', 'Ethio Telecom Agency', '+251911443322', $5, '2026-08-01', '2026-08-01', '18:00:00', '23:00:00', 'Ethiopian Skylight Hotel', 95000.00, 'Ongoing', $7),
+        ($3, '[DEMO 2026Q3] Yared & Bethlehem Wedding', 'Yared Tadesse', '+251911665544', $6, '2026-07-20', '2026-07-20', '10:00:00', '22:00:00', 'Hilton Addis Ababa', 250000.00, 'Completed', $7)
       ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_EVENT_PLANNED_ID, DEMO_EVENT_ACTIVE_ID, DEMO_EVENT_COMPLETED_ID,
@@ -320,13 +320,15 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
       INSERT INTO event_assignments (
         id, event_id, employee_id, role, commission_amount, attended, attendance_marked_at, attendance_marked_by
       ) VALUES
-        ($1, $4, $7, 'Lead Coordinator', 2000.00, FALSE, NULL, NULL),
-        ($2, $6, $7, 'Lead Coordinator', 2500.00, TRUE, '2026-07-20 10:00:00', $9),
-        ($3, $6, $8, 'Stage Assistant', 1500.00, FALSE, '2026-07-20 10:00:00', $9)
+        ($1, $4, $6, 'Lead Coordinator', 2000.00, FALSE, NULL, NULL),
+        ($2, $5, $6, 'Lead Coordinator', 2500.00, TRUE, '2026-07-20 10:00:00', $8),
+        ($3, $5, $7, 'Stage Assistant', 1500.00, FALSE, '2026-07-20 10:00:00', $8)
       ON CONFLICT (id) DO NOTHING;
     `, [
+      // DEMO_EVENT_ACTIVE_ID is deliberately absent: no assignment references it, and passing
+      // an unused parameter makes Postgres fail with "could not determine data type of $5".
       DEMO_ASSIGN_UPCOMING_ID, DEMO_ASSIGN_ATTENDED_ID, DEMO_ASSIGN_ABSENT_ID,
-      DEMO_EVENT_PLANNED_ID, DEMO_EVENT_ACTIVE_ID, DEMO_EVENT_COMPLETED_ID,
+      DEMO_EVENT_PLANNED_ID, DEMO_EVENT_COMPLETED_ID,
       DEMO_EMP_REGULAR_ID, DEMO_EMP_COMMISSION_ONLY_ID,
       userId
     ]);
@@ -336,8 +338,8 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
       INSERT INTO event_allocations (
         id, event_id, item_id, quantity_allocated, status, departed_at, returned_at, notes, created_by
       ) VALUES
-        ($1, $4, $7, 50, 'Active', NULL, NULL, '[DEMO 2026Q3] Reserved for tech summit banquet', $10),
-        ($2, $5, $8, 20, 'Dispatched', '2026-08-01 08:00:00', NULL, '[DEMO 2026Q3] Dispatched for launch gala', $10),
+        ($1, $4, $7, 50, 'Reserved', NULL, NULL, '[DEMO 2026Q3] Reserved for tech summit banquet', $10),
+        ($2, $5, $8, 20, 'Pulled', '2026-08-01 08:00:00', NULL, '[DEMO 2026Q3] Dispatched for launch gala', $10),
         ($3, $6, $9, 2, 'Returned', '2026-07-20 07:00:00', '2026-07-21 18:00:00', '[DEMO 2026Q3] Returned safely post-wedding', $10)
       ON CONFLICT (id) DO NOTHING;
     `, [
@@ -352,12 +354,15 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
       INSERT INTO expenses (
         id, event_id, category, amount, description, status, created_by
       ) VALUES
-        ($1, $8, 'Labor', 2500.00, 'Auto-generated labor expense for 1 attended employee', 'Approved', $9),
-        ($2, $8, 'Fuel', 1200.00, '[DEMO 2026Q3] Transport fuel log', 'Approved', $9),
-        ($3, $8, 'Consumables', 3500.00, '[DEMO 2026Q3] Fresh floral supplies & ribbons', 'Approved', $9),
-        ($4, $8, 'Equipment Rental', 4000.00, '[DEMO 2026Q3] Heavy rigging crane hire', 'Approved', $9),
-        ($5, $7, 'Transportation', 2000.00, '[DEMO 2026Q3] Extra truck hire for lighting rig', 'Pending', $9),
-        ($6, $6, 'Other', 1500.00, '[DEMO 2026Q3] Site clearance fee', 'Approved', $9)
+        -- $7 = planned event, $8 = ongoing event, $9 = completed event, $10 = seeding user.
+        -- These were all off by one: $6 (an expense id) was used as an event_id and $9 (an
+        -- event id) as created_by, so every row violated a foreign key.
+        ($1, $9, 'Labor', 2500.00, 'Auto-generated labor expense for 1 attended employee', 'Approved', $10),
+        ($2, $9, 'Fuel', 1200.00, '[DEMO 2026Q3] Transport fuel log', 'Approved', $10),
+        ($3, $9, 'Consumables', 3500.00, '[DEMO 2026Q3] Fresh floral supplies & ribbons', 'Approved', $10),
+        ($4, $9, 'Equipment Rental', 4000.00, '[DEMO 2026Q3] Heavy rigging crane hire', 'Approved', $10),
+        ($5, $8, 'Transportation', 2000.00, '[DEMO 2026Q3] Extra truck hire for lighting rig', 'Pending', $10),
+        ($6, $7, 'Other', 1500.00, '[DEMO 2026Q3] Site clearance fee', 'Approved', $10)
       ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_EXP_LABOR_ID, DEMO_EXP_FUEL_ID, DEMO_EXP_CONSUMABLES_ID, DEMO_EXP_RENTAL_ID, DEMO_EXP_TRANS_ID, DEMO_EXP_OTHER_ID,
@@ -366,19 +371,26 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
     ]);
 
     // 9. Capital Investment & Inventory Movement
+    // A capital investment is a purchase line (quantity x unit_cost). total_cost is a
+    // generated column and must not be supplied. Stock application is recorded by
+    // stock_applied_at/by rather than a boolean flag.
     await client.query(`
       INSERT INTO capital_investments (
-        id, asset_name, amount, category, funding_source, investor_name, investment_date, notes, status, linked_inventory_item_id, stock_applied, created_by
+        id, purchase_date, item_name, category, quantity, unit, unit_cost, vendor, notes,
+        capex_classification, asset_id, creates_inventory_stock, status,
+        stock_applied_at, stock_applied_by, approved_by, approved_at, created_by
       ) VALUES
-        ($1, '[DEMO 2026Q3] Stage Trusses Acquisition', 45000.00, 'Equipment', 'Company Reserve', 'Dream Lux PLC', '2026-07-01', '[DEMO 2026Q3] Acquired 10 aluminum stage trusses', 'Approved', $2, TRUE, $3)
+        ($1, '2026-07-01', '[DEMO 2026Q3] Stage Trusses Acquisition', 'Equipment', 10, 'pcs', 4500.00,
+         'Dream Lux PLC', '[DEMO 2026Q3] Acquired 10 aluminum stage trusses',
+         'Inventory Asset', $2, TRUE, 'Approved', '2026-07-01 10:00:00', $3, $3, '2026-07-01 09:00:00', $3)
       ON CONFLICT (id) DO NOTHING;
     `, [DEMO_CAPITAL_ID, DEMO_ITEM_TRUSS_ID, userId]);
 
     await client.query(`
       INSERT INTO inventory_movements (
-        id, item_id, movement_type, quantity, reference_id, reference_type, notes, created_by
+        id, item_id, quantity_delta, quantity_before, quantity_after, source_type, source_id, notes, created_by
       ) VALUES
-        ($1, $2, 'CAPITAL_INVESTMENT', 10, $3, 'capital_investment', '[DEMO 2026Q3] Initial stock from capital acquisition', $4)
+        ($1, $2, 10, 0, 10, 'capital_investment', $3, '[DEMO 2026Q3] Initial stock from capital acquisition', $4)
       ON CONFLICT (id) DO NOTHING;
     `, [DEMO_MOVEMENT_CAPITAL_ID, DEMO_ITEM_TRUSS_ID, DEMO_CAPITAL_ID, userId]);
 
@@ -422,12 +434,12 @@ export async function applySeed(client: Queryable): Promise<{ applied: boolean; 
     // 11. Insert Audit Event Logs (4)
     await client.query(`
       INSERT INTO event_logs (
-        id, event_id, action, user_id, old_data, new_data
+        id, event_id, field_changed, user_id, old_value, new_value
       ) VALUES
-        ($1, $5, 'allocation_update', $9, '{"items": 0}', '{"allocated": 50, "item": "Gold Banquet Chairs"}'),
-        ($2, $6, 'dispatch_departure', $9, '{"status": "Active"}', '{"status": "Dispatched", "departed_at": "2026-08-01 08:00:00"}'),
-        ($3, $7, 'attendance_verification', $9, '{"attended": false}', '{"attended": true, "employee": "Abebe Demissie"}'),
-        ($4, $7, 'event_completion', $9, '{"status": "In Progress"}', '{"status": "Completed", "auto_labor_generated": 2500.00}')
+        ($1, $5, 'allocation_update', $8, '{"items": 0}', '{"allocated": 50, "item": "Gold Banquet Chairs"}'),
+        ($2, $6, 'dispatch_departure', $8, '{"status": "Active"}', '{"status": "Dispatched", "departed_at": "2026-08-01 08:00:00"}'),
+        ($3, $7, 'attendance_verification', $8, '{"attended": false}', '{"attended": true, "employee": "Abebe Demissie"}'),
+        ($4, $7, 'event_completion', $8, '{"status": "Ongoing"}', '{"status": "Completed", "auto_labor_generated": 2500.00}')
       ON CONFLICT (id) DO NOTHING;
     `, [
       DEMO_LOG_1_ID, DEMO_LOG_2_ID, DEMO_LOG_3_ID, DEMO_LOG_4_ID,
@@ -485,19 +497,25 @@ export async function verifySeed(client: Queryable): Promise<{ success: boolean;
   checks["labor_expense_equals_attended_commission"] = parseFloat(laborExpRes.rows[0]?.amount ?? "0") === 2500.00;
 
   // Check 4: Capital investment stock increment
-  const capitalRes = await client.query("SELECT stock_applied FROM capital_investments WHERE id = $1", [DEMO_CAPITAL_ID]);
+  // Stock application is recorded by a timestamp, not a boolean flag.
+  const capitalRes = await client.query(
+    "SELECT (stock_applied_at IS NOT NULL) AS stock_applied FROM capital_investments WHERE id = $1",
+    [DEMO_CAPITAL_ID],
+  );
   const itemRes = await client.query("SELECT quantity FROM items WHERE id = $1", [DEMO_ITEM_TRUSS_ID]);
   checks["capital_investment_applied_and_stock_incremented"] = capitalRes.rows[0]?.stock_applied === true && itemRes.rows[0]?.quantity === 10;
 
+  // The movement ledger stores a signed delta plus the source that caused it.
   const movementRes = await client.query(
-    "SELECT item_id, quantity, reference_id, reference_type FROM inventory_movements WHERE id = $1",
+    "SELECT item_id, quantity_delta, quantity_before, quantity_after, source_id, source_type FROM inventory_movements WHERE id = $1",
     [DEMO_MOVEMENT_CAPITAL_ID],
   );
   const movement = movementRes.rows[0];
   checks["capital_movement_matches_owned_item_without_double_counting"] = movement?.item_id === DEMO_ITEM_TRUSS_ID
-    && Number(movement?.quantity) === 10
-    && movement?.reference_id === DEMO_CAPITAL_ID
-    && movement?.reference_type === "capital_investment"
+    && Number(movement?.quantity_delta) === 10
+    && Number(movement?.quantity_after) - Number(movement?.quantity_before) === Number(movement?.quantity_delta)
+    && movement?.source_id === DEMO_CAPITAL_ID
+    && movement?.source_type === "capital_investment"
     && Number(itemRes.rows[0]?.quantity) === 10;
 
   const convertedRes = await client.query(

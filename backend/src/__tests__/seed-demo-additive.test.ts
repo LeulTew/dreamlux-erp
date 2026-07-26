@@ -147,7 +147,8 @@ function createMockClient() {
         return { rows: itemRows };
       }
       if (normalizedSql.startsWith("SELECT") && sql.includes("FROM inventory_movements WHERE id =")) {
-        return { rows: seedPresence.inventoryMovements ? [{ item_id: DEMO_ITEM_TRUSS_ID, quantity: 10, reference_id: DEMO_CAPITAL_ID, reference_type: "capital_investment" }] : [] };
+        // Mirrors the real ledger shape: a signed delta plus before/after levels and the source.
+        return { rows: seedPresence.inventoryMovements ? [{ item_id: DEMO_ITEM_TRUSS_ID, quantity_delta: 10, quantity_before: 0, quantity_after: 10, source_id: DEMO_CAPITAL_ID, source_type: "capital_investment" }] : [] };
       }
       if (normalizedSql.startsWith("SELECT") && sql.includes("FROM event_proposals WHERE id =")) {
         return { rows: seedPresence.proposals ? [{ converted_event_id: "d2600000-0000-4000-8000-000000000032" }] : [] };
