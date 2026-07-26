@@ -102,8 +102,8 @@ test.describe("Issue 197/203 staff attendance must be explicitly resolved", () =
     await expect.poll(() => attendancePatchBody).toEqual({ attended: true });
 
     // 5. The row now reports verified attendance.
-    // StatusBadge renders an outer span wrapping an inner one, so scope to the badge root.
-    // assertion is about the rendered state, not the control label.
+    // StatusBadge renders an outer span wrapping an inner one, so both match the text; .first()
+    // is the badge root. Scoping to the span asserts the rendered state, not the control label.
     await expect(page.locator("span").filter({ hasText: /^Attended$/ }).first()).toBeVisible();
     await expect(page.getByRole("radio", { name: /^Attended Daniel Kebede$/i })).toHaveAttribute("aria-checked", "true");
 

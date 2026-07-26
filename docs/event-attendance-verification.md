@@ -43,15 +43,15 @@ columns existed are never reinterpreted as unresolved - no backfill is required.
 
 Money logic is untouched: only `attended IS TRUE` is ever paid, by either labor or payroll.
 
-Why:
+Why this shape rather than an enum:
 
-- Every consumer only ever asks one question: *was attendance explicitly verified?* Labor uses
-  `attended = true`; payroll uses `ea.attended IS TRUE`. Nothing in the product reports on,
-  deducts for, or reconciles absence.
-- A tri-state would force us to invent meaning for historical data. Today's `false` rows are
-  ambiguous — some were deliberately unchecked, some were never touched — so mapping them to
-  either `absent` or `unverified` would fabricate a fact the database does not contain.
-- The smallest safe model that fixes the reported bug is the right one.
+- It needs no new column, no enum type, and above all **no backfill**. A `scheduled | attended |
+  absent` enum would have forced us to invent a meaning for every historical `false` row, which
+  is exactly the fabrication the #197 design was right to refuse.
+- The money predicate stays a single unambiguous test (`attended IS TRUE`), so labor and payroll
+  did not have to change at all.
+- The third state is derived from data the audit trail already had to record — who resolved the
+  attendance and when — rather than from a parallel field that could disagree with it.
 
 **Remaining limitation:** absence is recorded as a fact but carries no reason code. If the
 business later needs to distinguish an excused absence from a no-show, or to deduct pay for one,
@@ -123,19 +123,26 @@ unchanged, and an override correction is flagged in the audit payload.
 
 ## Labor generation
 
-Unchanged in what it counts: `SUM(commission_amount) WHERE attended = true`, which excludes both
-`false` and legacy `NULL`.
+Unchanged in what it counts: only explicitly attended assignments are ever billed. One aggregate
+now returns both the payable total and the number of unresolved rows:
 
-What changed is the explanation. Previously any zero total returned *"No attended labor assignments
-found for this event"*, which hid the actual reason. The helper now distinguishes:
+```sql
+SELECT COALESCE(SUM(commission_amount) FILTER (WHERE attended IS TRUE), 0) AS total,
+       COUNT(*) FILTER (WHERE attended IS NOT TRUE AND attendance_marked_at IS NULL)::int AS unverified
+  FROM event_assignments
+ WHERE event_id = $1
+```
 
-- **`attendance_unverified`** → `409`, *"Attendance must be verified before labor can be generated.
-  N assigned employees still have unverified attendance."* plus `unverified_count`.
+Previously any zero total returned *"No attended labor assignments found for this event"*, which
+hid the actual reason. The helper now distinguishes:
+
+- **`attendance_unverified`** → `409`, *"Attendance must be resolved before labor can be generated.
+  N assigned employees still need to be marked attended or absent."* plus `unverified_count`.
 - **`no_labor`** → `400`, the original message, for when nobody is assigned or nobody earns
   commission.
 
-The extra count query lives inside the zero branch so the happy path keeps its existing query
-sequence.
+Note the ordering: the unresolved check runs **before** the zero-total check, so "somebody still
+has to be marked" is always reported in preference to "there is nothing to bill".
 
 **Mixed attendance policy:** labor generation is blocked until every assignment is **resolved**
 (attended or explicitly absent) - not until every assignment is *attended*. The generated labor
@@ -171,7 +178,11 @@ In the Event Workspace → Team & Vehicles tab each assignment shows:
   and both are disabled for read-only users, in-flight requests, and completed events;
 - a localized explanation when the control is locked by event completion.
 
-There is no optimistic update: the box reflects the server's value and only flips after the
+When every assignment is resolved but nobody attended, the workspace says **"No attended
+employees. No labor expense is required."** rather than offering to generate a zero-value
+expense - an all-absent event is a valid terminal state, not an error.
+
+There is no optimistic update: the control reflects the server's value and only flips after the
 round-trip and refetch land. A successful transition invalidates the workspace, event profit, and
 payroll commission eligibility caches.
 
