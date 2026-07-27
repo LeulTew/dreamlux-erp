@@ -25,6 +25,7 @@ import {
 } from "react-icons/hi2";
 
 import ActivityDrawer from "@/components/ActivityDrawer";
+import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import { HiOutlineClock } from "react-icons/hi2";
 import AuthLayout from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Available": "Available",
     "Allocated": "Allocated",
     "No allocations yet. Reserve inventory before event setup begins.": "No allocations yet. Reserve inventory before event setup begins.",
+    "Read-only view. You do not have permission to allocate inventory items.": "Read-only view. You do not have permission to allocate inventory items.",
+    "Dispatch view. You can check existing allocations and mark them departed, but cannot change reserved quantities.": "Dispatch view. You can check existing allocations and mark them departed, but cannot change reserved quantities.",
     Release: "Release",
     "Allocation exceeds available stock.": "Allocation exceeds available stock.",
     "Allocation saved": "Allocation saved",
@@ -149,6 +152,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No eligible drivers available.": "No eligible drivers available.",
     "Assign": "Assign",
     "No staff assigned yet.": "No staff assigned yet.",
+    "Commission Payouts": "Commission Payouts",
+    "Attended commission-only staff": "Attended commission-only staff",
+    "No commission-only payouts are ready. Mark attendance first. Absent, unresolved, and salaried staff are excluded.": "No commission-only payouts are ready. Mark attendance first. Absent, unresolved, and salaried staff are excluded.",
+    "Staff Count": "Staff Count",
+    "Payout Total": "Payout Total",
     "No vehicles assigned yet.": "No vehicles assigned yet.",
     "Attendance": "Attendance",
     "Attended": "Attended",
@@ -200,6 +208,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Category Breakdown": "Category Breakdown",
     "No approved expenses yet. Profit is same as contract price.": "No approved expenses yet. Profit is same as contract price.",
     "Total Approved Expenses": "Total Approved Expenses",
+    "Live Financial Summary": "Live Financial Summary",
+    Revenue: "Revenue",
     "Event Manager": "Event Manager",
     "Supervisor": "Supervisor",
     "Team Leader": "Team Leader",
@@ -241,6 +251,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Available": "ያለ",
     "Allocated": "የተመደበ",
     "No allocations yet. Reserve inventory before event setup begins.": "እስካሁን ምደባ የለም። የዝግጅት ማቀናበር ከመጀመሩ በፊት ዕቃ ያስይዙ።",
+    "Read-only view. You do not have permission to allocate inventory items.": "የንባብ ብቻ እይታ። የእቃ ምደባ ፈቃድ የለዎትም።",
+    "Dispatch view. You can check existing allocations and mark them departed, but cannot change reserved quantities.": "የመላኪያ እይታ። ያሉ ምደባዎችን ማረጋገጥና እንደተነሱ ምልክት ማድረግ ይችላሉ፣ የተያዘውን ብዛት ግን መቀየር አይችሉም።",
     Release: "ልቀቅ",
     "Allocation exceeds available stock.": "ምደባው ካለው ክምችት በላይ ነው።",
     "Allocation saved": "ምደባ ተቀምጧል",
@@ -300,6 +312,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "No eligible drivers available.": "ተስማሚ ሾፌር የለም።",
     "Assign": "መድብ",
     "No staff assigned yet.": "እስካሁን ምንም ሠራተኛ አልተመደበም።",
+    "Commission Payouts": "የኮሚሽን ክፍያዎች",
+    "Attended commission-only staff": "የተገኙ ኮሚሽን ብቻ የሚከፈላቸው ሰራተኞች",
+    "No commission-only payouts are ready. Mark attendance first. Absent, unresolved, and salaried staff are excluded.": "ለክፍያ ዝግጁ የሆነ ኮሚሽን ብቻ ሰራተኛ የለም። በመጀመሪያ መገኘትን ያረጋግጡ። ያልተገኙ፣ ያልተወሰኑ እና ደመወዝተኛ ሰራተኞች አይካተቱም።",
+    "Staff Count": "የሰራተኞች ብዛት",
+    "Payout Total": "የክፍያ ድምር",
     "No vehicles assigned yet.": "እስካሁን ምንም ተሽከርካሪ አልተመደበም።",
     "Attendance": "መገኘት",
     "Attended": "ተገኝቷል",
@@ -351,6 +368,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Category Breakdown": "የወጪ ዝርዝር በምድብ",
     "No approved expenses yet. Profit is same as contract price.": "እስካሁን የጸደቀ ወጪ የለም። ትርፉ ከውሉ ዋጋ ጋር እኩል ነው።",
     "Total Approved Expenses": "አጠቃላይ የጸደቁ ወጪዎች",
+    "Live Financial Summary": "የቀጥታ የፋይናንስ ማጠቃለያ",
+    Revenue: "ገቢ",
     "Event Manager": "የዝግጅት ሥራ አስኪያጅ",
     "Supervisor": "ሱፐርቫይዘር",
     "Team Leader": "የቡድን መሪ",
@@ -685,6 +704,52 @@ function EventProfitPanel({
   );
 }
 
+function EventFinancialSummary({
+  profitQuery,
+  t,
+}: {
+  profitQuery: UseQueryResult<EventProfitSummary, Error>;
+  t: (key: string) => string;
+}) {
+  if (profitQuery.isLoading) {
+    return <Skeleton className="h-48 w-full dl-radius-lg" />;
+  }
+
+  const profit = profitQuery.data;
+  if (profitQuery.isError || !profit) {
+    return (
+      <section className="border border-border bg-card p-4 dl-radius-lg">
+        <h2 className="text-base font-bold text-foreground">{t("Live Financial Summary")}</h2>
+        <p className="mt-2 text-sm text-muted">{t("Workspace unavailable")}</p>
+      </section>
+    );
+  }
+
+  const values = [
+    { label: t("Revenue"), value: formatCurrency(profit.contractPrice), tone: "text-foreground" },
+    { label: t("Total Approved Expenses"), value: formatCurrency(profit.totalExpenses), tone: "text-foreground" },
+    { label: t("Net Profit"), value: formatCurrency(profit.netProfit), tone: profit.netProfit >= 0 ? "text-success" : "text-danger" },
+    { label: t("Profit Margin"), value: `${Number(profit.profitMargin || 0).toFixed(1)}%`, tone: profit.profitMargin >= 0 ? "text-success" : "text-danger" },
+  ];
+
+  return (
+    <section className="border border-border bg-card p-4 dl-radius-lg" aria-label={t("Live Financial Summary")}>
+      <div className="mb-3 flex items-center gap-2 border-b border-border pb-3">
+        <HiArrowTrendingUp className="h-5 w-5 text-primary" />
+        <h2 className="text-base font-bold text-foreground">{t("Live Financial Summary")}</h2>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {values.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <dt className="text-[11px] font-semibold text-muted">{item.label}</dt>
+            <dd className={`mt-0.5 truncate text-base font-black tabular-nums ${item.tone}`}>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 export default function EventWorkspacePage() {
   const params = useParams<{ id: string }>();
   const eventId = params.id;
@@ -706,11 +771,13 @@ export default function EventWorkspacePage() {
   const [taskOwner, setTaskOwner] = useState("");
   const [taskDueDate, setTaskDueDate] = useState("");
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [isCommissionPayoutOpen, setIsCommissionPayoutOpen] = useState(false);
 
   const { hasPermission, hasAnyPermission, user } = useAuth();
   const hasProfitAccess = hasPermission("reports:profit:read");
   const canViewOperations = hasAnyPermission(["events:write", "event_assignments:write", "vehicle_assignments:write", "events:delete", "expenses:approve"]);
-  const canWriteAllocations = hasPermission("event_allocations:write") || hasPermission("assets:write");
+  const canWriteAllocations = hasPermission("event_allocations:write");
+  const canDispatchAllocations = hasPermission("event_allocations:dispatch");
   const canWriteChecklist = hasPermission("event_checklist:write");
   const canWriteAssignments = hasPermission("event_assignments:write");
   const canWriteVehicles = hasPermission("vehicle_assignments:write");
@@ -1080,11 +1147,19 @@ export default function EventWorkspacePage() {
   const checkedDispatchCount = activeDispatchAllocations.filter((allocation) => allocation.dispatch_checked_at).length;
   const departedDispatchCount = activeDispatchAllocations.filter((allocation) => allocation.departed_at).length;
   const canDepartDispatch =
-    canWriteAllocations &&
+    canDispatchAllocations &&
     activeDispatchAllocations.length > 0 &&
     checkedDispatchCount === activeDispatchAllocations.length &&
     departedDispatchCount < activeDispatchAllocations.length &&
     !dispatchDepartMutation.isPending;
+  const commissionPayoutRows = assignments.filter(
+    (assignment: EventAssignment) =>
+      assignment.attended === true && assignment.compensation_mode === "commission_only",
+  );
+  const commissionPayoutTotal = commissionPayoutRows.reduce(
+    (total: number, assignment: EventAssignment) => total + Number(assignment.commission_amount || 0),
+    0,
+  );
 
   return (
     <AuthLayout>
@@ -1190,14 +1265,19 @@ export default function EventWorkspacePage() {
                   </div>
                 </section>
 
-                {canViewOperations && (
-                  <DesignPackagePanel
-                    key={`${event.id}:${event.updated_at}`}
-                    eventId={eventId}
-                    initialNotes={event.package_design_notes || ""}
-                    initialCost={Number(event.estimated_design_cost || 0)}
-                    t={t}
-                  />
+                {(hasProfitAccess || canViewOperations) && (
+                  <div className="space-y-4">
+                    {hasProfitAccess && <EventFinancialSummary profitQuery={profitQuery} t={t} />}
+                    {canViewOperations && (
+                      <DesignPackagePanel
+                        key={`${event.id}:${event.updated_at}`}
+                        eventId={eventId}
+                        initialNotes={event.package_design_notes || ""}
+                        initialCost={Number(event.estimated_design_cost || 0)}
+                        t={t}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -1288,7 +1368,10 @@ export default function EventWorkspacePage() {
                     </div>
                   </div>
                   {!canWriteAllocations && (
-                    <ReadOnlyBanner message={t("Read-only view. You do not have permission to allocate inventory items.")} />
+                    <ReadOnlyBanner message={canDispatchAllocations
+                      ? t("Dispatch view. You can check existing allocations and mark them departed, but cannot change reserved quantities.")
+                      : t("Read-only view. You do not have permission to allocate inventory items.")}
+                    />
                   )}
                   {allocations.length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted">{t("No allocations yet. Reserve inventory before event setup begins.")}</div>
@@ -1301,12 +1384,12 @@ export default function EventWorkspacePage() {
                         return (
                         <div key={allocation.id} className="p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <label className={`flex min-w-0 items-start gap-3 select-none ${(!canWriteAllocations || Boolean(allocation.departed_at) || dispatchCheckMutation.isPending) ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}>
+                          <label className={`flex min-w-0 items-start gap-3 select-none ${(!canDispatchAllocations || Boolean(allocation.departed_at) || dispatchCheckMutation.isPending) ? "cursor-not-allowed opacity-80" : "cursor-pointer"}`}>
                             <input
                               type="checkbox"
                               aria-label={`${t("Dispatch Checklist")} ${allocation.item_name}`}
                               checked={Boolean(allocation.dispatch_checked_at)}
-                              disabled={!canWriteAllocations || Boolean(allocation.departed_at) || dispatchCheckMutation.isPending}
+                              disabled={!canDispatchAllocations || Boolean(allocation.departed_at) || dispatchCheckMutation.isPending}
                               onChange={(eventChange) =>
                                 dispatchCheckMutation.mutate({ allocationId: allocation.id, checked: eventChange.target.checked })
                               }
@@ -1442,7 +1525,7 @@ export default function EventWorkspacePage() {
                       })}
                     </div>
                   )}
-                  {canWriteAllocations && allocations.length > 0 && (
+                  {canDispatchAllocations && allocations.length > 0 && (
                     <div className="sticky bottom-3 mt-4 flex justify-end border-t border-border bg-card pt-4">
                       <Button
                         type="button"
@@ -1629,6 +1712,23 @@ export default function EventWorkspacePage() {
                   )}
 
                   <section className="rounded-lg border border-border bg-card p-4">
+                    {hasProfitAccess && (
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+                        <div>
+                          <h2 className="text-base font-bold text-foreground">{t("Commission Payouts")}</h2>
+                          <p className="mt-1 text-xs text-muted">{t("Attended commission-only staff")}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="min-h-12"
+                          onClick={() => setIsCommissionPayoutOpen(true)}
+                        >
+                          <HiCurrencyDollar className="h-4 w-4" />
+                          {t("Commission Payouts")}
+                        </Button>
+                      </div>
+                    )}
                     {!canWriteAssignments && (
                       <ReadOnlyBanner message={t("Read-only view. You do not have permission to assign staff.")} />
                     )}
@@ -2029,6 +2129,47 @@ export default function EventWorkspacePage() {
           </>
         )}
       </div>
+      {hasProfitAccess && (
+        <ResponsiveDrawer
+          isOpen={isCommissionPayoutOpen}
+          onClose={() => setIsCommissionPayoutOpen(false)}
+          title={t("Commission Payouts")}
+          subtitle={event?.name || t("Event Workspace")}
+        >
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="border border-border bg-card-alt p-4 dl-radius-lg">
+                <div className="text-[11px] font-semibold text-muted">{t("Staff Count")}</div>
+                <div className="mt-1 text-2xl font-black tabular-nums text-foreground">{commissionPayoutRows.length}</div>
+              </div>
+              <div className="border border-border bg-card-alt p-4 dl-radius-lg">
+                <div className="text-[11px] font-semibold text-muted">{t("Payout Total")}</div>
+                <div className="mt-1 text-2xl font-black tabular-nums text-success">{formatCurrency(commissionPayoutTotal)}</div>
+              </div>
+            </div>
+
+            {commissionPayoutRows.length === 0 ? (
+              <div className="border border-border bg-card-alt p-5 text-sm leading-relaxed text-muted dl-radius-lg">
+                {t("No commission-only payouts are ready. Mark attendance first. Absent, unresolved, and salaried staff are excluded.")}
+              </div>
+            ) : (
+              <div className="divide-y divide-border border border-border dl-radius-lg">
+                {commissionPayoutRows.map((assignment: EventAssignment) => (
+                  <div key={assignment.id} className="flex items-start justify-between gap-4 p-4">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-foreground">{assignment.employee_name}</div>
+                      <div className="mt-1 text-xs text-muted">{t(assignment.role)}</div>
+                    </div>
+                    <div className="shrink-0 text-right font-black tabular-nums text-foreground">
+                      {formatCurrency(assignment.commission_amount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </ResponsiveDrawer>
+      )}
       <ActivityDrawer
         entityType="event"
         entityId={eventId}

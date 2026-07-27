@@ -9,7 +9,10 @@ const router = express.Router();
 router.get("/", async (_req: AuthRequest, res: Response) => {
   try {
     const scopes = await getActiveServiceScopes(pool);
-    res.json(scopes);
+    // Keep the catalog response aligned with the typed frontend API contract.
+    // Returning a bare array here made a successful request look like an empty
+    // catalog because ServiceScopeSelect reads `response.service_scopes`.
+    res.json({ service_scopes: scopes });
   } catch (error: any) {
     console.error("[service-scopes] Error fetching catalog:", error);
     res.status(500).json({ error: "Failed to fetch service scopes catalog" });

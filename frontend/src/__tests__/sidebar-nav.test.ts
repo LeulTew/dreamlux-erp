@@ -117,10 +117,10 @@ describe("sidebar permission navigation", () => {
     expect(nav.reconcileLink).toBeNull();
   });
 
-  it("shows Add Item and dispatch for assets:write", () => {
+  it("shows Add Item but not dispatch for assets:write alone", () => {
     const nav = navFor("/assets", ["assets:write"]);
     expect(nav.inventoryLinks.some((l) => l.href === "/assets/insert")).toBe(true);
-    expect(nav.dispatchLink).not.toBeNull();
+    expect(nav.dispatchLink).toBeNull();
     expect(nav.showInventoryGroup).toBe(true);
   });
 
@@ -129,8 +129,8 @@ describe("sidebar permission navigation", () => {
     expect(nav.reconcileLink).not.toBeNull();
   });
 
-  it("shows dispatch for event_allocations:write even without assets:read", () => {
-    const nav = navFor("/assets/dispatch", ["event_allocations:write"]);
+  it("shows dispatch for event_allocations:dispatch even without assets:read", () => {
+    const nav = navFor("/assets/dispatch", ["event_allocations:dispatch"]);
     expect(nav.dispatchLink).not.toBeNull();
     expect(nav.showInventoryGroup).toBe(true);
     expect(nav.inventoryLinks.some((l) => l.href === "/assets/dashboard")).toBe(false); // no assets:read

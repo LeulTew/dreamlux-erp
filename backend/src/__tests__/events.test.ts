@@ -1917,8 +1917,7 @@ describe("Events API", () => {
 
       const res = await request(app)
         .patch("/events/event-1/allocations/alloc-1")
-        // INVENTORY_CONTROLLER holds event_allocations:write but not events:override_completed.
-        .set("Authorization", `Bearer ${getToken("INVENTORY_CONTROLLER")}`)
+        .set("Authorization", `Bearer ${getToken("CUSTOM", { permission_slugs: ["event_allocations:write"] })}`)
         .send({ quantity_allocated: 5 });
 
       expect(res.status).toBe(403);
@@ -3455,6 +3454,20 @@ describe("Events API", () => {
       expect(res.body.error).toContain("Forbidden");
     });
 
+    test("POST /events/:id/allocations blocks dispatch-only inventory roles before DB access", async () => {
+      const res = await request(app)
+        .post("/events/event-1/allocations")
+        .set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER")}`)
+        .send({
+          item_id: "7891594c-ecc0-4f66-a51f-a29d530587a2",
+          quantity_allocated: 5,
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("Forbidden");
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
     test("GET /events/dispatch/queue blocks users without allocation privileges before DB access", async () => {
       const res = await request(app)
         .get("/events/dispatch/queue")
@@ -3907,9 +3920,9 @@ describe("Events API", () => {
       expect(mockQuery).not.toHaveBeenCalled();
     });
 
-    // Issue #178: storekeepers run the dispatch/return checklists inside the
-    // event workspace, so allocation writers get a redacted operational read.
-    test("GET /events/:id/workspace allows INVENTORY_OFFICER (event_allocations:write) with financials redacted", async () => {
+    // Storekeepers run dispatch checklists inside the event workspace, so the
+    // dispatch-only permission grants a redacted operational read.
+    test("GET /events/:id/workspace allows INVENTORY_OFFICER (event_allocations:dispatch) with financials redacted", async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],
         rowCount: 1,
@@ -3929,7 +3942,7 @@ describe("Events API", () => {
       expect(res.body.expenses).toEqual([]);
     });
 
-    test("GET /events/:id allows INVENTORY_OFFICER (event_allocations:write) with financials redacted", async () => {
+    test("GET /events/:id allows INVENTORY_OFFICER (event_allocations:dispatch) with financials redacted", async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00" }],
         rowCount: 1,
@@ -3952,7 +3965,7 @@ describe("Events API", () => {
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // allocations
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // checklist
       mockQuery.mockResolvedValueOnce({
-        rows: [{ id: "assign-1", employee_name: "John Doe", employee_phone: "+251911111111", commission_amount: "5000.00" }],
+        rows: [{ id: "assign-1", employee_name: "John Doe", employee_phone: "+251911111111", commission_amount: "5000.00", compensation_mode: "commission_only" }],
         rowCount: 1,
       });
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // vehicle assignments
@@ -3966,6 +3979,41 @@ describe("Events API", () => {
       expect(res.body.event.estimated_design_cost).toBeUndefined();
       expect(res.body.assignments[0].employee_phone).toBeUndefined();
       expect(res.body.assignments[0].commission_amount).toBeUndefined();
+      expect(res.body.assignments[0].compensation_mode).toBeUndefined();
+    });
+
+    test("GET /events/:id/workspace exposes commission payout fields to ACCOUNTANT", async () => {
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "event-1", name: "Wedding", contract_price: "50000.00", estimated_design_cost: "5000.00" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // allocations
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // checklist
+      mockQuery.mockResolvedValueOnce({
+        rows: [{
+          id: "assign-1",
+          employee_name: "John Doe",
+          employee_phone: "+251911111111",
+          commission_amount: "5000.00",
+          compensation_mode: "commission_only",
+          attended: true,
+        }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // vehicle assignments
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // expenses
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // trips
+
+      const res = await request(app)
+        .get("/events/event-1/workspace")
+        .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.assignments[0]).toMatchObject({
+        commission_amount: "5000.00",
+        compensation_mode: "commission_only",
+        attended: true,
+      });
     });
 
     test("GET /events/:id/workspace redacts financial fields for OPS_MANAGER", async () => {

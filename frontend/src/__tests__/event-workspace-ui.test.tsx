@@ -43,6 +43,12 @@ const apiMocks = vi.hoisted(() => ({
   updateEventAllocation: vi.fn().mockResolvedValue({}),
   updateEmployeeAttendance: vi.fn().mockResolvedValue({}),
   createEmployeeAssignment: vi.fn().mockResolvedValue({}),
+  getEventProfit: vi.fn().mockResolvedValue({
+    revenue: 150000,
+    approved_expenses: 45000,
+    net_profit: 105000,
+    margin_percentage: 70,
+  }),
 }));
 
 type AllocationFixture = {
@@ -62,6 +68,7 @@ type AssignmentFixture = {
   employee_name: string;
   role: string;
   commission_amount: number;
+  compensation_mode?: "regular" | "commission_only";
   attended: boolean | null;
   attendance_marked_at?: string | null;
 };
@@ -122,7 +129,7 @@ vi.mock("@/lib/api", () => ({
   createEventTripLog: apiMocks.createEventTripLog,
   createEventExpense: vi.fn(),
   generateEventLaborExpense: vi.fn(),
-  getEventProfit: vi.fn().mockResolvedValue({}),
+  getEventProfit: apiMocks.getEventProfit,
 }));
 
 // Mock react-query
@@ -236,6 +243,17 @@ vi.mock("@/components/PaginationControls", () => ({
 vi.mock("@/components/ui/StatusBadge", () => ({
   default: ({ status }: { status: string }) => <span>{status}</span>,
 }));
+vi.mock("@/components/ui/ResponsiveDrawer", () => ({
+  default: ({
+    isOpen,
+    title,
+    children,
+  }: {
+    isOpen: boolean;
+    title: string;
+    children: React.ReactNode;
+  }) => isOpen ? <div role="dialog" aria-label={title}>{children}</div> : null,
+}));
 vi.mock("../[id]/DesignPackagePanel", () => ({
   default: () => <div>Design Package Panel</div>,
 }));
@@ -251,6 +269,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     apiMocks.updateEventAllocationDispatchCheck.mockClear();
     apiMocks.markEventDispatchDeparted.mockClear();
     apiMocks.createEventTripLog.mockClear();
+    apiMocks.getEventProfit.mockClear();
     mockLang = "en";
     mockMutationsPending = false;
     workspaceData.allocations = [
@@ -289,6 +308,16 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     
     expect(screen.getByText("Contract Price")).toBeInTheDocument();
     expect(screen.getByText("ETB 150,000")).toBeInTheDocument();
+    expect(screen.getByText("Live Financial Summary")).toBeInTheDocument();
+    expect(apiMocks.getEventProfit).toHaveBeenCalledWith("event-123");
+  });
+
+  it("does not request or render the financial summary without profit access", () => {
+    mockPermissions = ["events:read"];
+    render(<EventWorkspacePage />);
+
+    expect(screen.queryByText("Live Financial Summary")).toBeNull();
+    expect(apiMocks.getEventProfit).not.toHaveBeenCalled();
   });
 
   it("does not fetch mutation-only option lists for read-only event users", () => {
@@ -301,7 +330,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
   });
 
   it("disables dispatch departure until every allocation is checked", () => {
-    mockPermissions = ["events:read", "event_allocations:write"];
+    mockPermissions = ["events:read", "event_allocations:dispatch"];
     render(<EventWorkspacePage />);
 
     fireEvent.click(screen.getByRole("button", { name: /Inventory Allocation/i }));
@@ -311,7 +340,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
   });
 
   it("calls dispatch check mutation when storekeeper checks an allocation", () => {
-    mockPermissions = ["events:read", "event_allocations:write"];
+    mockPermissions = ["events:read", "event_allocations:dispatch"];
     render(<EventWorkspacePage />);
 
     fireEvent.click(screen.getByRole("button", { name: /Inventory Allocation/i }));
@@ -321,7 +350,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
   });
 
   it("enables departure for checked allocations and disables departed rows", () => {
-    mockPermissions = ["events:read", "event_allocations:write"];
+    mockPermissions = ["events:read", "event_allocations:dispatch"];
     workspaceData.allocations = [
       {
         id: "alloc-1",
@@ -350,6 +379,16 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
 
     expect(screen.getByRole("button", { name: /Mark Departed/i })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: /Dispatch Checklist Silver Stands/i })).toBeDisabled();
+  });
+
+  it("keeps allocation authoring hidden for dispatch-only inventory users", () => {
+    mockPermissions = ["events:read", "event_allocations:dispatch"];
+    render(<EventWorkspacePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Inventory Allocation/i }));
+
+    expect(screen.getByText(/check existing allocations and mark them departed/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Edit Allocation Gold Chairs/i })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: /Dispatch Checklist Gold Chairs/i })).toBeEnabled();
   });
 
   // Issue #196: storekeepers correct an active allocation in place instead of
@@ -774,6 +813,56 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
       expect(group).toBeInTheDocument();
       expect(within(group).getAllByRole("radio")).toHaveLength(2);
     });
+  });
+
+  it("shows payouts only for attended commission-only staff to financial users", () => {
+    workspaceData.assignments = [
+      {
+        id: "asg-1",
+        employee_id: "emp-1",
+        employee_name: "Abebe",
+        role: "Decorator",
+        commission_amount: 5000,
+        compensation_mode: "commission_only",
+        attended: true,
+      },
+      {
+        id: "asg-2",
+        employee_id: "emp-2",
+        employee_name: "Kebede",
+        role: "Assistant",
+        commission_amount: 1200,
+        compensation_mode: "commission_only",
+        attended: false,
+      },
+      {
+        id: "asg-3",
+        employee_id: "emp-3",
+        employee_name: "Sara",
+        role: "Coordinator",
+        commission_amount: 800,
+        compensation_mode: "regular",
+        attended: true,
+      },
+    ];
+    mockPermissions = ["events:read", "reports:profit:read"];
+    render(<EventWorkspacePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Team & Vehicles/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Commission Payouts/i }));
+
+    const drawer = screen.getByRole("dialog", { name: /Commission Payouts/i });
+    expect(within(drawer).getByText("Abebe")).toBeInTheDocument();
+    expect(within(drawer).getAllByText("ETB 5,000")).toHaveLength(2);
+    expect(within(drawer).queryByText("Kebede")).toBeNull();
+    expect(within(drawer).queryByText("Sara")).toBeNull();
+  });
+
+  it("hides commission payouts from users without financial access", () => {
+    mockPermissions = ["events:read"];
+    render(<EventWorkspacePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Team & Vehicles/i }));
+
+    expect(screen.queryByRole("button", { name: /Commission Payouts/i })).toBeNull();
   });
 
 

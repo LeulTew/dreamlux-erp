@@ -54,7 +54,7 @@ export default function DispatchQueuePage() {
   const { hasPermission, isAuthenticated, isLoading } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
-  const canManageDispatch = hasPermission("event_allocations:write") || hasPermission("assets:write");
+  const canManageDispatch = hasPermission("event_allocations:dispatch");
 
   const queueQuery = useQuery<{ queue: EventDispatchQueueItem[] }>({
     queryKey: ["event-dispatch-queue"],

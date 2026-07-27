@@ -216,7 +216,7 @@ export function buildSidebarNavState(params: {
     .map(({ href, label, active }) => ({ href, label, active }));
 
   // Other Inventory modules
-  const dispatchLink = hasAny(["event_allocations:write", "assets:write"])
+  const dispatchLink = hasAny(["event_allocations:dispatch"])
     ? { href: "/assets/dispatch", label: t("Dispatch"), active: pathname === "/assets/dispatch" }
     : null;
 

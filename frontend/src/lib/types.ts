@@ -371,6 +371,7 @@ export interface EventAssignment {
   employee_id: string;
   employee_name?: string;
   employee_phone?: string;
+  compensation_mode?: "regular" | "commission_only";
   role: string;
   commission_amount: number;
   // Issue #197: true only after an authorized user explicitly verified attendance. New
@@ -721,6 +722,8 @@ export interface HisabEventRow {
   event_id: string;
   event_name: string;
   event_date: string;
+  venue_location: string | null;
+  service_scopes: ServiceScope[];
   period_start: string;
   income: number;
   transport: number;

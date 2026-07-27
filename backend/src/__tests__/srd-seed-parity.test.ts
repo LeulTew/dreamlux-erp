@@ -42,6 +42,7 @@ describe("DreamLux SRD seed parity", () => {
     expect(seedSql).toContain("('assets:delete', 'Soft-delete inventory items')");
     expect(seedSql).toContain("('trips:create', 'Create event trip logs and generated fuel expenses')");
     expect(seedSql).toContain("('event_allocations:write', 'Create and release event inventory allocations')");
+    expect(seedSql).toContain("('event_allocations:dispatch', 'Check and dispatch existing event inventory allocations')");
     expect(seedSql).toContain("WHERE r.name = 'DRIVER' ON CONFLICT DO NOTHING");
     expect(seedSql).toContain("p.slug IN ('events:read', 'trips:create')");
     expect(seedSql).not.toMatch(/\$2[aby]\$\d{2}\$/);
@@ -50,10 +51,10 @@ describe("DreamLux SRD seed parity", () => {
   test("grants dispatch allocation permission to inventory storekeeper roles", () => {
     expect(seedSql).toContain("WHERE r.name = 'INVENTORY_OFFICER' ON CONFLICT DO NOTHING");
     expect(seedSql).toContain("WHERE r.name = 'INVENTORY_CONTROLLER' ON CONFLICT DO NOTHING");
-    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'offices:read')");
-    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'offices:read')");
-    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read', 'offices:read')");
-    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read', 'offices:read')");
+    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:dispatch', 'offices:read')");
+    expect(seedSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:dispatch', 'offices:read')");
+    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:dispatch', 'exports:read', 'offices:read')");
+    expect(schemaSql).toContain("p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:dispatch', 'exports:read', 'offices:read')");
     expect(inventoryDispatchMigrationSql).toContain("WHERE LOWER(r.name) IN ('inventory_officer', 'inventory_controller')");
   });
 

@@ -141,7 +141,7 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/hr/finance/imports": { label: "Hisab Import", permissions: ["finance:imports:write"] },
   "/assets": { label: "Items", permissions: ["assets:read"] },
   "/assets/dashboard": { label: "Dashboard", permissions: ["assets:read"] },
-  "/assets/dispatch": { label: "Dispatch", permissions: ["event_allocations:write", "assets:write"] },
+  "/assets/dispatch": { label: "Dispatch", permissions: ["event_allocations:dispatch"] },
   "/assets/new": { label: "New Item", permissions: ["assets:write"] },
   "/assets/reconcile": { label: "Reconcile", permissions: ["assets:reconcile"] },
   "/assets/history": { label: "Audit Log", permissions: ["assets:read"] },
