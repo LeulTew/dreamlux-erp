@@ -25,6 +25,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   "events:proposals:write": "Create Event Proposals",
   "events:proposals:approve": "Approve Event Proposals",
   "event_allocations:write": "Allocate Inventory to Events",
+  "event_allocations:dispatch": "Check & Dispatch Event Inventory",
   "event_checklist:write": "Manage Event Checklists",
   "event_assignments:write": "Assign Staff to Events",
   "vehicle_assignments:write": "Assign Vehicles & Drivers",

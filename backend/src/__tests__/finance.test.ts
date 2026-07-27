@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeAll, beforeEach } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import ExcelJS from "exceljs";
 
 // Mock the DB pool
 const mockQuery = mock((..._args: any[]) => Promise.resolve({ rows: [] as any[], rowCount: 1 }));
@@ -339,6 +340,8 @@ const HISAB_EVENT_ROWS = [
     event_name: "Hikma Full Package",
     event_date: "2026-05-04",
     period_start: "2026-05-04",
+    venue_location: "Sheraton Addis",
+    service_scopes: [{ id: "scope-1", code: "DECOR", name_en: "Decoration", name_am: "ዲኮር" }],
     income: "80000.00",
     transport: "5000.00",
     rental: "3000.00",
@@ -350,6 +353,8 @@ const HISAB_EVENT_ROWS = [
     event_name: "Bethel Full Package",
     event_date: "2026-05-06",
     period_start: "2026-05-04",
+    venue_location: null,
+    service_scopes: [],
     income: "60000.00",
     transport: "4000.00",
     rental: "0.00",
@@ -391,6 +396,14 @@ describe("Hisab rollup", () => {
     expect(period.label).toBe("Week of 2026-05-04");
     expect(period.period_end).toBe("2026-05-10");
     expect(period.events).toHaveLength(2);
+    expect(period.events[0]).toMatchObject({
+      venue_location: "Sheraton Addis",
+      service_scopes: [{ code: "DECOR", name_en: "Decoration" }],
+    });
+    expect(period.events[1]).toMatchObject({
+      venue_location: null,
+      service_scopes: [],
+    });
 
     // Workbook math: income 140000, expenses 36000, profit 104000,
     // operational 2300, net 101700. Pending amounts never join totals.
@@ -438,8 +451,36 @@ describe("Hisab export", () => {
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("text/csv");
     expect(res.text).toContain("Hikma Full Package");
+    expect(res.text).toContain("Service Scopes");
+    expect(res.text).toContain("Decoration");
+    expect(res.text).toContain("Sheraton Addis");
     expect(res.text).toContain("Office Lunch");
     expect(res.text).toContain("Period Total");
+  });
+
+  test("XLSX export uses the same Service Scopes and Venue columns as CSV", async () => {
+    mockHisabQueries();
+
+    const res = await request(app)
+      .get("/finance/hisab/export?period_type=week&start_date=2026-05-01&end_date=2026-05-31&format=xlsx")
+      .set("Authorization", `Bearer ${getToken()}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("spreadsheetml");
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(res.body);
+    const worksheet = workbook.getWorksheet("Hisab Report");
+    expect(worksheet).toBeDefined();
+    expect(worksheet!.getRow(1).values).toEqual(expect.arrayContaining(["Service Scopes", "Venue"]));
+    expect(worksheet!.getColumn(5).values).toContain("Decoration");
+    expect(worksheet!.getColumn(6).values).toContain("Sheraton Addis");
   });
 
   test("export is blocked and audited when rows exceed maxRows", async () => {

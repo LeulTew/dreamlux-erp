@@ -7,7 +7,8 @@ describe("role permission seeds", () => {
       const slugs = roleNamesToPermissionSlugs([roleName]);
 
       expect(hasPermissionSlug(slugs, "assets:write")).toBe(true);
-      expect(hasPermissionSlug(slugs, "event_allocations:write")).toBe(true);
+      expect(hasPermissionSlug(slugs, "event_allocations:dispatch")).toBe(true);
+      expect(hasPermissionSlug(slugs, "event_allocations:write")).toBe(false);
       expect(hasPermissionSlug(slugs, "reports:profit:read")).toBe(false);
       expect(hasPermissionSlug(slugs, "users:manage")).toBe(false);
       expect(hasPermissionSlug(slugs, "events:delete")).toBe(false);

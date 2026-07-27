@@ -27,6 +27,7 @@ INSERT INTO permissions (slug, description) VALUES
   ('events:write', 'Create and update events'),
   ('events:assign', 'Assign staff and vehicles to events'),
   ('event_allocations:write', 'Create and release event inventory allocations'),
+  ('event_allocations:dispatch', 'Check and dispatch existing event inventory allocations'),
   ('expenses:write', 'Log event expenses'),
   ('expenses:approve', 'Approve pending event expenses'),
   ('reports:read', 'View financial and profit reports'),
@@ -39,7 +40,7 @@ SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
 WHERE r.name IN ('SUPER_ADMIN', 'OWNER') ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', 'events:write', 'events:assign', 'expenses:write')
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', 'events:write', 'events:assign', 'event_allocations:write', 'event_allocations:dispatch', 'expenses:write')
 WHERE r.name = 'OPS_MANAGER' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
@@ -47,15 +48,15 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', '
 WHERE r.name = 'ACCOUNTANT' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', 'events:write', 'expenses:write')
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('events:read', 'events:write', 'event_allocations:write', 'event_allocations:dispatch', 'expenses:write')
 WHERE r.name = 'EVENT_MANAGER' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'offices:read')
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:dispatch', 'offices:read')
 WHERE r.name = 'INVENTORY_OFFICER' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'offices:read')
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:dispatch', 'offices:read')
 WHERE r.name = 'INVENTORY_CONTROLLER' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)

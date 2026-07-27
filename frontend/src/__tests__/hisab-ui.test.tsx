@@ -79,6 +79,8 @@ const ROLLUP_FIXTURE = {
           event_name: "Hikma Full Package",
           event_date: "2026-05-04",
           period_start: "2026-05-04",
+          venue_location: "Sheraton Addis",
+          service_scopes: [{ id: "scope-1", code: "DECOR", name_en: "Decoration", name_am: "ዲኮር" }],
           income: 80000,
           transport: 5000,
           rental: 3000,
@@ -86,6 +88,21 @@ const ROLLUP_FIXTURE = {
           other: 2000,
           expense_total: 22000,
           profit: 58000,
+        },
+        {
+          event_id: "ev-2",
+          event_name: "Metadata Pending Event",
+          event_date: "2026-05-05",
+          period_start: "2026-05-04",
+          venue_location: null,
+          service_scopes: [],
+          income: 0,
+          transport: 0,
+          rental: 0,
+          labour: 0,
+          other: 0,
+          expense_total: 0,
+          profit: 0,
         },
       ],
       eventTotals: { income: 80000, transport: 5000, rental: 3000, labour: 12000, other: 2000, expenses: 22000, profit: 58000 },
@@ -152,6 +169,10 @@ describe("HisabReportPage", () => {
 
     expect(screen.getByText("Hisab Reports")).toBeInTheDocument();
     expect(screen.getByText("Hikma Full Package")).toBeInTheDocument();
+    expect(screen.getByText("Decoration")).toBeInTheDocument();
+    expect(screen.getByText("Sheraton Addis")).toBeInTheDocument();
+    expect(screen.getByText("Metadata Pending Event")).toBeInTheDocument();
+    expect(screen.getAllByText("—")).toHaveLength(2);
     // KPI strip: income and net
     expect(screen.getAllByText("ETB 80,000.00").length).toBeGreaterThan(0);
     expect(screen.getAllByText("ETB 56,500.00").length).toBeGreaterThan(0);

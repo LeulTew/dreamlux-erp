@@ -83,7 +83,7 @@ describe("ServiceScopeSelect Component", () => {
 
     const combobox = screen.getByRole("combobox");
     expect(combobox).toBeInTheDocument();
-    expect(combobox).toHaveClass("min-h-[48px]");
+    expect(combobox).toHaveClass("min-h-12");
     expect(screen.getByText("Select Service Scopes...")).toBeInTheDocument();
   });
 
@@ -129,8 +129,8 @@ describe("ServiceScopeSelect Component", () => {
 
     expect(screen.getByText("Full")).toBeInTheDocument();
     const removeButton = screen.getByRole("button", { name: /Remove/i });
-    expect(removeButton).toHaveClass("min-h-[48px]");
-    expect(removeButton).toHaveClass("min-w-[48px]");
+    expect(removeButton).toHaveClass("min-h-12");
+    expect(removeButton).toHaveClass("min-w-12");
   });
 
   it("opens dropdown showing all 4 authoritative scopes and toggles selection on click", async () => {
@@ -215,8 +215,8 @@ describe("ServiceScopeSelect Component", () => {
 
     const retryButton = screen.getByRole("button", { name: /Retry/i });
     expect(retryButton).toBeInTheDocument();
-    expect(retryButton).toHaveClass("min-h-[48px]");
-    expect(retryButton).toHaveClass("min-w-[48px]");
+    expect(retryButton).toHaveClass("min-h-12");
+    expect(retryButton).toHaveClass("min-w-12");
   });
 
   it("isolates hover styles behind pointer-capability [@media(hover:hover)_and_(pointer:fine)] for touch safety", () => {
@@ -232,7 +232,7 @@ describe("ServiceScopeSelect Component", () => {
     const classList = combobox.className;
 
     // Verify hover is isolated behind pointer:fine and hover:hover media queries
-    expect(classList).toContain("[@media(hover:hover)_and_(pointer:fine)]:hover:border-slate-600");
+    expect(classList).toContain("[@media(hover:hover)_and_(pointer:fine)]:hover:border-primary/60");
   });
 
   it("handles disabled state: aria-disabled=true, clicks and keyboard events ignored", () => {

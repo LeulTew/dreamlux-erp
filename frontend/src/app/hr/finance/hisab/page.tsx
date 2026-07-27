@@ -68,6 +68,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Net": "Net",
     "Event": "Event",
     "Date": "Date",
+    "Service Scopes": "Service Scopes",
+    "Venue": "Venue",
     "Income": "Income",
     "Period Summary": "Period Summary",
     "Period": "Period",
@@ -150,6 +152,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Net": "የተጣራ",
     "Event": "ዝግጅት",
     "Date": "ቀን",
+    "Service Scopes": "የአገልግሎት ዓይነቶች",
+    "Venue": "ቦታ",
     "Income": "ገቢ",
     "Period Summary": "የወቅት ማጠቃለያ",
     "Period": "ወቅት",
@@ -702,6 +706,8 @@ export default function HisabReportPage() {
                           <tr className="bg-card-alt/30 border-b border-border text-[10px] uppercase tracking-[0.2em] text-muted font-black">
                             <th className="px-4 py-3">{t("Event")}</th>
                             <th className="px-4 py-3">{t("Date")}</th>
+                            <th className="px-4 py-3">{t("Service Scopes")}</th>
+                            <th className="px-4 py-3">{t("Venue")}</th>
                             <th className="px-4 py-3 text-right">{t("Income")}</th>
                             <th className="px-4 py-3 text-right">{t("Transport")}</th>
                             <th className="px-4 py-3 text-right">{t("Rental")}</th>
@@ -716,6 +722,14 @@ export default function HisabReportPage() {
                             <tr key={event.event_id} className="border-b border-border/50 [@media(hover:hover)]:hover:bg-card-alt/20 transition-all font-semibold text-foreground">
                               <td className="px-4 py-3 font-bold max-w-[220px] truncate">{event.event_name}</td>
                               <td className="px-4 py-3 font-mono text-muted">{event.event_date}</td>
+                              <td className="px-4 py-3 max-w-[220px]">
+                                {(event.service_scopes?.length ?? 0) > 0
+                                  ? event.service_scopes.map((scope) => lang === "am" ? scope.name_am : scope.name_en).join(", ")
+                                  : "—"}
+                              </td>
+                              <td className="px-4 py-3 max-w-[180px] truncate" title={event.venue_location || undefined}>
+                                {event.venue_location || "—"}
+                              </td>
                               <td className="px-4 py-3 text-right font-mono tabular-nums">{formatCurrency(event.income)}</td>
                               <td className="px-4 py-3 text-right font-mono tabular-nums">{formatCurrency(event.transport)}</td>
                               <td className="px-4 py-3 text-right font-mono tabular-nums">{formatCurrency(event.rental)}</td>
@@ -728,7 +742,7 @@ export default function HisabReportPage() {
                             </tr>
                           ))}
                           <tr className="bg-card-alt/40 font-black text-foreground">
-                            <td className="px-4 py-3 uppercase tracking-wider text-[10px]" colSpan={2}>{t("Events Total")}</td>
+                            <td className="px-4 py-3 uppercase tracking-wider text-[10px]" colSpan={4}>{t("Events Total")}</td>
                             <td className="px-4 py-3 text-right font-mono tabular-nums">{formatCurrency(period.eventTotals.income)}</td>
                             <td className="px-4 py-3 text-right font-mono tabular-nums">{formatCurrency(period.eventTotals.transport)}</td>
                             <td className="px-4 py-3 text-right font-mono tabular-nums">{formatCurrency(period.eventTotals.rental)}</td>

@@ -65,6 +65,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "events:delete": "events:delete",
     "events:override_completed": "events:override_completed",
     "event_allocations:write": "event_allocations:write",
+    "event_allocations:dispatch": "event_allocations:dispatch",
     "event_checklist:write": "event_checklist:write",
     "event_assignments:write": "event_assignments:write",
     "vehicle_assignments:write": "vehicle_assignments:write",
@@ -153,6 +154,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "events:delete": "events:delete (ዝግጅት መሰረዝ)",
     "events:override_completed": "events:override_completed (ያለቁ ዝግጅቶች ማሻሻል)",
     "event_allocations:write": "event_allocations:write (ለዝግጅት ዕቃ መመደብ)",
+    "event_allocations:dispatch": "event_allocations:dispatch (የዝግጅት ዕቃ መነሻ ማረጋገጥ)",
     "event_checklist:write": "event_checklist:write (የዝግጅት ተግባራት ማስተዳደር)",
     "event_assignments:write": "event_assignments:write (ለዝግጅት ሰራተኛ መመደብ)",
     "vehicle_assignments:write": "vehicle_assignments:write (ለዝግጅት መኪና/ሹፌር መመደብ)",
@@ -213,6 +215,7 @@ const MODULE_GROUPS = [
     name: "Event Operations",
     slugs: [
       "event_allocations:write",
+      "event_allocations:dispatch",
       "event_checklist:write",
       "event_assignments:write",
       "vehicle_assignments:write",

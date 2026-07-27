@@ -67,6 +67,7 @@ INSERT INTO permissions (slug, description) VALUES
   ('events:proposals:write', 'Create and submit event intake profitability proposals'),
   ('events:proposals:approve', 'Approve, reject, cancel, and convert event intake proposals'),
   ('event_allocations:write', 'Create and release event inventory allocations'),
+  ('event_allocations:dispatch', 'Check and dispatch existing event inventory allocations'),
   ('event_checklist:write', 'Create and update event checklist items'),
   ('event_assignments:write', 'Assign employees to events and manage attendance'),
   ('vehicle_assignments:write', 'Assign vehicles and drivers to events'),
@@ -101,7 +102,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:write', 'exports:read', 'offices:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'assets:delete', 'event_allocations:dispatch', 'exports:read', 'offices:read')
 WHERE LOWER(r.name) IN ('inventory_controller')
 ON CONFLICT DO NOTHING;
 
@@ -129,21 +130,21 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:write', 'exports:read', 'offices:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'assets:write', 'assets:reconcile', 'event_allocations:dispatch', 'exports:read', 'offices:read')
 WHERE LOWER(r.name) IN ('inventory_officer')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'events:saved_views:share', 'events:proposals:write', 'events:proposals:approve', 'event_allocations:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:delete', 'events:override_completed', 'events:saved_views:share', 'events:proposals:write', 'events:proposals:approve', 'event_allocations:write', 'event_allocations:dispatch', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write', 'expenses:labor_generate', 'exports:read', 'approvals:history:read')
 WHERE LOWER(r.name) IN ('ops_manager')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:proposals:write', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write')
+JOIN permissions p ON p.slug IN ('assets:read', 'events:read', 'events:write', 'events:proposals:write', 'event_allocations:write', 'event_allocations:dispatch', 'event_checklist:write', 'event_assignments:write', 'vehicle_assignments:write', 'trips:create', 'expenses:write')
 WHERE LOWER(r.name) IN ('event_manager')
 ON CONFLICT DO NOTHING;
 

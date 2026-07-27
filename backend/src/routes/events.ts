@@ -122,15 +122,19 @@ function canReadEvents(req: AuthRequest): boolean {
   return hasPermission(req, "events:read");
 }
 
-// Storekeepers (event_allocations:write) need the event workspace to run the
+// Storekeepers (event_allocations:dispatch) need the event workspace to run the
 // dispatch/return checklists even though they lack events:read (issue #178).
 // Financial fields remain redacted by canViewEventFinancials.
 function canReadEventOperations(req: AuthRequest): boolean {
-  return canReadEvents(req) || hasPermission(req, "event_allocations:write");
+  return canReadEvents(req) || hasAnyPermission(req, ["event_allocations:write", "event_allocations:dispatch"]);
+}
+
+function canReadEventWorkspace(req: AuthRequest): boolean {
+  return canReadEventOperations(req) || canAccessProfitReports(req);
 }
 
 function canManageDispatch(req: AuthRequest): boolean {
-  return hasAnyPermission(req, ["event_allocations:write", "assets:write"]);
+  return hasPermission(req, "event_allocations:dispatch");
 }
 
 async function getHiddenEventFields(req: AuthRequest): Promise<string[]> {
@@ -1607,7 +1611,7 @@ router.delete("/:id/permanent", requireAuth, async (req: AuthRequest, res: Respo
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!canReadEventOperations(req)) {
+    if (!canReadEventWorkspace(req)) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
       return;
     }
@@ -1990,7 +1994,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!canReadEventOperations(req)) {
+    if (!canReadEventWorkspace(req)) {
       res.status(403).json({ error: "Forbidden: Insufficient privileges to view events" });
       return;
     }
@@ -2062,7 +2066,8 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     const checklistResult = await pool.query(checklistQuery, [id]);
 
     const assignmentsQuery = `
-      SELECT ea.*, emp.full_name as employee_name, emp.phone as employee_phone
+      SELECT ea.*, emp.full_name as employee_name, emp.phone as employee_phone,
+             emp.compensation_mode
       FROM event_assignments ea
       JOIN employees emp ON ea.employee_id = emp.id
       WHERE ea.event_id = $1
@@ -2129,8 +2134,11 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
     const filteredAssignments = assignmentsResult.rows.map((asg: any) => {
       const cloned = { ...asg };
       if (!isPrivileged) {
-        delete cloned.commission_amount;
         delete cloned.employee_phone;
+      }
+      if (!isFinancial) {
+        delete cloned.commission_amount;
+        delete cloned.compensation_mode;
       }
       return cloned;
     });
@@ -2471,7 +2479,7 @@ router.patch("/:id/design", requireAuth, async (req: AuthRequest, res: Response)
 router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
+    if (!hasPermission(req, "event_allocations:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -2576,7 +2584,7 @@ router.post("/:id/allocations", requireAuth, async (req: AuthRequest, res: Respo
 router.patch("/:id/allocations/:allocationId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, allocationId } = req.params;
-    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
+    if (!hasPermission(req, "event_allocations:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }
@@ -2759,7 +2767,7 @@ router.patch("/:id/allocations/:allocationId", requireAuth, async (req: AuthRequ
 router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id, allocationId } = req.params;
-    if (!hasAnyPermission(req, ["event_allocations:write", "assets:write"])) {
+    if (!hasPermission(req, "event_allocations:write")) {
       res.status(403).json({ error: "Forbidden: Insufficient inventory allocation privileges" });
       return;
     }

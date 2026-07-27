@@ -518,6 +518,8 @@ type HisabEventRow = {
   event_id: string;
   event_name: string;
   event_date: string;
+  venue_location: string | null;
+  service_scopes: Array<{ id: string; code: string; name_en: string; name_am: string }>;
   period_start: string;
   income: number;
   transport: number;
@@ -548,6 +550,8 @@ async function fetchHisabRows(query: HisabQueryInput): Promise<{
        e.id AS event_id,
        e.name AS event_name,
        to_char(e.start_date, 'YYYY-MM-DD') AS event_date,
+       e.venue_location,
+       COALESCE(scopes.service_scopes, '[]'::jsonb) AS service_scopes,
        to_char(date_trunc($3, e.start_date), 'YYYY-MM-DD') AS period_start,
        COALESCE(e.contract_price, 0)::numeric AS income,
        COALESCE(SUM(x.amount) FILTER (WHERE x.status = 'Approved' AND x.category IN ('Transportation', 'Fuel')), 0)::numeric AS transport,
@@ -556,8 +560,22 @@ async function fetchHisabRows(query: HisabQueryInput): Promise<{
        COALESCE(SUM(x.amount) FILTER (WHERE x.status = 'Approved' AND x.category NOT IN ('Transportation', 'Fuel', 'Equipment Rental', 'Labor')), 0)::numeric AS other
      FROM events e
      LEFT JOIN expenses x ON x.event_id = e.id
+     LEFT JOIN LATERAL (
+       SELECT jsonb_agg(
+         jsonb_build_object(
+           'id', ess.id,
+           'code', ess.code,
+           'name_en', ess.name_en,
+           'name_am', ess.name_am
+         )
+         ORDER BY ess.display_order, ess.code
+       ) AS service_scopes
+       FROM event_service_scope_links essl
+       JOIN event_service_scopes ess ON ess.id = essl.service_scope_id
+       WHERE essl.event_id = e.id
+     ) scopes ON TRUE
      WHERE e.deleted_at IS NULL AND e.start_date >= $1 AND e.start_date <= $2
-     GROUP BY e.id
+     GROUP BY e.id, scopes.service_scopes
      ORDER BY e.start_date ASC, e.name ASC`,
     params,
   );
@@ -586,6 +604,8 @@ async function fetchHisabRows(query: HisabQueryInput): Promise<{
       event_id: row.event_id,
       event_name: row.event_name,
       event_date: row.event_date,
+      venue_location: row.venue_location || null,
+      service_scopes: Array.isArray(row.service_scopes) ? row.service_scopes : [],
       period_start: row.period_start,
       income,
       transport,
@@ -787,6 +807,8 @@ const HISAB_EXPORT_COLUMNS = [
   { key: "row_type", header: "Row Type" },
   { key: "name", header: "Event / Category" },
   { key: "date", header: "Date" },
+  { key: "service_scopes", header: "Service Scopes" },
+  { key: "venue", header: "Venue" },
   { key: "income", header: "Income" },
   { key: "transport", header: "Transport" },
   { key: "rental", header: "Rental" },
@@ -820,6 +842,8 @@ router.get(
             row_type: "Event",
             name: event.event_name,
             date: event.event_date,
+            service_scopes: event.service_scopes.map((scope) => scope.name_en).join(", "),
+            venue: event.venue_location || "",
             income: event.income,
             transport: event.transport,
             rental: event.rental,
@@ -836,6 +860,8 @@ router.get(
             row_type: "Operational Expense",
             name: entry.category,
             date: "",
+            service_scopes: "",
+            venue: "",
             income: "",
             transport: "",
             rental: "",
@@ -851,6 +877,8 @@ router.get(
           row_type: "Period Total",
           name: "",
           date: "",
+          service_scopes: "",
+          venue: "",
           income: period.eventTotals.income,
           transport: period.eventTotals.transport,
           rental: period.eventTotals.rental,
