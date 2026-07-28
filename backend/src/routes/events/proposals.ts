@@ -37,6 +37,10 @@ function canImportEvents(req: AuthRequest): boolean {
   return hasPermission(req, "events:write");
 }
 
+function canReadProposalProfit(req: AuthRequest): boolean {
+  return hasPermission(req, "reports:profit:read");
+}
+
 type ProposalFilterField = "name" | "client_name" | "venue_location" | "status" | "requested_budget" | "estimated_net_profit" | "estimated_margin_percentage" | "requested_start_date" | "requested_end_date" | "created_at" | "event_type_name";
 type ProposalFilterOperator = "contains" | "equals" | "not_equals" | "greater_than" | "less_than" | "between";
 
@@ -157,7 +161,7 @@ function normalizeOptionalText(value: unknown): string | null {
   return String(value).trim();
 }
 
-function formatProposal(row: any, scopesMap?: Map<string, ServiceScopeSummary[]>) {
+function formatProposal(row: any, scopesMap?: Map<string, ServiceScopeSummary[]>, includeProfit = true) {
   if (!row) return null;
   const budget = Number(row.requested_budget || 0);
   const estimatedTotalCost = Number(row.estimated_total_cost || 0);
@@ -172,8 +176,13 @@ function formatProposal(row: any, scopesMap?: Map<string, ServiceScopeSummary[]>
     estimated_trip_cost: Number(row.estimated_trip_cost || 0),
     estimated_other_cost: Number(row.estimated_other_cost || 0),
     estimated_total_cost: estimatedTotalCost,
-    estimated_net_profit: estimatedNetProfit,
-    estimated_margin_percentage: estimatedMarginPercentage,
+    ...(includeProfit ? {
+      estimated_net_profit: estimatedNetProfit,
+      estimated_margin_percentage: estimatedMarginPercentage,
+    } : {
+      estimated_net_profit: null,
+      estimated_margin_percentage: null,
+    }),
     service_scopes: scopes,
     service_scope_ids: scopes.map((s: any) => s.id),
   };
@@ -233,6 +242,21 @@ export function createEventProposalsRouter(): Router {
         sortBy,
         sortOrder
       } = validationResult.data;
+      const includeProfit = canReadProposalProfit(req);
+      const sensitiveFilters = filters?.some((filter) =>
+        filter.field === "estimated_net_profit" || filter.field === "estimated_margin_percentage"
+      );
+      if (!includeProfit && (
+        min_margin !== undefined ||
+        max_margin !== undefined ||
+        min_profit !== undefined ||
+        max_profit !== undefined ||
+        sensitiveFilters ||
+        sortBy === "estimated_margin_percentage"
+      )) {
+        res.status(403).json({ error: "Forbidden: Missing profit report permission" });
+        return;
+      }
       const params: any[] = [];
       const conditions = ["p.deleted_at IS NULL"];
 
@@ -286,7 +310,7 @@ export function createEventProposalsRouter(): Router {
       const offset = (page - 1) * limit;
       const queryParams = [...params, limit, offset];
 
-      let orderByClause = `
+      let orderByClause = includeProfit ? `
         ORDER BY
           CASE WHEN p.status = 'Submitted' THEN 0 ELSE 1 END,
           CASE
@@ -299,6 +323,10 @@ export function createEventProposalsRouter(): Router {
             THEN p.estimated_margin_percentage
             ELSE NULL
           END DESC NULLS LAST,
+          p.created_at ASC
+      ` : `
+        ORDER BY
+          CASE WHEN p.status = 'Submitted' THEN 0 ELSE 1 END,
           p.created_at ASC
       `;
 
@@ -334,7 +362,7 @@ export function createEventProposalsRouter(): Router {
       const proposalIds = result.rows.map((r: any) => r.id);
       const scopesMap = await fetchProposalServiceScopes(pool, proposalIds);
       res.json({
-        proposals: result.rows.map((r: any) => formatProposal(r, scopesMap)),
+        proposals: result.rows.map((r: any) => formatProposal(r, scopesMap, includeProfit)),
         total,
         page,
         limit,
@@ -416,7 +444,7 @@ export function createEventProposalsRouter(): Router {
         await insertProposalAuditLog(client, newProposalId, req.user?.id || null, "proposal_created", null, "Draft");
         await client.query("COMMIT");
         const scopesMap = resolvedScopeIds.length > 0 ? await fetchProposalServiceScopes(client, [newProposalId]) : undefined;
-        res.status(201).json({ proposal: formatProposal(result.rows[0], scopesMap) });
+        res.status(201).json({ proposal: formatProposal(result.rows[0], scopesMap, canReadProposalProfit(req)) });
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -467,7 +495,7 @@ export function createEventProposalsRouter(): Router {
       );
 
       const total = Number(countResult.rows[0]?.count || 0);
-      res.json({ proposals: result.rows.map((r) => formatProposal(r)), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
+      res.json({ proposals: result.rows.map((r) => formatProposal(r, undefined, canReadProposalProfit(req))), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) });
     } catch (error: any) {
       console.error("[event-proposals-trash-list] Error:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
@@ -501,7 +529,7 @@ export function createEventProposalsRouter(): Router {
 
       await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_restored", null, result.rows[0].status, "Restored from trash");
       await client.query("COMMIT");
-      res.json({ proposal: formatProposal(result.rows[0]) });
+      res.json({ proposal: formatProposal(result.rows[0], undefined, canReadProposalProfit(req)) });
     } catch (error: any) {
       await client.query("ROLLBACK");
       console.error("[event-proposals-restore] Error:", error);
@@ -590,7 +618,7 @@ export function createEventProposalsRouter(): Router {
         [req.params.proposalId],
       );
       const scopesMap = await fetchProposalServiceScopes(pool, [result.rows[0].id]);
-      res.json({ proposal: formatProposal(result.rows[0], scopesMap), logs: logsResult.rows });
+      res.json({ proposal: formatProposal(result.rows[0], scopesMap, canReadProposalProfit(req)), logs: logsResult.rows });
     } catch (error: any) {
       console.error("[event-proposals-detail] Error:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
@@ -684,7 +712,7 @@ export function createEventProposalsRouter(): Router {
         await client.query("COMMIT");
 
         const scopesMap = await fetchProposalServiceScopes(pool, [req.params.proposalId]);
-        res.json({ proposal: formatProposal(updateResult.rows[0], scopesMap) });
+        res.json({ proposal: formatProposal(updateResult.rows[0], scopesMap, canReadProposalProfit(req)) });
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -756,7 +784,7 @@ export function createEventProposalsRouter(): Router {
         await client.query("COMMIT");
 
         const scopesMap = await fetchProposalServiceScopes(pool, [newProposalId]);
-        res.status(201).json({ proposal: formatProposal(cloneResult.rows[0], scopesMap) });
+        res.status(201).json({ proposal: formatProposal(cloneResult.rows[0], scopesMap, canReadProposalProfit(req)) });
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -795,7 +823,7 @@ export function createEventProposalsRouter(): Router {
       );
       await insertProposalAuditLog(client, req.params.proposalId, req.user?.id || null, "proposal_deleted", existing.rows[0].status, existing.rows[0].status, "Moved to trash");
       await client.query("COMMIT");
-      res.json({ proposal: formatProposal(result.rows[0]) });
+      res.json({ proposal: formatProposal(result.rows[0], undefined, canReadProposalProfit(req)) });
     } catch (error: any) {
       await client.query("ROLLBACK");
       console.error("[event-proposals-delete] Error:", error);
@@ -880,7 +908,7 @@ export function createEventProposalsRouter(): Router {
         });
       }
 
-      res.json({ proposal: formatProposal(updateResult.rows[0]) });
+      res.json({ proposal: formatProposal(updateResult.rows[0], undefined, canReadProposalProfit(req)) });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -1059,7 +1087,7 @@ export function createEventProposalsRouter(): Router {
       });
 
       const finalProposalRow = updatedProposal.rows && updatedProposal.rows.length > 0 ? updatedProposal.rows[0] : proposal;
-      res.status(201).json({ proposal: formatProposal(finalProposalRow), event: eventResult.rows[0] });
+      res.status(201).json({ proposal: formatProposal(finalProposalRow, undefined, canReadProposalProfit(req)), event: eventResult.rows[0] });
     } catch (error: any) {
       await client.query("ROLLBACK");
       console.error("[event-proposals-convert] Error:", error);

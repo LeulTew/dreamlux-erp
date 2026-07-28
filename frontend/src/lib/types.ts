@@ -654,8 +654,8 @@ export interface EventProposal {
   estimated_trip_cost: number;
   estimated_other_cost: number;
   estimated_total_cost: number;
-  estimated_net_profit: number;
-  estimated_margin_percentage: number;
+  estimated_net_profit: number | null;
+  estimated_margin_percentage: number | null;
   status: "Draft" | "Submitted" | "Approved" | "Rejected" | "Converted" | "Canceled";
   rejection_reason: string | null;
   converted_event_id: string | null;

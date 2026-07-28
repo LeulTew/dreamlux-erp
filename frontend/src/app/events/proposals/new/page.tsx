@@ -175,7 +175,8 @@ function NewProposalContent() {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const router = useRouter();
-  const { hasAnyPermission, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { hasAnyPermission, hasPermission, isAuthenticated, isLoading: authLoading } = useAuth();
+  const canViewProposalProfit = hasPermission("reports:profit:read");
 
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
@@ -1076,7 +1077,7 @@ function NewProposalContent() {
 
           {/* Sticky Live Financial Summary Card */}
           <div className="hidden md:block w-full lg:w-80 shrink-0 space-y-4 lg:sticky lg:top-6">
-            <div className="bg-card border border-border dl-radius-lg p-5 flex flex-col gap-4 shadow-sm">
+            {canViewProposalProfit && <div className="bg-card border border-border dl-radius-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
                 <HiOutlinePresentationChartBar className="w-4 h-4 text-primary" />
                 {t("Live Financial Summary")}
@@ -1114,9 +1115,9 @@ function NewProposalContent() {
                   </span>
                 </div>
               </div>
-            </div>
+            </div>}
 
-            {hasMarginRisk && (
+            {canViewProposalProfit && hasMarginRisk && (
               <div className="bg-danger/5 border border-danger/20 dl-radius-lg p-4 text-danger flex items-start gap-2.5 shadow-sm animate-pulse-subtle">
                 <HiExclamationTriangle className="w-5 h-5 shrink-0 text-danger" />
                 <div className="space-y-1">
@@ -1176,7 +1177,7 @@ function NewProposalContent() {
           </div>
 
           {/* Dense Fixed Bottom Strip for Mobile (<768px) */}
-          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border/80 px-4 py-2.5 shadow-lg flex items-center justify-between text-xs font-semibold">
+          {canViewProposalProfit && <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border/80 px-4 py-2.5 shadow-lg flex items-center justify-between text-xs font-semibold">
             <div className="flex flex-col">
               <span className="text-[9px] text-muted uppercase tracking-wider block">{t("Revenue")}</span>
               <span className="font-mono font-bold text-foreground">
@@ -1207,7 +1208,7 @@ function NewProposalContent() {
                 {financials.margin}%
               </span>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 

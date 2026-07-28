@@ -614,7 +614,7 @@ describe("Events API", () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.proposal.estimated_net_profit).toBe(110000);
+    expect(res.body.proposal.estimated_net_profit).toBeNull();
     const insertParams = mockQuery.mock.calls[1][1] as unknown[];
     const storedCostBreakdown = JSON.parse(insertParams[12] as string);
     expect(storedCostBreakdown.team[0].amount).toBe(24000);
@@ -659,7 +659,7 @@ describe("Events API", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.proposal.estimated_team_cost).toBe(12000);
-    expect(res.body.proposal.estimated_net_profit).toBe(88000);
+    expect(res.body.proposal.estimated_net_profit).toBeNull();
     const insertParams = mockQuery.mock.calls[1][1] as unknown[];
     const storedCostBreakdown = JSON.parse(insertParams[12] as string);
     expect(storedCostBreakdown.team[0]).toMatchObject({
@@ -751,7 +751,7 @@ describe("Events API", () => {
 
     const res = await request(app)
       .get("/events/proposals?status=Submitted&min_profit=100000&min_margin=40")
-      .set("Authorization", `Bearer ${getToken("OPS_MANAGER")}`);
+      .set("Authorization", `Bearer ${getToken("OWNER")}`);
 
     expect(res.status).toBe(200);
     expect(res.body.proposals[0].estimated_margin_percentage).toBe(55);
@@ -763,6 +763,40 @@ describe("Events API", () => {
     expect(String(mockQuery.mock.calls[1][0])).toContain("LEFT JOIN users approver");
     expect(String(mockQuery.mock.calls[0][0])).toContain("p.deleted_at IS NULL");
     expect(String(mockQuery.mock.calls[1][0])).toContain("p.deleted_at IS NULL");
+  });
+
+  test("GET /events/proposals redacts profit data for event managers", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 });
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "proposal-1",
+        name: "Private Margin Gala",
+        status: "Submitted",
+        requested_budget: "200000.00",
+        estimated_total_cost: "90000.00",
+        estimated_net_profit: "110000.00",
+        estimated_margin_percentage: "55.00",
+      }],
+      rowCount: 1,
+    });
+
+    const res = await request(app)
+      .get("/events/proposals")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.proposals[0].estimated_net_profit).toBeNull();
+    expect(res.body.proposals[0].estimated_margin_percentage).toBeNull();
+    expect(String(mockQuery.mock.calls[1][0])).not.toContain("THEN p.estimated_net_profit");
+  });
+
+  test("GET /events/proposals blocks profit filters for event managers", async () => {
+    const res = await request(app)
+      .get("/events/proposals?min_margin=25")
+      .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`);
+
+    expect(res.status).toBe(403);
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 
   test("GET /events/proposals/:id returns proposer and approver metadata with logs", async () => {

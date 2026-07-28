@@ -199,6 +199,7 @@ export default function ProposalDetailPage() {
 
   const canApprove = hasPermission("events:proposals:approve");
   const canWrite = hasPermission("events:proposals:write") || hasPermission("events:write");
+  const canViewProposalProfit = hasPermission("reports:profit:read");
 
   const proposal = data?.proposal;
   const logs = data?.logs || [];
@@ -276,7 +277,9 @@ export default function ProposalDetailPage() {
         `${t("Venue")}: ${proposal.venue_location || "-"}   ${t("Status")}: ${proposal.status}`,
         `Service Scopes: ${proposal.service_scopes?.map((s) => s.name_en).join(", ") || "None"}`,
         `${t("Requested Budget")}: ${etb(proposal.requested_budget)}   ${t("Estimated Cost")}: ${etb(proposal.estimated_total_cost)}`,
-        `${t("Net Profit")}: ${etb(proposal.estimated_net_profit)}   ${t("Margin")}: ${proposal.estimated_margin_percentage}%`,
+        ...(canViewProposalProfit ? [
+          `${t("Net Profit")}: ${etb(Number(proposal.estimated_net_profit))}   ${t("Margin")}: ${proposal.estimated_margin_percentage}%`,
+        ] : []),
       ],
       output: "print",
       fileName: `proposal-${proposal.name.replace(/\s+/g, "-").toLowerCase()}.pdf`,
@@ -534,7 +537,7 @@ export default function ProposalDetailPage() {
           <div className="space-y-6 sticky top-6 w-full shrink-0">
 
             {/* Live Financial Totals */}
-            <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
+            {canViewProposalProfit && <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4 shadow-sm">
               <h3 className="text-xs font-black text-foreground uppercase tracking-wider border-b border-border/40 pb-2 flex items-center gap-1.5">
                 <HiCurrencyDollar className="w-4 h-4 text-primary" />
                 {t("Live Financial Summary")}
@@ -555,18 +558,18 @@ export default function ProposalDetailPage() {
                 </div>
                 <div className="flex items-center justify-between border-t border-border/40 pt-2.5">
                   <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Net Profit")}</span>
-                  <span className={`font-mono font-black ${proposal.estimated_net_profit < 0 ? "text-danger" : "text-foreground"}`}>
+                  <span className={`font-mono font-black ${Number(proposal.estimated_net_profit) < 0 ? "text-danger" : "text-foreground"}`}>
                     ETB {Number(proposal.estimated_net_profit).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted font-semibold text-xs uppercase tracking-wider">{t("Margin %")}</span>
-                  <span className={`font-mono font-black ${proposal.estimated_margin_percentage < 25 ? "text-warning" : "text-success"}`}>
+                  <span className={`font-mono font-black ${Number(proposal.estimated_margin_percentage) < 25 ? "text-warning" : "text-success"}`}>
                     {proposal.estimated_margin_percentage}%
                   </span>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Workflow Actions Panel */}
             <div className="bg-card border border-border rounded-xl p-5 space-y-4 actions-panel no-print">

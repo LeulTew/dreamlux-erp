@@ -106,6 +106,7 @@ export default function ProposalsPage() {
   const canReadProposals = hasAnyPermission(["events:proposals:write", "events:write", "events:proposals:approve"]);
   const canCreateProposals = hasAnyPermission(["events:proposals:write", "events:write"]);
   const canDeleteEvents = hasPermission("events:delete");
+  const canViewProposalProfit = hasPermission("reports:profit:read");
 
   const serverFilters = useMemo<EventProposalFilter[]>(() => {
     return advancedFilters.map((rule) => {
@@ -234,7 +235,7 @@ export default function ProposalsPage() {
         </header>
 
         {/* KPI Strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className={`grid grid-cols-2 ${canViewProposalProfit ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4 mb-6`}>
           {/* Card 1: Total Proposals */}
           <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-indigo-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-indigo-500/10 to-transparent rounded-full blur-xl group-hover:scale-110 transition-transform duration-500 pointer-events-none" />
@@ -277,7 +278,7 @@ export default function ProposalsPage() {
           </div>
 
           {/* Card 4: Avg Margin */}
-          <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-violet-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
+          {canViewProposalProfit && <div className="group relative bg-card border border-border/60 rounded-2xl p-5 overflow-hidden shadow-sm hover:shadow-md hover:border-violet-500/30 transition-all duration-300 flex flex-col justify-between h-[110px]">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-violet-500/10 to-transparent rounded-full blur-xl group-hover:scale-110 transition-transform duration-500 pointer-events-none" />
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-muted uppercase tracking-wider font-extrabold">{t("Avg Margin")}</span>
@@ -288,7 +289,7 @@ export default function ProposalsPage() {
             <span className="text-2xl font-black text-foreground tracking-tight tabular-nums mt-2">
               {stats.avgMargin}%
             </span>
-          </div>
+          </div>}
         </div>
 
         {/* Filters Toolbar */}
@@ -332,7 +333,7 @@ export default function ProposalsPage() {
                   { key: "name", label: t("Proposal Name"), type: "string" },
                   { key: "client_name", label: t("Client"), type: "string" },
                   { key: "requested_budget", label: t("Budget"), type: "number" },
-                  { key: "estimated_margin_percentage", label: t("Margin %"), type: "number" },
+                  ...(canViewProposalProfit ? [{ key: "estimated_margin_percentage", label: t("Margin %"), type: "number" as const }] : []),
                   { key: "venue_location", label: t("Venue"), type: "string" },
                   {
                     key: "status",
@@ -447,7 +448,7 @@ export default function ProposalsPage() {
                         }}
                       />
                     </th>
-                    <th className="px-6 py-4 text-right">
+                    {canViewProposalProfit && <th className="px-6 py-4 text-right">
                       <SortableHeader
                         label={t("Margin %")}
                         sortKey="estimated_margin_percentage"
@@ -460,7 +461,7 @@ export default function ProposalsPage() {
                           setPage(1);
                         }}
                       />
-                    </th>
+                    </th>}
                     <th className="px-6 py-4 text-center">
                       <SortableHeader
                         label={t("Status")}
@@ -504,9 +505,9 @@ export default function ProposalsPage() {
                       <td className="px-6 py-4 font-bold text-foreground text-right font-mono">
                         ETB {Number(proposal.requested_budget).toLocaleString()}
                       </td>
-                      <td className={`px-6 py-4 font-black text-right font-mono ${proposal.estimated_margin_percentage < 25 ? "text-warning" : "text-success"}`}>
+                      {canViewProposalProfit && <td className={`px-6 py-4 font-black text-right font-mono ${Number(proposal.estimated_margin_percentage) < 25 ? "text-warning" : "text-success"}`}>
                         {proposal.estimated_margin_percentage}%
-                      </td>
+                      </td>}
                       <td className="px-6 py-4 text-center">
                         <div className="inline-flex justify-center w-full">
                           <StatusBadge status={proposal.status} />
@@ -553,12 +554,12 @@ export default function ProposalsPage() {
                         ETB {Number(proposal.requested_budget).toLocaleString()}
                       </span>
                     </div>
-                    <div>
+                    {canViewProposalProfit && <div>
                       <span className="text-[10px] text-muted block uppercase tracking-wider font-bold">Margin</span>
-                      <span className={`font-mono font-bold ${proposal.estimated_margin_percentage < 25 ? "text-warning" : "text-success"}`}>
+                      <span className={`font-mono font-bold ${Number(proposal.estimated_margin_percentage) < 25 ? "text-warning" : "text-success"}`}>
                         {proposal.estimated_margin_percentage}%
                       </span>
-                    </div>
+                    </div>}
                   </div>
                 </Link>
               ))}
