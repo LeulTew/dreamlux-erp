@@ -97,6 +97,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Allocation exceeds available stock.": "Allocation exceeds available stock.",
     "Allocation saved": "Allocation saved",
     "Allocation released": "Allocation released",
+    "Release failed": "Release failed",
     Edit: "Edit",
     Save: "Save",
     Cancel: "Cancel",
@@ -257,6 +258,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Allocation exceeds available stock.": "ምደባው ካለው ክምችት በላይ ነው።",
     "Allocation saved": "ምደባ ተቀምጧል",
     "Allocation released": "ምደባ ተለቋል",
+    "Release failed": "ማስለቀቅ አልተሳካም",
     Edit: "አስተካክል",
     Save: "አስቀምጥ",
     Cancel: "ሰርዝ",
@@ -856,7 +858,17 @@ export default function EventWorkspacePage() {
     mutationFn: (allocationId: string) => deleteEventAllocation(eventId, allocationId),
     onSuccess: () => {
       toast.success(t("Allocation released"));
+      // Releasing returns the reserved units to availability, so the same derived views the
+      // edit flow refreshes must be refetched here too.
       queryClient.invalidateQueries({ queryKey: ["event-workspace", eventId] });
+      queryClient.invalidateQueries({ queryKey: ["event-allocation-items"] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["event-dispatch-queue"] });
+    },
+    // Issue #219: the server now refuses to release departed or returned allocations. Without
+    // this the 409 was swallowed and the row simply appeared not to change.
+    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
+      toast.error(err.response?.data?.error || err.message || t("Release failed"));
     },
   });
 
@@ -1435,7 +1447,9 @@ export default function EventWorkspacePage() {
                                 className="min-h-12"
                                 onClick={() => releaseMutation.mutate(allocation.id)}
                                 loading={releaseMutation.isPending}
-                                disabled={Boolean(allocation.departed_at)}
+                                // Mirrors the server guard: once stock has departed or been
+                                // returned, its history must be preserved rather than released.
+                                disabled={Boolean(lockReason)}
                               >
                                 <HiMinusCircle className="h-4 w-4" />
                                 {t("Release")}

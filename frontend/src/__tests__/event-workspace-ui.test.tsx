@@ -43,6 +43,7 @@ const apiMocks = vi.hoisted(() => ({
   updateEventAllocation: vi.fn().mockResolvedValue({}),
   updateEmployeeAttendance: vi.fn().mockResolvedValue({}),
   createEmployeeAssignment: vi.fn().mockResolvedValue({}),
+  deleteEventAllocation: vi.fn().mockResolvedValue({}),
   getEventProfit: vi.fn().mockResolvedValue({
     revenue: 150000,
     approved_expenses: 45000,
@@ -114,7 +115,7 @@ vi.mock("@/lib/api", () => ({
   getAvailableEmployees: apiMocks.getAvailableEmployees,
   getAvailableVehicles: apiMocks.getAvailableVehicles,
   createEventAllocation: vi.fn(),
-  deleteEventAllocation: vi.fn(),
+  deleteEventAllocation: apiMocks.deleteEventAllocation,
   updateEventAllocation: apiMocks.updateEventAllocation,
   updateEventAllocationDispatchCheck: apiMocks.updateEventAllocationDispatchCheck,
   markEventDispatchDeparted: apiMocks.markEventDispatchDeparted,
@@ -292,6 +293,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
     apiMocks.updateEventAllocation.mockResolvedValue({});
     apiMocks.updateEmployeeAttendance.mockResolvedValue({});
     apiMocks.createEmployeeAssignment.mockResolvedValue({});
+    apiMocks.deleteEventAllocation.mockResolvedValue({});
   });
 
   it("redacts contract price if user lacks reports:profit:read", () => {
@@ -393,6 +395,84 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
 
   // Issue #196: storekeepers correct an active allocation in place instead of
   // releasing and re-creating it.
+  // Issue #219: releasing is for stock that never left. The server now refuses departed and
+  // returned allocations, so the UI must not offer the action and must surface the refusal.
+  describe("allocation release guards", () => {
+    const openInventoryTab = (permissions = ["events:read", "event_allocations:write"]) => {
+      mockPermissions = permissions;
+      render(<EventWorkspacePage />);
+      fireEvent.click(screen.getByRole("button", { name: /^Inventory Allocation$/i }));
+    };
+
+    it("offers Release on a reserved allocation", () => {
+      openInventoryTab();
+      expect(screen.getByRole("button", { name: /^Release$/i })).toBeEnabled();
+    });
+
+    it("disables Release once the allocation has departed", () => {
+      workspaceData.allocations = [
+        {
+          id: "alloc-1",
+          item_id: "item-1",
+          item_name: "Gold Chairs",
+          status: "Pulled",
+          quantity_allocated: 50,
+          notes: null,
+          dispatch_checked_at: "2026-07-01T10:00:00.000Z",
+          departed_at: "2026-07-01T11:00:00.000Z",
+        },
+      ];
+      openInventoryTab();
+
+      expect(screen.getByRole("button", { name: /^Release$/i })).toBeDisabled();
+    });
+
+    it("disables Release on a returned allocation so return history is preserved", () => {
+      workspaceData.allocations = [
+        {
+          id: "alloc-1",
+          item_id: "item-1",
+          item_name: "Gold Chairs",
+          status: "Returned",
+          quantity_allocated: 50,
+          notes: null,
+          dispatch_checked_at: "2026-07-01T10:00:00.000Z",
+          departed_at: null,
+        },
+      ];
+      openInventoryTab();
+
+      // Previously only `departed_at` was checked, so a returned-but-not-departed row still
+      // offered Release and would now hit a 409.
+      expect(screen.getByRole("button", { name: /^Release$/i })).toBeDisabled();
+    });
+
+    it("surfaces the server refusal instead of silently doing nothing", async () => {
+      apiMocks.deleteEventAllocation.mockRejectedValueOnce({
+        response: { data: { error: "Departed allocations cannot be released. Record a return instead." } },
+      });
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /^Release$/i }));
+
+      await waitFor(() =>
+        expect(toastMocks.error).toHaveBeenCalledWith("Departed allocations cannot be released. Record a return instead."),
+      );
+    });
+
+    it("refreshes availability caches after a successful release", async () => {
+      openInventoryTab();
+      fireEvent.click(screen.getByRole("button", { name: /^Release$/i }));
+
+      await waitFor(() => expect(toastMocks.success).toHaveBeenCalledWith("Allocation released"));
+      const keys = invalidateQueriesMock.mock.calls.map(
+        (call) => JSON.stringify((call[0] as { queryKey: unknown[] }).queryKey),
+      );
+      expect(keys).toContain(JSON.stringify(["event-workspace", "event-123"]));
+      expect(keys).toContain(JSON.stringify(["event-allocation-items"]));
+      expect(keys).toContain(JSON.stringify(["items"]));
+    });
+  });
+
   describe("inline allocation editing", () => {
     const openInventoryTab = (permissions = ["events:read", "event_allocations:write"]) => {
       mockPermissions = permissions;
