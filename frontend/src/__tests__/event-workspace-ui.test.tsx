@@ -736,7 +736,7 @@ describe("EventWorkspacePage Role-Aware Controls", () => {
 
       await waitFor(() => expect(toastMocks.success).toHaveBeenCalledWith("Attendance updated"));
       const keys = invalidateQueriesMock.mock.calls.map(
-        (call: [{ queryKey: unknown[] }]) => JSON.stringify(call[0].queryKey),
+        (call) => JSON.stringify((call[0] as { queryKey: unknown[] }).queryKey),
       );
       expect(keys).toContain(JSON.stringify(["event-workspace", "event-123"]));
       expect(keys).toContain(JSON.stringify(["event-profit", "event-123"]));
