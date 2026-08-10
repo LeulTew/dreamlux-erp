@@ -1663,16 +1663,16 @@ describe("Events API", () => {
 
   // Allocation - Delete
   test("DELETE /events/:id/allocations/:allocationId releases allocation", async () => {
-    // Event check
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 }); // event check
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ status: "Planned" }], rowCount: 1 }); // event FOR UPDATE
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "event-1", status: "Planned" }],
+      rows: [{ id: "alloc-1", event_id: "event-1", item_id: "item-1", quantity_allocated: 10, notes: null, status: "Reserved", departed_at: null, returned_at: null, returned_good_quantity: 0, returned_damaged_quantity: 0, returned_lost_quantity: 0, returned_repair_quantity: 0 }],
       rowCount: 1,
-    });
-    // Delete allocation
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "alloc-1", status: "Reserved" }],
-      rowCount: 1,
-    });
+    }); // allocation FOR UPDATE
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "alloc-1", status: "Reserved" }], rowCount: 1 }); // DELETE
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
 
     const res = await request(app)
       .delete("/events/event-1/allocations/alloc-1")
@@ -1680,6 +1680,320 @@ describe("Events API", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+  });
+
+  // Issue #219: release/removal used to be a bare hard DELETE - no transaction, no audit row,
+  // and for allocations no lifecycle guard at all. event_return_receipts cascades on
+  // event_allocations, so deleting a returned allocation silently destroyed immutable return
+  // receipts; event_return_corrections is ON DELETE RESTRICT and would instead surface an
+  // opaque foreign-key error.
+  describe("audited deletes (issue #219)", () => {
+    const RESERVED_ALLOCATION = {
+      id: "alloc-1",
+      event_id: "event-1",
+      item_id: "item-1",
+      quantity_allocated: 10,
+      notes: "Front hall",
+      status: "Reserved",
+      departed_at: null,
+      returned_at: null,
+      returned_good_quantity: 0,
+      returned_damaged_quantity: 0,
+      returned_lost_quantity: 0,
+      returned_repair_quantity: 0,
+    };
+
+    function mockAllocationPreamble(event: Record<string, unknown> = { id: "event-1", status: "Planned" }) {
+      mockQuery.mockResolvedValueOnce({ rows: [event], rowCount: 1 }); // event check (pre-transaction)
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ status: event.status }], rowCount: 1 }); // event FOR UPDATE
+    }
+
+    test("releasing an allocation writes an audit row capturing the deleted values", async () => {
+      mockAllocationPreamble();
+      mockQuery.mockResolvedValueOnce({ rows: [RESERVED_ALLOCATION], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "alloc-1" }], rowCount: 1 }); // DELETE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      const auditCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"));
+      expect(auditCall).toBeDefined();
+      const [eventId, userId, field, oldValue, newValue] = auditCall![1];
+      expect(eventId).toBe("event-1");
+      expect(userId).toBe("user-1");
+      expect(field).toBe("allocation_released");
+      // The removed row is recorded in full so the release stays reconstructible.
+      expect(JSON.parse(oldValue)).toEqual({
+        allocation_id: "alloc-1",
+        item_id: "item-1",
+        quantity_allocated: 10,
+        status: "Reserved",
+        notes: "Front hall",
+      });
+      expect(newValue).toBeNull();
+      expect(mockQuery.mock.calls.at(-1)![0]).toBe("COMMIT");
+    });
+
+    test("refuses to release a departed allocation", async () => {
+      mockAllocationPreamble();
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...RESERVED_ALLOCATION, status: "Pulled", departed_at: "2026-07-01T11:00:00.000Z" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain("Departed allocations cannot be released");
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("DELETE FROM event_allocations"))).toBe(false);
+    });
+
+    test("refuses to release a returned allocation so return receipts are not cascaded away", async () => {
+      mockAllocationPreamble();
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...RESERVED_ALLOCATION, status: "Returned", returned_at: "2026-07-02T09:00:00.000Z", returned_good_quantity: 10 }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain("Returned allocations cannot be released");
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("DELETE FROM event_allocations"))).toBe(false);
+    });
+
+    test("refuses to release an allocation with partial returns recorded", async () => {
+      mockAllocationPreamble();
+      // Still 'Pulled' and not flagged returned, but receipts exist against it.
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ ...RESERVED_ALLOCATION, status: "Pulled", returned_good_quantity: 4 }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain("Returned allocations cannot be released");
+    });
+
+    test("rejects an allocation belonging to another event without leaking existence", async () => {
+      mockAllocationPreamble();
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // event-scoped lookup misses
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-from-other-event")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe("Allocation not found");
+      const lookupCall = mockQuery.mock.calls.find((call: any[]) =>
+        String(call[0]).includes("FROM event_allocations") && String(call[0]).includes("FOR UPDATE"),
+      );
+      expect(lookupCall![1]).toEqual(["alloc-from-other-event", "event-1"]);
+    });
+
+    test("returns 409 when a racing depart makes the allocation unreleasable", async () => {
+      mockAllocationPreamble();
+      mockQuery.mockResolvedValueOnce({ rows: [RESERVED_ALLOCATION], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // DELETE matches nothing
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toBe("Allocation is no longer releasable");
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"))).toBe(false);
+    });
+
+    test("rolls back the release when the audit insert fails", async () => {
+      mockAllocationPreamble();
+      mockQuery.mockResolvedValueOnce({ rows: [RESERVED_ALLOCATION], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "alloc-1" }], rowCount: 1 }); // DELETE
+      mockQuery.mockRejectedValueOnce(new Error("audit log write failed"));
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(500);
+      const sqls = mockQuery.mock.calls.map((call: any[]) => String(call[0]));
+      expect(sqls).toContain("ROLLBACK");
+      expect(sqls).not.toContain("COMMIT");
+    });
+
+    test("rejects allocation release without permission and before any connection", async () => {
+      const res = await request(app)
+        .delete("/events/event-1/allocations/alloc-1")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+      expect(res.status).toBe(403);
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+
+    test("rejects unauthenticated allocation release", async () => {
+      const res = await request(app).delete("/events/event-1/allocations/alloc-1");
+      expect(res.status).toBe(401);
+    });
+
+    // --- assignment removal ---
+
+    test("removing an assignment writes an audit row capturing the deleted values", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "asg-1", employee_id: "emp-1", role: "Assistant", commission_amount: 500, attended: false, attendance_marked_at: null }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1" }], rowCount: 1 }); // DELETE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .delete("/events/event-1/assignments/employees/emp-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      const auditCall = mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"));
+      const [, , field, oldValue, newValue] = auditCall![1];
+      expect(field).toBe("event_assignment_removed");
+      expect(JSON.parse(oldValue)).toEqual({
+        assignment_id: "asg-1",
+        employee_id: "emp-1",
+        role: "Assistant",
+        commission_amount: 500,
+        attended: false,
+        attendance_marked_at: null,
+      });
+      expect(newValue).toBeNull();
+    });
+
+    test("refuses to remove an attended assignment already inside a generated labor expense", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [{ status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "asg-1", employee_id: "emp-1", role: "Team Leader", commission_amount: 2500, attended: true, attendance_marked_at: "2026-07-20T10:00:00.000Z" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "exp-labor" }], rowCount: 1 }); // labor expense exists
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/assignments/employees/emp-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain("Reverse the labor expense");
+      expect(res.body.labor_expense_id).toBe("exp-labor");
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("DELETE FROM event_assignments"))).toBe(false);
+    });
+
+    test("allows removing an attended assignment once no labor expense remains", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "asg-1", employee_id: "emp-1", role: "Team Leader", commission_amount: 2500, attended: true, attendance_marked_at: "2026-07-20T10:00:00.000Z" }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // labor expense reversed/absent
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1" }], rowCount: 1 }); // DELETE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .delete("/events/event-1/assignments/employees/emp-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(JSON.parse(mockQuery.mock.calls.find((call: any[]) => String(call[0]).includes("INSERT INTO event_logs"))![1][3]).attended).toBe(true);
+    });
+
+    test("does not consult labor expenses when the assignment was never attended", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "asg-1", employee_id: "emp-1", role: "Assistant", commission_amount: 0, attended: false, attendance_marked_at: null }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1" }], rowCount: 1 }); // DELETE
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+
+      const res = await request(app)
+        .delete("/events/event-1/assignments/employees/emp-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(mockQuery.mock.calls.some((call: any[]) => String(call[0]).includes("FROM expenses"))).toBe(false);
+    });
+
+    test("locks assignment removal on a completed event without the override permission", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
+
+      const res = await request(app)
+        .delete("/events/event-1/assignments/employees/emp-1")
+        .set("Authorization", `Bearer ${getToken("event_manager")}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain("Completed event assignments cannot be modified");
+    });
+
+    test("rolls back assignment removal when the audit insert fails", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({ rows: [{ status: "Planned" }], rowCount: 1 });
+      mockQuery.mockResolvedValueOnce({
+        rows: [{ id: "asg-1", employee_id: "emp-1", role: "Assistant", commission_amount: 0, attended: false, attendance_marked_at: null }],
+        rowCount: 1,
+      });
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "asg-1" }], rowCount: 1 }); // DELETE
+      mockQuery.mockRejectedValueOnce(new Error("audit log write failed"));
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+
+      const res = await request(app)
+        .delete("/events/event-1/assignments/employees/emp-1")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(500);
+      const sqls = mockQuery.mock.calls.map((call: any[]) => String(call[0]));
+      expect(sqls).toContain("ROLLBACK");
+      expect(sqls).not.toContain("COMMIT");
+    });
+
+    test("rejects assignment removal without permission and before any connection", async () => {
+      const res = await request(app)
+        .delete("/events/event-1/assignments/employees/emp-1")
+        .set("Authorization", `Bearer ${getToken("DRIVER")}`);
+
+      expect(res.status).toBe(403);
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+
+    test("rejects unauthenticated assignment removal", async () => {
+      const res = await request(app).delete("/events/event-1/assignments/employees/emp-1");
+      expect(res.status).toBe(401);
+    });
   });
 
   // Issue #196 - PATCH /events/:id/allocations/:allocationId
@@ -2359,16 +2673,16 @@ describe("Events API", () => {
 
   // Scheduling - DELETE Employee Assignment
   test("DELETE /events/:id/assignments/employees/:employeeId removes assignment", async () => {
-    // Event check
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Planned" }], rowCount: 1 }); // event check
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ status: "Planned" }], rowCount: 1 }); // event FOR UPDATE
     mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "event-1", status: "Planned" }],
+      rows: [{ id: "asg-1", employee_id: "emp-1", role: "Assistant", commission_amount: 500, attended: false, attendance_marked_at: null }],
       rowCount: 1,
-    });
-    // Delete query
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ event_id: "event-1", employee_id: "emp-1" }],
-      rowCount: 1,
-    });
+    }); // assignment FOR UPDATE
+    mockQuery.mockResolvedValueOnce({ rows: [{ event_id: "event-1", employee_id: "emp-1" }], rowCount: 1 }); // DELETE
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // audit
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
 
     const res = await request(app)
       .delete("/events/event-1/assignments/employees/emp-1")

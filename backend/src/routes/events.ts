@@ -2790,19 +2790,113 @@ router.delete("/:id/allocations/:allocationId", requireAuth, async (req: AuthReq
       return;
     }
 
-    const deleteQuery = `
-      DELETE FROM event_allocations
-      WHERE id = $1 AND event_id = $2
-      RETURNING *
-    `;
-    const result = await pool.query(deleteQuery, [allocationId, id]);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ error: "Allocation not found" });
-      return;
+      // Re-read the event under lock so a concurrent completion cannot slip past the check above.
+      const lockedEvent = await client.query(
+        "SELECT status FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        [id],
+      );
+      if (lockedEvent.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+      if (lockedEvent.rows[0].status === "Completed" && !isOverrideAuthorized) {
+        await client.query("ROLLBACK");
+        res.status(403).json({
+          error: "Completed events cannot be edited except by administrators or accountants",
+        });
+        return;
+      }
+
+      // Scoped by event_id as well as id: an allocation on another event must not be
+      // reachable by pairing it with a visible event (BOLA).
+      const allocationResult = await client.query(
+        `
+          SELECT id, event_id, item_id, quantity_allocated, notes, status, departed_at, returned_at,
+                 returned_good_quantity, returned_damaged_quantity,
+                 returned_lost_quantity, returned_repair_quantity
+          FROM event_allocations
+          WHERE id = $1 AND event_id = $2
+          FOR UPDATE
+        `,
+        [allocationId, id],
+      );
+      if (allocationResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Allocation not found" });
+        return;
+      }
+
+      const allocation = allocationResult.rows[0];
+      const returnedTotal =
+        Number(allocation.returned_good_quantity || 0) +
+        Number(allocation.returned_damaged_quantity || 0) +
+        Number(allocation.returned_lost_quantity || 0) +
+        Number(allocation.returned_repair_quantity || 0);
+
+      // Issue #219: releasing is for stock that never left. Deleting a departed or returned
+      // allocation destroyed dispatch and return history - event_return_receipts cascades on
+      // this row, so immutable receipts (issue #173) were silently removed with it, while
+      // event_return_corrections would instead fail with an opaque foreign-key error.
+      if (allocation.status === "Returned" || allocation.returned_at || returnedTotal > 0) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Returned allocations cannot be released. Their return history must be preserved." });
+        return;
+      }
+      if (allocation.departed_at) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Departed allocations cannot be released. Record a return instead." });
+        return;
+      }
+
+      // The lifecycle predicates are repeated here so a depart/return committing between the
+      // read and the write cannot be overtaken.
+      const result = await client.query(
+        `
+          DELETE FROM event_allocations
+          WHERE id = $1
+            AND event_id = $2
+            AND status <> 'Returned'
+            AND departed_at IS NULL
+          RETURNING *
+        `,
+        [allocationId, id],
+      );
+
+      if (result.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: "Allocation is no longer releasable" });
+        return;
+      }
+
+      // The deleted row is captured in full so the release stays reconstructible.
+      await insertEventAuditLog(
+        client,
+        id,
+        req.user?.id || null,
+        "allocation_released",
+        JSON.stringify({
+          allocation_id: allocationId,
+          item_id: allocation.item_id,
+          quantity_allocated: Number(allocation.quantity_allocated),
+          status: allocation.status,
+          notes: allocation.notes ?? null,
+        }),
+        null,
+      );
+
+      await client.query("COMMIT");
+      res.json({ success: true, allocation: result.rows[0] });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    res.json({ success: true, allocation: result.rows[0] });
   } catch (error: any) {
     console.error("[delete-event-allocation] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
@@ -3231,19 +3325,102 @@ router.delete("/:id/assignments/employees/:employeeId", requireAuth, async (req:
       return;
     }
 
-    const deleteQuery = `
-      DELETE FROM event_assignments
-      WHERE event_id = $1 AND employee_id = $2
-      RETURNING *
-    `;
-    const result = await pool.query(deleteQuery, [id, employeeId]);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (result.rowCount === 0) {
-      res.status(404).json({ error: "Assignment not found" });
-      return;
+      const lockedEvent = await client.query(
+        "SELECT status FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        [id],
+      );
+      if (lockedEvent.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+      if (lockedEvent.rows[0].status === "Completed" && !canOverrideCompleted(req)) {
+        await client.query("ROLLBACK");
+        res.status(400).json({
+          error: "Completed event assignments cannot be modified except by administrators or accountants",
+        });
+        return;
+      }
+
+      const assignmentResult = await client.query(
+        `
+          SELECT id, employee_id, role, commission_amount, attended, attendance_marked_at
+          FROM event_assignments
+          WHERE event_id = $1 AND employee_id = $2
+          FOR UPDATE
+        `,
+        [id, employeeId],
+      );
+      if (assignmentResult.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Assignment not found" });
+        return;
+      }
+
+      const assignment = assignmentResult.rows[0];
+
+      // Issue #219: a verified attendance whose commission is already inside a generated
+      // labor expense cannot just vanish - the expense would survive with no source, and
+      // payroll eligibility would silently recompute without it. Reverse the labor expense
+      // first, which is an audited action of its own.
+      if (assignment.attended === true) {
+        const laborResult = await client.query(
+          "SELECT id FROM expenses WHERE event_id = $1 AND category = 'Labor' AND description = $2 AND status <> 'Rejected'",
+          [id, AUTO_LABOR_EXPENSE_DESCRIPTION],
+        );
+        if ((laborResult.rowCount || 0) > 0) {
+          await client.query("ROLLBACK");
+          res.status(409).json({
+            error: "This employee's attendance is already included in a generated labor expense. Reverse the labor expense before removing the assignment.",
+            labor_expense_id: laborResult.rows[0]?.id ?? null,
+          });
+          return;
+        }
+      }
+
+      const result = await client.query(
+        `
+          DELETE FROM event_assignments
+          WHERE event_id = $1 AND employee_id = $2
+          RETURNING *
+        `,
+        [id, employeeId],
+      );
+
+      if (result.rowCount === 0) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "Assignment not found" });
+        return;
+      }
+
+      await insertEventAuditLog(
+        client,
+        id,
+        req.user?.id || null,
+        "event_assignment_removed",
+        JSON.stringify({
+          assignment_id: assignment.id,
+          employee_id: assignment.employee_id,
+          role: assignment.role,
+          commission_amount: Number(assignment.commission_amount),
+          attended: assignment.attended === true,
+          attendance_marked_at: assignment.attendance_marked_at ?? null,
+        }),
+        null,
+      );
+
+      await client.query("COMMIT");
+      res.json({ message: "Employee assignment removed successfully" });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    res.json({ message: "Employee assignment removed successfully" });
   } catch (error: any) {
     console.error("[delete-employee-assignment] Error:", error);
     res.status(500).json({ error: error.message || "Internal server error" });
