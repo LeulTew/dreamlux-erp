@@ -6,9 +6,18 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch: # Allow manual triggering
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   ping:
+    name: Keep-alive ping
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
       - name: Ping Supabase Database
         env:
