@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useId } from "react";
 import { HiChevronDown, HiMagnifyingGlass } from "react-icons/hi2";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -30,6 +30,12 @@ interface SelectProps {
   disabled?: boolean;
   /** Message shown when there are no options (or no search matches). */
   emptyMessage?: string;
+  /** Optional name for hidden form input / test label binding. */
+  name?: string;
+  /** Optional id for hidden form input / label binding. */
+  id?: string;
+  /** Optional aria-label for accessibility / testing-library query binding. */
+  "aria-label"?: string;
 }
 
 export default function Select({
@@ -47,7 +53,13 @@ export default function Select({
   searchPlaceholder = "Search...",
   disabled = false,
   emptyMessage = "No options",
+  name,
+  id,
+  "aria-label": ariaLabel,
 }: SelectProps) {
+  // Stable across SSR and hydration, and unique per instance, so several selects
+  // on one page do not all claim to control the same listbox.
+  const listboxId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -117,11 +129,37 @@ export default function Select({
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
+      {name && (
+        <select
+          name={name}
+          id={id}
+          aria-hidden="true"
+          tabIndex={-1}
+          className="sr-only absolute inset-0 opacity-0"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {!selectedOption && <option value="" />}
+          {options.map((opt) => (
+            <option key={opt.id} value={opt.id} />
+          ))}
+        </select>
+      )}
       <button
         type="button"
         disabled={disabled}
+        // The trigger is the control the user (and assistive tech) actually
+        // operates, so it carries the combobox role and the accessible name.
+        // The hidden <select> above is aria-hidden and exists only to serialize
+        // into FormData, which is why the name lives here and not there.
+        role="combobox"
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        // role="combobox" requires aria-controls as well as aria-expanded.
+        // Without it a screen reader announces the trigger but cannot associate
+        // it with the option list it opens.
+        aria-controls={listboxId}
         onClick={() => !disabled && (isOpen ? closeMenu() : openMenu())}
         onKeyDown={handleKeyDown}
         className={
@@ -148,6 +186,7 @@ export default function Select({
             transition={{ duration: 0.15, ease: "easeOut" }}
             className="absolute z-[100] w-full mt-2 bg-card border border-border shadow-lg rounded-xl overflow-hidden py-1"
             role="listbox"
+            id={listboxId}
           >
             {searchable && (
               <div className="px-2 pt-1 pb-2 border-b border-border/40">
