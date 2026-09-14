@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import OverheadsPage from "../app/hr/finance/overheads/page";
+import type { getEffectivePermissions } from "@/lib/api";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
@@ -27,9 +28,10 @@ vi.mock("@/components/AuthLayout", () => ({
 }));
 
 type MockQueryData = Record<string, unknown> | null;
+type MockAuthData = Pick<Awaited<ReturnType<typeof getEffectivePermissions>>, "permission_slugs" | "is_superuser"> | null;
 
 // Mock react-query
-let mockAuthData: MockQueryData = null;
+let mockAuthData: MockAuthData = null;
 let mockSummaryData: MockQueryData = null;
 let mockListData: MockQueryData = null;
 
@@ -160,7 +162,7 @@ describe("Overhead Register Page UI", () => {
   });
 
   it("gates access with ForbiddenState for unauthorized users", () => {
-    mockAuthData = { permission_slugs: [] };
+    mockAuthData = { permission_slugs: [], is_superuser: false };
     render(<OverheadsPage />);
     expect(screen.queryByTestId("auth-layout")).not.toBeInTheDocument();
     expect(screen.getByText(/forbidden/i)).toBeInTheDocument();
@@ -191,6 +193,7 @@ describe("Overhead Register Page UI", () => {
   });
 
   it("shows approve/reject buttons for owner/approver", () => {
+    if (!mockAuthData) throw new Error("Permission fixture was not initialized");
     mockAuthData.permission_slugs.push("finance:overheads:approve");
     render(<OverheadsPage />);
     expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument();

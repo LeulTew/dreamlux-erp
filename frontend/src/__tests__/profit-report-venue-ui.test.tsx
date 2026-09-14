@@ -4,6 +4,7 @@ import React from "react";
 import FinancialDashboardPage from "@/app/hr/reports/profit/page";
 import { generateReportPdf } from "@/lib/pdf-report";
 import { getProfitReport, getProfitReportExportUrl } from "@/lib/api";
+import type { ProfitReportSummary } from "@/lib/types";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => {
@@ -78,7 +79,7 @@ const { mockProfitReportData } = vi.hoisted(() => {
     },
   ];
 
-  const reportData = {
+  const reportData: ProfitReportSummary = {
     summary: {
       totalEvents: 2,
       totalRevenue: 150000.0,

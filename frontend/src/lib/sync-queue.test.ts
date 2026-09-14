@@ -8,7 +8,12 @@ import {
   subscribeSyncQueue,
 } from "./sync-queue";
 
-type MockRequest<T> = Pick<IDBRequest<T>, "onsuccess" | "onerror" | "result">;
+type MockRequest<T> = {
+  result: T;
+  error: DOMException | null;
+  onsuccess: ((this: MockRequest<T>, event: Event) => void) | null;
+  onerror: ((this: MockRequest<T>, event: Event) => void) | null;
+};
 
 type MockStore = {
   add: ReturnType<typeof vi.fn<(item: QueuedMutation) => MockRequest<string>>>;
@@ -25,9 +30,10 @@ function createMockRequest<T>(result: T): MockRequest<T> {
     onsuccess: null,
     onerror: null,
     result,
+    error: null,
   };
   setTimeout(() => {
-    req.onsuccess?.call(req as IDBRequest<T>, new Event("success"));
+    req.onsuccess?.call(req, new Event("success"));
   }, 0);
   return req;
 }
@@ -71,9 +77,10 @@ describe("sync-queue library", () => {
           onerror: null,
           onupgradeneeded: null,
           result: mockDb,
+          error: null,
         };
         setTimeout(() => {
-          req.onsuccess?.call(req as IDBRequest<typeof mockDb>, new Event("success"));
+          req.onsuccess?.call(req, new Event("success"));
         }, 0);
         return req;
       },
