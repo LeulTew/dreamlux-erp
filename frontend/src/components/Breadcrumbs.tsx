@@ -249,21 +249,25 @@ export default function Breadcrumbs() {
   }
 
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted select-none">
+    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-muted select-none">
       {crumbs.map((crumb, idx) => {
         const isLast = idx === crumbs.length - 1;
         const isAllowed = crumb.permissions ? hasAnyPermission(crumb.permissions) : true;
         const renderLink = crumb.href && !isLast && isAllowed;
 
         return (
-          <span key={idx} className="flex items-center gap-1">
-            {idx > 0 && <HiChevronRight className="w-3 h-3 text-muted/50 shrink-0" />}
+          <span key={idx} className={isLast ? "flex min-w-0 items-center gap-1" : "hidden shrink-0 items-center gap-1 md:flex"}>
+            {idx > 0 && <HiChevronRight className="hidden w-3 h-3 text-muted/50 shrink-0 md:block" />}
             {renderLink ? (
               <Link href={crumb.href!} className="hover:text-foreground transition-colors font-medium">
                 {crumb.label}
               </Link>
             ) : (
-              <span className={isLast ? "text-foreground font-semibold" : "font-medium text-muted/80"}>
+              <span
+                aria-current={isLast ? "page" : undefined}
+                className={isLast ? "min-w-0 truncate text-foreground font-semibold" : "font-medium text-muted/80"}
+                title={isLast ? crumb.label : undefined}
+              >
                 {crumb.label}
               </span>
             )}

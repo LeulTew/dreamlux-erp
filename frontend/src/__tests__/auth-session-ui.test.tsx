@@ -4,11 +4,20 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AuthLayout from "@/components/AuthLayout";
+import type { useAuth } from "@/hooks/useAuth";
+import type { User } from "@/lib/types";
 
 const replaceMock = vi.fn();
-let authState = {
+type AuthState = Pick<ReturnType<typeof useAuth>,
+  "isPreviewActive" | "previewRoleName" | "clearPreview" | "hasPermission" |
+  "isLoading" | "isAuthenticated" | "isSessionResolved"
+> & {
+  user: Pick<User, "id" | "username" | "full_name" | "role_name" | "role_names" | "profile_image_url"> | undefined;
+};
+
+let authState: AuthState = {
   isPreviewActive: false,
-  previewRoleName: null as string | null,
+  previewRoleName: null,
   clearPreview: vi.fn(),
   hasPermission: () => true,
   isLoading: false,
@@ -110,7 +119,7 @@ describe("AuthLayout session hardening", () => {
       isPreviewActive: false,
       previewRoleName: null,
       clearPreview: vi.fn(),
-  hasPermission: () => true,
+      hasPermission: () => true,
       isLoading: false,
       isAuthenticated: true,
       isSessionResolved: true,

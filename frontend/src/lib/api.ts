@@ -32,6 +32,8 @@ import {
   HisabImportCommitResult,
   HisabImportPreview,
   MonthlyNetProfitStatement,
+  EventProposal,
+  EventProposalLog,
 } from "./types";
 
 export type CreateUserPayload = {
@@ -1578,8 +1580,8 @@ export type EventProposalFilter = {
 export const createEventProposal = (data: Record<string, unknown>) =>
   api.post("/events/proposals", data).then((r) => r.data);
 
-export const getEventProposal = (id: string) =>
-  api.get(`/events/proposals/${id}`).then((r) => r.data);
+export const getEventProposal = (id: string, options?: Pick<AxiosRequestConfig, "signal" | "timeout">) =>
+  api.get<{ proposal: EventProposal; logs: EventProposalLog[] }>(`/events/proposals/${encodeURIComponent(id)}`, options).then((r) => r.data);
 
 export const deleteEventProposal = (id: string) =>
   api.delete(`/events/proposals/${id}`).then((r) => r.data);

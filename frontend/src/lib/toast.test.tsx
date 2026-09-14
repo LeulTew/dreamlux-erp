@@ -1,7 +1,8 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { toast as sonnerToast } from "sonner";
 
-const customMock = vi.fn(() => "custom-toast-id");
+const customMock = vi.fn<typeof sonnerToast.custom>(() => "custom-toast-id");
 const successMock = vi.fn();
 const errorMock = vi.fn();
 const infoMock = vi.fn();
@@ -39,7 +40,7 @@ describe("toast compatibility helper", () => {
     expect(customMock).toHaveBeenCalledTimes(1);
     expect(successMock).not.toHaveBeenCalled();
 
-    const renderFn = customMock.mock.calls[0][0] as (id: string) => React.ReactElement;
+    const renderFn = customMock.mock.calls[0][0];
     const element = renderFn("toast-id") as React.ReactElement<{ children: React.ReactElement }>;
     const premiumToast = element.props.children as React.ReactElement<{
       title: string;

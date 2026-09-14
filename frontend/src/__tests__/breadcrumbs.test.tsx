@@ -90,4 +90,22 @@ describe("Breadcrumbs Component", () => {
     expect(eventsLink.closest("a")).toHaveAttribute("href", "/events");
   });
 
+  it("marks a single current crumb while preserving authorized desktop ancestors", () => {
+    mockPathname = "/events/proposals/123";
+    mockPermissions = ["events:read", "events:proposals:write"];
+    const { container } = render(<Breadcrumbs />);
+    expect(container.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    expect(container.querySelector('[aria-current="page"]')).toHaveTextContent("Proposal Detail");
+    expect(screen.getByRole("link", { name: "Events" })).toHaveAttribute("href", "/events");
+    expect(screen.getByRole("link", { name: "Event Proposals" })).toHaveAttribute("href", "/events/proposals");
+  });
+
+  it.each(["/hr/expenses/approve", "/hr/reports/profit"])("does not link nonexistent grouping paths on %s", (path) => {
+    mockPathname = path;
+    mockIsSuperuser = true;
+    const { container } = render(<Breadcrumbs />);
+    expect(container.querySelector('a[href="/hr/expenses"]')).toBeNull();
+    expect(container.querySelector('a[href="/hr/reports"]')).toBeNull();
+  });
+
 });
