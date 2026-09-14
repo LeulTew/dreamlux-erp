@@ -65,3 +65,34 @@ The JSON report in `test-results` retains measurements and screenshots from
 passing cases as well as failures. It does not verify a live
 backend or production Auth, Database, or Storage. Do not supply production
 environment files to this harness.
+
+## Proposal duplication
+
+Duplicate reads the canonical `EventProposal` response: requested schedule,
+`package_design_notes`, and the four `cost_breakdown` arrays. Client details,
+budget, venue, ordinary notes, event type, and Dream Lux service scopes remain
+editable; approval, source identity and audit metadata are not copied to the
+new draft. Date-only inputs preserve the API's calendar date, and time inputs
+use minute precision.
+
+Source loading waits for resolved authentication and proposal-write access.
+Until a valid source has loaded, no editable form or save/submit action is
+shown. A request is aborted after 30 seconds, on cancellation or when the user
+or source changes. Failures show an explicit localized recovery state with
+at most three manual retries and no automatic retries. Unrelated rerenders
+or query refreshes do not overwrite already-loaded edits. An empty or
+malformed clone source cannot silently become ordinary blank intake.
+
+Focused checks from this folder (run only when the coordinating resource
+slot is available):
+
+```powershell
+bun run test proposal-clone --maxWorkers=1
+bun run test:e2e --config playwright.proposal-clone.config.ts
+```
+
+The clone browser suite reuses the isolated `3114` / dummy `4114` navigation
+test server setup, runs serial desktop/mobile journeys, and checks exact
+outgoing draft and submit requests against synthetic canonical responses.
+HTTP and WebSocket fixtures block unmocked API and non-local requests.
+It does not contact or verify production services.

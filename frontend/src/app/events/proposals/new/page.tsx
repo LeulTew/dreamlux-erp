@@ -31,9 +31,26 @@ import {
 import { motion } from "framer-motion";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  hydrateProposalClone,
+  PROPOSAL_CLONE_MAX_RETRIES,
+  PROPOSAL_CLONE_TIMEOUT_MS,
+  type ProposalDraftLine as EstimateLine,
+} from "@/lib/proposal-clone";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
+    "Loading source proposal": "Loading source proposal",
+    "Clone loading description": "Please wait before editing or saving. The source proposal has not been copied yet.",
+    "Cannot duplicate proposal": "Cannot duplicate proposal",
+    "Clone error description": "The source could not be loaded safely. Retry or cancel; no proposal has been created.",
+    "Clone timed out": "The source request timed out after 30 seconds.",
+    "Clone retries exhausted": "Retry limit reached. Cancel and reopen Duplicate to try again.",
+    "Retry source": "Retry source",
+    "Duplicate ready": "Duplicate ready",
+    "Clone ready description": "Proposal data copied. Review the details before saving or submitting.",
+    "Clone not ready": "Wait for the source proposal to load before continuing.",
+    "Cancel": "Cancel",
     "New Proposal Intake": "New Proposal Intake",
     "Progress": "Progress",
     "Basics": "Basics",
@@ -97,6 +114,17 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "New Proposal Subtitle": "Fill in all 3 steps to create a proposal"
   },
   am: {
+    "Loading source proposal": "ዋናውን ፕሮፖዛል በመጫን ላይ",
+    "Clone loading description": "ከማስተካከል ወይም ከማስቀመጥ በፊት እባክዎን ይጠብቁ። ዋናው ፕሮፖዛል ገና አልተቀዳም።",
+    "Cannot duplicate proposal": "ፕሮፖዛሉን መቅዳት አልተቻለም",
+    "Clone error description": "ዋናውን ፕሮፖዛል በትክክል መጫን አልተቻለም። እንደገና ይሞክሩ ወይም ይሰርዙ፤ አዲስ ፕሮፖዛል አልተፈጠረም።",
+    "Clone timed out": "ዋናውን ፕሮፖዛል ለመጫን የተሰጠው 30 ሰከንድ አልፏል።",
+    "Clone retries exhausted": "የድጋሚ ሙከራ ገደብ ላይ ደርሰዋል። ይሰርዙና እንደገና ቅጂ ይጀምሩ።",
+    "Retry source": "ዋናውን እንደገና ጫን",
+    "Duplicate ready": "ቅጂው ዝግጁ ነው",
+    "Clone ready description": "የፕሮፖዛሉ መረጃ ተቀድቷል። ከማስቀመጥ ወይም ከማቅረብ በፊት ዝርዝሩን ይከልሱ።",
+    "Clone not ready": "ከመቀጠልዎ በፊት ዋናው ፕሮፖዛል እስኪጫን ይጠብቁ።",
+    "Cancel": "ሰርዝ",
     "New Proposal Intake": "አዲስ ፕሮፖዛል ማስገቢያ",
     "Progress": "ሂደት",
     "Basics": "መሰረታዊያን",
@@ -161,22 +189,23 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   }
 };
 
-interface EstimateLine {
-  label: string;
-  amount: number;
-  notes: string;
-  people_count?: number;
-  commission_per_person?: number;
-  km?: number;
-  fuel_price?: number;
-}
+type CloneLoadState = {
+  status: "loading" | "ready" | "error";
+  attempt: number;
+  reason?: "source" | "timeout";
+};
 
-function NewProposalContent() {
+function NewProposalContent({ auth, cloneFromId }: {
+  auth: ReturnType<typeof useAuth>;
+  cloneFromId: string | null;
+}) {
   const { lang } = useLanguage();
-  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const t = useMemo(() => (key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
   const router = useRouter();
-  const { hasAnyPermission, hasPermission, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { hasAnyPermission, hasPermission, isAuthenticated, isLoading: authLoading } = auth;
   const canViewProposalProfit = hasPermission("reports:profit:read");
+  const canCreateProposals = hasAnyPermission(["events:proposals:write", "events:write"]);
+  const canLoadClone = !authLoading && isAuthenticated && canCreateProposals;
 
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
@@ -252,53 +281,84 @@ function NewProposalContent() {
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const searchParams = useSearchParams();
-  const cloneFromId = searchParams.get("clone_from_id");
+  const [cloneLoad, setCloneLoad] = useState<CloneLoadState>({
+    status: cloneFromId === null ? "ready" : "loading",
+    attempt: 0,
+  });
+  const settledCloneAttempt = useRef<number | null>(null);
+  const cloneRequest = useRef<AbortController | null>(null);
+  const cloneReady = cloneFromId === null || cloneLoad.status === "ready";
 
   useEffect(() => {
-    if (!cloneFromId) return;
-
-    const formatDateForInput = (d?: string | Date) => {
-      if (!d) return "";
-      const date = new Date(d);
-      if (isNaN(date.getTime())) return "";
-      return date.toISOString().split("T")[0];
-    };
-
-    const formatTimeForInput = (t?: string) => {
-      if (!t) return "";
-      return t.slice(0, 5); // HH:MM
-    };
-
-    getEventProposal(cloneFromId)
-      .then((response) => {
-        const proposal = response.proposal;
-        setName(proposal.name + " (Copy)");
-        setClientName(proposal.client_name);
-        setClientPhone(proposal.client_phone || "");
-        setEventTypeId(proposal.event_type_id || "");
-        setServiceScopeIds(proposal.service_scope_ids || proposal.service_scopes?.map((scope: { id: string }) => scope.id) || []);
-        setRequestedBudget(proposal.requested_budget);
-        setStartDate(formatDateForInput(proposal.start_date));
-        setEndDate(formatDateForInput(proposal.end_date));
-        setStartTime(formatTimeForInput(proposal.start_time));
-        setEndTime(formatTimeForInput(proposal.end_time));
-        setVenueLocation(proposal.venue_location || "");
-        setNotes(proposal.notes || "");
-        setDesignNotes(proposal.design_notes || "");
-
-        // Set estimate lines
-        setDesignLines(proposal.design_estimate || []);
-        setTeamLines(proposal.team_estimate || []);
-        setTripLines(proposal.trip_estimate || []);
-        setOtherLines(proposal.other_estimate || []);
-
-        notify.success("Duplicated Mode", "Proposal data pre-filled! Please edit or submit.");
-      })
-      .catch(() => {
-        notify.error("Error", "Failed to retrieve source proposal to duplicate");
+    if (cloneFromId === null || !canLoadClone || settledCloneAttempt.current === cloneLoad.attempt) return;
+    const controller = new AbortController();
+    cloneRequest.current = controller;
+    let active = true;
+    const fail = (reason: "source" | "timeout", error: unknown) => {
+      if (!active || controller.signal.aborted) return;
+      console.warn("[Dream Lux proposal clone] Source could not be loaded.", {
+        sourceId: cloneFromId,
+        attempt: cloneLoad.attempt + 1,
+        reason,
+        error: error instanceof Error ? error.name : "UnknownError",
       });
-  }, [cloneFromId]);
+      settledCloneAttempt.current = cloneLoad.attempt;
+      setCloneLoad({ status: "error", attempt: cloneLoad.attempt, reason });
+    };
+    const timer = window.setTimeout(() => {
+      fail("timeout", new Error("Proposal source request timed out"));
+      controller.abort();
+    }, PROPOSAL_CLONE_TIMEOUT_MS);
+
+    const load = async () => {
+      try {
+        if (!cloneFromId.trim()) throw new Error("Missing proposal source ID");
+        const response = await getEventProposal(cloneFromId, {
+          signal: controller.signal,
+          timeout: PROPOSAL_CLONE_TIMEOUT_MS,
+        });
+        if (!active || controller.signal.aborted) return;
+        const values = hydrateProposalClone(response, cloneFromId);
+        setName(values.name);
+        setClientName(values.clientName);
+        setClientPhone(values.clientPhone);
+        setEventTypeId(values.eventTypeId);
+        setServiceScopeIds(values.serviceScopeIds);
+        setRequestedBudget(values.requestedBudget);
+        setStartDate(values.startDate);
+        setEndDate(values.endDate);
+        setStartTime(values.startTime);
+        setEndTime(values.endTime);
+        setVenueLocation(values.venueLocation);
+        setNotes(values.notes);
+        setDesignNotes(values.designNotes);
+        setDesignLines(values.designLines);
+        setTeamLines(values.teamLines);
+        setTripLines(values.tripLines);
+        setOtherLines(values.otherLines);
+        settledCloneAttempt.current = cloneLoad.attempt;
+        setCloneLoad({ status: "ready", attempt: cloneLoad.attempt });
+        notify.success(t("Duplicate ready"), t("Clone ready description"));
+      } catch (error) {
+        fail("source", error);
+      } finally {
+        window.clearTimeout(timer);
+        if (cloneRequest.current === controller) cloneRequest.current = null;
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [cloneFromId, canLoadClone, cloneLoad.attempt, t]);
+
+  const ensureCloneReady = () => {
+    if (canLoadClone && cloneReady) return true;
+    setErrorMsg(t("Clone not ready"));
+    return false;
+  };
 
   // Fetch event types for dropdown
   const { data: eventTypesData } = useQuery<EventType[]>({
@@ -378,6 +438,7 @@ function NewProposalContent() {
   };
 
   const handleNextStep = () => {
+    if (!ensureCloneReady()) return;
     setErrorMsg("");
     if (step === 1) {
       if (!name || !clientName || !venueLocation || requestedBudget <= 0) {
@@ -412,6 +473,7 @@ function NewProposalContent() {
   });
 
   const handleSaveDraft = () => {
+    if (!ensureCloneReady()) return;
     if (!validateEstimateLabels()) return;
     createProposalMutation.mutate({
       name,
@@ -437,6 +499,7 @@ function NewProposalContent() {
   };
 
   const handleSubmitForApproval = async () => {
+    if (!ensureCloneReady()) return;
     if (!validateEstimateLabels()) return;
     setErrorMsg("");
     setIsSubmitting(true);
@@ -507,8 +570,6 @@ function NewProposalContent() {
     if (category === "other") setOtherLines(filterLine(otherLines));
   };
 
-  const canCreateProposals = hasAnyPermission(["events:proposals:write", "events:write"]);
-
   return (
     <AuthLayout>
       {authLoading ? (
@@ -519,6 +580,47 @@ function NewProposalContent() {
         <ForbiddenState
           description="You need event proposal write permissions to create proposals."
         />
+      ) : !cloneReady ? (
+        <div className="page-container px-4 py-8 sm:px-6 md:px-8">
+          <section className="flex flex-col gap-4 border border-border bg-card p-5 dl-radius-lg">
+            <div role={cloneLoad.status === "error" ? "alert" : "status"} className="space-y-2">
+              <h1 className="text-lg font-bold text-foreground">
+                {t(cloneLoad.status === "error" ? "Cannot duplicate proposal" : "Loading source proposal")}
+              </h1>
+              <p className="text-sm text-muted">
+                {t(cloneLoad.status === "error" ? "Clone error description" : "Clone loading description")}
+              </p>
+              {cloneLoad.reason === "timeout" && <p className="text-sm text-danger">{t("Clone timed out")}</p>}
+              {cloneLoad.attempt >= PROPOSAL_CLONE_MAX_RETRIES && cloneLoad.status === "error" && (
+                <p className="text-sm text-muted">{t("Clone retries exhausted")}</p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {cloneLoad.status === "error" && (
+                <button
+                  type="button"
+                  disabled={cloneLoad.attempt >= PROPOSAL_CLONE_MAX_RETRIES}
+                  onClick={() => setCloneLoad((state) => state.status === "error" && state.attempt < PROPOSAL_CLONE_MAX_RETRIES
+                    ? { status: "loading", attempt: state.attempt + 1 }
+                    : state)}
+                  className="min-h-12 border border-border bg-card-alt px-4 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 dl-radius-lg"
+                >
+                  {t("Retry source")} ({cloneLoad.attempt}/{PROPOSAL_CLONE_MAX_RETRIES})
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  cloneRequest.current?.abort();
+                  router.push("/events/proposals");
+                }}
+                className="min-h-12 border border-border px-4 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring dl-radius-lg"
+              >
+                {t("Cancel")}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : (
         <>
         <div className="page-container pt-4 pb-20 md:py-8 px-4 sm:px-6 md:px-8">
@@ -1047,14 +1149,14 @@ function NewProposalContent() {
                   <>
                     <button
                       onClick={handleSaveDraft}
-                      disabled={createProposalMutation.isPending || isSubmitting}
+                      disabled={!cloneReady || createProposalMutation.isPending || isSubmitting}
                       className="flex items-center justify-center min-h-12 sm:min-h-11 px-4 sm:px-5 dl-radius-xl text-xs font-black uppercase tracking-wider bg-card border border-border text-foreground [@media(hover:hover)]:hover:bg-card-alt transition-all active:scale-[0.98] cursor-pointer w-full sm:w-auto disabled:opacity-50 select-none"
                     >
                       {createProposalMutation.isPending ? "Saving..." : t("Create Draft")}
                     </button>
                     <motion.button
                       onClick={handleSubmitForApproval}
-                      disabled={createProposalMutation.isPending || isSubmitting}
+                      disabled={!cloneReady || createProposalMutation.isPending || isSubmitting}
                       whileTap={{ scale: 0.97 }}
                       animate={isSubmitting ? { scale: 0.98, opacity: 0.85 } : { scale: 1, opacity: 1 }}
                       transition={{ duration: 0.2, ease: "easeOut" }}
@@ -1293,6 +1395,13 @@ function NewProposalContent() {
   );
 }
 
+function NewProposalSource() {
+  const auth = useAuth();
+  const cloneFromId = useSearchParams().get("clone_from_id");
+  // Reset only for a different source or actual user, not an auth/query refresh.
+  return <NewProposalContent key={JSON.stringify([auth.user?.id ?? null, cloneFromId])} auth={auth} cloneFromId={cloneFromId} />;
+}
+
 export default function NewProposalPage() {
   return (
     <Suspense fallback={
@@ -1304,7 +1413,7 @@ export default function NewProposalPage() {
         </div>
       </AuthLayout>
     }>
-      <NewProposalContent />
+      <NewProposalSource />
     </Suspense>
   );
 }
