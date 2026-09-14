@@ -1,12 +1,12 @@
 "use client";
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useId } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Popover } from "radix-ui";
 import {
   HiUsers,
   HiOutlineCalendar,
   HiOutlineBanknotes,
-  HiBuildingOffice,
   HiTableCells,
   HiOutlineClipboardDocumentCheck,
   HiCog6Tooth,
@@ -16,11 +16,14 @@ import {
   HiChevronDown,
   HiChevronUp,
   HiChevronLeft,
+  HiChevronDoubleDown,
+  HiChevronDoubleUp,
 } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/useAuth";
-import { buildSidebarNavState } from "@/lib/sidebar-nav";
-
+import { useSidebarPreferences } from "@/hooks/use-sidebar-preferences";
+import { buildSidebarNavState, getVisibleSidebarSectionIds } from "@/lib/sidebar-nav";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import {
   Sidebar,
@@ -41,6 +44,13 @@ import {
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
+    "Expand all": "Expand all",
+    "Collapse all": "Collapse all",
+    "Expand all sections": "Expand all sections",
+    "Collapse all sections": "Collapse all sections",
+    "Expand Sidebar": "Expand sidebar",
+    "Collapse Sidebar": "Collapse sidebar",
+    "Session preferences": "Navigation choices will last for this session only.",
     Employees: "Employees",
     Payroll: "Payroll",
     Salary: "Salary Levels",
@@ -87,6 +97,13 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Hisab Import": "Hisab Import",
   },
   am: {
+    "Expand all": "ሁሉን ክፈት",
+    "Collapse all": "ሁሉን ዝጋ",
+    "Expand all sections": "ሁሉንም ክፍሎች ክፈት",
+    "Collapse all sections": "ሁሉንም ክፍሎች ዝጋ",
+    "Expand Sidebar": "የጎን ምናሌውን ክፈት",
+    "Collapse Sidebar": "የጎን ምናሌውን ዝጋ",
+    "Session preferences": "የምናሌ ምርጫዎች ለዚህ ክፍለ ጊዜ ብቻ ይቆያሉ።",
     Employees: "ሰራተኞች",
     Notifications: "ማሳወቂያዎች",
     Payroll: "ደመወዝ",
@@ -153,18 +170,30 @@ function CollapsedPopout({
   links: CollapsedPopoutLink[];
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const hoverOpened = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleMouseEnter = () => {
+  const cancelClose = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setOpen(true);
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerEnter = (event: React.PointerEvent) => {
+    if (event.pointerType === "touch" || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    cancelClose();
+    if (!open) {
+      hoverOpened.current = true;
+      setOpen(true);
+    }
+  };
+
+  const handlePointerLeave = () => {
+    cancelClose();
     timeoutRef.current = setTimeout(() => {
-      setOpen(false);
-    }, 200); // 200ms delay for smooth transition
+      const focused = document.activeElement;
+      if (!triggerRef.current?.contains(focused) && !contentRef.current?.contains(focused)) setOpen(false);
+    }, 200);
   };
 
   useEffect(() => {
@@ -174,78 +203,79 @@ function CollapsedPopout({
   }, []);
 
   return (
-    <div
-      ref={ref}
-      className="relative flex justify-center w-full"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        cancelClose();
+        if (next) hoverOpened.current = false;
+        setOpen(next);
+      }}
     >
-      <button
-        onClick={() => setOpen(!open)}
-        className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
-          isActive
-            ? "bg-primary text-primary-foreground shadow-md animate-pulse-subtle"
-            : "text-muted hover:bg-card-alt hover:text-foreground"
-        }`}
-        title={label}
-      >
-        <Icon className="w-[22px] h-[22px] shrink-0" />
-      </button>
-      {open && (
-        <div
-          className="absolute left-[calc(100%+16px)] top-[32px] z-50 bg-card border border-border/80 rounded-2xl p-1.5 min-w-[170px] shadow-massive flex flex-col gap-0.5 animate-scale-in"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+      <div className="flex justify-center w-full">
+        <Popover.Trigger asChild>
+          <button
+            ref={triggerRef}
+            type="button"
+            aria-label={label}
+            onPointerEnter={handlePointerEnter}
+            onPointerLeave={handlePointerLeave}
+            onClick={(event) => {
+              if (open && hoverOpened.current) {
+                event.preventDefault();
+                hoverOpened.current = false;
+                contentRef.current?.focus();
+              }
+            }}
+            className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "text-muted [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt [@media(hover:hover)_and_(pointer:fine)]:hover:text-foreground"
+            }`}
+          >
+            <Icon className="w-[22px] h-[22px] shrink-0" />
+          </button>
+        </Popover.Trigger>
+      </div>
+      <Popover.Portal>
+        <Popover.Content
+          ref={contentRef}
+          aria-label={label}
+          tabIndex={-1}
+          side="right"
+          align="start"
+          sideOffset={8}
+          collisionPadding={8}
+          hideWhenDetached
+          className="z-50 flex w-56 max-w-[calc(100vw-1rem)] min-h-0 max-h-[var(--radix-popover-content-available-height)] flex-col gap-1 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          onPointerEnter={cancelClose}
+          onPointerLeave={handlePointerLeave}
+          onFocusCapture={() => { hoverOpened.current = false; }}
+          onOpenAutoFocus={(event) => {
+            // Hover must not steal focus; keyboard opening retains Radix's link-only focus behavior.
+            if (hoverOpened.current) event.preventDefault();
+          }}
+          onCloseAutoFocus={(event) => {
+            if (hoverOpened.current) event.preventDefault();
+          }}
         >
-          {/* Transparent bridge to fill the 16px hover gap and prevent mouse-leave trigger */}
-          <div className="absolute right-full top-[-32px] w-6 h-[calc(100%+32px)] bg-transparent" style={{ marginRight: "-1px" }} />
-
-          {/* Subtle curved SVG connection tree-lines */}
-          <svg className="absolute right-full top-0 w-[72px] h-full pointer-events-none" style={{ marginRight: "-1px" }}>
-            {links.map((link, idx) => {
-              const y_item = 22 + idx * 34; // First item center is ~22px, next centers are spaced by 34px
-              const x_start = 8; // Button center in 96px sidebar (SVG width 72px, popout starts at 96+16=112px, 112-48=64px offset)
-              const x_trunk = 28; // Completely clears the button circle (24px radius from center)
-              const y_start = 16; // Button bottom height relative to top-[32px] container
-              const r = 6;
-
-              const path = idx === 0
-                ? `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_item} L 72,${y_item}`
-                : `M ${x_start},${y_start} H ${x_trunk - r} Q ${x_trunk},${y_start} ${x_trunk},${y_start + r} V ${y_item - r} Q ${x_trunk},${y_item} ${x_trunk + r},${y_item} L 72,${y_item}`;
-
-              return (
-                <path
-                  key={link.href}
-                  d={path}
-                  fill="none"
-                  stroke="currentColor"
-                  className="text-muted/40 dark:text-muted/20"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              );
-            })}
-          </svg>
-
-          <div className="flex flex-col gap-0.5">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className={`block px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  link.active
-                    ? "bg-primary/10 text-primary font-bold"
-                    : "text-foreground/80 hover:bg-card-alt hover:text-foreground"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={link.active ? "page" : undefined}
+              onClick={() => setOpen(false)}
+              className={`block shrink-0 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${
+                link.active
+                  ? "bg-primary-light text-foreground font-bold"
+                  : "text-foreground [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt"
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -262,32 +292,28 @@ function SidebarLink({
   active: boolean;
   isCollapsed: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
-
   if (isCollapsed) {
     return (
-      <div
-        className="relative flex justify-center w-full"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        <Link
-          href={href}
-          className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all cursor-pointer ${
-            active
-              ? "bg-primary text-primary-foreground shadow-md"
-              : "text-muted hover:bg-card-alt hover:text-foreground"
-          }`}
-        >
-          <Icon className="w-[22px] h-[22px] shrink-0" />
-        </Link>
-        {hovered && (
-          <div className="absolute left-[calc(100%+16px)] top-[6px] z-50 bg-card border border-border/80 rounded-2xl px-3 py-2 shadow-massive flex items-center animate-scale-in pointer-events-none whitespace-nowrap">
-            <span className="text-foreground/90 font-semibold text-xs leading-none">
-              {label}
-            </span>
-          </div>
-        )}
+      <div className="flex justify-center w-full">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              href={href}
+              aria-label={label}
+              aria-current={active ? "page" : undefined}
+              className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt [@media(hover:hover)_and_(pointer:fine)]:hover:text-foreground"
+              }`}
+            >
+              <Icon className="w-[22px] h-[22px] shrink-0" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8} className="motion-reduce:animate-none">
+            {label}
+          </TooltipContent>
+        </Tooltip>
       </div>
     );
   }
@@ -301,7 +327,7 @@ function SidebarLink({
         active ? "bg-primary/[0.04] border-primary/[0.08] text-primary font-bold dark:bg-primary-light dark:border-transparent" : ""
       }`}
     >
-      <Link href={href}>
+      <Link href={href} aria-current={active ? "page" : undefined}>
         <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? "text-primary" : ""}`} />
         <span>{label}</span>
       </Link>
@@ -339,18 +365,14 @@ function SubItemBranchLine({ isLast }: { isLast: boolean }) {
 export function AppSidebar() {
   const pathname = usePathname();
   const { lang } = useLanguage();
-  const { state: sidebarState, toggleSidebar } = useSidebar();
-  const isCollapsed = sidebarState === "collapsed";
-
-  // Collapsible sub-menus state
-  const [employeesOpen, setEmployeesOpen] = useState(true);
-  const [itemsOpen, setItemsOpen] = useState(true);
-  const [eventsOpen, setEventsOpen] = useState(true);
-  const [financeOpen, setFinanceOpen] = useState(true);
+  const { state: sidebarState, isMobile, toggleSidebar, setOpenMobile } = useSidebar();
+  const isCollapsed = !isMobile && sidebarState === "collapsed";
+  const sectionId = useId();
 
   const t = useMemo(() => (key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
 
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const { sections, persistence, setSection, setSections } = useSidebarPreferences(user?.id);
 
   const navState = useMemo(() => {
     return buildSidebarNavState({
@@ -365,21 +387,40 @@ export function AppSidebar() {
   const isFinanceActive = navState.financeLinks.some(l => l.active);
   const isRefDataActive = navState.refDataLinks.some(l => l.active);
   const isInventoryActive = navState.inventoryLinks.some(l => l.active);
-  const [refDataManuallyOpen, setRefDataManuallyOpen] = useState(false);
-  const refDataOpen = isRefDataActive || refDataManuallyOpen;
+  const employeesOpen = sections.employees ?? true;
+  const eventsOpen = sections.events ?? true;
+  const financeOpen = sections.finance ?? true;
+  const itemsOpen = sections.inventory ?? true;
+  const refDataOpen = sections["reference-data"] ?? isRefDataActive;
+  const visibleSectionIds = getVisibleSidebarSectionIds(navState);
+  const adminNavigation = navState.adminLink && (
+    <SidebarMenu className={isCollapsed ? "items-center" : ""}>
+      <SidebarMenuItem className="w-full flex justify-center">
+        <SidebarLink
+          href={navState.adminLink.href}
+          icon={HiCog6Tooth}
+          label={navState.adminLink.label}
+          active={navState.adminLink.active}
+          isCollapsed={isCollapsed}
+        />
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
 
   return (
     <Sidebar
       collapsible="icon"
+      mobileTitle="Dream Lux"
       className="border-none bg-transparent [&_[data-sidebar=sidebar]]:border-none [&_[data-sidebar=sidebar]]:bg-transparent [&_[data-sidebar=sidebar]]:shadow-none"
     >
       {/* Header - Logo & Collapse Toggle */}
-      <SidebarHeader className={`py-5 flex flex-row items-center justify-between select-none ${isCollapsed ? "px-0 justify-center" : "px-4"}`}>
+      <SidebarHeader className={`py-5 hidden md:flex flex-row items-center justify-between select-none ${isCollapsed ? "px-0 justify-center" : "px-4"}`}>
         {isCollapsed ? (
           <button
-            onClick={toggleSidebar}
+            onClick={(event) => toggleSidebar(event.currentTarget)}
             className="w-10 h-10 rounded-xl bg-foreground flex items-center justify-center text-background font-bold text-lg shrink-0 hover:opacity-90 transition-all cursor-pointer active:scale-95 shadow-md border border-border/10"
-            title="Expand Sidebar"
+            aria-label={t("Expand Sidebar")}
+            title={t("Expand Sidebar")}
           >
             D
           </button>
@@ -387,9 +428,10 @@ export function AppSidebar() {
           <>
             <div className="flex items-center gap-3 truncate">
               <button
-                onClick={toggleSidebar}
+                onClick={(event) => toggleSidebar(event.currentTarget)}
                 className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center text-background font-bold text-base shrink-0 hover:opacity-90 transition-all cursor-pointer active:scale-95 shadow-md border border-border/10"
-                title="Collapse Sidebar"
+                aria-label={t("Collapse Sidebar")}
+                title={t("Collapse Sidebar")}
               >
                 D
               </button>
@@ -404,9 +446,10 @@ export function AppSidebar() {
             </div>
 
             <button
-              onClick={toggleSidebar}
+              onClick={(event) => toggleSidebar(event.currentTarget)}
               className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-foreground hover:bg-card-alt transition-all cursor-pointer shrink-0"
-              title="Collapse Sidebar"
+              aria-label={t("Collapse Sidebar")}
+              title={t("Collapse Sidebar")}
             >
               <HiChevronLeft className="w-4 h-4" />
             </button>
@@ -415,15 +458,50 @@ export function AppSidebar() {
       </SidebarHeader>
 
       {/* Content Groupings */}
-      <SidebarContent className="py-2">
+      <SidebarContent
+        className="py-2"
+        onClickCapture={(event) => {
+          if (isMobile && event.target instanceof Element && event.target.closest("a[href]")) setOpenMobile(false);
+        }}
+      >
+        {visibleSectionIds.length > 0 && (
+          <div data-sidebar="section-controls" className="flex shrink-0 gap-2 px-2 pb-2">
+            {[
+              { open: true, label: "Expand all", name: "Expand all sections", icon: HiChevronDoubleDown },
+              { open: false, label: "Collapse all", name: "Collapse all sections", icon: HiChevronDoubleUp },
+            ].map(({ open, label, name, icon: Icon }) => (
+              <Tooltip key={label}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={t(name)}
+                    onClick={() => setSections(visibleSectionIds, open)}
+                    className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-border px-2 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt md:h-8"
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    {!isCollapsed && <span>{t(label)}</span>}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent hidden={!isCollapsed} side="right" sideOffset={8} className="motion-reduce:animate-none">
+                  {t(name)}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        )}
+        {persistence === "session" && (
+          <p role="status" className={isCollapsed ? "sr-only" : "px-3 pb-2 text-xs text-foreground"}>
+            {t("Session preferences")}
+          </p>
+        )}
         {/* HR Management Section */}
         {navState.showHRGroup && (
           <SidebarGroup>
-            <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
+            <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted group-data-[collapsible=icon]:hidden">
               {t("HR Management")}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
+              <SidebarMenu className={`${isCollapsed ? "items-center md:gap-2" : ""}`}>
                 {/* Employees (Nested) — expanded vs collapsed */}
                 {navState.showEmployeesMenu && (
                   <SidebarMenuItem className="w-full flex justify-center">
@@ -437,10 +515,13 @@ export function AppSidebar() {
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
-                          onClick={() => setEmployeesOpen(!employeesOpen)}
+                          data-nav-section="employees"
+                          aria-expanded={employeesOpen}
+                          aria-controls={`${sectionId}-employees`}
+                          onClick={() => setSection("employees", !employeesOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isEmployeesActive
-                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              ? "bg-primary-light border-primary/20 text-foreground font-bold rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
@@ -457,16 +538,17 @@ export function AppSidebar() {
                           </span>
                         </SidebarMenuButton>
                         {employeesOpen && (
-                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                          <SidebarMenuSub id={`${sectionId}-employees`} className="ml-[27px] border-none pl-3.5 mt-2 md:mt-1 relative">
                             {navState.employeesLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
                                 <SubItemBranchLine isLast={idx === navState.employeesLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
                                   <Link
                                     href={link.href}
+                                    aria-current={link.active ? "page" : undefined}
                                     className={
                                       link.active
-                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        ? "text-foreground font-bold flex items-center gap-1.5"
                                         : "text-muted flex items-center gap-1.5"
                                     }
                                   >
@@ -500,10 +582,13 @@ export function AppSidebar() {
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
-                          onClick={() => setEventsOpen(!eventsOpen)}
+                          data-nav-section="events"
+                          aria-expanded={eventsOpen}
+                          aria-controls={`${sectionId}-events`}
+                          onClick={() => setSection("events", !eventsOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isEventsActive
-                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              ? "bg-primary-light border-primary/20 text-foreground font-bold rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
@@ -520,16 +605,17 @@ export function AppSidebar() {
                           </span>
                         </SidebarMenuButton>
                         {eventsOpen && (
-                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                          <SidebarMenuSub id={`${sectionId}-events`} className="ml-[27px] border-none pl-3.5 mt-2 md:mt-1 relative">
                             {navState.eventLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
                                 <SubItemBranchLine isLast={idx === navState.eventLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
                                   <Link
                                     href={link.href}
+                                    aria-current={link.active ? "page" : undefined}
                                     className={
                                       link.active
-                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        ? "text-foreground font-bold flex items-center gap-1.5"
                                         : "text-muted flex items-center gap-1.5"
                                     }
                                   >
@@ -563,10 +649,13 @@ export function AppSidebar() {
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
-                          onClick={() => setFinanceOpen(!financeOpen)}
+                          data-nav-section="finance"
+                          aria-expanded={financeOpen}
+                          aria-controls={`${sectionId}-finance`}
+                          onClick={() => setSection("finance", !financeOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isFinanceActive
-                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              ? "bg-primary-light border-primary/20 text-foreground font-bold rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
@@ -583,16 +672,17 @@ export function AppSidebar() {
                           </span>
                         </SidebarMenuButton>
                         {financeOpen && (
-                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                          <SidebarMenuSub id={`${sectionId}-finance`} className="ml-[27px] border-none pl-3.5 mt-2 md:mt-1 relative">
                             {navState.financeLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
                                 <SubItemBranchLine isLast={idx === navState.financeLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
                                   <Link
                                     href={link.href}
+                                    aria-current={link.active ? "page" : undefined}
                                     className={
                                       link.active
-                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        ? "text-foreground font-bold flex items-center gap-1.5"
                                         : "text-muted flex items-center gap-1.5"
                                     }
                                   >
@@ -626,10 +716,13 @@ export function AppSidebar() {
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
-                          onClick={() => setRefDataManuallyOpen((open) => !open)}
+                          data-nav-section="reference-data"
+                          aria-expanded={refDataOpen}
+                          aria-controls={`${sectionId}-reference-data`}
+                          onClick={() => setSection("reference-data", !refDataOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isRefDataActive
-                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-xl dark:border-transparent dark:rounded-xl"
+                              ? "bg-primary-light border-primary/20 text-foreground font-bold rounded-xl"
                               : "rounded-xl"
                           }`}
                         >
@@ -646,16 +739,17 @@ export function AppSidebar() {
                           </span>
                         </SidebarMenuButton>
                         {refDataOpen && (
-                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                          <SidebarMenuSub id={`${sectionId}-reference-data`} className="ml-[27px] border-none pl-3.5 mt-2 md:mt-1 relative">
                             {navState.refDataLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
                                 <SubItemBranchLine isLast={idx === navState.refDataLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-xl">
                                   <Link
                                     href={link.href}
+                                    aria-current={link.active ? "page" : undefined}
                                     className={
                                       link.active
-                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        ? "text-foreground font-bold flex items-center gap-1.5"
                                         : "text-muted flex items-center gap-1.5"
                                     }
                                   >
@@ -683,11 +777,11 @@ export function AppSidebar() {
         {/* Inventory Management Section */}
         {navState.showInventoryGroup && (
           <SidebarGroup>
-            <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted/60 group-data-[collapsible=icon]:hidden">
+            <SidebarGroupLabel className="px-4 text-[10px] font-semibold tracking-widest uppercase text-muted group-data-[collapsible=icon]:hidden">
               {t("Inventory Management")}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className={`${isCollapsed ? "items-center gap-2" : ""}`}>
+              <SidebarMenu className={`${isCollapsed ? "items-center md:gap-2" : ""}`}>
 
 
                 {/* Items (Nested) */}
@@ -703,10 +797,13 @@ export function AppSidebar() {
                     ) : (
                       <div className="w-full">
                         <SidebarMenuButton
-                          onClick={() => setItemsOpen(!itemsOpen)}
+                          data-nav-section="inventory"
+                          aria-expanded={itemsOpen}
+                          aria-controls={`${sectionId}-inventory`}
+                          onClick={() => setSection("inventory", !itemsOpen)}
                           className={`w-full justify-between h-10 border border-transparent transition-all ${
                             isInventoryActive
-                              ? "bg-primary-light border-l-2 border-primary text-primary font-bold rounded-l-none rounded-r-md dark:border-transparent dark:rounded-md"
+                              ? "bg-primary-light border-primary/20 text-foreground font-bold rounded-md"
                               : "rounded-md"
                           }`}
                         >
@@ -723,16 +820,17 @@ export function AppSidebar() {
                           </span>
                         </SidebarMenuButton>
                         {itemsOpen && (
-                          <SidebarMenuSub className="ml-[27px] border-none pl-3.5 space-y-0.5 mt-1 relative">
+                          <SidebarMenuSub id={`${sectionId}-inventory`} className="ml-[27px] border-none pl-3.5 mt-2 md:mt-1 relative">
                             {navState.inventoryLinks.map((link, idx) => (
                               <SidebarMenuSubItem key={link.href} className="relative">
                                 <SubItemBranchLine isLast={idx === navState.inventoryLinks.length - 1} />
                                 <SidebarMenuSubButton asChild isActive={link.active} className="rounded-md">
                                   <Link
                                     href={link.href}
+                                    aria-current={link.active ? "page" : undefined}
                                     className={
                                       link.active
-                                        ? "text-primary font-bold flex items-center gap-1.5"
+                                        ? "text-foreground font-bold flex items-center gap-1.5"
                                         : "text-muted flex items-center gap-1.5"
                                     }
                                   >
@@ -820,24 +918,18 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+        {isMobile && adminNavigation && (
+          <SidebarFooter className="border-t border-border/50 p-3 shrink-0">
+            {adminNavigation}
+          </SidebarFooter>
+        )}
       </SidebarContent>
 
-      {/* Footer - Admin Settings */}
-      <SidebarFooter className="border-t border-border/50 p-3 shrink-0">
-        {navState.adminLink && (
-          <SidebarMenu className={`${isCollapsed ? "items-center" : ""}`}>
-            <SidebarMenuItem className="w-full flex justify-center">
-              <SidebarLink
-                href={navState.adminLink.href}
-                icon={HiCog6Tooth}
-                label={navState.adminLink.label}
-                active={navState.adminLink.active}
-                isCollapsed={isCollapsed}
-              />
-            </SidebarMenuItem>
-          </SidebarMenu>
-        )}
-      </SidebarFooter>
+      {!isMobile && (
+        <SidebarFooter className="border-t border-border/50 p-3 shrink-0">
+          {adminNavigation}
+        </SidebarFooter>
+      )}
     </Sidebar>
   );
 }

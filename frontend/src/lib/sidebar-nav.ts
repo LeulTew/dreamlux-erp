@@ -1,6 +1,7 @@
 export { createPermissionMatcher } from "@/lib/permission-matcher";
 import type { PermissionChecker } from "@/lib/permission-matcher";
 import { hasAnyPermission } from "@/lib/permission-matcher";
+import type { SidebarSectionId } from "@/lib/sidebar-preferences";
 
 export type SidebarNavLink = {
   href: string;
@@ -25,6 +26,18 @@ export type SidebarNavState = {
   reportsLink: SidebarNavLink | null;
   adminLink: SidebarNavLink | null;
 };
+
+export function getVisibleSidebarSectionIds(nav: SidebarNavState): SidebarSectionId[] {
+  const ids: SidebarSectionId[] = [];
+  if (nav.showHRGroup) {
+    if (nav.showEmployeesMenu) ids.push("employees");
+    if (nav.eventLinks.length > 0) ids.push("events");
+    if (nav.financeLinks.length > 0) ids.push("finance");
+    if (nav.refDataLinks.length > 0) ids.push("reference-data");
+  }
+  if (nav.showInventoryGroup && nav.inventoryLinks.length > 0) ids.push("inventory");
+  return ids;
+}
 
 const HR_GROUP_PERMISSIONS = [
   "hr:read",
