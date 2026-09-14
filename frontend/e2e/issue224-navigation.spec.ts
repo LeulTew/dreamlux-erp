@@ -264,6 +264,73 @@ test("collapsed scrolling and popover collisions remain bounded in short desktop
   await expect(page.locator('[data-slot="sidebar-mobile-entry"]')).toBeHidden();
 });
 
+for (const preference of ["reduce", "no-preference"] as const) {
+  test(`mobile navigation computes open and close motion for ${preference}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.emulateMedia({ reducedMotion: preference });
+    await initialize(page, { collapsed: true });
+    const entry = page.locator('[data-slot="sidebar-mobile-entry"] button');
+    await entry.click();
+    const sheet = page.getByRole("dialog", { name: "Dream Lux", exact: true });
+    await expect(sheet).toBeVisible();
+    const opened = await sheet.evaluate((element) => {
+      const sample = () => {
+        const style = getComputedStyle(element);
+        return {
+          connected: element.isConnected,
+          state: element.getAttribute("data-state"),
+          animationName: style.animationName,
+          animationDuration: style.animationDuration,
+          transitionProperty: style.transitionProperty,
+          transitionDuration: style.transitionDuration,
+          transform: style.transform,
+          opacity: style.opacity,
+          runningAnimations: element.getAnimations().filter((animation) => animation.playState === "running").length,
+        };
+      };
+      const result = sample();
+      const setAttribute = element.setAttribute;
+      // Sample the actual close commit before Radix immediately unmounts a nonanimated sheet.
+      element.setAttribute = function (name, value) {
+        setAttribute.call(this, name, value);
+        if (name === "data-state" && value === "closed") {
+          document.body.dataset.sidebarCloseMotion = JSON.stringify(sample());
+          element.setAttribute = setAttribute;
+        }
+      };
+      return result;
+    });
+    await sheet.getByRole("button", { name: english.done, exact: true }).click();
+    const closed = await page.evaluate(() => {
+      const recorded = document.body.dataset.sidebarCloseMotion;
+      if (!recorded) throw new Error("The mobile sheet's actual close state was not sampled");
+      delete document.body.dataset.sidebarCloseMotion;
+      return JSON.parse(recorded);
+    });
+    await testInfo.attach("navigation-motion", { body: JSON.stringify({ preference, opened, closed }), contentType: "application/json" });
+    expect(opened).toMatchObject({ connected: true, state: "open" });
+    expect(closed).toMatchObject({ connected: true, state: "closed" });
+    if (preference === "reduce") {
+      for (const sample of [opened, closed]) {
+        expect(sample).toMatchObject({
+          animationName: "none",
+          animationDuration: "0s",
+          transitionProperty: "none",
+          transform: "none",
+          opacity: "1",
+          runningAnimations: 0,
+        });
+      }
+    } else {
+      expect(opened).toMatchObject({ animationName: "enter", animationDuration: "0.2s", transitionDuration: "0.2s" });
+      expect(closed).toMatchObject({ animationName: "exit", animationDuration: "0.2s", transitionDuration: "0.2s" });
+    }
+    await expect(sheet).toBeHidden();
+    await expect(entry).toBeFocused();
+    expect(await page.evaluate(() => document.cookie)).toContain("sidebar_state=false");
+  });
+}
+
 test.describe("mobile navigation geometry", () => {
   test.use({ hasTouch: true });
   for (const viewport of [

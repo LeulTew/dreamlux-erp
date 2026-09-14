@@ -51,6 +51,15 @@ and exposes an in-layout lower navigation entry. Only the sheet handle accepts
 downward dismissal; close, Done, Escape and backdrop dismissal restore the
 opening control's focus.
 
+Under `prefers-reduced-motion: reduce`, the mobile navigation sheet content
+opens and closes instantly. State-qualified reduced-motion rules take
+precedence over the shared sheet's open/closed animations without `!important`
+or duration overrides; transitions are disabled by `transition-property: none`.
+Normal motion retains the existing 200ms enter/exit behavior. The shared sheet
+primitive and backdrop are unchanged. Browser regressions sample computed styles while the
+sheet is mounted on open and during the actual close commit before Radix
+unmounts it, rather than only setting the media preference.
+
 Targeted checks from this folder:
 
 ```powershell

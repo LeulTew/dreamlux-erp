@@ -258,7 +258,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-full min-h-0 max-h-[calc(100dvh-1rem)] gap-0 overflow-hidden rounded-t-2xl bg-sidebar p-0 text-sidebar-foreground shadow-none data-[side=bottom]:h-[min(90dvh,44rem)] motion-reduce:animate-none motion-reduce:transition-none"
+          className="w-full min-h-0 max-h-[calc(100dvh-1rem)] gap-0 overflow-hidden rounded-t-2xl bg-sidebar p-0 text-sidebar-foreground shadow-none data-[side=bottom]:h-[min(90dvh,44rem)] data-open:motion-reduce:animate-none data-closed:motion-reduce:animate-none motion-reduce:transition-none"
           side="bottom"
           showCloseButton={false}
           onCloseAutoFocus={(event) => {
