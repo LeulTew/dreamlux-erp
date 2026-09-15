@@ -20,7 +20,7 @@ export default function ToastTestSupportPage() {
           toast.custom(
             (t) => (
               <PremiumToast
-                t={{ ...t, duration: 4_000 }}
+                t={t}
                 title="Inventory saved"
                 description="The e2e toast can be paused and resumed."
                 type="success"
@@ -30,7 +30,7 @@ export default function ToastTestSupportPage() {
                 }}
               />
             ),
-            { duration: 4_000 },
+            { duration: 4_000, durationOwner: "renderer" },
           );
         }}
       >
