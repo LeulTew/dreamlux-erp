@@ -1,5 +1,5 @@
 import React from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Toaster, toast as sonnerToast } from "sonner";
 import toast, { notify } from "./toast";
@@ -68,6 +68,48 @@ describe("notification lifetime with the real Sonner host", () => {
     expect(screen.getByText(/close in 1 seconds/)).toBeVisible();
     await advance(1_500);
     expect(screen.queryByText("Inventory saved")).not.toBeInTheDocument();
+  });
+
+  it("expires a running sibling independently while preserving a paused notification's remaining budget", async () => {
+    let pausedId: string | number = "";
+    let runningId: string | number = "";
+    await show(() => { pausedId = toast.info("Paused notification A", { duration: 4_000 }); });
+    const pausedNotification = within(screen.getByRole("listitem"));
+    await advance(1_000);
+    const pause = pausedNotification.getByRole("button", { name: "Pause notification countdown" });
+    expect(pause).toHaveTextContent("This message will close in 3 seconds.");
+    fireEvent.click(pause);
+    const outside = screen.getByRole("button", { name: "Outside notification" });
+    outside.focus();
+    expect(outside).toHaveFocus();
+
+    await show(() => { runningId = toast.success("Running notification B", { duration: 1_000 }); });
+    expect(runningId).not.toBe(pausedId);
+    expect(sonnerToast.getToasts().map(({ id }) => id)).toEqual(expect.arrayContaining([pausedId, runningId]));
+    const runningHost = screen.getByText("Running notification B").closest("li");
+    if (!runningHost) throw new Error("Running notification B has no Sonner host");
+    const runningNotification = within(runningHost);
+    expect(runningNotification.getByRole("button", { name: "Pause notification countdown" }))
+      .toHaveTextContent("This message will close in 1 seconds.");
+    await advance(999);
+    expect(runningNotification.getByText("Running notification B")).toBeVisible();
+    await advance(501);
+    expect(screen.queryByText("Running notification B")).not.toBeInTheDocument();
+    expect(pausedNotification.getByRole("button", { name: "Resume notification countdown" })).toBeVisible();
+    await advance(3_500);
+    expect(outside).toHaveFocus();
+    expect(pausedNotification.getByText("Paused notification A")).toBeVisible();
+    const resume = pausedNotification.getByRole("button", { name: "Resume notification countdown" });
+    expect(resume).toBeVisible();
+
+    fireEvent.click(resume);
+    expect(pausedNotification.getByRole("button", { name: "Pause notification countdown" }))
+      .toHaveTextContent("This message will close in 3 seconds.");
+    await advance(2_999);
+    expect(pausedNotification.getByText("Paused notification A")).toBeVisible();
+    await advance(501);
+    expect(screen.queryByText("Paused notification A")).not.toBeInTheDocument();
+    expect(screen.queryByText("Running notification B")).not.toBeInTheDocument();
   });
 
   it.each(variants)("$type preserves its default duration and ID contract", async ({ type, duration }) => {
