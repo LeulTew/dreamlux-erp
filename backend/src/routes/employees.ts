@@ -709,12 +709,12 @@ router.patch(
       const updates: Record<string, unknown> = {
         full_name,
         employee_id,
-        department_id: department_id || null,
-        office_id: office_id || null,
+        ...(Object.hasOwn(req.body, "department_id") ? { department_id: department_id || null } : {}),
+        ...(Object.hasOwn(req.body, "office_id") ? { office_id: office_id || null } : {}),
         phone,
         email,
         commission: commission ? Number(commission) : undefined,
-        salary_level: salary_level || null,
+        ...(Object.hasOwn(req.body, "salary_level") ? { salary_level: salary_level || null } : {}),
         compensation_mode,
         event_prices: parsedEventPrices,
         updated_at: new Date().toISOString()

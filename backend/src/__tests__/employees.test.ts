@@ -9,6 +9,7 @@ import request from "supertest";
 import { NotificationsService } from "../services/notifications-service";
 
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
+const employeeWrites: Record<string, unknown>[] = [];
 
 mock.module("../db/pool", () => ({
   pool: { query: mockQuery, connect: mock(() => Promise.resolve({ release: mock(() => {}), query: mockQuery })) },
@@ -24,7 +25,10 @@ export const fakeChain = (isSingle = false): any => {
     or: () => fakeChain(isSingle),
     order: () => fakeChain(isSingle),
     range: () => fakeChain(isSingle),
-    update: () => fakeChain(isSingle),
+    update: (values: Record<string, unknown>) => {
+      employeeWrites.push({ ...values });
+      return fakeChain(isSingle);
+    },
     insert: () => fakeChain(isSingle),
     delete: () => fakeChain(isSingle),
     in: () => fakeChain(isSingle),
@@ -84,6 +88,83 @@ describe("Employees API", () => {
     mockQuery.mockReset();
     mockUploadImage.mockReset();
     mockDeleteImage.mockReset();
+    employeeWrites.length = 0;
+  });
+
+  describe("partial employee setup preservation", () => {
+    const existing = {
+      id: "23700000-0000-4000-8000-000000000001",
+      employee_id: "EMP-PARTIAL", full_name: "Original employee",
+      department_id: "23700000-0000-4000-8000-000000000002",
+      office_id: "23700000-0000-4000-8000-000000000003",
+      salary_level: "L1", compensation_mode: "commission_only", event_prices: {},
+    };
+    function prepare() {
+      mockQuery.mockResolvedValueOnce({ rows: [{ ...existing }] });
+      mockQuery.mockImplementationOnce(async () => {
+        const write = employeeWrites.at(-1);
+        if (!write) throw new Error("Expected an observed employee persistence call");
+        return { rows: [{ ...existing, ...write }] };
+      });
+    }
+
+    test.each(["json", "multipart"])("%s name-only edit preserves every omitted setup field", async (format) => {
+      prepare();
+      const call = request(app).patch(`/employees/${existing.id}`)
+        .set("Authorization", `Bearer ${getToken()}`);
+      const response = await (format === "json"
+        ? call.send({ full_name: "Updated employee" })
+        : call.field("full_name", "Updated employee"));
+      expect(response.status).toBe(200);
+      expect(employeeWrites).toHaveLength(1);
+      for (const key of ["department_id", "office_id", "salary_level"]) {
+        expect(employeeWrites[0]).not.toHaveProperty(key);
+      }
+      expect(response.body).toMatchObject({ ...existing, full_name: "Updated employee" });
+    });
+
+    test("an explicit blank clears all three fields even when parsed values become undefined", async () => {
+      prepare();
+      const response = await request(app).patch(`/employees/${existing.id}`)
+        .set("Authorization", `Bearer ${getToken()}`)
+        .field("department_id", "").field("office_id", "").field("salary_level", "");
+      expect(response.status).toBe(200);
+      expect(employeeWrites[0]).toMatchObject({ department_id: null, office_id: null, salary_level: null });
+      expect(response.body).toMatchObject({ department_id: null, office_id: null, salary_level: null });
+    });
+
+    test("a supplied full update preserves validated values, zero commission and empty event prices", async () => {
+      prepare();
+      const update = {
+        full_name: "Full update",
+        department_id: "23700000-0000-4000-8000-000000000004",
+        office_id: "23700000-0000-4000-8000-000000000005",
+        salary_level: "L2", compensation_mode: "regular", commission: "0", event_prices: {},
+      };
+      const response = await request(app).patch(`/employees/${existing.id}`)
+        .set("Authorization", `Bearer ${getToken()}`).send(update);
+      expect(response.status).toBe(200);
+      expect(employeeWrites[0]).toMatchObject({ ...update, commission: 0 });
+      expect(response.body).toMatchObject({ ...update, commission: 0 });
+    });
+
+    test("clearing one field leaves the other setup fields unchanged", async () => {
+      prepare();
+      const response = await request(app).patch(`/employees/${existing.id}`)
+        .set("Authorization", `Bearer ${getToken()}`).send({ office_id: "" });
+      expect(response.status).toBe(200);
+      expect(employeeWrites[0]).toMatchObject({ office_id: null });
+      expect(employeeWrites[0]).not.toHaveProperty("department_id");
+      expect(employeeWrites[0]).not.toHaveProperty("salary_level");
+      expect(response.body).toMatchObject({ department_id: existing.department_id, office_id: null, salary_level: "L1" });
+    });
+
+    test.each(["department_id", "office_id", "salary_level"])("invalid explicit null %s is still rejected", async (key) => {
+      const response = await request(app).patch(`/employees/${existing.id}`)
+        .set("Authorization", `Bearer ${getToken()}`).send({ [key]: null });
+      expect(response.status).toBe(400);
+      expect(employeeWrites).toEqual([]);
+    });
   });
 
   test("GET /employees returns list", async () => {
