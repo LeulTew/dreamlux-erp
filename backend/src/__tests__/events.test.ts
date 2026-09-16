@@ -3336,6 +3336,8 @@ describe("Events API", () => {
 
   test("PATCH /events/expenses/:expenseId/review approves pending expense", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // SET LOCAL
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1" }], rowCount: 1 }); // parent lock
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "expense-1", event_id: "event-1", category: "Fuel", amount: 1200, status: "Pending" }],
       rowCount: 1,
@@ -3368,6 +3370,8 @@ describe("Events API", () => {
 
   test("PATCH /events/expenses/:expenseId/review locks approved expenses", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // SET LOCAL
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1" }], rowCount: 1 }); // parent lock
     mockQuery.mockResolvedValueOnce({
       rows: [{ id: "expense-1", status: "Approved" }],
       rowCount: 1,
@@ -3381,6 +3385,110 @@ describe("Events API", () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error).toContain("Approved expenses are locked");
+  });
+
+  describe("expense review transaction failures", () => {
+    function prepareReview(status = "Pending") {
+      const query = async (sql: string, params?: unknown[]) => {
+        if (sql.includes("SELECT e.id FROM events")) {
+          return { rows: [{ id: "event-1" }], rowCount: 1 };
+        }
+        if (sql.includes("SELECT exp.*")) {
+          return {
+            rows: [{ id: "expense-1", event_id: "event-1", category: "Fuel", amount: "1200.00", status }],
+            rowCount: 1,
+          };
+        }
+        if (sql.includes("UPDATE expenses")) {
+          return { rows: [{ id: "expense-1", status: params?.[0] }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 0 };
+      };
+      mockQuery.mockImplementation(query);
+      return query;
+    }
+
+    const approve = () => request(app)
+      .patch("/events/expenses/expense-1/review")
+      .set("Authorization", `Bearer ${getToken("ACCOUNTANT")}`)
+      .send({ status: "Approved" });
+
+    test("re-review keeps the actual previous status and event-then-expense lock order", async () => {
+      prepareReview("Rejected");
+      const res = await approve();
+      expect(res.status).toBe(200);
+      const calls = mockQuery.mock.calls;
+      const parentIndex = calls.findIndex(([sql]) => sql.includes("FOR UPDATE OF e"));
+      const expenseIndex = calls.findIndex(([sql]) => sql.includes("FOR UPDATE OF exp"));
+      expect(parentIndex).toBeGreaterThan(-1);
+      expect(expenseIndex).toBeGreaterThan(parentIndex);
+      expect(calls[expenseIndex][1]).toEqual(["expense-1", "event-1"]);
+      expect(calls.find(([sql]) => sql.includes("UPDATE expenses"))?.[0]).toContain("status IS DISTINCT FROM 'Approved'");
+      expect(calls.find(([sql]) => sql.includes("INSERT INTO event_logs"))?.[1]?.[3])
+        .toBe("Rejected (ID: expense-1, Category: Fuel, Amount: 1200.00)");
+    });
+
+    test("approval permission remains mandatory before acquiring a connection", async () => {
+      const res = await request(app)
+        .patch("/events/expenses/expense-1/review")
+        .set("Authorization", `Bearer ${getToken("EVENT_MANAGER")}`)
+        .send({ status: "Approved" });
+      expect(res.status).toBe(403);
+      expect(mockConnect).not.toHaveBeenCalled();
+    });
+
+    test("lock timeout returns explicit non-uncertain reload guidance", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      mockQuery.mockRejectedValueOnce(Object.assign(new Error("busy"), { code: "55P03" }));
+      const res = await approve();
+      expect(res.status).toBe(503);
+      expect(res.body.outcome_uncertain).toBe(false);
+      expect(res.body.error).toContain("Reload");
+      expect(mockQuery.mock.calls.filter(([sql]) => sql === "ROLLBACK")).toHaveLength(1);
+      expect(mockRelease).toHaveBeenCalledWith(false);
+    });
+
+    test("audit failure rolls back, logs no success and discards a failed rollback lease", async () => {
+      const normal = prepareReview();
+      mockQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
+        if (sql.includes("INSERT INTO event_logs")) throw new Error("audit failed");
+        if (sql === "ROLLBACK") throw new Error("rollback acknowledgement lost");
+        return normal(sql, params);
+      });
+      const res = await approve();
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe("Failed to review expense");
+      expect(mockQuery.mock.calls.filter(([sql]) => sql === "COMMIT")).toHaveLength(0);
+      expect(mockQuery.mock.calls.filter(([sql]) => sql === "ROLLBACK")).toHaveLength(1);
+      expect(mockRelease).toHaveBeenCalledWith(true);
+    });
+
+    test("failed early rollback is not retried or returned to the pool", async () => {
+      const normal = prepareReview("Approved");
+      mockQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
+        if (sql === "ROLLBACK") throw new Error("rollback acknowledgement lost");
+        return normal(sql, params);
+      });
+      const res = await approve();
+      expect(res.status).toBe(500);
+      expect(mockQuery.mock.calls.filter(([sql]) => sql === "ROLLBACK")).toHaveLength(1);
+      expect(mockRelease).toHaveBeenCalledWith(true);
+    });
+
+    test("lost COMMIT acknowledgement never claims rollback or automatically retries", async () => {
+      const normal = prepareReview();
+      mockQuery.mockImplementation(async (sql: string, params?: unknown[]) => {
+        if (sql === "COMMIT") throw new Error("connection lost");
+        return normal(sql, params);
+      });
+      const res = await approve();
+      expect(res.status).toBe(503);
+      expect(res.body.outcome_uncertain).toBe(true);
+      expect(res.body.error).toContain("Reload before retrying");
+      expect(mockQuery.mock.calls.filter(([sql]) => sql.includes("UPDATE expenses"))).toHaveLength(1);
+      expect(mockRelease).toHaveBeenCalledWith(true);
+    });
   });
 
   test("POST /events/:id/expenses/generate-labor creates labor expense from attended assignments", async () => {
@@ -4523,6 +4631,7 @@ describe("Events API", () => {
     test("PATCH /events/expenses/:expenseId/review blocks reviews on soft-deleted events", async () => {
       // Test Case 1: Expense or event doesn't exist/deleted -> 404
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // SET LOCAL
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // JOIN select query (not found or deleted)
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
 
@@ -4537,6 +4646,8 @@ describe("Events API", () => {
       // Test Case 2: Success case - approves active event expense and inserts audit log
       mockQuery.mockReset();
       mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
+      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // SET LOCAL
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1" }], rowCount: 1 }); // parent lock
       mockQuery.mockResolvedValueOnce({
         rows: [{ id: "expense-1", event_id: "event-1", category: "Fuel", amount: 1200, status: "Pending" }],
         rowCount: 1,
