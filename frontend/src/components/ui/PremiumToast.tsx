@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { toast as sonnerDismiss } from "sonner";
 import {
   HiOutlineCheckCircle,
@@ -28,36 +28,70 @@ export function PremiumToast({ t, title, description, type, actionLabel, onActio
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Use the toast's duration if defined, otherwise default to 6000ms
-  const duration = t.duration || 6000;
+  const duration = Math.max(0, t.duration || 6000);
   const [timeLeft, setTimeLeft] = useState(duration);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const remainingRef = useRef(duration);
+  const stopTimerRef = useRef<() => void>(() => {});
+  const dismissedRef = useRef(false);
+  const actionInFlightRef = useRef(false);
+
+  const dismiss = useCallback((action?: () => void) => {
+    if (dismissedRef.current || actionInFlightRef.current) return;
+    if (action) {
+      actionInFlightRef.current = true;
+      try {
+        action();
+      } finally {
+        actionInFlightRef.current = false;
+      }
+    }
+    dismissedRef.current = true;
+    stopTimerRef.current();
+    sonnerDismiss.dismiss(t.id);
+  }, [t.id]);
 
   useEffect(() => {
-    if (isPaused) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
+    if (isPaused || duration === Infinity || dismissedRef.current) return;
 
-    const interval = 100;
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= interval) {
-          clearInterval(timerRef.current!);
-          sonnerDismiss.dismiss(t.id);
-          return 0;
-        }
-        return prev - interval;
-      });
-    }, interval);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+    let lastTick = performance.now();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const updateRemaining = () => {
+      const now = performance.now();
+      remainingRef.current = Math.max(0, remainingRef.current - Math.max(0, now - lastTick));
+      lastTick = now;
     };
-  }, [isPaused, t.id]);
+    const stop = () => {
+      if (!active) return;
+      active = false;
+      clearTimeout(timer);
+      updateRemaining();
+    };
+    const tick = () => {
+      if (!active) return;
+      updateRemaining();
+      setTimeLeft(remainingRef.current);
+      if (remainingRef.current === 0) {
+        dismiss();
+      } else {
+        timer = setTimeout(tick, Math.min(100, remainingRef.current));
+      }
+    };
 
+    stopTimerRef.current = stop;
+    timer = setTimeout(tick, Math.min(100, remainingRef.current));
+    return stop;
+  }, [isPaused, duration, dismiss]);
+
+  const togglePaused = () => {
+    stopTimerRef.current();
+    setTimeLeft(remainingRef.current);
+    setIsPaused(!isPaused);
+  };
+
+  const isPermanent = duration === Infinity;
   const secondsRemaining = Math.max(0, Math.ceil(timeLeft / 1000));
-  const progressPercent = (timeLeft / duration) * 100;
+  const progressPercent = duration > 0 && !isPermanent ? (timeLeft / duration) * 100 : 0;
 
   return (
     <div
@@ -94,7 +128,7 @@ export function PremiumToast({ t, title, description, type, actionLabel, onActio
               )}
               <button
                 type="button"
-                onClick={() => sonnerDismiss.dismiss(t.id)}
+                onClick={() => dismiss()}
                 className="p-1 rounded-lg text-muted hover:text-foreground hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all cursor-pointer"
                 aria-label="Dismiss notification"
               >
@@ -113,10 +147,7 @@ export function PremiumToast({ t, title, description, type, actionLabel, onActio
             <div className="pt-0.5">
               <button
                 type="button"
-                onClick={() => {
-                  onAction();
-                  sonnerDismiss.dismiss(t.id);
-                }}
+                onClick={() => dismiss(onAction)}
                 className="px-4 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-850 text-xs font-semibold text-foreground rounded-lg shadow-sm transition-all active:scale-[0.98] cursor-pointer"
               >
                 {actionLabel}
@@ -127,35 +158,43 @@ export function PremiumToast({ t, title, description, type, actionLabel, onActio
       </div>
 
       {/* Progress Bar & Countdown Hint Footer */}
-      <button
-        type="button"
-        onClick={() => setIsPaused(!isPaused)}
-        className="w-full bg-neutral-50 dark:bg-card-alt hover:bg-neutral-100 dark:hover:bg-border/20 px-4 py-2.5 border-t border-neutral-100 dark:border-border/40 flex justify-between items-center text-left text-[11px] text-muted-foreground select-none cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        aria-label={isPaused ? "Resume notification countdown" : "Pause notification countdown"}
-      >
-        <span>
-          {isPaused ? (
-            <>
-              Paused. <span className="font-bold text-foreground">Click to resume.</span>
-            </>
-          ) : (
-            <>
-              This message will close in {secondsRemaining} seconds.{" "}
-              <span className="font-bold text-foreground">Click to stop.</span>
-            </>
-          )}
-        </span>
-      </button>
+      {isPermanent ? (
+        <div className="w-full bg-neutral-50 dark:bg-card-alt px-4 py-2.5 border-t border-neutral-100 dark:border-border/40 text-[11px] text-muted-foreground">
+          This message stays open until dismissed.
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={togglePaused}
+          className="w-full bg-neutral-50 dark:bg-card-alt hover:bg-neutral-100 dark:hover:bg-border/20 px-4 py-2.5 border-t border-neutral-100 dark:border-border/40 flex justify-between items-center text-left text-[11px] text-muted-foreground select-none cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          aria-label={isPaused ? "Resume notification countdown" : "Pause notification countdown"}
+        >
+          <span>
+            {isPaused ? (
+              <>
+                Paused. <span className="font-bold text-foreground">Click to resume.</span>
+              </>
+            ) : (
+              <>
+                This message will close in {secondsRemaining} seconds.{" "}
+                <span className="font-bold text-foreground">Click to stop.</span>
+              </>
+            )}
+          </span>
+        </button>
+      )}
 
       {/* Full Width Progress Bar at the very bottom */}
-      <div className="w-full h-[3px] bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-        <div
-          className={`h-full transition-all duration-105 ${
-            type === "success" ? "bg-emerald-500" : type === "error" ? "bg-red-500" : "bg-indigo-500"
-          }`}
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
+      {!isPermanent && (
+        <div className="w-full h-[3px] bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-105 ${
+              type === "success" ? "bg-emerald-500" : type === "error" ? "bg-red-500" : "bg-indigo-500"
+            }`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
