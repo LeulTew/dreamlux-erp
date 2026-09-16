@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
   "framework": "nextjs",
   "installCommand": "bun install",
   "buildCommand": "bun run build"

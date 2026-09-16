@@ -31,6 +31,29 @@ bun run lint
 
 - `NEXT_PUBLIC_API_URL` (for example: `http://localhost:4000` locally)
 
+## Shared-ERP audit release hold
+
+Automatic Git deployments from `main` are temporarily disabled in the
+[root](../vercel.json), [backend](../backend/vercel.json) and
+[frontend](./vercel.json) Vercel configurations. Reviewed shared-code backports
+can merge without automatically replacing the live production site before the
+whole-project release gate is complete. Existing routes, services, build
+commands, headers and schedules are unchanged; feature previews retain their
+existing provider behavior.
+
+The hold does not modify the currently deployed application, credentials,
+database or project links, and does not authorize a manual deployment. Remove
+the three holds and their temporary regression check only in a separately
+reviewed release after independent verification, backup/recovery and smoke
+criteria are satisfied. Never copy Koti environment or deployment bindings.
+
+From the repository root, verify the configuration without loading environment
+files or instantiating application clients:
+
+```powershell
+bun --no-env-file test scripts\release-hold.test.ts
+```
+
 ## Shared navigation
 
 The five section choices are device-local, under
