@@ -7,6 +7,14 @@ Issue #195 defines compensation independently from scheduling fields such as `em
 
 Existing employees deliberately migrate to `regular`, preserving current payroll behavior. Every payroll employee line snapshots the applied compensation mode, base salary, commission total, and final total so later employee changes cannot rewrite history.
 
+Employee PATCH preserves omitted department, office and salary-code fields.
+An explicitly supplied, validated blank string still clears that field; it is
+not equivalent to omission. This applies to JSON and multipart requests, so a
+single-field Quick Edit cannot erase unrelated employee setup.
+The shared correction matches LeulTew/koti-catering#262 / LeulTew/koti-catering#263,
+without changing DreamLux's salary code/FK policy, compensation calculation,
+compatibility retries or historical payroll snapshots.
+
 Event commission is eligible only for verified work/attendance. `GET /payroll/eligible-commissions` groups attended assignments by employee and event type for the requested payroll dates, counting each event once and summing its recorded commission. Preview, draft, and finalize rebuild these lines server-side from the same query; client-submitted commission values are not authoritative. Corrections are made on the event assignment, preserving one audited source of truth. Unchecked attendance is excluded.
 
 Event completion records attended commission as the event's labor expense. Payroll snapshots the same earned commission as an employee liability/payment, but the monthly net-profit statement deducts only payroll base-salary snapshots because event commissions are already included in approved event labor expenses. This prevents the same commission from reducing profit twice.
