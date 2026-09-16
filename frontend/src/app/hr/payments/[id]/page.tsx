@@ -16,6 +16,9 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ActivityDrawer from "@/components/ActivityDrawer";
+import PayrollMutationNotice from "@/components/PayrollMutationNotice";
+import { useAuth } from "@/hooks/useAuth";
+import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -34,7 +37,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Mark this run as containing errors? This will help auditors identify discrepancies.": "Mark this run as containing errors? This will help auditors identify discrepancies.",
     "Finalize Payroll": "Finalize Payroll",
     "Confirm Finalization": "Confirm Finalization",
-    "Lock this payroll run and mark it as active? This will finalize all payout totals for this period.": "Lock this payroll run and mark it as active? This will finalize all payout totals for this period.",
+    "Finalization recalculates current salaries and verified attendance for this period. Saved draft totals may change.": "Finalization recalculates current salaries and verified attendance for this period. Saved draft totals may change.",
     "Total Paid": "Total Paid",
     "Employees": "Employees",
     "Average Paid": "Average Paid",
@@ -48,6 +51,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Payroll run moved to trash": "Payroll run moved to trash",
     "Status updated to": "Status updated to",
     "Failed to update status": "Failed to update status",
+    "Updating payroll...": "Updating payroll...",
     "FINALIZED": "FINALIZED",
     "DRAFT": "DRAFT",
     "FLAGGED_WRONG": "FLAGGED WRONG",
@@ -72,7 +76,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Mark this run as containing errors? This will help auditors identify discrepancies.": "ይህ ሩጫ ስህተቶች እንዳሉበት ምልክት ይደረግበት? ይህ ኦዲተሮች ልዩነቶችን እንዲለዩ ይረዳል።",
     "Finalize Payroll": "የክፍያ መዝገብ አጠናቅ",
     "Confirm Finalization": "ማጠናቀቅን አረጋግጥ",
-    "Lock this payroll run and mark it as active? This will finalize all payout totals for this period.": "ይህን የክፍያ ሩጫ ይቆልፉ እና ንቁ መሆኑን ምልክት ያድርጉ? ይህ የዚህን ጊዜ አጠቃላይ ክፍያዎች ያጠናቅቃል።",
+    "Finalization recalculates current salaries and verified attendance for this period. Saved draft totals may change.": "ማጠናቀቅ የዚህን ጊዜ ክፍያ በአሁኑ ደመወዝ እና በተረጋገጠ የተሳትፎ መረጃ ያሰላል። የተቀመጠው ረቂቅ ድምር ሊለወጥ ይችላል።",
     "Total Paid": "በጠቅላላ የተከፈለ",
     "Employees": "ሠራተኞች",
     "Average Paid": "አማካይ የተከፈለ",
@@ -86,6 +90,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Payroll run moved to trash": "የክፍያ ሩጫ ወደ መጣያ ተወስዷል",
     "Status updated to": "ሁኔታው ተሻሽሏል ወደ",
     "Failed to update status": "ሁኔታውን ማሻሻል አልተቻለም",
+    "Updating payroll...": "የክፍያ ለውጥ በማስቀመጥ ላይ...",
     "FINALIZED": "የተጠናቀቀ",
     "DRAFT": "ረቂቅ",
     "FLAGGED_WRONG": "ስህተት የተገኘበት",
@@ -122,6 +127,10 @@ export default function PaymentRunDetailPage() {
   const { id } = useParams() as { id: string };
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { hasPermission, isAuthenticated } = useAuth();
+  const hasPayrollWrite = isAuthenticated && hasPermission("payroll:write");
+  const { begin: beginWrite, complete: completeWrite, fail: failWrite,
+    pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isFlagModalOpen, setIsFlagModalOpen] = useState(false);
@@ -131,14 +140,19 @@ export default function PaymentRunDetailPage() {
 
 
 
-  const { data: run, isLoading, error } = useQuery({
+  const { data: run, isLoading, error, refetch } = useQuery({
     queryKey: ["payroll-run", id],
     queryFn: () => getPayrollRun(id),
   });
 
   const statusMutation = useMutation({
+    retry: false,
     mutationFn: (status: "FINALIZED" | "FLAGGED_WRONG" | "TRASH") => updatePayrollRunStatus(id, status),
     onSuccess: (data) => {
+      completeWrite();
+      setIsDeleteModalOpen(false);
+      setIsFlagModalOpen(false);
+      setIsFinalizeModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["payroll-run", id] });
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       if (data.status === "TRASH") {
@@ -148,10 +162,18 @@ export default function PaymentRunDetailPage() {
         toast.success(`${t("Status updated to")} ${t(data.status)}`);
       }
     },
-    onError: () => {
-      toast.error(t("Failed to update status"));
+    onError: (error: unknown) => {
+      failWrite(error, t("Failed to update status"));
+      setIsDeleteModalOpen(false);
+      setIsFlagModalOpen(false);
+      setIsFinalizeModalOpen(false);
     }
   });
+
+  const handleStatus = (status: "FINALIZED" | "FLAGGED_WRONG" | "TRASH") => {
+    if (!hasPayrollWrite || !beginWrite()) return;
+    statusMutation.mutate(status);
+  };
 
   if (isLoading) {
     return (
@@ -166,8 +188,13 @@ export default function PaymentRunDetailPage() {
   if (error || !run) {
     return (
       <AuthLayout>
-        <div className="p-8 text-destructive font-black uppercase tracking-widest text-center">
-          {t("Error loading payroll data")}
+        <PayrollMutationNotice failure={mutationFailure} pending={writePending} />
+        <div role="alert" className="space-y-3 p-8 text-center">
+          <p>{t("Error loading payroll data")}</p>
+          <button type="button" onClick={() => { void refetch(); }}
+            className="min-h-12 rounded-lg border border-border px-4 font-semibold focus-visible:outline-2 focus-visible:outline-primary">
+            {lang === "am" ? "እንደገና ሞክር" : "Retry payroll details"}
+          </button>
         </div>
       </AuthLayout>
     );
@@ -242,10 +269,11 @@ export default function PaymentRunDetailPage() {
               {t("Activity")}
             </button>
 
-             {run.status === "FINALIZED" && (
+             {hasPayrollWrite && run.status === "FINALIZED" && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsFlagModalOpen(true)}
+                  disabled={writePending || needsReload}
                   className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 dl-radius-lg hover:bg-amber-500/20 transition-all active:scale-[0.98]"
                   title={t("Flag as Wrong")}
                 >
@@ -253,6 +281,7 @@ export default function PaymentRunDetailPage() {
                 </button>
                 <button
                   onClick={() => setIsDeleteModalOpen(true)}
+                  disabled={writePending || needsReload}
                   className="p-2.5 bg-rose-600 text-white dl-radius-lg hover:bg-rose-700 transition-all active:scale-[0.98] shadow-md shadow-rose-500/10"
                   title={t("Move to Trash")}
                 >
@@ -261,9 +290,10 @@ export default function PaymentRunDetailPage() {
               </div>
             )}
 
-            {run.status === "DRAFT" && (
+            {hasPayrollWrite && run.status === "DRAFT" && (
               <button
                 onClick={() => setIsFinalizeModalOpen(true)}
+                disabled={writePending || needsReload}
                 className="inline-flex items-center gap-2 h-10 px-4 bg-emerald-600 text-white dl-radius-lg text-xs font-semibold hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm"
               >
                 {t("Finalize Payout")}
@@ -271,6 +301,8 @@ export default function PaymentRunDetailPage() {
             )}
           </div>
         </div>
+
+        <PayrollMutationNotice failure={mutationFailure} pending={writePending} />
 
         <PrintOptionsModal
           isOpen={isPrintModalOpen}
@@ -283,36 +315,39 @@ export default function PaymentRunDetailPage() {
         <DeleteConfirmModal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={() => statusMutation.mutate("TRASH")}
+          onConfirm={() => handleStatus("TRASH")}
           title={t("Move to Trash")}
           message={t("Are you sure you want to archive this payroll run? It will be moved to history trash.")}
           itemName={`${run?.month}/${run?.year} Run`}
-          isDeleting={statusMutation.isPending}
+          isDeleting={writePending}
+          pendingLabel={t("Updating payroll...")}
+          confirmDisabled={needsReload || !hasPayrollWrite}
         />
 
          <DeleteConfirmModal
           isOpen={isFlagModalOpen}
           onClose={() => setIsFlagModalOpen(false)}
-          onConfirm={() => statusMutation.mutate("FLAGGED_WRONG")}
+          onConfirm={() => handleStatus("FLAGGED_WRONG")}
           title={t("Flag as Incorrect")}
           message={t("Mark this run as containing errors? This will help auditors identify discrepancies.")}
           itemName={periodLabel}
-          isDeleting={statusMutation.isPending}
+          isDeleting={writePending}
+          pendingLabel={t("Updating payroll...")}
+          confirmDisabled={needsReload || !hasPayrollWrite}
         />
 
         <DeleteConfirmModal
           isOpen={isFinalizeModalOpen}
           onClose={() => setIsFinalizeModalOpen(false)}
-          onConfirm={() => {
-            statusMutation.mutate("FINALIZED");
-            setIsFinalizeModalOpen(false);
-          }}
+          onConfirm={() => handleStatus("FINALIZED")}
           variant="primary"
           confirmLabel={t("Confirm Finalization")}
           title={t("Finalize Payroll")}
-          message={t("Lock this payroll run and mark it as active? This will finalize all payout totals for this period.")}
+          message={t("Finalization recalculates current salaries and verified attendance for this period. Saved draft totals may change.")}
           itemName={periodLabel}
-          isDeleting={statusMutation.isPending}
+          isDeleting={writePending}
+          pendingLabel={t("Updating payroll...")}
+          confirmDisabled={needsReload || !hasPayrollWrite}
         />
 
         <div className="grid gap-3 md:grid-cols-3">

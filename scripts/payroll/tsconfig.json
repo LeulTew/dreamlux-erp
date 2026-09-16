@@ -1,0 +1,17 @@
+{
+  "extends": "../../backend/tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "rootDir": "../..",
+    "declaration": false,
+    "noEmit": true,
+    "typeRoots": ["../../backend/node_modules/@types", "../../frontend/node_modules/@types"]
+  },
+  "include": [
+    "./*.ts",
+    "../../frontend/payroll-qa-environment.ts",
+    "../../frontend/next.payroll-native.config.ts",
+    "../../frontend/playwright.payroll-native.config.ts"
+  ]
+}

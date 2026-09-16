@@ -3,11 +3,26 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 import { getToken } from "./setup_helpers";
 import "./setup";
+import { pool } from "../db/pool";
+import { supabase } from "../db/supabase";
+import { ELIGIBLE_COMMISSIONS_SQL } from "../lib/eligible-payroll-commissions";
+import { PayrollPersistenceFixture, syntheticRun } from "./payroll-persistence-fixture";
 
 // ─── Local mock wiring ───────────────────────────────────────────────────────
-const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
+const mockQuery = mock((..._args: unknown[]) => Promise.resolve({ rows: [] as any[] }));
 let insertPayloads: unknown[] = [];
 let eligibleCommissionRows: any[] = [];
+let payrollDb: PayrollPersistenceFixture;
+
+const transactionQuery = async (sql: string, values?: unknown[]) => {
+  if (/^\s*with eligible as/.test(sql)) payrollDb.sources.commissions = eligibleCommissionRows;
+  return payrollDb.query(sql, values);
+};
+const mockSqlQuery = mock(async (sql: string, values?: unknown[]) => {
+  if (sql === ELIGIBLE_COMMISSIONS_SQL) return { rows: eligibleCommissionRows };
+  if (/^\s*with eligible as/.test(sql)) return transactionQuery(sql, values);
+  return mockQuery(sql, values);
+});
 
 mock.module("../db/pool", () => ({
   pool: {
@@ -19,23 +34,6 @@ mock.module("../db/pool", () => ({
       })
     ),
   },
-}));
-
-mock.module("../lib/eligible-payroll-commissions", () => ({
-  getEligibleCommissionRows: mock(async () => eligibleCommissionRows),
-  getAuthoritativePayrollInputLines: mock(async (_start: string, _end: string, employeeIds: string[]) =>
-    employeeIds.map((employeeId) => ({
-      employee_id: employeeId,
-      events: eligibleCommissionRows
-        .filter((row) => row.employee_id === employeeId)
-        .map((row) => ({
-          event_type_id: row.event_type_id,
-          quantity: Number(row.quantity),
-          price_override: Number(row.commission_total) / Number(row.quantity),
-          override_reason: "Verified attended event assignments",
-        })),
-    })),
-  ),
 }));
 
 const fakeChain = (isSingle = false): any => {
@@ -134,8 +132,13 @@ beforeAll(async () => {
 
 beforeEach(() => mockQuery.mockReset());
 beforeEach(() => {
-  insertPayloads = [];
+  payrollDb = new PayrollPersistenceFixture();
+  insertPayloads = payrollDb.payloads;
   eligibleCommissionRows = [];
+  mockSqlQuery.mockClear();
+  pool.query = mockSqlQuery as unknown as typeof pool.query;
+  pool.connect = mock(async () => ({ query: transactionQuery, release: payrollDb.release })) as unknown as typeof pool.connect;
+  supabase.from = (() => fakeChain()) as typeof supabase.from;
 });
 
 // ─── Unit Tests: Zod Validation Schema ───────────────────────────────────────
@@ -441,7 +444,7 @@ describe("Payroll API > GET /payroll/runs", () => {
     expect(res.status).toBe(401);
   });
 
-  test("gracefully handles DB error on lines fetch (returns runs with zero totals)", async () => {
+  test("does not turn a failed saved-total lookup into zero-value payroll history", async () => {
     mockQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -463,8 +466,9 @@ describe("Payroll API > GET /payroll/runs", () => {
       .set("Authorization", AUTH());
 
     // Should still return 200 — totals just default to 0
-    expect(res.status).toBe(200);
-    expect(res.body.runs[0].total_payroll_value).toBe(0);
+    expect(res.status).toBe(500);
+    expect(res.body).not.toHaveProperty("runs");
+    expect(res.body.error).toContain("saved payroll totals");
   });
 });
 
@@ -487,11 +491,6 @@ describe("Payroll API > read/write permission split", () => {
   });
 
   test("allows payroll:read users to generate preview without persisting", async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
-
     const res = await request(app)
       .post("/payroll/preview")
       .set("Authorization", PAYROLL_READ_ONLY_AUTH())
@@ -522,6 +521,22 @@ describe("Payroll API > read/write permission split", () => {
 
 // ─── Integration Tests: GET /payroll/runs/:id ────────────────────────────────
 describe("Payroll API > GET /payroll/runs/:id", () => {
+  test("fails rather than returning a saved run with missing financial event snapshots", async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: RUN_ID, period_start: "2026-04-01", period_end: "2026-04-15", status: "finalized" }] })
+      .mockResolvedValueOnce({ rows: [{
+        id: LINE_ID, employee_id: EMPLOYEE_ID, employee_name_snapshot: "Synthetic Guard Loader",
+        base_salary_snapshot: 7000, commission_total_snapshot: 2000, employee_total_snapshot: 9000,
+      }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(new Error("Synthetic saved-event lookup failure"));
+
+    const res = await request(app).get(`/payroll/runs/${RUN_ID}`).set("Authorization", AUTH());
+    expect(res.status).toBe(500);
+    expect(res.body).not.toHaveProperty("employee_lines");
+    expect(res.body.error).toContain("saved payroll event snapshots");
+  });
+
   test("returns 404 for non-existent run", async () => {
     mockQuery.mockResolvedValueOnce({ rows: [] }); // run not found
 
@@ -698,9 +713,7 @@ describe("Payroll API > PATCH /payroll/runs/:id/status", () => {
   });
 
   test("accepts FLAGGED_WRONG status", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: RUN_ID, status: "flagged_wrong", updated_at: new Date().toISOString(), deleted_at: null, finalized_at: null }],
-    });
+    payrollDb.state.runs = [syntheticRun({ status: "finalized" })];
 
     const res = await request(app)
       .patch(`/payroll/runs/${RUN_ID}/status`)
@@ -712,9 +725,7 @@ describe("Payroll API > PATCH /payroll/runs/:id/status", () => {
   });
 
   test("accepts TRASH status", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: RUN_ID, status: "trashed", updated_at: new Date().toISOString(), deleted_at: new Date().toISOString(), finalized_at: null }],
-    });
+    payrollDb.state.runs = [syntheticRun({ status: "finalized" })];
 
     const res = await request(app)
       .patch(`/payroll/runs/${RUN_ID}/status`)
@@ -748,27 +759,20 @@ describe("Payroll API > GET /payroll/eligible-commissions", () => {
 
 describe("Payroll API > POST /payroll/preview", () => {
   test("returns preview with correct totals for default price", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 3000 }];
-    mockQuery
-      // event_types
-      .mockResolvedValueOnce({
-        rows: [{ id: EVENT_TYPE_ID, name: "Birthday" }],
-      })
-      // employees
-      .mockResolvedValueOnce({
-        rows: [{ 
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 4000 }];
+    payrollDb.sources = {
+      event_types: [{ id: EVENT_TYPE_ID, name: "Birthday" }],
+      employees: [{
           id: EMPLOYEE_ID, 
-          full_name: "Abera Belay", 
+          full_name: "Synthetic Guard Loader",
           salary_level: "L2", 
           base_salary: 0, 
           profile_photo_key: null,
-          event_prices: { [EVENT_TYPE_ID]: 1500 }
+          event_prices: { [EVENT_TYPE_ID]: 2000 }
         }],
-      })
-      // salary_levels
-      .mockResolvedValueOnce({
-        rows: [{ id: "sl-1", code: "L2", amount_etb: 7000 }],
-      });
+      salary_levels: [{ id: "23900000-0000-4000-8000-000000000101", code: "L2", amount_etb: 7000 }],
+      commissions: eligibleCommissionRows,
+    };
 
     const res = await request(app)
       .post("/payroll/preview")
@@ -785,26 +789,26 @@ describe("Payroll API > POST /payroll/preview", () => {
       });
 
     expect(res.status).toBe(200);
-    // 7000 base + (1500 × 2) events = 10000
-    expect(res.body.total_payroll_value).toBe(10000);
+    expect(res.body.total_payroll_value).toBe(11000);
     expect(res.body.employee_lines[0].snapshot_base_salary).toBe(7000);
-    expect(res.body.employee_lines[0].total_events_value).toBe(3000);
+    expect(res.body.employee_lines[0].total_events_value).toBe(4000);
   });
 
   test("uses verified commission instead of trusting the submitted override", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 999 }];
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ id: EVENT_TYPE_ID, name: "Birthday" }] })
-      .mockResolvedValueOnce({ rows: [{ 
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 2000 }];
+    payrollDb.sources = {
+      event_types: [{ id: EVENT_TYPE_ID, name: "Birthday" }],
+      employees: [{
           id: EMPLOYEE_ID, 
-          full_name: "Test", 
+          full_name: "Synthetic Guard Loader",
           salary_level: "L1", 
           base_salary: 0, 
           profile_photo_key: null,
-          event_prices: { [EVENT_TYPE_ID]: 1500 }
-        }] 
-      })
-      .mockResolvedValueOnce({ rows: [{ id: "sl1", code: "L1", amount_etb: 5000 }] });
+          event_prices: { [EVENT_TYPE_ID]: 2000 }
+        }],
+      salary_levels: [{ id: "23900000-0000-4000-8000-000000000101", code: "L1", amount_etb: 7000 }],
+      commissions: eligibleCommissionRows,
+    };
 
     const res = await request(app)
       .post("/payroll/preview")
@@ -821,16 +825,10 @@ describe("Payroll API > POST /payroll/preview", () => {
       });
 
     expect(res.status).toBe(200);
-    // 5000 + 999 override = 5999
-    expect(res.body.total_payroll_value).toBe(5999);
+    expect(res.body.total_payroll_value).toBe(9000);
   });
 
   test("skips unknown employee gracefully", async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] }) // no event types
-      .mockResolvedValueOnce({ rows: [] }) // no employees (employee_id won't match)
-      .mockResolvedValueOnce({ rows: [] }); // no salary levels
-
     const res = await request(app)
       .post("/payroll/preview")
       .set("Authorization", AUTH())
@@ -875,66 +873,28 @@ describe("Payroll API > POST /payroll/drafts", () => {
   const LEVEL_L2_ID = "2e7553f3-8616-4530-9566-38078c444fd8";
 
   function mockDraftCreateSequence(overrides: { runId?: string } = {}) {
-    const id = overrides.runId ?? RUN_ID;
-    mockQuery
-      // existing draft lookup
-      .mockResolvedValueOnce({ rows: [] })
-      // event types
-      .mockResolvedValueOnce({ rows: [{ id: EVENT_TYPE_ID, name: "Birthday" }] })
-      // employees
-      .mockResolvedValueOnce({
-        rows: [{
+    payrollDb.nextRunId = overrides.runId ?? RUN_ID;
+    payrollDb.sources = {
+      event_types: [{ id: EVENT_TYPE_ID, name: "Birthday" }],
+      employees: [{
           id: EMPLOYEE_ID,
-          full_name: "Abera",
+          full_name: "Synthetic Guard Loader",
           salary_level: "L2",
           base_salary: 0,
-          event_prices: { [EVENT_TYPE_ID]: 1900 },
+          event_prices: { [EVENT_TYPE_ID]: 2000 },
         }],
-      })
-      // salary levels
-      .mockResolvedValueOnce({ rows: [{ id: LEVEL_L2_ID, code: "L2", amount_etb: 7000 }] })
-      // insert payroll_run
-      .mockResolvedValueOnce({ rows: [{ id }] })
-      // insert employee lines
-      .mockResolvedValueOnce({ rows: [{ id: LINE_ID, employee_id: EMPLOYEE_ID }] })
-      // insert event rows
-      .mockResolvedValueOnce({ rows: [] })
-      // insert audit log
-      .mockResolvedValueOnce({ rows: [] });
+      salary_levels: [{ id: LEVEL_L2_ID, code: "L2", amount_etb: 7000 }],
+      commissions: [],
+    };
   }
 
   function mockDraftUpdateSequence() {
-    mockQuery
-      // existing draft lookup
-      .mockResolvedValueOnce({ rows: [{ id: RUN_ID }] })
-      // event types
-      .mockResolvedValueOnce({ rows: [{ id: EVENT_TYPE_ID, name: "Birthday" }] })
-      // employees
-      .mockResolvedValueOnce({
-        rows: [{
-          id: EMPLOYEE_ID,
-          full_name: "Abera",
-          salary_level: "L2",
-          base_salary: 0,
-          event_prices: { [EVENT_TYPE_ID]: 1900 },
-        }],
-      })
-      // salary levels
-      .mockResolvedValueOnce({ rows: [{ id: LEVEL_L2_ID, code: "L2", amount_etb: 7000 }] })
-      // update payroll_run
-      .mockResolvedValueOnce({ rows: [{ id: RUN_ID }] })
-      // delete existing lines
-      .mockResolvedValueOnce({ rows: [] })
-      // insert employee lines
-      .mockResolvedValueOnce({ rows: [{ id: LINE_ID, employee_id: EMPLOYEE_ID }] })
-      // insert event rows
-      .mockResolvedValueOnce({ rows: [] })
-      // insert audit log
-      .mockResolvedValueOnce({ rows: [] });
+    mockDraftCreateSequence();
+    payrollDb.state.runs = [syntheticRun()];
   }
 
   test("creates a draft run and returns id", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 1900 }];
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 2000 }];
     mockDraftCreateSequence();
 
     const res = await request(app)
@@ -961,7 +921,7 @@ describe("Payroll API > POST /payroll/drafts", () => {
       action: "draft_saved",
       status_snapshot: "draft",
       employee_count: 1,
-      total_payroll_snapshot: 8900,
+      total_payroll_snapshot: 9000,
       period_start: "2026-04-01",
       period_end: "2026-04-15",
     }));
@@ -1053,40 +1013,26 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   const LEVEL_L2_ID = "2e7553f3-8616-4530-9566-38078c444fd8";
 
   function mockFinalizeSequence(overrides: { runId?: string } = {}) {
-    const id = overrides.runId ?? RUN_ID;
-    mockQuery
-      // event_types lookup
-      .mockResolvedValueOnce({
-        rows: [{
+    payrollDb.nextRunId = overrides.runId ?? RUN_ID;
+    payrollDb.sources = {
+      event_types: [{
           id: EVENT_TYPE_ID,
           name: "Birthday",
         }],
-      })
-      // employees lookup
-      .mockResolvedValueOnce({ 
-        rows: [{ 
+      employees: [{
           id: EMPLOYEE_ID, 
-          full_name: "Abera", 
+          full_name: "Synthetic Guard Loader",
           salary_level: "L2", 
           base_salary: 0,
-          event_prices: { [EVENT_TYPE_ID]: 1900 } 
-        }] 
-      })
-      // salary_levels lookup
-      .mockResolvedValueOnce({ rows: [{ id: LEVEL_L2_ID, code: "L2", amount_etb: 7000 }] })
-      // insert payroll_run
-      .mockResolvedValueOnce({ rows: [{ id }] })
-      // insert employee line
-        .mockResolvedValueOnce({ rows: [{ id: LINE_ID, employee_id: EMPLOYEE_ID }] })
-      // insert event rows
-      .mockResolvedValueOnce({ rows: [] })
-      // insert audit log
-      .mockResolvedValueOnce({ rows: [] });
+          event_prices: { [EVENT_TYPE_ID]: 2000 }
+        }],
+      salary_levels: [{ id: LEVEL_L2_ID, code: "L2", amount_etb: 7000 }],
+      commissions: [],
+    };
   }
 
   test("returns 409 Conflict if a finalized run already exists", async () => {
-    // Check if duplicate exists
-    mockQuery.mockResolvedValueOnce({ rows: [{ id: RUN_ID }] });
+    payrollDb.state.runs = [syntheticRun({ status: "finalized" })];
 
     const res = await request(app)
       .post("/payroll/runs")
@@ -1098,10 +1044,7 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   });
 
   test("creates a finalized run and returns id", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 3800 }];
-    // 1. Check duplicate -> returns empty
-    mockQuery.mockResolvedValueOnce({ rows: [] });
-    // 2. Mock the rest of the sequence
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 4000 }];
     mockFinalizeSequence();
 
     const res = await request(app)
@@ -1117,14 +1060,13 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
       action: "finalized",
       status_snapshot: "finalized",
       employee_count: 1,
-      total_payroll_snapshot: 10800,
+      total_payroll_snapshot: 11000,
       period_start: "2026-04-01",
       period_end: "2026-04-15",
     }));
   });
 
   test("creates a finalized weekly run and guards duplicates by weekly bounds", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     mockFinalizeSequence();
 
     const res = await request(app)
@@ -1173,8 +1115,6 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   });
 
   test("handles employee with price override (no reason required)", async () => {
-    // 1. Check duplicate -> returns empty
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     mockFinalizeSequence();
 
     const res = await request(app)
@@ -1203,8 +1143,7 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   });
 
   test("does not let a submitted salary-level suffix alter the verified commission snapshot", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 1900 }];
-    mockQuery.mockResolvedValueOnce({ rows: [] });
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 2000 }];
     mockFinalizeSequence();
 
     const res = await request(app)
@@ -1222,7 +1161,7 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
                 event_type_id: EVENT_TYPE_ID,
                 quantity: 1,
                 selected_level_id: LEVEL_L2_ID,
-                price_override: 1900,
+                price_override: 2000,
               },
             ],
           },
@@ -1238,8 +1177,7 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   });
 
   test("stores verified unit-price and line-total snapshots", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 3800 }];
-    mockQuery.mockResolvedValueOnce({ rows: [] });
+    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 4000 }];
     mockFinalizeSequence();
 
     const res = await request(app)
@@ -1265,13 +1203,11 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
     expect(res.status).toBe(201);
 
     const serializedPayloads = insertPayloads.map((payload) => JSON.stringify(payload)).join("\n");
-    expect(serializedPayloads).toContain('"unit_price_snapshot":1900');
-    expect(serializedPayloads).toContain('"line_total_snapshot":3800');
+    expect(serializedPayloads).toContain('"unit_price_snapshot":2000');
+    expect(serializedPayloads).toContain('"line_total_snapshot":4000');
   });
 
   test("creates half-month H1 run with correct title", async () => {
-    // 1. Check duplicate -> returns empty
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     mockFinalizeSequence();
 
     const res = await request(app)
@@ -1290,8 +1226,6 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   });
 
   test("creates half-month H2 run", async () => {
-    // 1. Check duplicate -> returns empty
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     mockFinalizeSequence();
 
     const res = await request(app)
@@ -1330,16 +1264,6 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
   });
 
   test("handles empty employee list gracefully (no events posted)", async () => {
-    // 1. Check duplicate -> returns empty
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] }) // 1. Duplicate check
-      .mockResolvedValueOnce({ rows: [] }) // 2. event types
-      .mockResolvedValueOnce({ rows: [] }) // 3. employees
-      .mockResolvedValueOnce({ rows: [] }) // 4. salary levels
-      .mockResolvedValueOnce({ rows: [{ id: RUN_ID }] }) // 5. insert run
-      .mockResolvedValueOnce({ rows: [] }) // 6. insert employee lines batch (empty)
-      .mockResolvedValueOnce({ rows: [] }); // 7. insert audit log
-
     const res = await request(app)
       .post("/payroll/runs")
       .set("Authorization", AUTH())
@@ -1353,7 +1277,7 @@ describe("Payroll API > POST /payroll/runs (finalize)", () => {
 // ─── Integration Tests: DELETE /payroll/runs/:id ─────────────────────────────
 describe("Payroll API > DELETE /payroll/runs/:id", () => {
   test("soft-deletes an existing run", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [{ id: RUN_ID }] });
+    payrollDb.state.runs = [syntheticRun()];
 
     const res = await request(app)
       .delete(`/payroll/runs/${RUN_ID}`)
@@ -1369,5 +1293,3 @@ describe("Payroll API > DELETE /payroll/runs/:id", () => {
     expect(res.status).toBe(401);
   });
 });
-
-

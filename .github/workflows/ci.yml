@@ -30,8 +30,10 @@ jobs:
         run: cd backend && bun install --frozen-lockfile
       - name: Verify temporary production release hold
         run: bun --no-env-file test scripts/release-hold.test.ts
+      - name: Verify payroll runner boundaries
+        run: bun --no-env-file test scripts/payroll backend/src/db/testing/dreamlux-native-target.test.ts
       - name: Run tests
-        run: cd backend && bun test
+        run: cd backend && bun --no-env-file test --timeout=30000 --preload ../scripts/payroll/offline-unit-guard.ts
         env:
           JWT_SECRET: test-secret
           ADMIN_PASSWORD: test-password
@@ -52,11 +54,82 @@ jobs:
           bun-version: 1.3.14
       - name: Install dependencies
         run: cd frontend && bun install --frozen-lockfile
-      - name: Lint and type-check
-        run: cd frontend && bun run lint
-      - name: Run tests
-        run: cd frontend && bun run test
-      - name: Build
-        run: cd frontend && bun run build
+      - name: Isolated frontend lint, types, tests, and build
+        run: bun --no-env-file scripts/payroll/build-ui.ts --checks --output .qa-payroll-build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:3000
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:5326
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54335
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: synthetic-dreamlux-browser-key-not-a-provider-credential
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: synthetic-dreamlux-browser-key-not-a-provider-credential
+      - name: Save the single frontend build for native browser QA
+        uses: actions/upload-artifact@v4
+        with:
+          name: payroll-frontend-${{ github.sha }}
+          path: .qa-payroll-build
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  native-payroll:
+    name: Native payroll and real browser contracts
+    needs: [backend-test, frontend-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: dreamlux_parity
+          POSTGRES_DB: postgres
+          # Intentionally public, disposable CI-only password; never a provider credential.
+          POSTGRES_PASSWORD: "0000000000000000000000000000000000000000000000000000000000000239"
+          PGPORT: "55434"
+        ports:
+          - 55434:55434
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -p 55434 -U dreamlux_parity -d postgres"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/download-artifact@v4
+        with:
+          name: payroll-frontend-${{ github.sha }}
+          path: .qa-payroll-build
+      - name: Install existing dependencies
+        run: |
+          bun install --cwd backend --frozen-lockfile
+          bun install --cwd frontend --frozen-lockfile
+      - name: Type-check portable verification infrastructure
+        run: bun --no-env-file backend/node_modules/typescript/bin/tsc --project scripts/payroll/tsconfig.json --noEmit
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-payroll-chromium-${{ hashFiles('frontend/bun.lock') }}
+      - name: Install the pinned lockfile's Chromium
+        run: bun --no-env-file frontend/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Verify PostgREST 16.3 archive, binary, and version
+        run: |
+          set -euo pipefail
+          mkdir .qa-payroll-postgrest
+          curl --fail --silent --show-error --location --max-time 30 \
+            https://github.com/PostgREST/postgrest/releases/download/v16.3/postgrest-v16.3-linux-static-x86-64.tar.xz \
+            --output .qa-payroll-postgrest/postgrest.tar.xz
+          printf '%s  %s\n' '4eb414eb948c8800863cc8c9896a17b611b2dccf9ff581f4d57f42ec9ccee40d' '.qa-payroll-postgrest/postgrest.tar.xz' | sha256sum --check -
+          tar -xJf .qa-payroll-postgrest/postgrest.tar.xz -C .qa-payroll-postgrest --no-same-owner
+          printf '%s  %s\n' '0cf367dc2ee47d5c648baa2952e25bdf299de4e1998d31e251bb00d129262d71' '.qa-payroll-postgrest/postgrest' | sha256sum --check -
+          .qa-payroll-postgrest/postgrest --version | grep -E '^PostgREST 16\.3($|[[:space:]])'
+      - name: Run native assertions, then serial browsers against the reused build
+        run: |
+          bun --no-env-file scripts/payroll/run.ts \
+            --allow-disposable-postgres \
+            --postgrest "$PWD/.qa-payroll-postgrest/postgrest" \
+            --frontend-build .qa-payroll-build
+        env:
+          DREAMLUX_NATIVE_TEST_ADMIN_URL: postgresql://dreamlux_parity:0000000000000000000000000000000000000000000000000000000000000239@127.0.0.1:55434/postgres?sslmode=disable
