@@ -1,5 +1,6 @@
 import axios, { AxiosRequestConfig } from "axios";
 import { clearAuthSessionStorage } from "@/lib/auth-session";
+import { validatePayrollDeleteAcknowledgement, validatePayrollRunAcknowledgement, type PayrollMutationStatus } from "@/lib/payroll-error";
 import {
   User,
   Role,
@@ -1321,6 +1322,8 @@ export const getServiceScopes = () => api.get<{ service_scopes: import("./types"
 // ====================================================
 // PAYROLL RUNS
 // ====================================================
+const PAYROLL_MUTATION_TIMEOUT_MS = 45_000;
+
 export type PayrollRunsResponse = {
   runs: PayrollRun[];
   total: number;
@@ -1354,15 +1357,24 @@ export const getPayrollRuns = (params?: {
 }) =>
   api.get<PayrollRun[] | PayrollRunsResponse>("/payroll/runs", { params }).then(res => normalizePayrollRunsResponse(res.data));
 export const getPayrollRun = (id: string) => api.get(`/payroll/runs/${id}`).then(res => res.data);
-export const updatePayrollRunStatus = (id: string, status: "DRAFT" | "FINALIZED" | "FLAGGED_WRONG" | "TRASH") =>
-  api.patch(`/payroll/runs/${id}/status`, { status }).then(res => res.data);
-export const deletePayrollRun = (id: string) => api.delete(`/payroll/runs/${id}`).then(res => res.data);
-export const permanentlyDeletePayrollRun = (id: string) => api.delete(`/payroll/runs/${id}/permanent`).then(res => res.data);
+export const updatePayrollRunStatus = (id: string, status: PayrollMutationStatus) =>
+  api.patch<unknown>(`/payroll/runs/${id}/status`, { status }, { timeout: PAYROLL_MUTATION_TIMEOUT_MS })
+    .then(res => validatePayrollRunAcknowledgement(res.data, status, id));
+export const deletePayrollRun = (id: string) =>
+  api.delete<unknown>(`/payroll/runs/${id}`, { timeout: PAYROLL_MUTATION_TIMEOUT_MS })
+    .then(res => validatePayrollDeleteAcknowledgement(res.data, id));
+export const permanentlyDeletePayrollRun = (id: string) =>
+  api.delete<unknown>(`/payroll/runs/${id}/permanent`, { timeout: PAYROLL_MUTATION_TIMEOUT_MS })
+    .then(res => validatePayrollDeleteAcknowledgement(res.data, id));
 export const previewPayrollRun = (data: Record<string, unknown>) => api.post("/payroll/preview", data).then(res => res.data);
 export const getEligiblePayrollCommissions = (periodStart: string, periodEnd: string) =>
   api.get("/payroll/eligible-commissions", { params: { period_start: periodStart, period_end: periodEnd } }).then((res) => res.data);
-export const savePayrollDraft = (data: Record<string, unknown>) => api.post("/payroll/drafts", data).then(res => res.data);
-export const finalizePayrollRun = (data: Record<string, unknown>) => api.post("/payroll/runs", data).then(res => res.data);
+export const savePayrollDraft = (data: Record<string, unknown>) =>
+  api.post<unknown>("/payroll/drafts", data, { timeout: PAYROLL_MUTATION_TIMEOUT_MS })
+    .then(res => validatePayrollRunAcknowledgement(res.data, "DRAFT"));
+export const finalizePayrollRun = (data: Record<string, unknown>) =>
+  api.post<unknown>("/payroll/runs", data, { timeout: PAYROLL_MUTATION_TIMEOUT_MS })
+    .then(res => validatePayrollRunAcknowledgement(res.data, "FINALIZED"));
 
 
 export const getSalaryLevelsTrash = () => api.get("/salary-levels/trash/list").then(res => res.data);

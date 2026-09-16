@@ -52,6 +52,9 @@ import toast from "@/lib/toast";
 import { findRunForPeriod } from "@/utils/payroll-period";
 import { useLanguage } from "@/hooks/use-language";
 import ForbiddenState from "@/components/ForbiddenState";
+import PayrollMutationNotice from "@/components/PayrollMutationNotice";
+import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
+import { extractPayrollHttpError } from "@/lib/payroll-error";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -212,25 +215,6 @@ type PreviewResponse = {
   }>;
 };
 
-function extractHttpError(error: unknown): { status: number | null; message: string | null } {
-  if (typeof error !== "object" || error === null || !("response" in error)) {
-    return { status: null, message: null };
-  }
-
-  const response = (error as { response?: { status?: unknown; data?: unknown } }).response;
-  const status = typeof response?.status === "number" ? response.status : null;
-  const data = response?.data;
-
-  if (typeof data === "object" && data !== null && "error" in data) {
-    const message = (data as { error?: unknown }).error;
-    if (typeof message === "string" && message.trim().length > 0) {
-      return { status, message };
-    }
-  }
-
-  return { status, message: null };
-}
-
 function normalizeLevelLabel(rawLabel: string): string {
   const cleaned = rawLabel.replace(/^legacy:/i, "").trim().toUpperCase();
   if (!cleaned) return "";
@@ -300,6 +284,8 @@ function PaymentRunProcessPageContent() {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<"name" | "department" | "pay">("name");
   const [errorMsg, setErrorMsg] = useState("");
+  const { begin: beginWrite, complete: completeWrite, fail: failWrite,
+    pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
   const [eventLinesByEmployee, setEventLinesByEmployee] = useState<Record<string, EventLine[]>>({});
   const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -348,7 +334,7 @@ function PaymentRunProcessPageContent() {
     enabled: hasPayrollWrite,
   });
 
-  const { data: runsHistoryPayload, isLoading: runsHistoryLoading } = useQuery({
+  const { data: runsHistoryPayload, isLoading: runsHistoryLoading, isError: runsHistoryError, refetch: refetchRunsHistory } = useQuery({
     queryKey: ["payroll-runs", "active"],
     queryFn: () => getPayrollRuns({ view: "active", limit: 100 }),
     enabled: hasPayrollWrite,
@@ -633,66 +619,43 @@ function PaymentRunProcessPageContent() {
   });
 
   const saveDraftMutation = useMutation({
+    retry: false,
     mutationFn: (payload: PayrollGenerateRequest & { created_by_user_id?: string }) =>
-      savePayrollDraft(payload as unknown as Record<string, unknown>) as Promise<{ id: string }>,
+      savePayrollDraft({ ...payload }),
     onSuccess: (data) => {
+      completeWrite();
       setIsDraftDirty(false);
       setLastSavedAt(new Date().toISOString());
       setDraftPeriodKey(`${selectedMonth}:${periodType}`);
       setErrorMsg("");
-      if (data?.id) {
-        hasAutoLoaded.current = data.id;
-      }
+      hasAutoLoaded.current = data.id;
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
       if (lastSaveSourceRef.current === "manual") {
         toast.success(t("Draft saved"));
       }
     },
     onError: (error: unknown) => {
-      const { message } = extractHttpError(error);
-
-      if (message) {
-        setErrorMsg(message);
-        return;
-      }
-
-      if (error instanceof Error) {
-        setErrorMsg(error.message || t("Failed to save draft"));
-        return;
-      }
-
-      setErrorMsg(t("Failed to save draft"));
+      setErrorMsg("");
+      failWrite(error, t("Failed to save draft"));
     },
   });
 
   const finalizeMutation = useMutation({
+    retry: false,
     mutationFn: (payload: PayrollGenerateRequest & { created_by_user_id?: string }) => 
-      finalizePayrollRun(payload as unknown as Record<string, unknown>) as Promise<{ id: string }>,
+      finalizePayrollRun({ ...payload }),
     onSuccess: (data) => {
+      completeWrite();
+      queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       router.push(`/hr/payments/${data.id}`);
     },
     onError: (error: unknown) => {
-      const { status, message } = extractHttpError(error);
-
-      if (status === 409) {
-        setErrorMsg(
-          message ||
-            t("A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.")
-        );
-        return;
-      }
-
-      if (message) {
-        setErrorMsg(message);
-        return;
-      }
-
-      if (error instanceof Error) {
-        setErrorMsg(error.message || t("Failed to finalize payroll run"));
-        return;
-      }
-
-      setErrorMsg(t("Failed to finalize payroll run"));
+      const { status } = extractPayrollHttpError(error);
+      setErrorMsg("");
+      failWrite(error, status === 409
+        ? t("A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.")
+        : t("Failed to finalize payroll run"));
     },
   });
 
@@ -731,27 +694,30 @@ function PaymentRunProcessPageContent() {
   }, [activeDates.end, activeDates.kind, activeDates.start, employees, eventLinesByEmployee, getEmployeeEventPrice, selectedMonth]);
 
   const handleSaveDraft = useCallback((source: "manual" | "auto") => {
-    if (employeesLoading || authLoading) return;
+    if (employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !hasPayrollWrite || needsReload || writePending || finalizeMutation.isSuccess) return;
+    if (source === "auto" && (saveDraftMutation.isError || mutationFailure)) return;
 
     setErrorMsg("");
+    let payload: PayrollGenerateRequest;
     try {
-      const payload = buildPayload();
-      const createdByUserId = user?.id;
-
-      lastSaveSourceRef.current = source;
-      saveDraftMutation.mutate({
-        ...payload,
-        ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
-      });
+      payload = buildPayload();
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
+      return;
     }
-  }, [authLoading, buildPayload, employeesLoading, saveDraftMutation, user]);
+    if (!beginWrite()) return;
+    const createdByUserId = user?.id;
+    lastSaveSourceRef.current = source;
+    saveDraftMutation.mutate({
+      ...payload,
+      ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
+    });
+  }, [authLoading, beginWrite, buildPayload, employeesLoading, finalizeMutation.isSuccess, hasPayrollWrite, mutationFailure, needsReload, runsHistoryError, runsHistoryLoading, saveDraftMutation, user, writePending]);
 
   useEffect(() => {
     if (!isDraftDirty) return;
-    if (employeesLoading || authLoading) return;
-    if (saveDraftMutation.isPending) return;
+    if (employeesLoading || authLoading || runsHistoryLoading || runsHistoryError) return;
+    if (writePending || needsReload || mutationFailure || saveDraftMutation.isError || finalizeMutation.isSuccess) return;
 
     const activePeriodKey = `${selectedMonth}:${periodType}`;
     if (!draftPeriodKey || draftPeriodKey !== activePeriodKey) return;
@@ -777,11 +743,18 @@ function PaymentRunProcessPageContent() {
     draftPeriodKey,
     employeesLoading,
     authLoading,
-    saveDraftMutation.isPending,
+    runsHistoryLoading,
+    runsHistoryError,
+    writePending,
+    needsReload,
+    mutationFailure,
+    saveDraftMutation.isError,
+    finalizeMutation.isSuccess,
     handleSaveDraft,
   ]);
 
   const handlePreview = () => {
+    if (writePending || needsReload) return;
     setErrorMsg("");
     try {
       const payload = buildPayload();
@@ -792,6 +765,7 @@ function PaymentRunProcessPageContent() {
   };
 
   const handleFinalize = () => {
+    if (employeesLoading || authLoading || runsHistoryError || !hasPayrollWrite || writePending || needsReload || finalizeMutation.isSuccess) return;
     setErrorMsg("");
 
     if (runsHistoryLoading) {
@@ -807,17 +781,19 @@ function PaymentRunProcessPageContent() {
       return;
     }
 
+    let payload: PayrollGenerateRequest;
     try {
-      const payload = buildPayload();
-      const createdByUserId = user?.id;
-
-      finalizeMutation.mutate({
-        ...payload,
-        ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
-      });
+      payload = buildPayload();
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
+      return;
     }
+    if (!beginWrite()) return;
+    const createdByUserId = user?.id;
+    finalizeMutation.mutate({
+      ...payload,
+      ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
+    });
   };
 
   const addEventLine = (employeeId: string) => {
@@ -850,7 +826,11 @@ function PaymentRunProcessPageContent() {
     setDraftPeriodKey(`${selectedMonth}:${periodType}`);
   };
 
-  const draftStatusLabel = saveDraftMutation.isPending
+  const draftStatusLabel = needsReload
+    ? (lang === "am" ? "እንደገና መጫን ያስፈልጋል" : "Reload required")
+    : saveDraftMutation.isError
+      ? t("Failed to save draft")
+      : saveDraftMutation.isPending
     ? t("Saving draft...")
     : isDraftDirty
       ? t("Unsaved changes")
@@ -907,21 +887,21 @@ function PaymentRunProcessPageContent() {
               )}
               <button
                 onClick={() => handleSaveDraft("manual")}
-                disabled={saveDraftMutation.isPending || employeesLoading || authLoading}
+                disabled={writePending || needsReload || finalizeMutation.isSuccess || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-500/10 text-amber-700 border border-amber-500/20 shadow-premium hover:bg-amber-500/20 transition-all disabled:opacity-50"
               >
                 {saveDraftMutation.isPending ? t("Saving...") : t("Save Draft")}
               </button>
               <button
                 onClick={handlePreview}
-                disabled={previewMutation.isPending || employeesLoading || authLoading}
+                disabled={previewMutation.isPending || writePending || needsReload || employeesLoading || authLoading}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card text-foreground shadow-premium hover:bg-card-alt transition-all disabled:opacity-50"
               >
                 {previewMutation.isPending ? t("Previewing...") : t("Preview")}
               </button>
               <button
                 onClick={handleFinalize}
-                disabled={finalizeMutation.isPending || employeesLoading || authLoading || runsHistoryLoading || !!existingFinalized}
+                disabled={writePending || needsReload || finalizeMutation.isSuccess || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !!existingFinalized}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-primary text-background shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {finalizeMutation.isPending ? t("Finalizing...") : t("Finalize Run")}
@@ -932,6 +912,17 @@ function PaymentRunProcessPageContent() {
             </p>
           </div>
         </div>
+
+        <PayrollMutationNotice failure={mutationFailure} pending={writePending} />
+        {runsHistoryError && (
+          <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-card p-4 text-sm">
+            <p>{lang === "am" ? "የክፍያ ታሪኩን መጫን አልተቻለም። ለውጥ ከማድረግዎ በፊት እንደገና ይሞክሩ።" : "Payroll history could not be loaded. Retry before making changes."}</p>
+            <button type="button" onClick={() => { void refetchRunsHistory(); }}
+              className="min-h-12 rounded-lg border border-border px-4 font-semibold focus-visible:outline-2 focus-visible:outline-primary">
+              {lang === "am" ? "ታሪኩን እንደገና ጫን" : "Retry history"}
+            </button>
+          </div>
+        )}
 
         {existingDraft && (
           <PrintOptionsModal 
@@ -1138,7 +1129,7 @@ function PaymentRunProcessPageContent() {
 
         <div ref={sentinelRef} className="h-px w-full invisible" />
         <div 
-          className={`sticky bottom-10 md:bottom-8 flex flex-col p-6 rounded-xl bg-card/80 backdrop-blur-xl shadow-massive border border-border/40 text-foreground z-30 transition-all duration-300 ease-in-out ${isFloating ? '-translate-y-1' : 'translate-y-0'}`}
+          className={`${mutationFailure ? 'relative' : 'sticky bottom-10 md:bottom-8'} flex flex-col p-6 rounded-xl bg-card/80 backdrop-blur-xl shadow-massive border border-border/40 text-foreground z-30 transition-all duration-300 ease-in-out ${!mutationFailure && isFloating ? '-translate-y-1' : 'translate-y-0'}`}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className={`flex items-center transition-all duration-300 ${isFloating ? 'gap-4' : 'gap-6'}`}>

@@ -1,0 +1,2 @@
+[test]
+preload = ["./src/db/testing/dreamlux-native-guard.ts"]
