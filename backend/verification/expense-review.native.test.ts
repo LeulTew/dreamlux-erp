@@ -1,10 +1,11 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import express from "express";
-import jwt from "jsonwebtoken";
-import { Pool, type PoolClient } from "pg";
-import request from "supertest";
+import { createServer, type Server } from "node:http";
+import net from "node:net";
+import type express from "express";
+import type { Pool, PoolClient } from "pg";
+import type supertest from "supertest";
 
 // Run alone from the repository root: backend/bunfig.toml preloads a mocked pg.
 const enabled = process.env.DREAM_EXPENSE_NATIVE === "1";
@@ -20,7 +21,13 @@ suite("expense review native PostgreSQL", () => {
   const secret = randomUUID();
   let database: Pool;
   let admin: PoolClient;
-  let app: express.Express;
+  let request: typeof supertest;
+  let sign: typeof import("jsonwebtoken").sign;
+  let server: Server | undefined;
+  let apiUrl: string;
+  let httpPort: number | undefined;
+  const originalConnect = net.Socket.prototype.connect;
+  let restoreFetch: (() => void) | undefined;
   let schemaCreated = false;
   let fault: "audit" | "write" | "commit" | "rollback" | "early-rollback" | "notification" | null = null;
   let race: {
@@ -93,10 +100,10 @@ suite("expense review native PostgreSQL", () => {
   }
 
   const token = (id: string, role = "ACCOUNTANT") =>
-    jwt.sign({ id, username: `reviewer-${id}`, role }, secret, { expiresIn: "5m" });
+    sign({ id, username: `reviewer-${id}`, role }, secret, { expiresIn: "5m" });
 
   function review(status: "Approved" | "Rejected", actor = approverId, reason = "Duplicate receipt") {
-    return request(app).patch(`/events/expenses/${expenseId}/review`)
+    return request(apiUrl).patch(`/events/expenses/${expenseId}/review`)
       .set("Authorization", `Bearer ${token(actor)}`)
       .send({ status, rejected_reason: reason });
   }
@@ -112,11 +119,36 @@ suite("expense review native PostgreSQL", () => {
     const name = process.env.DREAM_EXPENSE_PGDATABASE || "";
     const user = process.env.DREAM_EXPENSE_PGUSER || "";
     const password = process.env.DREAM_EXPENSE_PGPASSWORD;
-    if (!Number.isInteger(port) || port < 1024 || port > 65535 || port === 5432 ||
-        !/^dream_issue231_[a-z0-9_]+$/.test(name) || user !== "dream_issue231" || !password) {
+    if (port !== 55431 || name !== "dream_issue231_aa556166" ||
+        user !== "dream_issue231" || !password) {
       throw new Error("Requires an owned loopback scratch database/role and dedicated non-default port");
     }
-    database = new Pool({
+    for (const key of Object.keys(process.env)) {
+      if (/^(DATABASE_|POSTGRES|PG|SUPABASE|JWT|NEXT_PUBLIC_.*SUPABASE|OTEL_|SENTRY_|VERCEL_)|SECRET|TOKEN|PASSWORD|TELEMETRY|DSN/i.test(key)) {
+        delete process.env[key];
+      }
+    }
+    // Admit only the owned database and this fixture's ephemeral loopback HTTP listener.
+    net.Socket.prototype.connect = function (this: net.Socket, ...args: unknown[]): net.Socket {
+      const first: unknown = Array.isArray(args[0]) ? args[0][0] : args[0];
+      const options = first && typeof first === "object" ? first : undefined;
+      const targetPort = Number(options && "port" in options ? options.port : first);
+      const host = options && "host" in options ? options.host : args[1];
+      if (host !== "127.0.0.1" || (targetPort !== port && targetPort !== httpPort)) {
+        throw new Error("Native expense fixture blocked an unowned network target");
+      }
+      return Reflect.apply(originalConnect, this, args);
+    };
+    const fetchGuard = spyOn(globalThis, "fetch").mockImplementation(async () => {
+      throw new Error("Native expense fixture does not permit fetch/provider traffic");
+    });
+    restoreFetch = () => { fetchGuard.mockRestore(); };
+    const { Pool: NativePool } = await import("pg");
+    const { default: express } = await import("express");
+    const { default: jwt } = await import("jsonwebtoken");
+    request = (await import("supertest")).default;
+    sign = jwt.sign;
+    database = new NativePool({
       host: "127.0.0.1", port, database: name, user,
       password,
       ssl: false, max: 4, connectionTimeoutMillis: 3000,
@@ -124,11 +156,21 @@ suite("expense review native PostgreSQL", () => {
       application_name: schema,
     });
     admin = await database.connect();
-    const target = await admin.query<{ name: string; owner: string }>(
-      "SELECT current_database() AS name, pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname = current_database()",
-    );
-    if (target.rows[0]?.name !== name || target.rows[0]?.owner !== user) {
-      throw new Error("Scratch database ownership mismatch");
+    const target = await admin.query<{
+      name: string; owner: string; actor: string; address: string; port: number;
+      rolsuper: boolean; rolcreatedb: boolean; rolcreaterole: boolean;
+    }>(`
+      SELECT current_database() AS name, pg_get_userbyid(d.datdba) AS owner,
+             current_user AS actor, inet_server_addr()::text AS address,
+             inet_server_port() AS port, r.rolsuper, r.rolcreatedb, r.rolcreaterole
+      FROM pg_database d JOIN pg_roles r ON r.rolname = current_user
+      WHERE d.datname = current_database()
+    `);
+    const identity = target.rows[0];
+    if (!identity || identity.name !== name || identity.owner !== user || identity.actor !== user ||
+        identity.address !== "127.0.0.1" || identity.port !== port ||
+        identity.rolsuper || identity.rolcreatedb || identity.rolcreaterole) {
+      throw new Error("Scratch database endpoint, ownership or least-privilege attestation failed");
     }
     await admin.query(`CREATE SCHEMA "${schema}"`);
     schemaCreated = true;
@@ -174,9 +216,18 @@ suite("expense review native PostgreSQL", () => {
       },
     }));
     const { default: events } = await import("../src/routes/events");
-    app = express();
+    const app: express.Express = express();
     app.use(express.json());
     app.use("/events", events);
+    server = createServer(app);
+    await new Promise<void>((resolve, reject) => {
+      server!.once("error", reject);
+      server!.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Missing owned HTTP listener address");
+    httpPort = address.port;
+    apiUrl = `http://127.0.0.1:${httpPort}`;
   });
 
   beforeEach(async () => {
@@ -197,15 +248,28 @@ suite("expense review native PostgreSQL", () => {
 
   afterAll(async () => {
     try {
-      if (admin) {
+      try {
+        if (server?.listening) {
+          await new Promise<void>((resolve, reject) => {
+            server!.close((error) => error ? reject(error) : resolve());
+          });
+        }
+      } finally {
         try {
-          if (schemaCreated) await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+          if (admin) {
+            try {
+              if (schemaCreated) await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+            } finally {
+              admin.release();
+            }
+          }
         } finally {
-          admin.release();
+          if (database) await database.end();
         }
       }
     } finally {
-      if (database) await database.end();
+      net.Socket.prototype.connect = originalConnect;
+      restoreFetch?.();
     }
   });
 
@@ -263,9 +327,9 @@ suite("expense review native PostgreSQL", () => {
       expect(state.expense.approved_by).toBe(approverId);
       expect(state.logs).toHaveLength(1);
       expect(notifications).toHaveLength(1);
-      const pending = await request(app).get("/events/expenses/pending")
+      const pending = await request(apiUrl).get("/events/expenses/pending")
         .set("Authorization", `Bearer ${token(approverId)}`);
-      const history = await request(app).get("/events/expenses/history")
+      const history = await request(apiUrl).get("/events/expenses/history")
         .set("Authorization", `Bearer ${token(approverId)}`);
       expect(pending.status).toBe(200);
       expect(pending.body.data).toHaveLength(0);
@@ -281,9 +345,9 @@ suite("expense review native PostgreSQL", () => {
   }, 12000);
 
   test("permissions and missing rejection reason fail before any mutation", async () => {
-    const anonymous = await request(app).patch(`/events/expenses/${expenseId}/review`).send({ status: "Approved" });
+    const anonymous = await request(apiUrl).patch(`/events/expenses/${expenseId}/review`).send({ status: "Approved" });
     expect(anonymous.status).toBe(401);
-    const forbidden = await request(app).patch(`/events/expenses/${expenseId}/review`)
+    const forbidden = await request(apiUrl).patch(`/events/expenses/${expenseId}/review`)
       .set("Authorization", `Bearer ${token(rejectorId, "EVENT_MANAGER")}`).send({ status: "Approved" });
     expect(forbidden.status).toBe(403);
     expect((await review("Rejected", rejectorId, "")).status).toBe(400);

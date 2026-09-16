@@ -52,8 +52,12 @@ only during a coordinated functional testing turn. Opt in with
 `DREAM_EXPENSE_NATIVE=1` and supply `DREAM_EXPENSE_PGPORT`,
 `DREAM_EXPENSE_PGDATABASE`, `DREAM_EXPENSE_PGUSER`, and
 `DREAM_EXPENSE_PGPASSWORD` for a freshly owned synthetic PostgreSQL instance.
-The fixture requires literal loopback, a non-default port, database name
-`dream_issue231_<suffix>`, and owning role `dream_issue231`. It does not use
+The fixture binds to `127.0.0.1:55431`, database `dream_issue231_aa556166`,
+and owning role `dream_issue231` (no superuser, role-creation or database-creation
+privileges). Before DDL it verifies the database, owner, current user, server
+endpoint and role privileges. Before application imports it clears ambient
+connection/provider credentials and blocks network targets other than its
+database and owned loopback HTTP listener. It does not use
 application environment files, backups, startup migrations, or Supabase.
 It creates and drops only its unique schema, using the checked-in event, expense,
 and audit table definitions. Two synthetic JWT actors exercise the actual
