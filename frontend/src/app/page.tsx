@@ -590,6 +590,9 @@ function EmployeesPageInner() {
     },
   });
 
+  const updateEmployeeRecord = updateEmployeeMutation.mutate;
+  const deleteEmployeeRecord = deleteMutation.mutate;
+  const recoverEmployeeRecord = recoverMutation.mutate;
   const debouncedUpdate = useCallback(
     (id: string, field: string, value: string) => {
       const key = `${id}-${field}`;
@@ -597,12 +600,12 @@ function EmployeesPageInner() {
         clearTimeout(debounceTimers.get(key));
       }
       const timer = setTimeout(() => {
-        updateEmployeeMutation.mutate({ id, field, value });
+        updateEmployeeRecord({ id, field, value });
         debounceTimers.delete(key);
       }, 800);
       debounceTimers.set(key, timer);
     },
-    [updateEmployeeMutation],
+    [updateEmployeeRecord],
   );
 
   const toggleSelection = useCallback((id: string) => {
@@ -639,9 +642,9 @@ function EmployeesPageInner() {
     }
   };
 
-  const handleSinglePermanentDelete = (id: string) => {
+  const handleSinglePermanentDelete = useCallback((id: string) => {
     setSingleDeleteId(id);
-  };
+  }, []);
 
   const confirmSingleDelete = async () => {
     if (!singleDeleteId) return;
@@ -665,9 +668,9 @@ function EmployeesPageInner() {
       limit,
       debouncedUpdate,
       setEditingEmployee,
-      deleteMutation,
+      { mutate: deleteEmployeeRecord },
       showTrash,
-      recoverMutation,
+      { mutate: recoverEmployeeRecord },
       setEmployeeToDelete,
       selectedIds,
       toggleSelection,
@@ -681,7 +684,7 @@ function EmployeesPageInner() {
       setSortBy,
       setSortOrder,
     ),
-    [editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteMutation, showTrash, recoverMutation, setEmployeeToDelete, selectedIds, toggleSelection, employees.length, toggleAll, selectMode, t, sortBy, sortOrder, setSortBy, setSortOrder],
+    [editMode, page, limit, debouncedUpdate, setEditingEmployee, deleteEmployeeRecord, showTrash, recoverEmployeeRecord, setEmployeeToDelete, selectedIds, toggleSelection, employees.length, toggleAll, handleSinglePermanentDelete, selectMode, t, sortBy, sortOrder, setSortBy, setSortOrder],
   );
 
   const table = useReactTable({

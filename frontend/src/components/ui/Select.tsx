@@ -64,6 +64,7 @@ export default function Select({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const selectedOption = options.find((opt) => String(opt.id) === String(value));
@@ -121,14 +122,17 @@ export default function Select({
       e.preventDefault();
       const opt = filteredOptions[activeIndex];
       if (opt && !opt.disabled) commit(opt.id);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      closeMenu();
     }
   };
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div className={`relative ${className}`} ref={containerRef} onKeyDown={(event) => {
+      if (!isOpen || event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+      triggerRef.current?.focus({ preventScroll: true });
+    }}>
       {name && (
         <select
           name={name}
@@ -147,6 +151,7 @@ export default function Select({
       )}
       <button
         type="button"
+        ref={triggerRef}
         disabled={disabled}
         // The trigger is the control the user (and assistive tech) actually
         // operates, so it carries the combobox role and the accessible name.

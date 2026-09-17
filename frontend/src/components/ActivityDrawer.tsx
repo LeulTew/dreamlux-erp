@@ -1,8 +1,10 @@
 "use client";
 
 import React from "react";
+import { Dialog } from "radix-ui";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
+import { useModalFocus } from "@/hooks/use-modal-focus";
 import { api } from "@/lib/api";
 import { 
   HiOutlineXMark, 
@@ -124,6 +126,7 @@ const getActionColor = (action: string) => {
 export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }: ActivityDrawerProps) {
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
+  const modalFocus = useModalFocus();
 
   const { data, isLoading, error } = useQuery<{ activity: ActivityLogEntry[]; page: number; limit: number; hasMore: boolean }>({
     queryKey: ["activity-logs", entityType, entityId],
@@ -146,39 +149,43 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
   const logs = data?.activity || [];
 
   return (
-    <>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
       {/* Backdrop overlay */}
-      <div 
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
-        onClick={onClose}
+      <Dialog.Overlay
+        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 motion-reduce:transition-none"
       />
 
       {/* Slide-out Sheet Panel */}
-      <div 
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-card border-l border-border text-foreground flex flex-col shadow-massive transition-transform duration-300 transform translate-x-0"
-        role="dialog"
+      <Dialog.Content
+        {...modalFocus}
         aria-modal="true"
+        aria-describedby={undefined}
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-card border-l border-border text-foreground flex flex-col shadow-massive transition-transform duration-300 motion-reduce:transition-none transform translate-x-0"
       >
         {/* Header */}
         <div className="p-4 border-b border-border flex justify-between items-center bg-card-alt/50">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <HiOutlineClock className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold tracking-tight text-foreground">{t("ActivityTimeline")}</h2>
+            <Dialog.Title asChild>
+              <h2 className="text-lg font-bold tracking-tight text-foreground">{t("ActivityTimeline")}</h2>
+            </Dialog.Title>
           </div>
           <button 
+            type="button"
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-transparent text-muted hover:bg-card-alt hover:text-foreground transition-colors focus:outline-none"
+            className="min-h-12 min-w-12 shrink-0 flex items-center justify-center rounded-2xl bg-transparent text-muted [@media(hover:hover)]:hover:bg-card-alt [@media(hover:hover)]:hover:text-foreground transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             aria-label={t("Close")}
           >
-            <HiOutlineXMark className="w-5 h-5" />
+            <HiOutlineXMark className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
         {/* Content body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-6">
           {isLoading && (
             <div className="flex flex-col items-center justify-center h-48 space-y-2 text-muted">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              <div className="animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-b-2 border-primary" />
               <p className="text-sm">{t("Loading")}</p>
             </div>
           )}
@@ -283,7 +290,8 @@ export default function ActivityDrawer({ entityType, entityId, isOpen, onClose }
             </div>
           )}
         </div>
-      </div>
-    </>
+      </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

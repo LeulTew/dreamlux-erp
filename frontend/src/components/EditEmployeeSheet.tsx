@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
@@ -184,6 +184,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
   const [newDepartment, setNewDepartment] = useState("");
   const [isAddingDepartment, setIsAddingDepartment] = useState(false);
+  const addDepartmentTrigger = useRef<HTMLButtonElement>(null);
 
   const { data: departments, refetch: refetchDepartments } = useQuery({
     queryKey: ["departments"],
@@ -358,6 +359,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       setFormData(prev => ({ ...prev, department_id: res.id }));
       setNewDepartment("");
       setIsAddingDepartment(false);
+      addDepartmentTrigger.current?.focus({ preventScroll: true });
       notify.success(t("Department added!"));
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
@@ -674,12 +676,14 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                       <Select
                         options={departments?.map((d: { id: string; name: string }) => ({ id: d.id, label: d.name })) || []}
                         value={formData.department_id}
+                        aria-label={t("Department")}
                         onChange={(val) => setFormData({...formData, department_id: val})}
                         placeholder={t("Select Department")}
-                        className="flex-1"
+                        className="min-w-0 flex-1"
                       />
                       <button
                         type="button"
+                        ref={addDepartmentTrigger}
                         onClick={() => setIsAddingDepartment(!isAddingDepartment)}
                         className={`w-11 h-11 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-sm ${
                           isAddingDepartment
@@ -687,13 +691,23 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                             : "bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                         }`}
                         title={isAddingDepartment ? t("Cancel") : t("Add Department")}
+                        aria-label={isAddingDepartment ? t("Cancel") : t("Add Department")}
                       >
                         <HiPlus className="w-5 h-5 transition-transform duration-300" />
                       </button>
                     </div>
 
                     {isAddingDepartment && (
-                      <div className="flex gap-2 p-2 bg-card-alt/50 border border-border/40 rounded-xl animate-in slide-in-from-top-2 duration-200">
+                      <div data-modal-escape
+                        onKeyDown={(event) => {
+                          if (event.key !== "Escape") return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setIsAddingDepartment(false);
+                          setNewDepartment("");
+                          addDepartmentTrigger.current?.focus({ preventScroll: true });
+                        }}
+                        className="flex gap-2 p-2 bg-card-alt/50 border border-border/40 rounded-xl animate-in slide-in-from-top-2 duration-200 motion-reduce:animate-none">
                         <input
                           type="text"
                           autoFocus
@@ -704,13 +718,9 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                             if (e.key === "Enter") {
                               e.preventDefault();
                               handleAddDepartment();
-                            } else if (e.key === "Escape") {
-                              e.preventDefault();
-                              setIsAddingDepartment(false);
-                              setNewDepartment("");
                             }
                           }}
-                          className="flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs outline-none text-foreground focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
+                          className="min-w-0 flex-1 h-9 px-3 rounded-lg border border-border bg-card text-xs outline-none text-foreground focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
                         />
                         <button
                           type="button"

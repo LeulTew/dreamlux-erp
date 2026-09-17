@@ -60,6 +60,24 @@ Use this table to decide which blackbox suites matter most after a release. A re
 
 ## 4. Test Suites (Verification Tables)
 
+### Focused drawer lifecycle verification (Issue #234)
+
+`ResponsiveDrawer` treats parent-driven `isOpen=false` as immediate removal, not a new user dismissal. A close button, backdrop, Escape, or mobile handle swipe preserves the exit animation and reports `onClose` once. Reopening or unmounting during exit cancels the old callback.
+
+| Case | Expected outcome |
+| :--- | :--- |
+| External close while the component remains mounted | Contents and overlay disappear; no user-close callback is emitted. |
+| Keyboard opening and Tab/Shift+Tab | The labelled modal receives focus, keeps navigation inside the active layer, and returns focus to its connected opener when dismissed. Mobile card shortcuts use the existing Edit button as their return target. |
+| Nested department input, Select, staff-payment portal, activity, or confirmation | First Escape closes only the active child. Parent draft and scroll lock survive; focus returns to the child opener. |
+| Pending confirmation | Confirm, Cancel, close button, backdrop, and Escape cannot repeat or dismiss a pending destructive action. Existing custom pending/confirm labels and hidden-confirm behavior remain supported. |
+| Multiple overlays, interrupted exit, and unmount | No stale overlay, duplicate callback, stolen focus, or prematurely released body scroll lock. Existing inline body overflow is restored. |
+| Mobile and motion preferences | Close controls are labelled and at least 48px square; content scroll is independent of handle-only swipe dismissal. Reduced motion avoids entrance/exit travel. |
+| Employee actions | Normal update/delete payloads and department selection are retained. Quick Edit still debounces for 800ms and replaces a queued older value for the same field. |
+
+Focused automated commands, from `frontend`, are `bun --no-env-file run test ResponsiveDrawer.lifecycle.test.tsx ActivityDrawer.test.tsx` and `bun --no-env-file run test:e2e --config=playwright.drawer.config.ts`. The browser configuration targets an **owned** Next development server at `http://127.0.0.1:3234`; start it with `bun --no-env-file run dev --hostname 127.0.0.1 --port 3234`, using synthetic loopback API/realtime environment values rather than copied environment files. The spec supplies synthetic HTTP and realtime responses, blocks other requests, and retains traces. It exercises the real employee screen and shared components, not a mocked drawer. `/test-support/drawer` is a development-only lifecycle fixture and rejects production rendering.
+
+Keep original failures, fixture/setup corrections, final passes, and unrun checks separate. These cases are not backend authorization, database persistence, deployment, or production smoke proof. Dream's existing activity request literal `/api/activity` and resulting browser `/api/api/activity` fixture remain intentional; do not change that routing contract as part of a modal repair.
+
 ### Test Suite A: Reference Data & Settings (New)
 *Verify operational reference data CRUD features.*
 
