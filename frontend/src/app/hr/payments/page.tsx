@@ -16,6 +16,8 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
 import ForbiddenState from "@/components/ForbiddenState";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
+import PayrollMutationNotice from "@/components/PayrollMutationNotice";
+import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -133,12 +135,18 @@ function PaymentsPageContent() {
     });
   }, [prefsReady, sortBy, sortOrder, yearFilter, statusFilter, savePreference]);
   const [confirmState, setConfirmState] = useState<{ id: string; action: "trash" | "restore" | "delete" } | null>(null);
+  const { begin: beginWrite, complete: completeWrite, fail: failWrite,
+    pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
+  const reportMutationFailure = (error: unknown, message: string) => {
+    failWrite(error, message);
+    setConfirmState(null);
+  };
   const highlightedId = searchParams.get("highlight");
 
   const hasPayrollAccess = hasPermission("payroll:read") || hasPermission("payroll:write");
   const hasPayrollWrite = hasPermission("payroll:write");
 
-  const { data: runsPayload, isLoading, isRefetching, refetch } = useQuery<PayrollRunsResponse>({
+  const { data: runsPayload, isLoading, isRefetching, isError: historyError, refetch } = useQuery<PayrollRunsResponse>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder, page],
     queryFn: () => getPayrollRuns({
       view,
@@ -153,67 +161,80 @@ function PaymentsPageContent() {
   });
 
   const trashMutation = useMutation({
+    retry: false,
     mutationFn: (id: string) => updatePayrollRunStatus(id, "TRASH"),
     onSuccess: () => {
+      completeWrite();
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
       toast.success("Payroll run moved to trash");
       setConfirmState(null);
     },
-    onError: () => {
-      toast.error("Failed to trash payroll run");
+    onError: (error: unknown) => {
+      reportMutationFailure(error, "Failed to trash payroll run");
     }
   });
 
   const restoreMutation = useMutation({
+    retry: false,
     mutationFn: (id: string) => updatePayrollRunStatus(id, "DRAFT"),
     onSuccess: () => {
+      completeWrite();
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
       toast.success("Payroll run restored");
       setConfirmState(null);
     },
-    onError: () => {
-      toast.error("Failed to restore payroll run");
+    onError: (error: unknown) => {
+      reportMutationFailure(error, "Failed to restore payroll run");
     },
   });
 
   const permanentDeleteMutation = useMutation({
+    retry: false,
     mutationFn: (id: string) => permanentlyDeletePayrollRun(id),
     onSuccess: () => {
+      completeWrite();
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
       toast.success("Payroll run permanently deleted");
       setConfirmState(null);
     },
-    onError: () => {
-      toast.error("Failed to permanently delete payroll run");
+    onError: (error: unknown) => {
+      reportMutationFailure(error, "Failed to permanently delete payroll run");
     },
   });
 
   const paginatedRuns = useMemo(() => runsPayload?.runs ?? [], [runsPayload]);
   const totalPages = runsPayload?.totalPages ?? 1;
 
-  const isMutating = trashMutation.isPending || restoreMutation.isPending || permanentDeleteMutation.isPending;
+  const isMutating = writePending;
 
   useEffect(() => {
     if (!highlightedId || paginatedRuns.length === 0) return;
     if (paginatedRuns.some((run) => run.id === highlightedId)) return;
   }, [highlightedId, paginatedRuns]);
 
-  const executeConfirmAction = async () => {
-    if (!confirmState) return;
+  const executeConfirmAction = () => {
+    if (!confirmState || !hasPayrollWrite || isLoading || historyError || !beginWrite()) return;
     if (confirmState.action === "trash") {
-      await trashMutation.mutateAsync(confirmState.id);
+      trashMutation.mutate(confirmState.id);
       return;
     }
     if (confirmState.action === "restore") {
-      await restoreMutation.mutateAsync(confirmState.id);
+      restoreMutation.mutate(confirmState.id);
       return;
     }
-    await permanentDeleteMutation.mutateAsync(confirmState.id);
+    permanentDeleteMutation.mutate(confirmState.id);
   };
 
   const handleSync = async () => {
-    await refetch();
-    toast.success("Payroll history updated");
+    const result = await refetch();
+    if (result.isError) {
+      toast.error("Failed to load payroll history");
+    } else {
+      toast.success("Payroll history updated");
+    }
   };
 
   if (authLoading) {
@@ -293,12 +314,24 @@ function PaymentsPageContent() {
             {hasPayrollWrite && (
               <FancyButton
                 onClick={() => router.push(`/hr/payments/run?date=${selectedMonth}`)}
+                disabled={isMutating || needsReload || isLoading || historyError}
               >
                 {t("New Payout")}
               </FancyButton>
             )}
           </div>
         </div>
+
+        <PayrollMutationNotice failure={mutationFailure} pending={isMutating} />
+        {historyError && (
+          <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-card p-4 text-sm">
+            <p>{lang === "am" ? "የተቀመጠ የክፍያ ታሪክ መጫን አልተቻለም።" : "Saved payroll history could not be loaded."}</p>
+            <button type="button" onClick={handleSync}
+              className="min-h-12 rounded-lg border border-border px-4 font-semibold focus-visible:outline-2 focus-visible:outline-primary">
+              {lang === "am" ? "ታሪኩን እንደገና ጫን" : "Retry history"}
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-card/40 backdrop-blur-md p-4 rounded-2xl border border-border/50 shadow-sm">
           <div className="space-y-1.5">
@@ -353,7 +386,7 @@ function PaymentsPageContent() {
           </div>
         </div>
 
-        {isLoading ? (
+        {historyError ? null : isLoading ? (
           <div className="p-20 text-center text-muted-foreground animate-pulse font-black uppercase text-[10px] tracking-[0.4em] bg-card rounded-xl border border-border/50 shadow-inner">
             {t("Retrieving payroll audit history...")}
           </div>
@@ -434,6 +467,8 @@ function PaymentsPageContent() {
                         {hasPayrollWrite && currentStatus === "DRAFT" && (
                           <Link
                             href={`/hr/payments/run?date=${run.period_start ? run.period_start.slice(0, 7) : ""}&period_type=${run.period_start?.endsWith("-16") ? "h2" : run.period_start?.endsWith("-01") && run.period_end?.endsWith("-15") ? "h1" : "full"}`}
+                            aria-disabled={isMutating || needsReload || historyError}
+                            onClick={(event) => { if (isMutating || needsReload || historyError) event.preventDefault(); }}
                             className="flex items-center justify-center gap-2 p-3 bg-amber-500 text-white rounded-2xl hover:bg-amber-600 transition-all active:scale-95 shadow-lg shadow-amber-500/10"
                             title="Edit Draft"
                           >
@@ -444,6 +479,7 @@ function PaymentsPageContent() {
                           view === "active" ? (
                             <button
                               onClick={() => setConfirmState({ id: run.id, action: "trash" })}
+                              disabled={isMutating || needsReload || historyError}
                               className="flex items-center justify-center gap-2 p-3 bg-rose-600 text-white rounded-2xl hover:bg-rose-700 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
                               title="Move to Trash"
                             >
@@ -453,6 +489,7 @@ function PaymentsPageContent() {
                             <>
                             <button
                               onClick={() => setConfirmState({ id: run.id, action: "restore" })}
+                              disabled={isMutating || needsReload || historyError}
                               className="flex items-center justify-center gap-2 p-3 bg-emerald-600 text-white rounded-2xl hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/10"
                               title="Restore"
                             >
@@ -460,6 +497,7 @@ function PaymentsPageContent() {
                             </button>
                             <button
                               onClick={() => setConfirmState({ id: run.id, action: "delete" })}
+                              disabled={isMutating || needsReload || historyError}
                               className="flex items-center justify-center gap-2 p-3 bg-rose-700 text-white rounded-2xl hover:bg-rose-800 transition-all active:scale-95 shadow-lg shadow-rose-500/10"
                               title="Delete Permanently"
                             >
@@ -484,7 +522,7 @@ function PaymentsPageContent() {
           </div>
         )}
 
-        {(runsPayload?.total ?? 0) > ITEMS_PER_PAGE && (
+        {!historyError && (runsPayload?.total ?? 0) > ITEMS_PER_PAGE && (
           <div className="pt-2 flex justify-center">
             <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
@@ -512,6 +550,7 @@ function PaymentsPageContent() {
           }
           itemName={paginatedRuns.find(r => r.id === confirmState?.id)?.id.slice(0,8) || ""}
           isDeleting={isMutating}
+          confirmDisabled={needsReload || historyError || !hasPayrollWrite}
         />
       </div>
     </AuthLayout>

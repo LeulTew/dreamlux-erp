@@ -28,7 +28,6 @@ import {
   getStores,
   getSalaryLevels,
   getEventTypes,
-  previewPayrollRun,
   savePayrollDraft,
   finalizePayrollRun,
   getPayrollRuns,
@@ -52,6 +51,11 @@ import toast from "@/lib/toast";
 import { findRunForPeriod } from "@/utils/payroll-period";
 import { useLanguage } from "@/hooks/use-language";
 import ForbiddenState from "@/components/ForbiddenState";
+import PayrollMutationNotice from "@/components/PayrollMutationNotice";
+import PayrollPreviewSheet from "@/components/PayrollPreviewSheet";
+import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
+import { extractPayrollHttpError } from "@/lib/payroll-error";
+import { capturePayrollPreviewRequest, type PayrollPreviewRequest } from "@/lib/payroll-preview";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -62,6 +66,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save Draft": "Save Draft",
     "Previewing...": "Previewing...",
     "Preview": "Preview",
+    "Preview requires payroll read permission.": "Preview requires payroll read permission.",
+    "Setup totals are estimates. Use Preview to review the server calculation before saving.": "Setup totals are estimates. Use Preview to review the server calculation before saving.",
     "Finalizing...": "Finalizing...",
     "Finalize Run": "Finalize Run",
     "Saving draft...": "Saving draft...",
@@ -81,18 +87,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Sort: Dept": "Sort: Dept",
     "Sort: Pay": "Sort: Pay",
     "Manage Event Types": "Manage Event Types",
-    "Base Salary": "Base Salary",
-    "Events / Commissions": "Events / Commissions",
+    "Base Salary": "Base Salary (estimate)",
+    "Events / Commissions": "Events / Commissions (estimate)",
     "No events added for this employee yet.": "No events added for this employee yet.",
     "Select event": "Select event",
     "Decrease": "Decrease",
     "Increase": "Increase",
     "Remove Event": "Remove Event",
     "Add Event": "Add Event",
-    "Total Earnings": "Total Earnings",
-    "Base Salary Total": "Base Salary Total",
-    "Commission Total": "Commission Total",
-    "Grand Total Disbursement": "Grand Total Disbursement",
+    "Total Earnings": "Total Earnings (estimate)",
+    "Base Salary Total": "Base Salary Total (estimate)",
+    "Commission Total": "Commission Total (estimate)",
+    "Grand Total Disbursement": "Grand Total Disbursement (estimate)",
     "Loading payroll run...": "Loading payroll run...",
     "Existing draft loaded!": "Existing draft loaded!",
     "Draft saved": "Draft saved",
@@ -129,6 +135,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save Draft": "ረቂቅ አስቀምጥ",
     "Previewing...": "ቅድመ-ዕይታ በማዘጋጀት ላይ...",
     "Preview": "ቅድመ-ዕይታ",
+    "Preview requires payroll read permission.": "ቅድመ እይታ የክፍያ ንባብ ፈቃድ ይፈልጋል።",
+    "Setup totals are estimates. Use Preview to review the server calculation before saving.": "የዝግጅቱ ድምሮች ግምቶች ናቸው። ከማስቀመጥዎ በፊት የአገልጋዩን ስሌት በቅድመ እይታ ያረጋግጡ።",
     "Finalizing...": "በማጠናቀቅ ላይ...",
     "Finalize Run": "ክፍያውን አጠናቅ",
     "Saving draft...": "ረቂቅ በመቀመጥ ላይ...",
@@ -148,18 +156,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Sort: Dept": "በክፍል ደርድር",
     "Sort: Pay": "በክፍያ ደርድር",
     "Manage Event Types": "የክስተት ዓይነቶችን ያስተዳድሩ",
-    "Base Salary": "መሠረታዊ ደመወዝ",
-    "Events / Commissions": "ክስተቶች / ኮሚሽኖች",
+    "Base Salary": "መሠረታዊ ደመወዝ (ግምት)",
+    "Events / Commissions": "ክስተቶች / ኮሚሽኖች (ግምት)",
     "No events added for this employee yet.": "ለዚህ ሠራተኛ እስካሁን የተጨመረ ክስተት የለም።",
     "Select event": "ክስተት ይምረጡ",
     "Decrease": "ቀንስ",
     "Increase": "ጨምር",
     "Remove Event": "ክስተት አስወግድ",
     "Add Event": "ክስተት ጨምር",
-    "Total Earnings": "አጠቃላይ ገቢ",
-    "Base Salary Total": "አጠቃላይ መሠረታዊ ደመወዝ",
-    "Commission Total": "አጠቃላይ ኮሚሽን",
-    "Grand Total Disbursement": "አጠቃላይ የተከፈለ ክፍያ",
+    "Total Earnings": "አጠቃላይ ገቢ (ግምት)",
+    "Base Salary Total": "አጠቃላይ መሠረታዊ ደመወዝ (ግምት)",
+    "Commission Total": "አጠቃላይ ኮሚሽን (ግምት)",
+    "Grand Total Disbursement": "አጠቃላይ የተከፈለ ክፍያ (ግምት)",
     "Loading payroll run...": "የክፍያ መዝገብ በመጫን ላይ...",
     "Existing draft loaded!": "ያለው ረቂቅ ተጭኗል!",
     "Draft saved": "ረቂቅ ተቀምጧል",
@@ -197,39 +205,6 @@ type EventLine = {
   override_reason?: string | null;
   selected_level_id?: string | null;
 };
-
-type PreviewResponse = {
-  month: number;
-  year: number;
-  total_payroll_value: number;
-  employee_lines: Array<{
-    employee_id: string;
-    employee_name_snapshot: string;
-    compensation_mode_snapshot: "regular" | "commission_only";
-    snapshot_base_salary: number;
-    total_events_value: number;
-    total_line_pay: number;
-  }>;
-};
-
-function extractHttpError(error: unknown): { status: number | null; message: string | null } {
-  if (typeof error !== "object" || error === null || !("response" in error)) {
-    return { status: null, message: null };
-  }
-
-  const response = (error as { response?: { status?: unknown; data?: unknown } }).response;
-  const status = typeof response?.status === "number" ? response.status : null;
-  const data = response?.data;
-
-  if (typeof data === "object" && data !== null && "error" in data) {
-    const message = (data as { error?: unknown }).error;
-    if (typeof message === "string" && message.trim().length > 0) {
-      return { status, message };
-    }
-  }
-
-  return { status, message: null };
-}
 
 function normalizeLevelLabel(rawLabel: string): string {
   const cleaned = rawLabel.replace(/^legacy:/i, "").trim().toUpperCase();
@@ -300,6 +275,13 @@ function PaymentRunProcessPageContent() {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<"name" | "department" | "pay">("name");
   const [errorMsg, setErrorMsg] = useState("");
+  const [previewRequest, setPreviewRequest] = useState<PayrollPreviewRequest | null>(null);
+  const previewSequence = useRef(0);
+  const previewButton = useRef<HTMLButtonElement>(null);
+  const previewAccessNote = useRef<HTMLParagraphElement>(null);
+  const closePreview = useCallback(() => setPreviewRequest(null), []);
+  const { begin: beginWrite, complete: completeWrite, fail: failWrite,
+    pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
   const [eventLinesByEmployee, setEventLinesByEmployee] = useState<Record<string, EventLine[]>>({});
   const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -329,6 +311,7 @@ function PaymentRunProcessPageContent() {
   }, []);
 
   const hasPayrollWrite = isAuthenticated && hasPermission("payroll:write");
+  const hasPayrollRead = isAuthenticated && hasPermission("payroll:read");
 
   const { data: employeesPayload, isLoading: employeesLoading } = useQuery({
     queryKey: ["payroll-run-employees", officeId],
@@ -348,7 +331,7 @@ function PaymentRunProcessPageContent() {
     enabled: hasPayrollWrite,
   });
 
-  const { data: runsHistoryPayload, isLoading: runsHistoryLoading } = useQuery({
+  const { data: runsHistoryPayload, isLoading: runsHistoryLoading, isError: runsHistoryError, refetch: refetchRunsHistory } = useQuery({
     queryKey: ["payroll-runs", "active"],
     queryFn: () => getPayrollRuns({ view: "active", limit: 100 }),
     enabled: hasPayrollWrite,
@@ -435,6 +418,15 @@ function PaymentRunProcessPageContent() {
 
     return { start, end, kind };
   }, [selectedMonth, periodType, settings]);
+
+  const previewContextKey = JSON.stringify([
+    user?.id, !authLoading && hasPayrollRead && hasPayrollWrite, selectedMonth, periodType, officeId,
+    searchParams.get("date"), searchParams.get("period_type"), activeDates.start, activeDates.end, activeDates.kind,
+  ]);
+  const currentPreview = previewRequest?.contextKey === previewContextKey ? previewRequest : null;
+  // Clear before rendering so a changed owner/period/grant cannot expose or
+  // later reopen an old result, even when its transport ignores cancellation.
+  if (previewRequest && !currentPreview) setPreviewRequest(null);
 
   const { data: eligibleCommissions } = useQuery<{
     lines: Array<{ employee_id: string; event_type_id: string; quantity: number; commission_total: number }>;
@@ -624,75 +616,44 @@ function PaymentRunProcessPageContent() {
     };
   }, [employees, computeEmployeeTotals]);
 
-  const previewMutation = useMutation({
-    mutationFn: (payload: PayrollGenerateRequest) =>
-      previewPayrollRun(payload as unknown as Record<string, unknown>) as Promise<PreviewResponse>,
-    onError: (error: Error) => {
-      setErrorMsg(error.message || t("Failed to generate preview"));
-    },
-  });
-
   const saveDraftMutation = useMutation({
+    retry: false,
     mutationFn: (payload: PayrollGenerateRequest & { created_by_user_id?: string }) =>
-      savePayrollDraft(payload as unknown as Record<string, unknown>) as Promise<{ id: string }>,
+      savePayrollDraft({ ...payload }),
     onSuccess: (data) => {
+      completeWrite();
       setIsDraftDirty(false);
       setLastSavedAt(new Date().toISOString());
       setDraftPeriodKey(`${selectedMonth}:${periodType}`);
       setErrorMsg("");
-      if (data?.id) {
-        hasAutoLoaded.current = data.id;
-      }
+      hasAutoLoaded.current = data.id;
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
       if (lastSaveSourceRef.current === "manual") {
         toast.success(t("Draft saved"));
       }
     },
     onError: (error: unknown) => {
-      const { message } = extractHttpError(error);
-
-      if (message) {
-        setErrorMsg(message);
-        return;
-      }
-
-      if (error instanceof Error) {
-        setErrorMsg(error.message || t("Failed to save draft"));
-        return;
-      }
-
-      setErrorMsg(t("Failed to save draft"));
+      setErrorMsg("");
+      failWrite(error, t("Failed to save draft"));
     },
   });
 
   const finalizeMutation = useMutation({
+    retry: false,
     mutationFn: (payload: PayrollGenerateRequest & { created_by_user_id?: string }) => 
-      finalizePayrollRun(payload as unknown as Record<string, unknown>) as Promise<{ id: string }>,
+      finalizePayrollRun({ ...payload }),
     onSuccess: (data) => {
+      completeWrite();
+      queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       router.push(`/hr/payments/${data.id}`);
     },
     onError: (error: unknown) => {
-      const { status, message } = extractHttpError(error);
-
-      if (status === 409) {
-        setErrorMsg(
-          message ||
-            t("A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.")
-        );
-        return;
-      }
-
-      if (message) {
-        setErrorMsg(message);
-        return;
-      }
-
-      if (error instanceof Error) {
-        setErrorMsg(error.message || t("Failed to finalize payroll run"));
-        return;
-      }
-
-      setErrorMsg(t("Failed to finalize payroll run"));
+      const { status } = extractPayrollHttpError(error);
+      setErrorMsg("");
+      failWrite(error, status === 409
+        ? t("A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.")
+        : t("Failed to finalize payroll run"));
     },
   });
 
@@ -731,27 +692,30 @@ function PaymentRunProcessPageContent() {
   }, [activeDates.end, activeDates.kind, activeDates.start, employees, eventLinesByEmployee, getEmployeeEventPrice, selectedMonth]);
 
   const handleSaveDraft = useCallback((source: "manual" | "auto") => {
-    if (employeesLoading || authLoading) return;
+    if (employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !hasPayrollWrite || needsReload || writePending || finalizeMutation.isSuccess) return;
+    if (source === "auto" && (saveDraftMutation.isError || mutationFailure)) return;
 
     setErrorMsg("");
+    let payload: PayrollGenerateRequest;
     try {
-      const payload = buildPayload();
-      const createdByUserId = user?.id;
-
-      lastSaveSourceRef.current = source;
-      saveDraftMutation.mutate({
-        ...payload,
-        ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
-      });
+      payload = buildPayload();
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
+      return;
     }
-  }, [authLoading, buildPayload, employeesLoading, saveDraftMutation, user]);
+    if (!beginWrite()) return;
+    const createdByUserId = user?.id;
+    lastSaveSourceRef.current = source;
+    saveDraftMutation.mutate({
+      ...payload,
+      ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
+    });
+  }, [authLoading, beginWrite, buildPayload, employeesLoading, finalizeMutation.isSuccess, hasPayrollWrite, mutationFailure, needsReload, runsHistoryError, runsHistoryLoading, saveDraftMutation, user, writePending]);
 
   useEffect(() => {
     if (!isDraftDirty) return;
-    if (employeesLoading || authLoading) return;
-    if (saveDraftMutation.isPending) return;
+    if (employeesLoading || authLoading || runsHistoryLoading || runsHistoryError) return;
+    if (writePending || needsReload || mutationFailure || saveDraftMutation.isError || finalizeMutation.isSuccess) return;
 
     const activePeriodKey = `${selectedMonth}:${periodType}`;
     if (!draftPeriodKey || draftPeriodKey !== activePeriodKey) return;
@@ -777,21 +741,32 @@ function PaymentRunProcessPageContent() {
     draftPeriodKey,
     employeesLoading,
     authLoading,
-    saveDraftMutation.isPending,
+    runsHistoryLoading,
+    runsHistoryError,
+    writePending,
+    needsReload,
+    mutationFailure,
+    saveDraftMutation.isError,
+    finalizeMutation.isSuccess,
     handleSaveDraft,
   ]);
 
   const handlePreview = () => {
+    if (writePending || needsReload || employeesLoading || authLoading || !hasPayrollRead || !user?.id) return;
     setErrorMsg("");
     try {
       const payload = buildPayload();
-      previewMutation.mutate(payload);
+      setPreviewRequest(capturePayrollPreviewRequest({
+        sequence: ++previewSequence.current, userId: user.id, contextKey: previewContextKey, payload,
+        periodStart: activeDates.start, periodEnd: activeDates.end, periodKind: activeDates.kind,
+      }));
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
     }
   };
 
   const handleFinalize = () => {
+    if (employeesLoading || authLoading || runsHistoryError || !hasPayrollWrite || writePending || needsReload || finalizeMutation.isSuccess) return;
     setErrorMsg("");
 
     if (runsHistoryLoading) {
@@ -807,17 +782,19 @@ function PaymentRunProcessPageContent() {
       return;
     }
 
+    let payload: PayrollGenerateRequest;
     try {
-      const payload = buildPayload();
-      const createdByUserId = user?.id;
-
-      finalizeMutation.mutate({
-        ...payload,
-        ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
-      });
+      payload = buildPayload();
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
+      return;
     }
+    if (!beginWrite()) return;
+    const createdByUserId = user?.id;
+    finalizeMutation.mutate({
+      ...payload,
+      ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
+    });
   };
 
   const addEventLine = (employeeId: string) => {
@@ -850,7 +827,11 @@ function PaymentRunProcessPageContent() {
     setDraftPeriodKey(`${selectedMonth}:${periodType}`);
   };
 
-  const draftStatusLabel = saveDraftMutation.isPending
+  const draftStatusLabel = needsReload
+    ? (lang === "am" ? "እንደገና መጫን ያስፈልጋል" : "Reload required")
+    : saveDraftMutation.isError
+      ? t("Failed to save draft")
+      : saveDraftMutation.isPending
     ? t("Saving draft...")
     : isDraftDirty
       ? t("Unsaved changes")
@@ -907,21 +888,24 @@ function PaymentRunProcessPageContent() {
               )}
               <button
                 onClick={() => handleSaveDraft("manual")}
-                disabled={saveDraftMutation.isPending || employeesLoading || authLoading}
+                disabled={writePending || needsReload || finalizeMutation.isSuccess || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-500/10 text-amber-700 border border-amber-500/20 shadow-premium hover:bg-amber-500/20 transition-all disabled:opacity-50"
               >
                 {saveDraftMutation.isPending ? t("Saving...") : t("Save Draft")}
               </button>
               <button
+                ref={previewButton}
+                type="button"
                 onClick={handlePreview}
-                disabled={previewMutation.isPending || employeesLoading || authLoading}
-                className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card text-foreground shadow-premium hover:bg-card-alt transition-all disabled:opacity-50"
+                aria-describedby={!hasPayrollRead ? "payroll-preview-access" : undefined}
+                disabled={!hasPayrollRead || !user?.id || currentPreview !== null || writePending || needsReload || employeesLoading || authLoading}
+                className="min-h-12 min-w-12 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card text-foreground border border-border [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
               >
-                {previewMutation.isPending ? t("Previewing...") : t("Preview")}
+                {t("Preview")}
               </button>
               <button
                 onClick={handleFinalize}
-                disabled={finalizeMutation.isPending || employeesLoading || authLoading || runsHistoryLoading || !!existingFinalized}
+                disabled={writePending || needsReload || finalizeMutation.isSuccess || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !!existingFinalized}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-primary text-background shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {finalizeMutation.isPending ? t("Finalizing...") : t("Finalize Run")}
@@ -932,6 +916,34 @@ function PaymentRunProcessPageContent() {
             </p>
           </div>
         </div>
+
+        <PayrollMutationNotice failure={mutationFailure} pending={writePending} />
+        {!hasPayrollRead && (
+          <p id="payroll-preview-access" ref={previewAccessNote} tabIndex={-1} className="rounded-xl border border-border p-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-foreground">
+            {t("Preview requires payroll read permission.")}
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground">{t("Setup totals are estimates. Use Preview to review the server calculation before saving.")}</p>
+        {currentPreview && (
+          <PayrollPreviewSheet
+            request={currentPreview}
+            canRead={hasPayrollRead}
+            onClose={closePreview}
+            restoreFocus={() => {
+              if (previewButton.current && !previewButton.current.disabled) previewButton.current.focus();
+              else previewAccessNote.current?.focus();
+            }}
+          />
+        )}
+        {runsHistoryError && (
+          <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-card p-4 text-sm">
+            <p>{lang === "am" ? "የክፍያ ታሪኩን መጫን አልተቻለም። ለውጥ ከማድረግዎ በፊት እንደገና ይሞክሩ።" : "Payroll history could not be loaded. Retry before making changes."}</p>
+            <button type="button" onClick={() => { void refetchRunsHistory(); }}
+              className="min-h-12 rounded-lg border border-border px-4 font-semibold focus-visible:outline-2 focus-visible:outline-primary">
+              {lang === "am" ? "ታሪኩን እንደገና ጫን" : "Retry history"}
+            </button>
+          </div>
+        )}
 
         {existingDraft && (
           <PrintOptionsModal 
@@ -1138,7 +1150,7 @@ function PaymentRunProcessPageContent() {
 
         <div ref={sentinelRef} className="h-px w-full invisible" />
         <div 
-          className={`sticky bottom-10 md:bottom-8 flex flex-col p-6 rounded-xl bg-card/80 backdrop-blur-xl shadow-massive border border-border/40 text-foreground z-30 transition-all duration-300 ease-in-out ${isFloating ? '-translate-y-1' : 'translate-y-0'}`}
+          className={`${mutationFailure ? 'relative' : 'sticky bottom-10 md:bottom-8'} flex flex-col p-6 rounded-xl bg-card/80 backdrop-blur-xl shadow-massive border border-border/40 text-foreground z-30 transition-all duration-300 ease-in-out ${!mutationFailure && isFloating ? '-translate-y-1' : 'translate-y-0'}`}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className={`flex items-center transition-all duration-300 ${isFloating ? 'gap-4' : 'gap-6'}`}>

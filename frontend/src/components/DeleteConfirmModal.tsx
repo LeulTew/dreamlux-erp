@@ -12,6 +12,7 @@ interface DeleteConfirmModalProps {
   isDeleting: boolean;
   variant?: "danger" | "primary";
   confirmLabel?: string;
+  pendingLabel?: string;
   confirmDisabled?: boolean;
 }
 
@@ -25,6 +26,7 @@ export default function DeleteConfirmModal({
   isDeleting,
   variant = "danger",
   confirmLabel,
+  pendingLabel,
   confirmDisabled = false
 }: DeleteConfirmModalProps) {
   const isDanger = variant === "danger";
@@ -77,7 +79,7 @@ export default function DeleteConfirmModal({
                     disabled={isDeleting}
                     className={`w-full h-11 text-white rounded-xl font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 ${isDanger ? 'bg-danger' : 'bg-emerald-600'}`}
                   >
-                    {isDeleting ? (isDanger ? "Deleting..." : "Restoring...") : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
+                    {isDeleting ? (pendingLabel || (isDanger ? "Deleting..." : "Restoring...")) : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
                   </button>
                 )}
                 <button

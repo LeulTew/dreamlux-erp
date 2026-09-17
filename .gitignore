@@ -12,3 +12,4 @@ backups/
 ux-polish-tracking.md
 .vercel
 .env*
+.qa-payroll-*

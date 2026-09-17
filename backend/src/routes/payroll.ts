@@ -3,11 +3,10 @@ import { supabase } from "../db/supabase";
 import { generatePayrollPreviewSchema, finalizePayrollRunSchema, savePayrollDraftSchema } from "../lib/validation";
 import { getMonthlyBounds, getHalfMonthBounds, getWeeklyBounds } from "../utils/payroll-utils";
 import { getPublicUrl } from "../storage/storage";
-import { buildPayrollLines, toPayrollEventPayloads, toPayrollLinePayloads } from "../lib/payroll-generation";
-import { getAuthoritativePayrollInputLines, getEligibleCommissionRows } from "../lib/eligible-payroll-commissions";
+import { getEligibleCommissionRows } from "../lib/eligible-payroll-commissions";
 import { AuthRequest, getEffectivePermissionSlugsFromUser } from "../middleware/auth";
 import { NotificationsService } from "../services/notifications-service";
-import { ActivityService } from "../services/activity-service";
+import { PayrollPersistenceError, PayrollPersistenceService, type PayrollPeriod } from "../services/payroll-persistence-service";
 import { hasPermissionSlug } from "../lib/permissions";
 import { getSettings } from "../lib/settings";
 import { pool } from "../db/pool";
@@ -125,32 +124,30 @@ function resolvePersistedPayrollPeriod(input: {
   };
 }
 
-async function insertPayrollAuditLog(input: {
-  payrollRunId: string;
-  userId?: string | null;
-  action: "draft_saved" | "finalized";
-  periodStart: string;
-  periodEnd: string;
-  statusSnapshot: "draft" | "finalized";
-  employeeCount: number;
-  totalPayrollSnapshot: number;
-  metadata?: Record<string, unknown>;
-}) {
-  const { error } = await supabase.from("payroll_audit_logs").insert({
-    payroll_run_id: input.payrollRunId,
-    user_id: input.userId ?? null,
-    action: input.action,
-    period_start: input.periodStart,
-    period_end: input.periodEnd,
-    status_snapshot: input.statusSnapshot,
-    employee_count: input.employeeCount,
-    total_payroll_snapshot: input.totalPayrollSnapshot,
-    metadata: input.metadata ?? {},
-  });
-
-  if (error) {
-    console.warn(`Payroll audit log insert failed for ${input.action}:`, error.message);
+function requestPeriod(input: {
+  month?: number; year?: number; period_kind?: PayrollPeriod["periodKind"];
+  period_start?: string; period_end?: string;
+}): PayrollPeriod {
+  try {
+    return resolvePersistedPayrollPeriod({
+      month: input.month, year: input.year, periodKind: input.period_kind,
+      periodStart: input.period_start, periodEnd: input.period_end,
+    });
+  } catch (error) {
+    throw new PayrollPersistenceError(400, error instanceof Error ? error.message : "Invalid payroll period", false, error);
   }
+}
+
+function payrollFailure(res: express.Response, error: unknown, message: string) {
+  console.error(`[Payroll] ${message}`, error);
+  if (error instanceof PayrollPersistenceError) {
+    return res.status(error.status).json({
+      error: error.status === 500 ? message : error.message,
+      ...(error.status >= 500 ? { outcome_uncertain: error.outcomeUncertain } : {}),
+    });
+  }
+  // An unexpected route/cleanup failure can occur after the database committed.
+  return res.status(500).json({ error: message, outcome_uncertain: true });
 }
 
 // GET /payroll/runs — list runs with aggregated totals
@@ -346,7 +343,7 @@ router.get("/runs", async (req: AuthRequest, res) => {
 
     if (linesError) {
       console.error("Error fetching payroll lines:", linesError);
-      // Continue without totals rather than failing completely
+      return res.status(500).json({ error: "Failed to load saved payroll totals" });
     }
 
     // Aggregate totals per run
@@ -446,9 +443,9 @@ router.get("/runs/:id", async (req: AuthRequest, res) => {
 
       if (evError) {
         console.error("Error fetching payroll events:", evError);
-      } else {
-        events = evData ?? [];
+        return res.status(500).json({ error: "Failed to load saved payroll event snapshots" });
       }
+      events = evData ?? [];
     }
 
     const totalPayrollValue = (lines ?? []).reduce((sum: number, l: any) => sum + Number(l.employee_total_snapshot ?? 0), 0);
@@ -510,36 +507,9 @@ router.patch("/runs/:id/status", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Invalid status" });
     }
 
-    const mappedStatus = toDbStatus(status);
-    const updates: Record<string, unknown> = {
-      status: mappedStatus,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (mappedStatus === "trashed") {
-      updates.deleted_at = new Date().toISOString();
-    } else {
-      updates.deleted_at = null;
-    }
-    if (mappedStatus === "finalized") {
-      updates.finalized_at = new Date().toISOString();
-    }
-
-    const { data, error } = await supabase
-      .from("payroll_runs")
-      .update(updates)
-      .eq("id", id)
-      .select("id, status, updated_at, deleted_at, finalized_at")
-      .single();
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-    if (!data) {
-      return res.status(404).json({ error: "Payroll run not found" });
-    }
-    if (mappedStatus === "finalized") {
-      NotificationsService.emitNotificationToRoleOrPermission({
+    const { published, ...data } = await PayrollPersistenceService.changeStatus(id, toDbStatus(status), req.user?.id ?? null);
+    if (published) {
+      void Promise.resolve().then(() => NotificationsService.emitNotificationToRoleOrPermission({
         permissionSlug: "payroll:read",
         actor_id: req.user?.id,
         title: "Payroll Run Finalized",
@@ -547,22 +517,14 @@ router.patch("/runs/:id/status", async (req: AuthRequest, res) => {
         entity_type: "payroll",
         entity_id: id,
         action_url: "/payroll",
+      })).catch((error: unknown) => {
+        console.error("[Payroll] Finalized-run notification delivery failed", { runId: id, actorId: req.user?.id, error });
       });
     }
 
-    // Log payroll activity
-    ActivityService.logActivity({
-      entity_type: "payroll",
-      entity_id: id,
-      user_id: req.user?.id || null,
-      action: "update_status",
-      note: `Payroll run status changed to "${mappedStatus}".`,
-    });
-
     res.json({ ...data, status: toApiStatus(data.status) });
   } catch (error) {
-    console.error("Error updating payroll run status:", error);
-    res.status(500).json({ error: "Internal server error" });
+    payrollFailure(res, error, "Failed to update payroll status");
   }
 });
 
@@ -571,25 +533,9 @@ router.delete("/runs/:id", async (req: AuthRequest, res) => {
   try {
     if (!requirePayrollWrite(req, res)) return;
 
-    const { id } = req.params;
-    const { data, error } = await supabase
-      .from("payroll_runs")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", id)
-      .select("id")
-      .single();
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-    if (!data) {
-      return res.status(404).json({ error: "Payroll run not found" });
-    }
-
-    res.json({ success: true, id: data.id });
+    res.json(await PayrollPersistenceService.remove(req.params.id, req.user?.id ?? null));
   } catch (error) {
-    console.error("Error deleting payroll run:", error);
-    res.status(500).json({ error: "Internal server error" });
+    payrollFailure(res, error, "Failed to delete payroll run");
   }
 });
 
@@ -598,21 +544,9 @@ router.delete("/runs/:id/permanent", async (req: AuthRequest, res) => {
   try {
     if (!requirePayrollWrite(req, res)) return;
 
-    const { id } = req.params;
-
-    const { error } = await supabase
-      .from("payroll_runs")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    res.json({ success: true, id });
+    res.json(await PayrollPersistenceService.remove(req.params.id, req.user?.id ?? null, true));
   } catch (error) {
-    console.error("Error permanently deleting payroll run:", error);
-    res.status(500).json({ error: "Internal server error" });
+    payrollFailure(res, error, "Failed to permanently delete payroll run");
   }
 });
 
@@ -626,45 +560,21 @@ router.post("/preview", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, period_end } = result.data;
-    const period = resolvePersistedPayrollPeriod({ month, year, periodKind: period_kind, periodStart: period_start, periodEnd: period_end });
-
-    const { data: eventsMaster } = await supabase
-      .from("event_types")
-      .select("id, name")
-      .is("deleted_at", null);
-
-    const { data: employees } = await supabase
-      .from("employees")
-      .select("id, full_name, salary_level, base_salary, profile_photo_key, event_prices, compensation_mode")
-      .is("deleted_at", null);
-
-    const { data: salaryLevels } = await supabase
-      .from("salary_levels")
-      .select("id, code, amount_etb")
-      .is("deleted_at", null);
-
-    const authoritativeLines = await getAuthoritativePayrollInputLines(
-      period.bounds.start,
-      period.bounds.end,
-      (employees ?? []).map((employee: { id: string }) => employee.id),
-    );
-    const { totalPayrollValue, lines: processedLines } = buildPayrollLines({
-      employeeLineEvents: authoritativeLines,
-      eventTypes: eventsMaster ?? [],
-      employees: employees ?? [],
-      salaryLevels: salaryLevels ?? [],
-    });
+    const { month, year } = result.data;
+    const period = requestPeriod(result.data);
+    const { totalPayrollValue, lines: processedLines } = await PayrollPersistenceService.preview(period);
 
     res.json({
       month,
       year,
+      period_start: period.bounds.start,
+      period_end: period.bounds.end,
+      period_kind: period.periodKind,
       total_payroll_value: totalPayrollValue,
       employee_lines: processedLines,
     });
   } catch (error) {
-    console.error("Error generating payroll preview:", error);
-    res.status(500).json({ error: "Internal server error" });
+    payrollFailure(res, error, "Unable to load payroll inputs. Please try again.");
   }
 });
 
@@ -678,161 +588,10 @@ router.post("/drafts", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, period_end } = result.data;
-    const actorUserId = req.user?.id ?? null;
-
-    let period;
-    try {
-      period = resolvePersistedPayrollPeriod({
-        month,
-        year,
-        periodKind: period_kind,
-        periodStart: period_start,
-        periodEnd: period_end,
-      });
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
-    }
-
-    const { bounds, title } = period;
-
-    const { data: existingDraft, error: draftLookupError } = await supabase
-      .from("payroll_runs")
-      .select("id")
-      .eq("period_start", bounds.start)
-      .eq("period_end", bounds.end)
-      .eq("status", "draft")
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (draftLookupError) {
-      console.error("Error checking for existing draft:", draftLookupError);
-    }
-
-    const { data: eventsMaster } = await supabase
-      .from("event_types")
-      .select("id, name")
-      .is("deleted_at", null);
-
-    const { data: employees } = await supabase
-      .from("employees")
-      .select("id, full_name, salary_level, base_salary, event_prices, compensation_mode")
-      .is("deleted_at", null);
-
-    const { data: salaryLevels } = await supabase
-      .from("salary_levels")
-      .select("id, code, amount_etb")
-      .is("deleted_at", null);
-
-    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee: { id: string }) => employee.id));
-    const { lines: processedLines } = buildPayrollLines({
-      employeeLineEvents: authoritativeLines,
-      eventTypes: eventsMaster ?? [],
-      employees: employees ?? [],
-      salaryLevels: salaryLevels ?? [],
-    });
-
-    const insertPayload = {
-      title,
-      period_kind: period.periodKind,
-      period_start: bounds.start,
-      period_end: bounds.end,
-      status: "draft",
-      created_by: actorUserId,
-    };
-
-    const updatePayload: Record<string, unknown> = {
-      title,
-      period_kind: period.periodKind,
-      period_start: bounds.start,
-      period_end: bounds.end,
-      status: "draft",
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-      finalized_at: null,
-    };
-
-    if (actorUserId) {
-      updatePayload.created_by = actorUserId;
-    }
-
-    const { data: runData, error: runError } = existingDraft
-      ? await supabase.from("payroll_runs").update(updatePayload).eq("id", existingDraft.id).select("id").single()
-      : await supabase.from("payroll_runs").insert(insertPayload).select("id").single();
-
-    if (runError || !runData) {
-      console.error("Error saving payroll draft:", runError);
-      return res.status(500).json({ error: runError?.message ?? "Failed to save payroll draft" });
-    }
-
-    const runId = runData.id;
-
-    try {
-      if (existingDraft) {
-        const { error: deleteError } = await supabase
-          .from("payroll_run_employee_lines")
-          .delete()
-          .eq("run_id", runId);
-
-        if (deleteError) {
-          throw new Error(`Failed to clear existing draft lines: ${deleteError.message}`);
-        }
-      }
-
-      const linePayloads = toPayrollLinePayloads(runId, processedLines);
-
-      let insertedLines: Array<{ id: string; employee_id: string }> = [];
-      if (linePayloads.length > 0) {
-        const { data: lineData, error: lineError } = await supabase
-          .from("payroll_run_employee_lines")
-          .insert(linePayloads)
-          .select("id, employee_id");
-
-        if (lineError || !lineData) {
-          throw new Error(`Failed to insert employee lines: ${lineError?.message}`);
-        }
-
-        insertedLines = lineData as Array<{ id: string; employee_id: string }>;
-      }
-
-      const allEventRows = toPayrollEventPayloads(processedLines, insertedLines);
-
-      if (allEventRows.length > 0) {
-        const { error: evError } = await supabase.from("payroll_run_line_events").insert(allEventRows);
-        if (evError) {
-          throw new Error(`Failed to insert event entries: ${evError.message}`);
-        }
-      }
-
-      const totalPayrollValue = processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0);
-      await insertPayrollAuditLog({
-        payrollRunId: runId,
-        userId: actorUserId,
-        action: "draft_saved",
-        periodStart: bounds.start,
-        periodEnd: bounds.end,
-        statusSnapshot: "draft",
-        employeeCount: processedLines.length,
-        totalPayrollSnapshot: totalPayrollValue,
-        metadata: { existing_draft_updated: Boolean(existingDraft) },
-      });
-
-      res.status(201).json({
-        id: runId,
-        title,
-        status: "DRAFT",
-        total_payroll_value: totalPayrollValue,
-        employee_count: processedLines.length,
-      });
-    } catch (err: any) {
-      console.error("Error saving payroll draft lines:", err);
-      res.status(500).json({ error: "Payroll draft save failed. Please try again.", details: err.message });
-    }
+    const saved = await PayrollPersistenceService.saveDraft(requestPeriod(result.data), req.user?.id ?? null);
+    res.status(201).json({ ...saved, status: toApiStatus(saved.status) });
   } catch (error) {
-    console.error("Error saving payroll draft:", error);
-    res.status(500).json({ error: "Internal server error" });
+    payrollFailure(res, error, "Payroll draft save failed. Please try again.");
   }
 });
 
@@ -846,150 +605,10 @@ router.post("/runs", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: result.error.errors[0].message });
     }
 
-    const { month, year, period_kind, period_start, period_end } = result.data;
-    const actorUserId = req.user?.id ?? null;
-
-    let period;
-    try {
-      period = resolvePersistedPayrollPeriod({
-        month,
-        year,
-        periodKind: period_kind,
-        periodStart: period_start,
-        periodEnd: period_end,
-      });
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
-    }
-
-    const { bounds, title } = period;
-
-    // 1. Duplicate Run Guard: Check if a finalized run already exists for this exact period
-    const { data: existingRun, error: checkError } = await supabase
-      .from("payroll_runs")
-      .select("id")
-      .eq("period_start", bounds.start)
-      .eq("period_end", bounds.end)
-      .eq("status", "finalized")
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error("Error checking for duplicate payroll run:", checkError);
-    }
-
-    if (existingRun) {
-      return res.status(409).json({
-        error: "A finalized payroll run already exists for this period. To redo it, trash the existing one first."
-      });
-    }
-
-    const { data: eventsMaster } = await supabase
-      .from("event_types")
-      .select("id, name")
-      .is("deleted_at", null);
-
-    const { data: employees } = await supabase
-      .from("employees")
-      .select("id, full_name, salary_level, base_salary, event_prices, compensation_mode")
-      .is("deleted_at", null);
-
-    const { data: salaryLevels } = await supabase
-      .from("salary_levels")
-      .select("id, code, amount_etb")
-      .is("deleted_at", null);
-
-    const authoritativeLines = await getAuthoritativePayrollInputLines(bounds.start, bounds.end, (employees ?? []).map((employee: { id: string }) => employee.id));
-    const { lines: processedLines } = buildPayrollLines({
-      employeeLineEvents: authoritativeLines,
-      eventTypes: eventsMaster ?? [],
-      employees: employees ?? [],
-      salaryLevels: salaryLevels ?? [],
-    });
-
-    // Insert payroll run header
-    const { data: runData, error: runError } = await supabase
-      .from("payroll_runs")
-      .insert({
-        title,
-        period_kind: period.periodKind,
-        period_start: bounds.start,
-        period_end: bounds.end,
-        status: "finalized",
-        finalized_at: new Date().toISOString(),
-        created_by: actorUserId,
-      })
-      .select("id")
-      .single();
-
-    if (runError || !runData) {
-      console.error("Error creating payroll run:", runError);
-      return res.status(500).json({ error: runError?.message ?? "Failed to create payroll run" });
-    }
-
-    const runId = runData.id;
-
-    try {
-      // 2. Batched Insert: Employee Lines (O(1) roundtrip)
-      const linePayloads = toPayrollLinePayloads(runId, processedLines);
-
-      const { data: insertedLines, error: lineError } = await supabase
-        .from("payroll_run_employee_lines")
-        .insert(linePayloads)
-        .select("id, employee_id");
-
-      if (lineError || !insertedLines) {
-        throw new Error(`Failed to insert employee lines: ${lineError?.message}`);
-      }
-
-      // 3. Batched Insert: Line Events (O(1) roundtrip)
-      const allEventRows = toPayrollEventPayloads(processedLines, insertedLines);
-
-      if (allEventRows.length > 0) {
-        const { error: evError } = await supabase
-          .from("payroll_run_line_events")
-          .insert(allEventRows);
-
-        if (evError) {
-          throw new Error(`Failed to insert event entries: ${evError.message}`);
-        }
-      }
-
-      const totalPayrollValue = processedLines.reduce((acc, curr) => acc + curr.total_line_pay, 0);
-      await insertPayrollAuditLog({
-        payrollRunId: runId,
-        userId: actorUserId,
-        action: "finalized",
-        periodStart: bounds.start,
-        periodEnd: bounds.end,
-        statusSnapshot: "finalized",
-        employeeCount: processedLines.length,
-        totalPayrollSnapshot: totalPayrollValue,
-        metadata: { duplicate_guard_checked: true },
-      });
-
-      res.status(201).json({
-        id: runId,
-        title,
-        status: "FINALIZED", // Match frontend expectation
-        total_payroll_value: totalPayrollValue,
-        employee_count: processedLines.length
-      });
-
-    } catch (err: any) {
-      console.error("Critical error during payroll finalization:", err);
-
-      // Attempt cleanup (soft rollback)
-      await supabase.from("payroll_runs").update({ status: "failed", deleted_at: new Date().toISOString() }).eq("id", runId);
-
-      res.status(500).json({
-        error: "Payroll finalization partially failed. The run has been marked as failed and hidden. Please try again.",
-        details: err.message
-      });
-    }
+    const published = await PayrollPersistenceService.publish(requestPeriod(result.data), req.user?.id ?? null);
+    res.status(201).json({ ...published, status: toApiStatus(published.status) });
   } catch (error) {
-    console.error("Error finalizing payroll run:", error);
-    res.status(500).json({ error: "Internal server error" });
+    payrollFailure(res, error, "Payroll finalization failed. Please try again.");
   }
 });
 

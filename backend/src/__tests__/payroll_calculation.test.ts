@@ -1,67 +1,13 @@
 import { describe, test, expect, beforeEach, beforeAll, mock } from "bun:test";
+import express from "express";
 import request from "supertest";
 import { getToken } from "./setup_helpers";
 import "./setup";
+import { pool } from "../db/pool";
+import { requireAuth } from "../middleware/auth";
+import { PayrollPersistenceFixture } from "./payroll-persistence-fixture";
 
-// ─── Local mock wiring ───────────────────────────────────────────────────────
-const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
-let eligibleCommissionRows: any[] = [];
-
-const fakeChain = (isSingle = false): any => {
-  const chain: any = {
-    select: () => fakeChain(isSingle),
-    eq: () => fakeChain(isSingle),
-    neq: () => fakeChain(isSingle),
-    is: () => fakeChain(isSingle),
-    not: () => fakeChain(isSingle),
-    or: () => fakeChain(isSingle),
-    order: () => fakeChain(isSingle),
-    range: () => fakeChain(isSingle),
-    update: () => fakeChain(isSingle),
-    insert: () => fakeChain(isSingle),
-    delete: () => fakeChain(isSingle),
-    in: () => fakeChain(isSingle),
-    limit: () => fakeChain(isSingle),
-    match: () => fakeChain(isSingle),
-    ilike: () => fakeChain(isSingle),
-    single: () => fakeChain(true),
-    maybeSingle: () => fakeChain(true),
-    then: async (resolve: any) => {
-      try {
-        const res = await mockQuery();
-        if (!res) return resolve({ data: null, error: null, count: 0 });
-        const rows = res?.rows || [];
-        resolve({
-          data: isSingle ? (rows[0] || null) : rows,
-          error: null,
-          count: rows.length,
-        });
-      } catch (err) {
-        resolve({ data: null, error: err, count: 0 });
-      }
-    },
-  };
-  return chain;
-};
-
-mock.module("../db/supabase", () => ({
-  supabase: { from: () => fakeChain() },
-}));
-
-mock.module("../lib/eligible-payroll-commissions", () => ({
-  getEligibleCommissionRows: mock(async () => eligibleCommissionRows),
-  getAuthoritativePayrollInputLines: mock(async (_start: string, _end: string, employeeIds: string[]) =>
-    employeeIds.map((employeeId) => ({
-      employee_id: employeeId,
-      events: eligibleCommissionRows.filter((row) => row.employee_id === employeeId).map((row) => ({
-        event_type_id: row.event_type_id,
-        quantity: Number(row.quantity),
-        price_override: Number(row.commission_total) / Number(row.quantity),
-        override_reason: "Verified attended event assignments",
-      })),
-    })),
-  ),
-}));
+let db: PayrollPersistenceFixture;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const AUTH = () => `Bearer ${getToken()}`;
@@ -74,42 +20,37 @@ const LEVEL_L2_ID = "770e8400-e29b-41d4-a716-446655440002";
 let app: import("express").Application;
 
 beforeAll(async () => {
-  const mod = await import("../index");
-  app = mod.default;
+  const { default: payroll } = await import("../routes/payroll");
+  app = express();
+  app.use(express.json());
+  app.use("/payroll", requireAuth, payroll);
 });
 
 beforeEach(() => {
-  mockQuery.mockReset();
-  eligibleCommissionRows = [];
+  db = new PayrollPersistenceFixture();
+  pool.query = db.query as unknown as typeof pool.query;
+  pool.connect = mock(async () => ({ query: db.query, release: db.release })) as unknown as typeof pool.connect;
 });
 
 describe("Authoritative verified-attendance payroll pricing", () => {
-  
+
   test("ignores a client override and uses the recorded attended commission", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 5000 }];
-    mockQuery
-      // event_types (metadata only)
-      .mockResolvedValueOnce({
-        rows: [{ 
-          id: EVENT_TYPE_ID, 
-          name: "Wedding", 
+    db.sources = {
+      commissions: [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 2000 }],
+      event_types: [{
+          id: EVENT_TYPE_ID,
+          name: "Wedding",
         }],
-      })
-      // employees (has 2500 set in event_prices)
-      .mockResolvedValueOnce({
-        rows: [{ 
-          id: EMPLOYEE_ID, 
-          full_name: "Tester", 
-          salary_level: "L1", 
-          base_salary: 0, 
+      employees: [{
+          id: EMPLOYEE_ID,
+          full_name: "Synthetic Operations Manager",
+          salary_level: "L1",
+          base_salary: 0,
           profile_photo_key: null,
-          event_prices: { [EVENT_TYPE_ID]: 2500 }
+          event_prices: { [EVENT_TYPE_ID]: 999 }
         }],
-      })
-      // salary_levels
-      .mockResolvedValueOnce({
-        rows: [{ id: LEVEL_L1_ID, code: "L1", amount_etb: 5000 }],
-      });
+      salary_levels: [{ id: LEVEL_L1_ID, code: "L1", amount_etb: 35000 }],
+    };
 
     const res = await request(app)
       .post("/payroll/preview")
@@ -120,47 +61,37 @@ describe("Authoritative verified-attendance payroll pricing", () => {
         employeeLineEvents: [
           {
             employee_id: EMPLOYEE_ID,
-            events: [{ 
-              event_type_id: EVENT_TYPE_ID, 
-              quantity: 1, 
-              price_override: 5000 // Manual override is 5000
+            events: [{
+              event_type_id: EVENT_TYPE_ID,
+              quantity: 1,
+              price_override: 9999
             }],
           },
         ],
       });
 
     expect(res.status).toBe(200);
-    // Base 5000 + Manual Override 5000 = 10000
-    // It should NOT use employee-specific (2500)
-    expect(res.body.employee_lines[0].total_events_value).toBe(5000);
-    expect(res.body.total_payroll_value).toBe(10000);
+    expect(res.body.employee_lines[0].total_events_value).toBe(2000);
+    expect(res.body.total_payroll_value).toBe(37000);
   });
 
   test("uses the attended assignment total rather than the employee rate", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 3500 }];
-    mockQuery
-      // event_types
-      .mockResolvedValueOnce({
-        rows: [{ 
-          id: EVENT_TYPE_ID, 
-          name: "Wedding", 
+    db.sources = {
+      commissions: [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 2, commission_total: 4000 }],
+      event_types: [{
+          id: EVENT_TYPE_ID,
+          name: "Wedding",
         }],
-      })
-      // employees
-      .mockResolvedValueOnce({
-        rows: [{ 
-          id: EMPLOYEE_ID, 
-          full_name: "Tester L2", 
-          salary_level: "L2", 
-          base_salary: 0, 
+      employees: [{
+          id: EMPLOYEE_ID,
+          full_name: "Synthetic Planner",
+          salary_level: "L2",
+          base_salary: 0,
           profile_photo_key: null,
-          event_prices: { [EVENT_TYPE_ID]: 3500 } // Employee override
+          event_prices: { [EVENT_TYPE_ID]: 999 }
         }],
-      })
-      // salary_levels
-      .mockResolvedValueOnce({
-        rows: [{ id: LEVEL_L2_ID, code: "L2", amount_etb: 8000 }],
-      });
+      salary_levels: [{ id: LEVEL_L2_ID, code: "L2", amount_etb: 14500 }],
+    };
 
     const res = await request(app)
       .post("/payroll/preview")
@@ -172,9 +103,9 @@ describe("Authoritative verified-attendance payroll pricing", () => {
         employeeLineEvents: [
           {
             employee_id: EMPLOYEE_ID,
-            events: [{ 
-              event_type_id: EVENT_TYPE_ID, 
-              quantity: 1, 
+            events: [{
+              event_type_id: EVENT_TYPE_ID,
+              quantity: 1,
               price_override: null // No manual override
             }],
           },
@@ -182,28 +113,20 @@ describe("Authoritative verified-attendance payroll pricing", () => {
       });
 
     expect(res.status).toBe(200);
-    // Base 8000 + Employee Override 3500 = 11500
-    expect(res.body.employee_lines[0].total_events_value).toBe(3500);
-    expect(res.body.total_payroll_value).toBe(11500);
+    expect(res.body.employee_lines[0].total_events_value).toBe(4000);
+    expect(res.body.total_payroll_value).toBe(18500);
   });
 
   test("excludes commission when no attended assignment is recorded", async () => {
-    mockQuery
-      // event_types
-      .mockResolvedValueOnce({
-        rows: [{ 
-          id: EVENT_TYPE_ID, 
-          name: "Wedding", 
+    db.sources = {
+      commissions: [],
+      event_types: [{
+          id: EVENT_TYPE_ID,
+          name: "Wedding",
         }],
-      })
-      // employees (no event_prices set)
-      .mockResolvedValueOnce({
-        rows: [{ id: EMPLOYEE_ID, full_name: "Tester L1", salary_level: "L1", base_salary: 0, profile_photo_key: null, event_prices: {} }],
-      })
-      // salary_levels
-      .mockResolvedValueOnce({
-        rows: [{ id: LEVEL_L1_ID, code: "L1", amount_etb: 5000 }],
-      });
+      employees: [{ id: EMPLOYEE_ID, full_name: "Synthetic Store Keeper", salary_level: "L1", base_salary: 0, profile_photo_key: null, event_prices: {} }],
+      salary_levels: [{ id: LEVEL_L1_ID, code: "L1", amount_etb: 10000 }],
+    };
 
     const res = await request(app)
       .post("/payroll/preview")
@@ -215,41 +138,30 @@ describe("Authoritative verified-attendance payroll pricing", () => {
         employeeLineEvents: [
           {
             employee_id: EMPLOYEE_ID,
-            events: [{ 
-              event_type_id: EVENT_TYPE_ID, 
-              quantity: 1, 
-              price_override: null 
+            events: [{
+              event_type_id: EVENT_TYPE_ID,
+              quantity: 1,
+              price_override: null
             }],
           },
         ],
       });
 
     expect(res.status).toBe(200);
-    // Base 5000 + Default 0 = 5000
     expect(res.body.employee_lines[0].total_events_value).toBe(0);
-    expect(res.body.total_payroll_value).toBe(5000);
+    expect(res.body.total_payroll_value).toBe(10000);
   });
 
   test("finalize persists the verified assignment commission snapshot", async () => {
-    eligibleCommissionRows = [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 2500 }];
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] }) // 1. Duplicate check
-      .mockResolvedValueOnce({
-        rows: [{ 
-          id: EVENT_TYPE_ID, 
-          name: "Wedding", 
+    db.sources = {
+      commissions: [{ employee_id: EMPLOYEE_ID, event_type_id: EVENT_TYPE_ID, quantity: 1, commission_total: 2000 }],
+      event_types: [{
+          id: EVENT_TYPE_ID,
+          name: "Wedding",
         }],
-      }) // 2. Event types
-      .mockResolvedValueOnce({
-        rows: [{ id: EMPLOYEE_ID, full_name: "Abera", salary_level: "L1", base_salary: 0, event_prices: { [EVENT_TYPE_ID]: 2500 } }]
-      }) // 3. Employees
-      .mockResolvedValueOnce({
-        rows: [{ id: LEVEL_L1_ID, code: "L1", amount_etb: 7000 }]
-      }) // 4. Salary levels
-      .mockResolvedValueOnce({ rows: [{ id: "run-999" }] }) // 5. Insert run
-      .mockResolvedValueOnce({ rows: [{ id: "line-999" }] }) // 6. Insert line
-      .mockResolvedValueOnce({ rows: [] }) // 7. Insert event rows (batch)
-      .mockResolvedValueOnce({ rows: [] }); // 8. Insert audit log
+      employees: [{ id: EMPLOYEE_ID, full_name: "Synthetic Guard Loader", salary_level: "L1", base_salary: 0, event_prices: { [EVENT_TYPE_ID]: 999 } }],
+      salary_levels: [{ id: LEVEL_L1_ID, code: "L1", amount_etb: 7000 }],
+    };
 
     const res = await request(app)
       .post("/payroll/runs")
@@ -261,15 +173,18 @@ describe("Authoritative verified-attendance payroll pricing", () => {
         employeeLineEvents: [
           {
             employee_id: EMPLOYEE_ID,
-            events: [{ 
-              event_type_id: EVENT_TYPE_ID, 
-              quantity: 1, 
-              price_override: null 
+            events: [{
+              event_type_id: EVENT_TYPE_ID,
+              quantity: 1,
+              price_override: null
             }],
           },
         ],
       });
 
     expect(res.status).toBe(201);
+    expect(db.state.employeeLines[0]).toMatchObject({ base_salary_snapshot: 7000, commission_total_snapshot: 2000, employee_total_snapshot: 9000 });
+    expect(db.state.events[0]).toMatchObject({ unit_price_snapshot: 2000, quantity: 1, line_total_snapshot: 2000 });
+    expect(db.state.audits[0]).toMatchObject({ action: "finalized", total_payroll_snapshot: 9000 });
   });
 });
