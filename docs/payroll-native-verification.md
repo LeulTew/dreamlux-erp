@@ -203,7 +203,14 @@ The original push/PR branch filters, concurrency cancellation and existing jobs
 remain. Their three-minute caps remain unchanged. The new `native-payroll` job
 depends on both, consumes the single frontend artifact, and has a **five-minute**
 cap. The native driver has its own 225-second work budget; browser global time is
-120 seconds. These limits are not success guarantees.
+150 seconds with a 160-second process allowance inside that same driver budget.
+These limits are not success guarantees.
+
+Issue244 increases only the expanded serial browser allowance. The first
+post-243 run passed native56 and40 of46 browser cases, then reached the older
+120-second deadline; six cases did not run. That run is incomplete, not green.
+All assertions, exact-registry checks, zero retries, the225-second driver bound,
+and the existing three-/five-minute hosted job caps are unchanged.
 
 Planning estimates, **not hosted measurements**:
 
