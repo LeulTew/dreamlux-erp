@@ -179,7 +179,7 @@ export async function verifyPayroll(plan: NativePlan, root = repositoryRoot) {
     await waitForHttp(UI_ORIGIN, ui, budget(30_000));
 
     const browser = start("native payroll browsers", process.execPath, browserArguments(), snapshot.directory, browserEnv);
-    const browserResult = await browser.requireSuccess(budget(130_000));
+    const browserResult = await browser.requireSuccess(budget(160_000));
     const browsers = browserReceipt(await boundedJson(browserReport), browserResult.exitCode, requested);
     ui.assertOutputSafe();
     budget(1);

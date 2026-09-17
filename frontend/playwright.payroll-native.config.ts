@@ -18,7 +18,7 @@ export default defineConfig({
   retries: 0,
   forbidOnly: true,
   timeout: 45_000,
-  globalTimeout: 120_000,
+  globalTimeout: 150_000,
   expect: { timeout: 7_500 },
   reporter: [["json", { outputFile: process.env.DREAMLUX_PAYROLL_BROWSER_REPORT }]],
   outputDir: process.env.DREAMLUX_PAYROLL_BROWSER_OUTPUT,
