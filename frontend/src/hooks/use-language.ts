@@ -1,32 +1,27 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
+
+function getLanguageSnapshot() {
+  return localStorage.getItem("lang") || "en";
+}
+
+// Hydration shares the server default; client-only mounts read storage immediately.
+function getServerLanguageSnapshot() {
+  return "en";
+}
+
+function subscribe(onChange: () => void) {
+  window.addEventListener("lang-change", onChange);
+  window.addEventListener("storage", onChange);
+
+  return () => {
+    window.removeEventListener("lang-change", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
 
 export function useLanguage() {
-  const [lang, setLang] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("lang") || "en";
-    }
-    return "en";
-  });
-
-  useEffect(() => {
-    const handleLangChange = () => {
-      const current = localStorage.getItem("lang") || "en";
-      setLang(current);
-    };
-
-    window.addEventListener("lang-change", handleLangChange);
-    window.addEventListener("storage", handleLangChange);
-
-    // Initial check on mount to ensure synchronization
-    handleLangChange();
-
-    return () => {
-      window.removeEventListener("lang-change", handleLangChange);
-      window.removeEventListener("storage", handleLangChange);
-    };
-  }, []);
-
+  const lang = useSyncExternalStore(subscribe, getLanguageSnapshot, getServerLanguageSnapshot);
   const toggle = () => {
     const next = lang === "en" ? "am" : "en";
     localStorage.setItem("lang", next);
