@@ -19,12 +19,12 @@ const id = (suffix: number) => `23900000-0000-4000-8000-${String(suffix).padStar
 function docxSources(): PayrollSources {
   return {
     employees: [
-      { id: PAYROLL_IDS.employee, full_name: "Synthetic Operations Manager", salary_level: "OPS", base_salary: 0 },
-      { id: id(2), full_name: "Synthetic Planner", salary_level: "PLAN", base_salary: 0 },
-      { id: id(3), full_name: "Synthetic Store Keeper", salary_level: "STORE", base_salary: 0 },
-      { id: id(4), full_name: "Synthetic Guard Loader", salary_level: "retired-code", base_salary: 7000 },
-      { id: id(5), full_name: "Synthetic General Manager", salary_level: "GM", base_salary: 0 },
-      { id: id(6), full_name: "Synthetic Team Leader", salary_level: "OPS", base_salary: 35000, compensation_mode: "commission_only" },
+      { id: PAYROLL_IDS.employee, employee_id: "SYNTHETIC-OPS", full_name: "Synthetic Operations Manager", salary_level: "OPS", base_salary: 0 },
+      { id: id(2), employee_id: "SYNTHETIC-PLAN", full_name: "Synthetic Planner", salary_level: "PLAN", base_salary: 0 },
+      { id: id(3), employee_id: "SYNTHETIC-STORE", full_name: "Synthetic Store Keeper", salary_level: "STORE", base_salary: 0 },
+      { id: id(4), employee_id: "SYNTHETIC-GUARD", full_name: "Synthetic Guard Loader", salary_level: "retired-code", base_salary: 7000 },
+      { id: id(5), employee_id: "SYNTHETIC-GM", full_name: "Synthetic General Manager", salary_level: "GM", base_salary: 0 },
+      { id: id(6), employee_id: "SYNTHETIC-LEAD", full_name: "Synthetic Team Leader", salary_level: "OPS", base_salary: 35000, compensation_mode: "commission_only" },
     ],
     event_types: [{ id: PAYROLL_IDS.eventType, name: "Synthetic event" }, { id: id(202), name: "Synthetic training attendance" }],
     salary_levels: [
@@ -122,6 +122,7 @@ describe("payroll publication required sources", () => {
     expect(response.body.employee_lines).toHaveLength(6);
     expect(db.calls).toHaveLength(1);
     expect(db.calls[0].sql).toContain("with eligible as");
+    expect(db.calls[0].sql).toContain("select id,employee_id,full_name");
     expect(db.calls[0].sql).toContain("from public.employees where deleted_at is null");
     expect(db.calls[0].sql).toContain("ea.attended is true");
     expect(db.calls[0].sql).toContain("count(distinct ea.event_id)");
@@ -188,6 +189,80 @@ describe("payroll publication snapshots and contracts", () => {
     { label: "custom range uses explicit endpoints", input: { period_kind: "range", period_start: "2026-04-03", period_end: "2026-04-09" },
       start: "2026-04-03", end: "2026-04-09", kind: "range", title: "Payroll 2026-04-03 to 2026-04-09" },
   ];
+  test.each(periods)("preview exposes canonical read metadata: $label", async ({ input, start, end, kind }) => {
+    seedDraft();
+    const before = structuredClone(db.state);
+    const response = await request(app).post("/payroll/preview").send({ month: 4, year: 2026, ...input });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      period_start: start, period_end: end, period_kind: kind, total_payroll_value: 141000,
+    });
+    expect(response.body.employee_lines[0]).toMatchObject({
+      employee_id: PAYROLL_IDS.employee, employee_code_snapshot: "SYNTHETIC-OPS",
+      employee_name_snapshot: "Synthetic Operations Manager",
+      snapshot_base_salary: 35000, total_events_value: 0, total_line_pay: 35000,
+    });
+    expect(db.calls).toHaveLength(1);
+    expect(db.calls[0].values).toEqual([start, end]);
+    expect(db.state).toEqual(before);
+    expect(pool.connect).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  test("preview exposes fresh metadata and compensation without accepting client amounts or persisting", async () => {
+    db.sources.employees = [db.sources.employees[1], db.sources.employees[5]];
+    db.sources.commissions[0].quantity = 1;
+    db.sources.commissions[0].commission_total = 2000;
+    const body = {
+      month: 4, year: 2026,
+      employeeLineEvents: [{ employee_id: id(2), events: [{ event_type_id: PAYROLL_IDS.eventType, quantity: 99, price_override: 70000 }] }],
+    };
+    const first = await request(app).post("/payroll/preview").send(body);
+    expect(first.status).toBe(200);
+    expect(first.body.total_payroll_value).toBe(17000);
+    expect(first.body.employee_lines).toEqual([
+      expect.objectContaining({ employee_id: id(2), employee_code_snapshot: "SYNTHETIC-PLAN", snapshot_base_salary: 14500, total_events_value: 0, total_line_pay: 14500 }),
+      expect.objectContaining({ employee_id: id(6), employee_code_snapshot: "SYNTHETIC-LEAD", snapshot_base_salary: 0, total_events_value: 2500, total_line_pay: 2500 }),
+    ]);
+
+    db.sources.employees[0].compensation_mode = "commission_only";
+    db.sources.employees[0].employee_id = "SYNTHETIC-PLAN-CURRENT";
+    db.sources.employees[0].full_name = "Synthetic current planner";
+    db.sources.commissions.pop();
+    const second = await request(app).post("/payroll/preview").send(body);
+    expect(second.status).toBe(200);
+    expect(second.body.total_payroll_value).toBe(2000);
+    expect(second.body.employee_lines[0]).toMatchObject({
+      employee_id: id(2), employee_code_snapshot: "SYNTHETIC-PLAN-CURRENT",
+      employee_name_snapshot: "Synthetic current planner", compensation_mode_snapshot: "commission_only",
+      snapshot_base_salary: 0, total_events_value: 0, total_line_pay: 0,
+    });
+    expect(first.body.employee_lines[0].employee_code_snapshot).toBe("SYNTHETIC-PLAN");
+    expect(db.calls).toHaveLength(2);
+    expect(db.calls.every((call) => call.sql.startsWith("with eligible as"))).toBe(true);
+    expect(db.state).toEqual({ runs: [], employeeLines: [], events: [], audits: [], activities: [] });
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
+  test("preview exposes a missing human code as null without substituting it for the employee UUID", async () => {
+    delete db.sources.employees[0].employee_id;
+    const response = await request(app).post("/payroll/preview").send(payload());
+    expect(response.status).toBe(200);
+    expect(response.body.employee_lines[0]).toMatchObject({
+      employee_id: PAYROLL_IDS.employee, employee_code_snapshot: null,
+    });
+  });
+
+  test.each(["", "   ", "\t"])("preview treats a legacy blank human code as missing: %j", async (code) => {
+    db.sources.employees[0].employee_id = code;
+    const response = await request(app).post("/payroll/preview").send(payload());
+    expect(response.status).toBe(200);
+    expect(response.body.employee_lines[0]).toMatchObject({
+      employee_id: PAYROLL_IDS.employee, employee_code_snapshot: null,
+    });
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
   test.each(periods)("preserves DreamLux period policy: $label", async ({ input, start, end, kind, title }) => {
     const body = { month: 4, year: 2026, employeeLineEvents: [], ...input };
     const draft = await request(app).post("/payroll/drafts").send(body);
@@ -212,6 +287,14 @@ describe("payroll publication snapshots and contracts", () => {
     });
     expect(db.state.runs[0].created_by).toBe(PAYROLL_IDS.actor);
     expect(db.state.employeeLines.map((line) => line.base_salary_snapshot)).toEqual([35000, 14500, 10000, 7000, 70000, 0]);
+    expect(Object.keys(db.state.employeeLines[0]).sort()).toEqual([
+      "base_salary_snapshot", "commission_total_snapshot", "compensation_mode_snapshot", "employee_id",
+      "employee_name_snapshot", "employee_total_snapshot", "id", "run_id", "salary_level_snapshot",
+    ]);
+    expect(Object.keys(db.state.events[0]).sort()).toEqual([
+      "employee_line_id", "event_name_snapshot", "event_type_id", "line_total_snapshot",
+      "override_price_etb", "override_reason", "quantity", "unit_price_snapshot",
+    ]);
     const leader = db.state.employeeLines.find((line) => line.employee_id === id(6));
     expect(leader).toMatchObject({ compensation_mode_snapshot: "commission_only", commission_total_snapshot: 4500, employee_total_snapshot: 4500 });
     expect(db.state.events.map((event) => [event.unit_price_snapshot, event.quantity, event.line_total_snapshot]))

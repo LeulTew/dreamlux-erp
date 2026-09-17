@@ -5,6 +5,11 @@ export const payrollPublicEnvironment = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "synthetic-dreamlux-browser-key-not-a-provider-credential",
 } as const;
 
+export const payrollBrowserTestFiles = [
+  "issue239-payroll-native.spec.ts",
+  "issue233-payroll-preview-native.spec.ts",
+] as const;
+
 const SYSTEM_KEYS = new Set([
   "PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "COMSPEC",
   "PROGRAMFILES", "PROGRAMFILES(X86)", "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)",

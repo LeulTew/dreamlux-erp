@@ -11,6 +11,7 @@ type PayrollRuntime = {
   requireAuth: RequestHandler;
   pool: Pool;
   NotificationsService: NotificationEmitter;
+  invalidatePermissionCache: () => void;
 };
 
 function isRouter(value: unknown): value is Router {
@@ -18,6 +19,10 @@ function isRouter(value: unknown): value is Router {
 }
 
 function isHandler(value: unknown): value is RequestHandler {
+  return typeof value === "function";
+}
+
+function isCallback(value: unknown): value is () => void {
   return typeof value === "function";
 }
 
@@ -36,6 +41,7 @@ export async function loadPayrollApiRuntime(): Promise<PayrollRuntime> {
       || !("payrollRouter" in source) || !isRouter(source.payrollRouter)
       || !("requireAuth" in source) || !isHandler(source.requireAuth)
       || !("NotificationsService" in source) || !isEmitter(source.NotificationsService)
+      || !("invalidatePermissionCache" in source) || !isCallback(source.invalidatePermissionCache)
       || !("pool" in source) || !(source.pool instanceof Pool)
     ) {
       throw new Error("The immutable payroll baseline has an unexpected runtime contract");
@@ -46,14 +52,16 @@ export async function loadPayrollApiRuntime(): Promise<PayrollRuntime> {
       requireAuth: source.requireAuth,
       NotificationsService: source.NotificationsService,
       pool: source.pool,
+      invalidatePermissionCache: source.invalidatePermissionCache,
     };
   }
-  const [auth, payroll, middleware, database, notices] = await Promise.all([
+  const [auth, payroll, middleware, database, notices, cache] = await Promise.all([
     import("../../routes/auth"), import("../../routes/payroll"), import("../../middleware/auth"),
-    import("../pool"), import("../../services/notifications-service"),
+    import("../pool"), import("../../services/notifications-service"), import("../../lib/permissions-cache"),
   ]);
   return {
     authRouter: auth.default, payrollRouter: payroll.default, requireAuth: middleware.requireAuth,
     pool: database.pool, NotificationsService: notices.NotificationsService,
+    invalidatePermissionCache: cache.invalidateAllCache,
   };
 }

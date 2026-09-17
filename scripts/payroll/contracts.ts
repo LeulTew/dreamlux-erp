@@ -1,7 +1,7 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { attestDreamluxNativeTarget } from "../../backend/src/db/testing/dreamlux-native-target";
-import { payrollSystemEnvironment } from "../../frontend/payroll-qa-environment";
+import { payrollBrowserTestFiles, payrollSystemEnvironment } from "../../frontend/payroll-qa-environment";
 
 export const POSTGREST_VERSION = "16.3";
 export const POSTGREST_LINUX_ARCHIVE_URL = "https://github.com/PostgREST/postgrest/releases/download/v16.3/postgrest-v16.3-linux-static-x86-64.tar.xz";
@@ -12,7 +12,7 @@ export const NATIVE_GUARD_BANNER = "[native DreamLux] Only the independent local
 export const API_ORIGIN = "http://127.0.0.1:5326";
 export const UI_ORIGIN = "http://127.0.0.1:3126";
 export const RUNNER_TIMEOUT_MS = 225_000;
-export const MINIMUM_NATIVE_TESTS = 43;
+export const MINIMUM_NATIVE_TESTS = 56;
 
 export function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -104,7 +104,7 @@ export function nativeEnvironment(
   }
   return {
     ...payrollSystemEnvironment(ambient),
-    NODE_ENV: "test",
+    NODE_ENV: "development",
     DATABASE_URL: fixture.href,
     DATABASE_BACKUP_URL: "",
     DATABASE_DIRECT_URL: "",
@@ -196,6 +196,8 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
   }
   if (new Set(projectIds.values()).size !== projectIds.size) throw new Error("Duplicate configured browser project identity");
   const counts: Record<string, number> = { desktop: 0, mobile: 0 };
+  const requiredFiles = new Set<string>(payrollBrowserTestFiles);
+  const coveredFiles = new Set<string>();
   const cases: BrowserIdentity[] = [];
   const keys = new Set<string>();
   function visit(suites: unknown[], titles: string[]) {
@@ -207,7 +209,7 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
         if (!record(spec) || typeof spec.id !== "string" || !spec.id || typeof spec.title !== "string"
             || typeof spec.file !== "string" || !Number.isInteger(spec.line) || Number(spec.line) < 1
             || !Number.isInteger(spec.column) || Number(spec.column) < 1
-            || spec.file.replace(/\\/g, "/").split("/").at(-1) !== "issue239-payroll-native.spec.ts"
+            || !requiredFiles.has(spec.file.replace(/\\/g, "/").split("/").at(-1) ?? "")
             || !Array.isArray(spec.tests) || !spec.tests.length || (purpose === "execution" && spec.ok !== true)) {
           throw new Error("Unexpected or incomplete payroll browser specification");
         }
@@ -228,6 +230,7 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
           keys.add(key);
           cases.push({ key, project: test.projectName });
           counts[test.projectName]++;
+          coveredFiles.add(`${test.projectName}:${spec.file.replace(/\\/g, "/").split("/").at(-1)}`);
         }
       }
       if (Array.isArray(suite.suites)) visit(suite.suites, titlePath);
@@ -235,6 +238,11 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
   }
   visit(value.suites, []);
   if (Object.values(counts).some((count) => count === 0)) throw new Error("Missing nonzero desktop/mobile browser coverage");
+  for (const project of ["desktop", "mobile"]) {
+    if (payrollBrowserTestFiles.some((file) => !coveredFiles.has(`${project}:${file}`))) {
+      throw new Error("Missing required browser file coverage for publication or preview");
+    }
+  }
   if (!record(value.stats) || value.stats.unexpected !== 0 || value.stats.flaky !== 0
       || (purpose === "execution" && (value.stats.expected !== cases.length || value.stats.skipped !== 0))) {
     throw new Error("Browser report totals disagree with the successful, non-retried test receipts");

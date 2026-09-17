@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AxiosError, type AxiosAdapter } from "axios";
 import {
-  api, deletePayrollRun, finalizePayrollRun, permanentlyDeletePayrollRun, savePayrollDraft, updatePayrollRunStatus,
+  api, deletePayrollRun, finalizePayrollRun, permanentlyDeletePayrollRun, previewPayrollRun, savePayrollDraft, updatePayrollRunStatus,
 } from "@/lib/api";
 import { getPayrollMutationFailure, PayrollAcknowledgementError } from "@/lib/payroll-error";
+import { previewResult } from "./payroll-preview-fixtures";
 
 const RUN_ID = "a3900000-0000-4000-8000-000000000301";
 const OTHER_ID = "a3900000-0000-4000-8000-000000000302";
@@ -31,6 +32,38 @@ const writes = [
   { label: "soft delete", method: "delete", url: `/payroll/runs/${RUN_ID}`, invoke: () => deletePayrollRun(RUN_ID), valid: { success: true, id: RUN_ID } },
   { label: "permanent delete", method: "delete", url: `/payroll/runs/${RUN_ID}/permanent`, invoke: () => permanentlyDeletePayrollRun(RUN_ID), valid: { success: true, id: RUN_ID } },
 ];
+
+describe("payroll preview read transport", () => {
+  it("forwards cancellation and the exact request body only to the preview endpoint", async () => {
+    acknowledgement = previewResult();
+    const controller = new AbortController();
+    expect(await previewPayrollRun(payload, { signal: controller.signal })).toEqual(acknowledgement);
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(adapter.mock.calls[0][0]).toMatchObject({
+      method: "post", url: "/payroll/preview", timeout: 30_000, signal: controller.signal, data: JSON.stringify(payload),
+    });
+  });
+
+  it("does not retry a preview timeout or invoke a persistence endpoint", async () => {
+    timeout = true;
+    await expect(previewPayrollRun(payload)).rejects.toMatchObject({ code: "ECONNABORTED" });
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(adapter.mock.calls[0][0]).toMatchObject({ url: "/payroll/preview", timeout: 30_000 });
+  });
+
+  it("rejects an aborted request even if the adapter resolves late", async () => {
+    const controller = new AbortController();
+    let resolve!: (response: Awaited<ReturnType<AxiosAdapter>>) => void;
+    const lateAdapter = vi.fn<AxiosAdapter>(() => new Promise((done) => { resolve = done; }));
+    api.defaults.adapter = lateAdapter;
+    const result = previewPayrollRun(payload, { signal: controller.signal });
+    await vi.waitFor(() => expect(lateAdapter).toHaveBeenCalledTimes(1));
+    controller.abort();
+    resolve({ data: previewResult(), status: 200, statusText: "OK", headers: {}, config: lateAdapter.mock.calls[0][0] });
+    await expect(result).rejects.toMatchObject({ code: "ERR_CANCELED" });
+    expect(lateAdapter).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("payroll API acknowledgements and transport limits", () => {
   it.each(writes)("preserves the valid $label contract, endpoint and 45-second timeout", async ({ invoke, valid, method, url }) => {

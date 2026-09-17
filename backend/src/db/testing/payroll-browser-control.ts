@@ -4,7 +4,7 @@ import { attestDreamluxNativeTarget } from "./dreamlux-native-target";
 const plannerId = "23900000-0000-4000-8000-000000000006";
 const eventId = "23900000-0000-4000-8000-000000000010";
 const trainingId = "23900000-0000-4000-8000-000000000011";
-const allowed = new Set(["reset", "change-source", "reject-employee-inserts", "clear-fault", "state"]);
+const allowed = new Set(["reset", "change-source", "reject-employee-inserts", "clear-fault", "state", "preview-roster", "empty-roster"]);
 
 async function main() {
   const action = process.argv[2];
@@ -34,6 +34,7 @@ async function main() {
       await client.query("begin");
       try {
         await client.query("truncate payroll_runs,activity_logs cascade");
+        await client.query("delete from employees where employee_id like 'QA-233-UI-ROSTER-%'");
         await client.query("update salary_levels set amount_etb=14500,deleted_at=null,is_active=true where code='QA-PLANNER-239'");
         await client.query(
           "update employees set deleted_at=null,base_salary=10000,compensation_mode=case when id=$1 then 'regular' else 'commission_only' end",
@@ -53,6 +54,15 @@ async function main() {
       await client.query("update employees set compensation_mode='commission_only' where id=$1", [plannerId]);
       await client.query("update event_assignments set attended=false where event_id=$1", [trainingId]);
     }
+    if (action === "preview-roster") {
+      await client.query(
+        `insert into employees(employee_id,full_name,salary_level,base_salary,compensation_mode)
+         select 'QA-233-UI-ROSTER-'||lpad(i::text,3,'0'),
+                'Synthetic preview employee '||lpad(i::text,3,'0'),'QA-PLANNER-239',10000,'regular'
+           from generate_series(1,248) i`,
+      );
+    }
+    if (action === "empty-roster") await client.query("update employees set deleted_at=now()");
     if (action === "reject-employee-inserts") {
       await client.query(
         `create function dreamlux_browser_employee_failure_239() returns trigger language plpgsql as $$

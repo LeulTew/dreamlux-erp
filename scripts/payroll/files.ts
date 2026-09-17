@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { payrollPublicEnvironment, payrollSystemEnvironment } from "../../frontend/payroll-qa-environment";
+import { payrollBrowserTestFiles, payrollPublicEnvironment, payrollSystemEnvironment } from "../../frontend/payroll-qa-environment";
 import { forbiddenFile, inside, record, safeRelative, selectedFrontendFile } from "./contracts";
 import { ManagedProcess } from "./processes";
 
@@ -55,7 +55,7 @@ export async function frontendSourceFiles(root: string): Promise<string[]> {
     "frontend/next.payroll-native.config.ts", "frontend/playwright.payroll-native.config.ts",
     "frontend/payroll-qa-environment.ts", "frontend/src/app/hr/payments/page.tsx",
     "frontend/src/app/hr/payments/run/page.tsx", "frontend/src/app/hr/payments/[id]/page.tsx",
-    "frontend/e2e/issue239-payroll-native.spec.ts", "frontend/e2e/payroll-native-fixture.ts",
+    ...payrollBrowserTestFiles.map((file) => `frontend/e2e/${file}`), "frontend/e2e/payroll-native-fixture.ts",
   ]) {
     if (!files.includes(required)) throw new Error(`Missing required QA source: ${required}`);
   }

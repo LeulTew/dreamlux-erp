@@ -20,7 +20,8 @@ if (process.env.SUPABASE_URL !== "http://127.0.0.1:54335" || !/^[a-f0-9]{64}$/.t
   throw new Error("Native QA requires its own local REST target and generated signing secret");
 }
 process.env.SUPABASE_SERVICE_ROLE_KEY = jwt.sign({ role: "dreamlux_parity" }, restSecret, { expiresIn: "1h" });
-process.env.NODE_ENV = "test";
+// Exercise the real account/permission lookups, not the application's unit-test bypass.
+process.env.NODE_ENV = "development";
 mock.module("dotenv", () => ({ config: () => ({ parsed: {} }), default: { config: () => ({ parsed: {} }) } }));
 mock.module("dotenv/config", () => ({}));
 

@@ -1,7 +1,7 @@
 # Payroll publication contract
 
-Issue #239 coordinates DreamLux's existing payroll writers. The visible preview
-workflow remains a separate concern in #233.
+Issue #239 coordinates DreamLux's existing payroll writers. Issue #233 adds a
+visible, read-only consumer of the same authoritative calculation.
 
 ## Entry points and compatibility
 
@@ -43,6 +43,67 @@ attended-assignment aggregation are unchanged. This introduces no proration,
 cross-period overlap rule, full-time filter, or salary-FK reconciliation.
 Client event quantities, employee omissions, rates, and overrides do not replace
 the authoritative active employees and verified attendance.
+
+## Visible read-only preview
+
+`POST /payroll/preview` retains `month`, `year`, `total_payroll_value` and
+`employee_lines`. It additionally returns the resolver's canonical `period_start`,
+`period_end` and `period_kind`. Each generated employee line has an optional
+`employee_code_snapshot`: the current human-readable `employees.employee_id`
+code, **not** the employee's `id` UUID. The UUID remains the line's `employee_id`.
+The code comes from the same single SQL source snapshot as compensation and
+attendance, with no second identity query. Missing codes render as a labelled
+record UUID, not an invented employee code.
+
+These are read metadata only. The existing employee/event persistence mappers
+still emit exactly their previous fields, without a new saved column or schema.
+There is no later salary-ID authority helper or salary-FK policy in this backport.
+
+The run page labels local figures as estimates. **Preview** captures an immutable
+copy of the current request, user and requested period, then opens the existing
+Radix-based [Sheet](../frontend/src/components/ui/sheet.tsx) through
+[PayrollPreviewSheet](../frontend/src/components/PayrollPreviewSheet.tsx).
+The successful result shows the returned employee identities, compensation
+modes, base/commission/employee totals, whole-roster totals and canonical period.
+It explains any difference from the captured requested dates or kind rather
+than relabelling the old result. Preview is not approval: saving/finalizing still
+recalculates current inputs through the atomic writer.
+
+- A current `payroll:read` grant is required independently of the page's
+  `payroll:write` grant. Without read access the trigger is disabled and explains
+  why. When refreshed client grants revoke access, cached values hide immediately
+  and the sheet closes, restoring focus to that explanation. User/period/setup-scope changes invalidate
+  the captured request, including a later switch back to the old context.
+- Reads use a 30-second Axios timeout and the query's abort signal, no automatic
+  retries, no focus/reconnect/interval refetch, and no retained query cache after
+  unmount. Close, unmount and stale-context transitions cancel the observation;
+  late payloads cannot reopen the sheet or replace the current result. Refresh
+  and retry are explicit, hide the previous result, and restart display paging.
+- Loading, malformed payloads, HTTP failures and a genuine successful empty
+  roster have distinct states. Missing canonical period metadata is an error,
+  never permission to reconstruct dates or show setup estimates as server data.
+- [The preview parser](../frontend/src/lib/payroll-preview.ts) validates finite,
+  nonnegative cent-denominated amounts, unique nonblank identities, compensation
+  modes and valid civil dates. It first permits operation-count-bounded floating
+  noise, capped at **0.01 cent (ETB 0.0001)**, then reconciles integer cents for
+  each employee and the full total. It does not round away ETB 0.001 corruption.
+  Arithmetic tests partition the documented ETB 500 training amount; they
+  introduce no compensation or proration policy.
+- Only ten returned employees render per page. Desktop uses a semantic table;
+  mobile uses compact rows with every base/commission/total value and a
+  bottom-anchored sheet. Actions are at least 48px, with bilingual labels,
+  focus trapping, Escape/backdrop dismissal, focus restoration and a mobile
+  swipe handle. The bottom height uses the side-qualified
+  `data-[side=bottom]:h-[90dvh]` override so the primitive's `h-auto` cannot move
+  the close control between loading and success.
+- Preview never calls the mutation guard's begin/complete/fail methods, never
+  marks the draft dirty and never modifies the save payload. Existing
+  `writePending` and unknown-outcome `needsReload` opening guards remain intact.
+
+The additive backend metadata must be released before or alongside this UI
+consumer through the independently authorized release process. An older response
+without canonical metadata deliberately fails validation rather than displaying
+a misleading payroll preview.
 
 ## Transaction and coordination
 
@@ -106,6 +167,27 @@ still valid. Optional historical photo lookup remains best-effort.
   the current dirty flag starts false and its legacy edit setters are unbound,
   so this is not evidence of a reproduced initial autosave loop.
 
+## Current authority prerequisite
+
+Issue242 is required by the preview's permission-revocation contract. After a
+successful database-backed or cached role resolution, middleware replaces the
+token's previous role names and explicit grants and removes its stale legacy
+permission map. A current empty role/grant set remains authoritative. Existing
+role-default and secondary-role policy is unchanged.
+
+A failed current lookup stops the request before a protected route executes.
+If an invalidation arrives during the lookup, the existing cache timestamp
+guard rejects that result; it is neither used nor cached. Both conditions return
+the existing `503` permission-unavailable response with
+`outcome_uncertain: false`, because no requested mutation has begun. This
+preserves safe manual recovery rather than claiming a payroll commit was lost.
+
+Preview results disappear when current client grants change; a server-denied
+refresh also removes old amounts. This does not promise instantaneous
+cross-instance invalidation or change the application's existing refresh/cache
+policy. Native proof uses actual role changes, cookie authentication and cache
+invalidation, not token-only unit mode.
+
 ## Verification and isolation
 
 The mocked payroll suites cover current-source calculation, old-draft
@@ -115,6 +197,16 @@ permission boundaries, and known versus unknown acknowledgements. Frontend
 classifier, guard, actual API-wrapper/adapter, and caller tests cover malformed
 resolved receipts, bounded request configuration, manual recovery, and cross-page
 blocking.
+Preview-specific backend controls cover canonical MONTH/H1/H2/weekly/range
+metadata, unchanged persisted payload keys, current employee codes, and a
+synthetic Planner plus Team Leader calculation of ETB 17,000 changing to ETB
+2,000 after current compensation/attendance changes. Frontend parser, component,
+caller and adapter cases cover malformed/empty/failing reads, cancellation,
+current-user/period/grant invalidation, 10-row paging and floating accumulation
+at 25/250/1,000/5,000 employees. Frontend runtime tests must run only in the
+credential-free QA snapshot described in
+[payroll-native-verification.md](payroll-native-verification.md), not beside
+original environment files.
 Synthetic compensation examples use the DreamLux DOCX anchors: Operations Manager
 35,000; Planner 14,500; Store Keeper 10,000; Guard/Loader 7,000; General Manager
 70,000; Team Leader 2,000/event plus 500 for training attendance.
@@ -127,3 +219,10 @@ operation. It does not repair the existing backup-URL priority or boot-time
 migration hazards: do not start the normal entrypoint against existing services
 to validate it. Production remains held; issue completion belongs to the
 independent integration/review workflow.
+
+For #233, the parent owns the native registry and actual browser proof: Preview
+must leave run, employee-line, line-event and audit persistence unchanged;
+mobile/keyboard/contrast/close-target geometry must be checked in the rendering
+browser, including loading-to-success and permission revocation. Static class
+checks and mocked focus tests are not that geometry/native proof. No counts or
+approval thresholds in the independent verification runner are relaxed here.
