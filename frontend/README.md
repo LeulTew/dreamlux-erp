@@ -31,6 +31,40 @@ bun run lint
 
 - `NEXT_PUBLIC_API_URL` (for example: `http://localhost:4000` locally)
 
+## Language preferences
+
+Use `useLanguage` for translated client surfaces. It reads the existing `lang`
+storage key and subscribes to same-document `lang-change` and cross-document
+`storage` events. Server rendering and initial hydration share the English
+snapshot; React then restores the saved language without rebuilding mismatched
+server markup. A newly mounted client-only consumer reads the current preference
+immediately. Empty or missing preferences still fall back to English; other
+stored values are not normalized. Do not hide mismatches with hydration-warning
+suppression or read browser storage in a server/client-dependent state initializer.
+
+`e2e/issue248-language-hydration.spec.ts` seeds storage before the first document
+loads. It checks the actual overhead route's English server markup and saved-locale
+permission surface, then the read-only register, both language toggle directions,
+a denied reload, and its enabled, reachable dashboard action. The actual
+`ForbiddenState` hydration test clicks that action and asserts Dream's unchanged
+`/` destination. This route renders `ForbiddenState` before permissions resolve; these checks
+do not imply that routes which initially render a loading skeleton had the same
+hydration failure.
+
+The English and Amharic desktop/mobile cases use synthetic local HTTP and
+realtime fixtures, retaining screenshots, completed phases, and diagnostics.
+The app's own service worker remains enabled.
+Hydration recovery, application errors, warnings, and unmocked requests fail the
+checks. Only successful, header-marked RSC prefetch cancellations are classified
+separately and retained. This is Dream-local evidence, not production or Koti proof.
+
+Focused checks from this folder:
+
+```powershell
+bun run test use-language-hydration.test.tsx forbidden-state.test.tsx --maxWorkers=1
+bun run test:e2e issue248-language-hydration.spec.ts --workers=1 --timeout=90000
+```
+
 ## Shared-ERP audit release hold
 
 Automatic Git deployments from `main` are temporarily disabled in the
