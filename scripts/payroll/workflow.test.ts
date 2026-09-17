@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  POSTGREST_LINUX_ARCHIVE_SHA256, POSTGREST_LINUX_ARCHIVE_URL, POSTGREST_LINUX_BINARY_SHA256, record,
+  POSTGREST_LINUX_ARCHIVE_SHA256, POSTGREST_LINUX_ARCHIVE_URL, POSTGREST_LINUX_BINARY_SHA256, RUNNER_TIMEOUT_MS, record,
 } from "./contracts";
 import { repositoryRoot } from "./files";
 import { attestDreamluxNativeTarget } from "../../backend/src/db/testing/dreamlux-native-target";
@@ -17,6 +17,18 @@ function steps(job: Record<string, unknown>) {
 }
 
 describe("local, unbilled CI definition contracts", () => {
+  test("budgets the expanded serial browser registry inside the unchanged driver cap", async () => {
+    const config = await readFile(join(repositoryRoot, "frontend", "playwright.payroll-native.config.ts"), "utf8");
+    const runner = await readFile(join(repositoryRoot, "scripts", "payroll", "run.ts"), "utf8");
+    const browserBudget = Number(config.match(/globalTimeout:\s*([\d_]+)/)?.[1].replaceAll("_", ""));
+    const processBudget = Number(runner.match(/browser\.requireSuccess\(budget\(([\d_]+)\)\)/)?.[1].replaceAll("_", ""));
+    expect(browserBudget).toBe(150_000);
+    expect(processBudget).toBe(160_000);
+    expect(browserBudget).toBeLessThan(processBudget);
+    expect(processBudget).toBeLessThan(RUNNER_TIMEOUT_MS);
+    expect(RUNNER_TIMEOUT_MS).toBe(225_000);
+  });
+
   test("retains existing triggers, concurrency, permissions and job caps", async () => {
     const parsed: unknown = Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8"));
     const workflow = object(parsed);
