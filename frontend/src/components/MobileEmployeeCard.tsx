@@ -1,6 +1,7 @@
 import { Employee } from "@/lib/types";
 import { HiIdentification, HiPhone, HiTrash, HiPencilSquare, HiArrowUturnLeft, HiCheckCircle } from "react-icons/hi2";
 import Image from "next/image";
+import { useRef } from "react";
 
 interface MobileEmployeeCardProps {
   employee: Employee;
@@ -29,11 +30,16 @@ export default function MobileEmployeeCard({
   selectMode,
   compensationLabel,
 }: MobileEmployeeCardProps) {
+  const editButton = useRef<HTMLButtonElement>(null);
+
   return (
     <div
       onClick={() => {
         if (showTrash && selectMode) { onSelect?.(employee.id); return; }
-        if (!editMode && !showTrash) onTap?.(employee);
+        if (!editMode && !showTrash) {
+          editButton.current?.focus({ preventScroll: true });
+          onTap?.(employee);
+        }
       }}
       className={`bg-card rounded-xl border-none p-5 shadow-premium transition-all ${
         selected ? "ring-2 ring-primary" : ""
@@ -176,8 +182,11 @@ export default function MobileEmployeeCard({
                   </div>
                   <div className="flex gap-2 ml-auto shrink-0">
                     <button
+                      ref={editButton}
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        e.currentTarget.focus({ preventScroll: true });
                         onTap?.(employee);
                       }}
                       className="min-w-[48px] min-h-[48px] rounded-xl bg-indigo-600 text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-indigo-700 transition-all active:scale-95 shadow-md flex items-center justify-center cursor-pointer"
