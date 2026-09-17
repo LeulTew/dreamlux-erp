@@ -30,6 +30,49 @@ DreamLux ERP follows a premium, high-end visual design system:
 
 Always use **Bun** (`bun`) as the sole package manager and runner.
 
+### Expense review concurrency
+
+Expense review preserves the `expenses:approve` permission and permits review of
+any non-approved expense, including a previously rejected one. It locks the live
+event before re-reading and locking its expense, matching labor reversal. The
+decision and actual previous-status audit commit together; notifications run only
+after confirmed commit and connection release. Approved expenses return the
+existing 409 error. A 503 with `outcome_uncertain: true` means commit acknowledgement
+was lost: reload before retrying. A bounded lock wait returns 503 with
+`outcome_uncertain: false`. Neither response automatically retries the mutation.
+
+Focused mocked route checks run from `backend` with
+`bun test --no-env-file src/__tests__/events.test.ts --test-name-pattern 'expense.*review|review.*expense'`.
+The existing frontend `expense-approval-ui.test.tsx` checks the caller's success
+and error handling; mocked UI transport is not database evidence.
+
+Native regression checks run **alone from the repository root** with
+`bun test --no-env-file ./backend/verification/expense-review.native.test.ts`,
+only during bounded local functional verification. Opt in with
+`DREAM_EXPENSE_NATIVE=1` and supply `DREAM_EXPENSE_PGPORT`,
+`DREAM_EXPENSE_PGDATABASE`, `DREAM_EXPENSE_PGUSER`, and
+`DREAM_EXPENSE_PGPASSWORD` for a freshly owned synthetic PostgreSQL instance.
+The fixture binds to `127.0.0.1:55431`, database `dream_issue231_aa556166`,
+and owning role `dream_issue231` (no superuser, role-creation or database-creation
+privileges). Before DDL it verifies the database, owner, current user, server
+endpoint and role privileges. Before application imports it clears ambient
+connection/provider credentials and blocks network targets other than its
+database and owned loopback HTTP listener. It does not use
+application environment files, backups, startup migrations, or Supabase.
+It creates and drops only its unique schema, using the checked-in event, expense,
+and audit table definitions. Two synthetic JWT actors exercise the actual
+Express route and PostgreSQL transactions; login, DB-backed role resolution,
+and notification delivery are not covered by this fixture.
+Native cases include deterministic approval/rejection and soft-delete races,
+normal re-review, queue/history read-back, permissions, write/audit rollback,
+lost commit/rollback acknowledgements, notification failure, and a real
+ten-second lock wait. Drain all owned requests/processes before restoring any
+original-source counterfactual; rerun the same cases on the restored fixed head.
+The fixture uses `host(inet_server_addr())` to compare the server's exact address
+without PostgreSQL's `/32` display suffix. Its busy-request control explicitly
+releases the observer lock and drains the request even when the original route
+exceeds the lock budget.
+
 ### 1. Install Dependencies
 Run from the repository root:
 ```bash

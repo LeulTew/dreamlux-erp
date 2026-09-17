@@ -1320,7 +1320,16 @@ router.get("/expenses/history", requireAuth, async (req: AuthRequest, res: Respo
   }
 });
 
-// PATCH /events/expenses/:expenseId/review - approve/reject pending expense
+type ReviewedExpense = {
+  id: string;
+  event_id: string;
+  category: string;
+  amount: string | number;
+  status: string | null;
+  created_by: string | null;
+};
+
+// PATCH /events/expenses/:expenseId/review - approve/reject an unapproved expense
 router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { expenseId } = req.params;
@@ -1336,43 +1345,78 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
     }
 
     const client = await pool.connect();
+    let committing = false;
+    let transactionOpen = false;
+    let discard = false;
+    let expense: ReviewedExpense | undefined;
+    const rollback = async () => {
+      if (!transactionOpen) return;
+      transactionOpen = false;
+      try {
+        await client.query("ROLLBACK");
+      } catch (error) {
+        discard = true;
+        console.error("[patch-expense-review] Rollback failed; discarding connection", error);
+        throw error;
+      }
+    };
     try {
+      transactionOpen = true;
       await client.query("BEGIN");
+      await client.query("SET LOCAL lock_timeout = '10s'");
 
-      const existingResult = await client.query(
+      // Match labor reversal's lock order; read mutable expense state only after the parent lock.
+      const eventResult = await client.query<{ id: string }>(
+        `SELECT e.id FROM events e JOIN expenses exp ON exp.event_id = e.id
+         WHERE exp.id = $1 AND e.deleted_at IS NULL FOR UPDATE OF e`,
+        [expenseId],
+      );
+      if (!eventResult.rows[0]) {
+        await rollback();
+        res.status(404).json({ error: "Expense not found or associated event is deleted" });
+        return;
+      }
+
+      const existingResult = await client.query<ReviewedExpense>(
         `
           SELECT exp.*
           FROM expenses exp
           JOIN events e ON exp.event_id = e.id
-          WHERE exp.id = $1 AND e.deleted_at IS NULL
+          WHERE exp.id = $1 AND e.id = $2 AND e.deleted_at IS NULL
+          FOR UPDATE OF exp
         `,
-        [expenseId]
+        [expenseId, eventResult.rows[0].id]
       );
 
-      if (existingResult.rowCount === 0) {
-        await client.query("ROLLBACK");
+      if (!existingResult.rows[0]) {
+        await rollback();
         res.status(404).json({ error: "Expense not found or associated event is deleted" });
         return;
       }
       if (existingResult.rows[0].status === "Approved") {
-        await client.query("ROLLBACK");
+        await rollback();
         res.status(409).json({ error: "Approved expenses are locked" });
         return;
       }
 
       const { status, rejected_reason } = validationResult.data;
-      const result = await client.query(
+      const result = await client.query<ReviewedExpense>(
         `
           UPDATE expenses
           SET status = $1,
               rejected_reason = $2,
               approved_by = $3,
               approved_at = NOW()
-          WHERE id = $4
+          WHERE id = $4 AND status IS DISTINCT FROM 'Approved'
           RETURNING *
         `,
         [status, status === "Rejected" ? rejected_reason : null, req.user?.id || null, expenseId]
       );
+      if (!result.rows[0]) {
+        await rollback();
+        res.status(409).json({ error: "Approved expenses are locked" });
+        return;
+      }
 
       // Insert audit log
       await client.query(
@@ -1384,22 +1428,52 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
           existingResult.rows[0].event_id,
           req.user?.id || null,
           "expense_status",
-          `Pending (ID: ${expenseId}, Category: ${existingResult.rows[0].category}, Amount: ${existingResult.rows[0].amount})`,
+          `${existingResult.rows[0].status} (ID: ${expenseId}, Category: ${existingResult.rows[0].category}, Amount: ${existingResult.rows[0].amount})`,
           status
         ]
       );
 
+      committing = true;
       await client.query("COMMIT");
-
-      // Notify the expense creator
-      const expense = result.rows[0];
-      if (expense.created_by) {
-        const title = `Expense ${status}`;
-        let message = `Your expense request for ${expense.category} of amount ${expense.amount} has been ${status.toLowerCase()} by ${req.user?.username || "Someone"}.`;
-        if (status === "Rejected" && rejected_reason) {
-          message += ` Reason: ${rejected_reason}`;
-        }
-        NotificationsService.createNotification({
+      transactionOpen = false;
+      expense = result.rows[0];
+    } catch (error: unknown) {
+      try {
+        await rollback();
+      } catch {
+        // rollback already logged the failure and marked this lease for discard.
+      }
+      if (committing) {
+        discard = true;
+        console.error("[patch-expense-review] Commit acknowledgement uncertain", error);
+        res.status(503).json({
+          error: "Expense review could not be confirmed. Reload before retrying.",
+          outcome_uncertain: true,
+        });
+        return;
+      }
+      if (error && typeof error === "object" && "code" in error && error.code === "55P03") {
+        console.error("[patch-expense-review] Lock wait exceeded", error);
+        res.status(503).json({
+          error: "This event or expense is being changed by another request. Reload and try again.",
+          outcome_uncertain: false,
+        });
+        return;
+      }
+      throw error;
+    } finally {
+      client.release(discard);
+    }
+    if (!expense) throw new Error("Expense review returned no persisted record");
+    const { status, rejected_reason } = validationResult.data;
+    if (expense.created_by) {
+      const title = `Expense ${status}`;
+      let message = `Your expense request for ${expense.category} of amount ${expense.amount} has been ${status.toLowerCase()} by ${req.user?.username || "Someone"}.`;
+      if (status === "Rejected" && rejected_reason) {
+        message += ` Reason: ${rejected_reason}`;
+      }
+      try {
+        void NotificationsService.createNotification({
           recipient_id: expense.created_by,
           actor_id: req.user?.id,
           title,
@@ -1407,19 +1481,15 @@ router.patch("/expenses/:expenseId/review", requireAuth, async (req: AuthRequest
           entity_type: "expense",
           entity_id: expense.id,
           action_url: `/events/${expense.event_id}`,
-        });
+        }).catch((error) => console.error("[patch-expense-review] Creator notification failed after commit", error));
+      } catch (error) {
+        console.error("[patch-expense-review] Creator notification failed after commit", error);
       }
-
-      res.json(result.rows[0]);
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
     }
-  } catch (error: any) {
+    res.json(expense);
+  } catch (error: unknown) {
     console.error("[patch-expense-review] Error:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    res.status(500).json({ error: "Failed to review expense" });
   }
 });
 

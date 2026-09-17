@@ -252,6 +252,26 @@ describe("Expense Approval Page UI and Logic Test Suite", () => {
     });
   });
 
+  it.each([
+    [409, "Approved expenses are locked"],
+    [503, "Expense review could not be confirmed. Reload before retrying."],
+    [503, "This event or expense is being changed by another request. Reload and try again."],
+  ])("preserves the review form and surfaces HTTP %s guidance: %s", async (status, error) => {
+    mockReviewEventExpense.mockRejectedValueOnce({ response: { status, data: { error } } });
+    render(<ExpenseApprovalPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Review/i }));
+    const comment = screen.getByPlaceholderText("Enter comment or reject reason...");
+    fireEvent.change(comment, { target: { value: "Check this amount" } });
+    await React.act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Reject/i }));
+    });
+    await vi.waitFor(() => expect(mockToastError).toHaveBeenCalledWith(error));
+    expect(mockToastSuccess).not.toHaveBeenCalled();
+    expect(mockInvalidateQueries).not.toHaveBeenCalled();
+    expect(comment).toHaveValue("Check this amount");
+    expect(mockReviewEventExpense).toHaveBeenCalledTimes(1);
+  });
+
   it("should support Amharic translation keys rendering when lang=am", () => {
     mockLang = "am";
     render(<ExpenseApprovalPage />);
