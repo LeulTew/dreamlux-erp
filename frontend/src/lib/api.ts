@@ -8,6 +8,7 @@ import {
   InventoryMovementsResponse,
   Store,
   ItemsResponse,
+  EmployeesResponse,
   Item,
   ReconcileSummary,
   ReconcileRunDetail,
@@ -907,18 +908,22 @@ export const reconcileItems = (items: { id: string; quantity: number }[]) =>
   api.post("/assets/reconcile", { items }).then((r) => r.data);
 
 // Employees
+export type EmployeeListStatus = "active" | "trash";
+
 export const getEmployees = (
   page = 1,
   limit = 50,
   search?: string,
-  status?: string,
+  status?: EmployeeListStatus,
   office_id?: string,
   department_id?: string,
   sortBy?: string,
-  sortOrder?: string
+  sortOrder?: string,
+  requestOptions?: Pick<AxiosRequestConfig, "signal" | "timeout">
 ) =>
   api
-    .get("/employees", {
+    .get<EmployeesResponse>("/employees", {
+      ...requestOptions,
       params: { page, limit, search, status, office_id, department_id, sortBy, sortOrder },
     })
     .then((r) => r.data);

@@ -443,7 +443,8 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
     if (resolvedSortBy === "salary") {
       query = query.order("amount_etb", { ascending: sortOrder === "asc", referencedTable: "salary_levels", nullsFirst: false });
     } else if (resolvedSortBy === "name" || resolvedSortBy === "full_name") {
-      query = query.order("full_name", { ascending: sortOrder === "asc" });
+      query = query.order("full_name", { ascending: sortOrder === "asc" })
+        .order("employee_id", { ascending: true });
     } else if (resolvedSortBy === "date") {
       query = query.order("updated_at", { ascending: sortOrder === "asc" });
     } else if (resolvedSortBy === "employee_id") {
@@ -497,7 +498,8 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
       if (resolvedSortBy === "salary") {
         fallbackQuery = fallbackQuery.order("base_salary", { ascending: sortOrder === "asc" });
       } else if (resolvedSortBy === "name" || resolvedSortBy === "full_name") {
-        fallbackQuery = fallbackQuery.order("full_name", { ascending: sortOrder === "asc" });
+        fallbackQuery = fallbackQuery.order("full_name", { ascending: sortOrder === "asc" })
+          .order("employee_id", { ascending: true });
       } else if (resolvedSortBy === "employee_id") {
         fallbackQuery = fallbackQuery.order("employee_id", { ascending: sortOrder === "asc" });
       } else if (resolvedSortBy === "commission") {
@@ -524,7 +526,8 @@ router.get("/", async (req: AuthRequest, res: Response): Promise<void> => {
         if (resolvedSortBy === "salary") {
           ultraFallback = ultraFallback.order("base_salary", { ascending: sortOrder === "asc" });
         } else if (resolvedSortBy === "name" || resolvedSortBy === "full_name") {
-          ultraFallback = ultraFallback.order("full_name", { ascending: sortOrder === "asc" });
+          ultraFallback = ultraFallback.order("full_name", { ascending: sortOrder === "asc" })
+            .order("employee_id", { ascending: true });
         } else if (resolvedSortBy === "employee_id") {
           ultraFallback = ultraFallback.order("employee_id", { ascending: sortOrder === "asc" });
         } else if (resolvedSortBy === "commission") {

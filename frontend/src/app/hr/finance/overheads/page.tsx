@@ -29,6 +29,7 @@ import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import StaffPaymentEmployeePicker from "@/components/StaffPaymentEmployeePicker";
 import {
   api,
   getFinanceOverheads,
@@ -40,7 +41,6 @@ import {
   rejectFinanceOverhead,
   closeOverheadMonth,
   reopenOverheadMonth,
-  getEmployees,
   OVERHEAD_CATEGORIES,
 } from "@/lib/api";
 import type { FinanceOverhead } from "@/lib/types";
@@ -313,14 +313,6 @@ export default function OverheadsPage() {
       }),
     enabled: canRead && prefsReady,
   });
-
-  // Employees for staff payments dropdown
-  const { data: employeesResponse } = useQuery({
-    queryKey: ["employees-lookup"],
-    queryFn: () => getEmployees(1, 100, undefined, "Active"),
-    enabled: canRead && isFormOpen,
-  });
-  const employeeList = employeesResponse?.employees || [];
 
   const isClosed = summary?.closed ?? false;
 
@@ -948,18 +940,11 @@ export default function OverheadsPage() {
             </div>
 
             {form.payment_kind === "staff_payment" && (
-              <div>
-                <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-1.5">{t("Employee Link")}</label>
-                <Select
-                  value={form.employee_id}
-                  onChange={(val) => setForm((f) => ({ ...f, employee_id: val }))}
-                  options={[
-                    { id: "", label: t("Select Employee") },
-                    ...employeeList.map((emp: { id: string; full_name: string }) => ({ id: emp.id, label: emp.full_name })),
-                  ]}
-                  className="h-[44px] text-sm"
-                />
-              </div>
+              <StaffPaymentEmployeePicker
+                value={form.employee_id}
+                onChange={(val) => setForm((f) => ({ ...f, employee_id: val }))}
+                savedLabel={editingExpense?.employee_id === form.employee_id ? editingExpense.employee_name : undefined}
+              />
             )}
 
             {form.scope === "Shared" && (
