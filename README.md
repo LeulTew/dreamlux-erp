@@ -42,13 +42,13 @@ was lost: reload before retrying. A bounded lock wait returns 503 with
 `outcome_uncertain: false`. Neither response automatically retries the mutation.
 
 Focused mocked route checks run from `backend` with
-`bun --no-env-file test src/__tests__/events.test.ts --test-name-pattern 'expense.*review|review.*expense'`.
+`bun test --no-env-file src/__tests__/events.test.ts --test-name-pattern 'expense.*review|review.*expense'`.
 The existing frontend `expense-approval-ui.test.tsx` checks the caller's success
 and error handling; mocked UI transport is not database evidence.
 
 Native regression checks run **alone from the repository root** with
-`bun --no-env-file test ./backend/verification/expense-review.native.test.ts`,
-only during a coordinated functional testing turn. Opt in with
+`bun test --no-env-file ./backend/verification/expense-review.native.test.ts`,
+only during bounded local functional verification. Opt in with
 `DREAM_EXPENSE_NATIVE=1` and supply `DREAM_EXPENSE_PGPORT`,
 `DREAM_EXPENSE_PGDATABASE`, `DREAM_EXPENSE_PGUSER`, and
 `DREAM_EXPENSE_PGPASSWORD` for a freshly owned synthetic PostgreSQL instance.
@@ -68,6 +68,10 @@ normal re-review, queue/history read-back, permissions, write/audit rollback,
 lost commit/rollback acknowledgements, notification failure, and a real
 ten-second lock wait. Drain all owned requests/processes before restoring any
 original-source counterfactual; rerun the same cases on the restored fixed head.
+The fixture uses `host(inet_server_addr())` to compare the server's exact address
+without PostgreSQL's `/32` display suffix. Its busy-request control explicitly
+releases the observer lock and drains the request even when the original route
+exceeds the lock budget.
 
 ### 1. Install Dependencies
 Run from the repository root:

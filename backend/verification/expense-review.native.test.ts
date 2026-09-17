@@ -139,9 +139,10 @@ suite("expense review native PostgreSQL", () => {
       }
       return Reflect.apply(originalConnect, this, args);
     };
-    const fetchGuard = spyOn(globalThis, "fetch").mockImplementation(async () => {
-      throw new Error("Native expense fixture does not permit fetch/provider traffic");
-    });
+    const fetchGuard = spyOn(globalThis, "fetch").mockImplementation(Object.assign(
+      async () => { throw new Error("Native expense fixture does not permit fetch/provider traffic"); },
+      { preconnect: () => { throw new Error("Native expense fixture does not permit fetch preconnect"); } },
+    ));
     restoreFetch = () => { fetchGuard.mockRestore(); };
     const { Pool: NativePool } = await import("pg");
     const { default: express } = await import("express");
@@ -161,7 +162,7 @@ suite("expense review native PostgreSQL", () => {
       rolsuper: boolean; rolcreatedb: boolean; rolcreaterole: boolean;
     }>(`
       SELECT current_database() AS name, pg_get_userbyid(d.datdba) AS owner,
-             current_user AS actor, inet_server_addr()::text AS address,
+             current_user AS actor, host(inet_server_addr()) AS address,
              inet_server_port() AS port, r.rolsuper, r.rolcreatedb, r.rolcreaterole
       FROM pg_database d JOIN pg_roles r ON r.rolname = current_user
       WHERE d.datname = current_database()
@@ -172,6 +173,7 @@ suite("expense review native PostgreSQL", () => {
         identity.rolsuper || identity.rolcreatedb || identity.rolcreaterole) {
       throw new Error("Scratch database endpoint, ownership or least-privilege attestation failed");
     }
+    console.info("[expense-native] Target identity and least privilege verified", identity);
     await admin.query(`CREATE SCHEMA "${schema}"`);
     schemaCreated = true;
     await admin.query(`SET search_path TO "${schema}"`);
@@ -228,6 +230,7 @@ suite("expense review native PostgreSQL", () => {
     if (!address || typeof address === "string") throw new Error("Missing owned HTTP listener address");
     httpPort = address.port;
     apiUrl = `http://127.0.0.1:${httpPort}`;
+    console.info("[expense-native] Owned HTTP listener ready", httpPort);
   });
 
   beforeEach(async () => {
@@ -437,13 +440,22 @@ suite("expense review native PostgreSQL", () => {
   test("a real parent lock wait is bounded and returns explicit reload guidance", async () => {
     await admin.query("BEGIN");
     await admin.query("SELECT id FROM events WHERE id = $1 FOR UPDATE", [eventId]);
+    const response = review("Approved").then((result) => result);
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const response = await review("Approved");
-      expect(response.status).toBe(503);
-      expect(response.body.outcome_uncertain).toBe(false);
-      expect(response.body.error).toContain("Reload");
+      const result = await Promise.race([
+        response,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Review exceeded its ten-second lock budget")), 12000);
+        }),
+      ]);
+      expect(result.status).toBe(503);
+      expect(result.body.outcome_uncertain).toBe(false);
+      expect(result.body.error).toContain("Reload");
     } finally {
+      clearTimeout(timer);
       await admin.query("ROLLBACK");
+      await response;
     }
     expect((await readState()).expense.status).toBe("Pending");
   }, 14000);
