@@ -34,11 +34,11 @@ for (const lang of ["am", "en"] as const) {
   test.describe(`Issue 248 cold saved ${lang}`, () => {
     test.use({
       serviceWorkers: "allow",
-      storageState: async ({ baseURL }, use) => {
+      storageState: async ({ baseURL }, provideState) => {
         if (!baseURL || !["127.0.0.1", "localhost"].includes(new URL(baseURL).hostname)) {
           throw new Error("Language hydration regression requires an owned loopback app");
         }
-        await use({
+        await provideState({
           cookies: [],
           origins: [{
             origin: new URL(baseURL).origin,
