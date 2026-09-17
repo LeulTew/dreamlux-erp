@@ -561,11 +561,15 @@ router.post("/preview", async (req: AuthRequest, res) => {
     }
 
     const { month, year } = result.data;
-    const { totalPayrollValue, lines: processedLines } = await PayrollPersistenceService.preview(requestPeriod(result.data));
+    const period = requestPeriod(result.data);
+    const { totalPayrollValue, lines: processedLines } = await PayrollPersistenceService.preview(period);
 
     res.json({
       month,
       year,
+      period_start: period.bounds.start,
+      period_end: period.bounds.end,
+      period_kind: period.periodKind,
       total_payroll_value: totalPayrollValue,
       employee_lines: processedLines,
     });

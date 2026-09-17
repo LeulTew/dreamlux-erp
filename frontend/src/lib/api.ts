@@ -1366,7 +1366,8 @@ export const deletePayrollRun = (id: string) =>
 export const permanentlyDeletePayrollRun = (id: string) =>
   api.delete<unknown>(`/payroll/runs/${id}/permanent`, { timeout: PAYROLL_MUTATION_TIMEOUT_MS })
     .then(res => validatePayrollDeleteAcknowledgement(res.data, id));
-export const previewPayrollRun = (data: Record<string, unknown>) => api.post("/payroll/preview", data).then(res => res.data);
+export const previewPayrollRun = (data: Record<string, unknown>, options?: Pick<AxiosRequestConfig, "signal" | "timeout">) =>
+  api.post<unknown>("/payroll/preview", data, { timeout: 30_000, ...options }).then(res => res.data);
 export const getEligiblePayrollCommissions = (periodStart: string, periodEnd: string) =>
   api.get("/payroll/eligible-commissions", { params: { period_start: periodStart, period_end: periodEnd } }).then((res) => res.data);
 export const savePayrollDraft = (data: Record<string, unknown>) =>

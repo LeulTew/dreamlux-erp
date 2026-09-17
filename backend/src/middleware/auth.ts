@@ -93,6 +93,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       let cached = getCachedUserPermissions(payload.id);
       const shouldQueryDB = process.env.NODE_ENV !== "test" || (typeof payload.id === "string" && payload.id.startsWith("verify-db-"));
       if (!cached && shouldQueryDB) {
+        const fetchedAt = Date.now();
         try {
           const roleContext = await fetchUserRoleContext(payload.id);
           if (roleContext.userExists === false) {
@@ -102,23 +103,28 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
             res.status(401).json({ error: "Your session is no longer valid. Please sign in again." });
             return;
           }
-          if (roleContext.roleNames.length > 0) {
-            cached = {
-              permissionSlugs: roleContext.permissionSlugs,
-              roleNames: roleContext.roleNames,
-            };
-            setCachedUserPermissions(payload.id, cached);
+          cached = {
+            permissionSlugs: roleContext.permissionSlugs,
+            roleNames: roleContext.roleNames,
+          };
+          if (!setCachedUserPermissions(payload.id, cached, Date.now(), fetchedAt)) {
+            console.warn("[AuthMiddleware] Permission lookup invalidated before completion");
+            res.status(503).json({ error: "Permission lookup unavailable", outcome_uncertain: false });
+            return;
           }
         } catch (dbError) {
           console.error("[AuthMiddleware] DB permission lookup failed:", dbError);
           req.permissionLookupFailed = true;
+          res.status(503).json({ error: "Permission lookup unavailable", outcome_uncertain: false });
+          return;
         }
       }
 
       if (cached) {
         payload.roles = cached.roleNames;
-        payload.role = cached.roleNames[0] || payload.role;
+        payload.role = cached.roleNames[0] ?? "";
         payload.permission_slugs = cached.permissionSlugs;
+        delete payload.permissions;
       }
     }
 

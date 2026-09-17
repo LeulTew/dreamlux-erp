@@ -25,6 +25,7 @@ export type PayrollGeneratedEvent = {
 
 export type PayrollGeneratedLine = {
   employee_id: string;
+  employee_code_snapshot?: string | null;
   employee_name_snapshot: string;
   salary_level_snapshot: string;
   profile_photo_url: string | null;
@@ -37,6 +38,7 @@ export type PayrollGeneratedLine = {
 
 type EmployeeRow = {
   id: string;
+  employee_id?: string | null;
   full_name: string;
   salary_level?: string | null;
   base_salary?: number | string | null;
@@ -123,6 +125,7 @@ export function buildPayrollLines(input: {
     totalPayrollValue += totalLinePay;
     lines.push({
       employee_id: employee.id,
+      employee_code_snapshot: employee.employee_id?.trim() ? employee.employee_id : null,
       employee_name_snapshot: employee.full_name,
       salary_level_snapshot: levelCode,
       profile_photo_url: employee.profile_photo_key ? getPublicUrl(employee.profile_photo_key) : null,

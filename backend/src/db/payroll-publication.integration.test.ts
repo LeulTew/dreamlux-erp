@@ -35,6 +35,7 @@ let proxy: Awaited<ReturnType<typeof startDreamluxRestProxy>> | undefined;
 let writerCookie = "";
 let readerCookie = "";
 let restoreNotice: (() => void) | undefined;
+let invalidatePermissions: (() => void) | undefined;
 let notificationFailure = false;
 let notificationCount = 0;
 
@@ -60,6 +61,7 @@ async function login(username: string, password: string) {
 
 beforeAll(async () => {
   if (!enabled) return;
+  expect(process.env.NODE_ENV).toBe("development");
   const target = attestDreamluxNativeTarget(process.env.DATABASE_URL ?? "", "fixture");
   if (Reflect.get(globalThis, "__mockSupabase")) throw new Error("Native QA cannot use mocked Supabase clients");
   observer = new Client({ connectionString: target.href, ssl: { rejectUnauthorized: false } });
@@ -111,6 +113,7 @@ beforeAll(async () => {
   );
   proxy = await startDreamluxRestProxy();
   const runtime = await loadPayrollApiRuntime();
+  invalidatePermissions = runtime.invalidatePermissionCache;
   const { NotificationsService } = runtime;
   const notice = spyOn(NotificationsService, "emitNotificationToRoleOrPermission").mockImplementation(async () => {
     notificationCount += 1;
@@ -128,6 +131,41 @@ beforeAll(async () => {
       }
       res.sendStatus(204);
       stopBrowser();
+    });
+    app.post("/__qa/payroll-read", async (req, res) => {
+      if (req.header("x-dreamlux-fixture-key") !== browserKey) {
+        res.sendStatus(403);
+        return;
+      }
+      if (typeof req.body?.enabled !== "boolean") {
+        res.sendStatus(400);
+        return;
+      }
+      try {
+        await database().query("begin");
+        await database().query(
+          "update roles set permissions=$1::jsonb where id=$2",
+          [JSON.stringify({ payroll: req.body.enabled ? ["read", "write"] : ["write"] }), writerRoleId],
+        );
+        if (req.body.enabled) {
+          await database().query(
+            "insert into role_permissions(role_id,permission_id) select $1,id from permissions where slug='payroll:read' on conflict do nothing",
+            [writerRoleId],
+          );
+        } else {
+          await database().query(
+            "delete from role_permissions where role_id=$1 and permission_id in (select id from permissions where slug='payroll:read')",
+            [writerRoleId],
+          );
+        }
+        await database().query("commit");
+        runtime.invalidatePermissionCache();
+        res.sendStatus(204);
+      } catch (error) {
+        await database().query("rollback");
+        console.error("Synthetic permission fixture update failed", error);
+        res.sendStatus(500);
+      }
     });
   }
   app.use("/auth", runtime.authRouter);
@@ -717,6 +755,146 @@ if (!browserMode) describe("independent DreamLux payroll API and PostgreSQL", ()
       console.log(`[native DreamLux] Complete 5000-employee publication: ${duration.toFixed(1)}ms`);
     } finally {
       await database().query("delete from employees where employee_id like 'QA-239-SCALE-%'");
+    }
+  });
+});
+
+if (!browserMode) describe("authoritative DreamLux preview read contract", () => {
+  nativeTest.each([
+    { label: "monthly", input: { period_kind: "month" }, kind: "month", start: "2026-04-01", end: "2026-04-30" },
+    { label: "omitted kind", input: { period_kind: undefined }, kind: "month", start: "2026-04-01", end: "2026-04-30" },
+    { label: "first half", input: { period_kind: "half_month", period_start: "2026-04-01" }, kind: "half_month", start: "2026-04-01", end: "2026-04-15" },
+    { label: "second half", input: { period_kind: "half_month", period_start: "2026-04-16" }, kind: "half_month", start: "2026-04-16", end: "2026-04-30" },
+    { label: "canonical week", input: { period_kind: "weekly", period_start: "2026-04-08", period_end: "2026-04-30" }, kind: "weekly", start: "2026-04-08", end: "2026-04-14" },
+    { label: "explicit range", input: { period_kind: "range", period_start: "2026-04-02", period_end: "2026-04-28" }, kind: "range", start: "2026-04-02", end: "2026-04-28" },
+  ])("returns the server-resolved $label period without writing payroll", async ({ input, kind, start, end }) => {
+    const response = await http().post("/payroll/preview").set("Cookie", readerCookie).send({ ...period, ...input });
+    expect(response.status).toBe(200);
+    expect(await counts()).toEqual({ runs: 0, lines: 0, events: 0, audits: 0, finalized: 0 });
+    expect(response.body).toMatchObject({ period_kind: kind, period_start: start, period_end: end });
+  });
+
+  nativeTest("returns current employee codes rather than historical or client-provided identities", async () => {
+    await database().query("update employees set employee_id='QA-233-PLANNER-UPDATED' where id=$1", [plannerId]);
+    try {
+      const response = await http().post("/payroll/preview").set("Cookie", readerCookie).send({
+        ...period, employeeLineEvents: [{ employee_id: plannerId, employee_code_snapshot: "UNTRUSTED", events: [] }],
+      });
+      expect(response.status).toBe(200);
+      expect(await counts()).toEqual({ runs: 0, lines: 0, events: 0, audits: 0, finalized: 0 });
+      expect(response.body.employee_lines).toEqual(expect.arrayContaining([
+        expect.objectContaining({ employee_id: plannerId, employee_code_snapshot: "QA-233-PLANNER-UPDATED", snapshot_base_salary: 14500 }),
+        expect.objectContaining({ employee_id: leaderId, employee_code_snapshot: "QA-239-LEADER", snapshot_base_salary: 0, total_events_value: 2500 }),
+      ]));
+    } finally {
+      await database().query("update employees set employee_id='QA-239-PLANNER' where id=$1", [plannerId]);
+    }
+  });
+
+  nativeTest("a legacy blank employee code remains a read-only UUID-identifiable preview", async () => {
+    await database().query("update employees set employee_id='' where id=$1", [plannerId]);
+    try {
+      const response = await http().post("/payroll/preview").set("Cookie", readerCookie).send(period);
+      expect(response.status).toBe(200);
+      expect(response.body.employee_lines).toEqual(expect.arrayContaining([
+        expect.objectContaining({ employee_id: plannerId, employee_code_snapshot: null, snapshot_base_salary: 14500 }),
+      ]));
+      expect(await counts()).toEqual({ runs: 0, lines: 0, events: 0, audits: 0, finalized: 0 });
+    } finally {
+      await database().query("update employees set employee_id='QA-239-PLANNER' where id=$1", [plannerId]);
+    }
+  });
+
+  nativeTest("new preview identity metadata does not change saved-line mappings", async () => {
+    const response = await http().post("/payroll/preview").set("Cookie", writerCookie).send(period);
+    expect(response.status).toBe(200);
+    expect((await counts()).runs).toBe(0);
+    const id = await createRun();
+    const persisted = await database().query(
+      "select employee_id,employee_code_snapshot from payroll_run_employee_lines where run_id=$1 order by employee_id",
+      [id],
+    );
+    expect(persisted.rows).toEqual([
+      { employee_id: plannerId, employee_code_snapshot: null },
+      { employee_id: leaderId, employee_code_snapshot: null },
+    ]);
+  });
+
+  nativeTest("a 250-person preview returns the whole roster without creating a saved payroll", async () => {
+    await database().query(
+      `insert into employees(employee_id,full_name,salary_level,base_salary,compensation_mode)
+       select 'QA-233-ROSTER-'||i::text,'Synthetic preview employee '||i::text,'QA-PLANNER-239',10000,'regular'
+         from generate_series(1,248) i`,
+    );
+    try {
+      const response = await http().post("/payroll/preview").set("Cookie", readerCookie).send(period);
+      expect(response.status).toBe(200);
+      expect(response.body.employee_lines).toHaveLength(250);
+      expect(response.body.total_payroll_value).toBe(249 * 14500 + 2500);
+      expect(await counts()).toEqual({ runs: 0, lines: 0, events: 0, audits: 0, finalized: 0 });
+    } finally {
+      await database().query("delete from employees where employee_id like 'QA-233-ROSTER-%'");
+    }
+  });
+});
+
+if (!browserMode) describe("current grant authorization for payroll preview", () => {
+  function invalidate() {
+    if (!invalidatePermissions) throw new Error("The real permission cache has not been loaded");
+    invalidatePermissions();
+  }
+
+  nativeTest("does not revive a revoked read grant from the signed token map", async () => {
+    await database().query("update roles set permissions=$1::jsonb where id=$2", [{ payroll: ["write"] }, writerRoleId]);
+    await database().query(
+      "delete from role_permissions where role_id=$1 and permission_id in (select id from permissions where slug='payroll:read')",
+      [writerRoleId],
+    );
+    invalidate();
+    try {
+      const current = await http().get("/auth/permissions").set("Cookie", writerCookie);
+      expect(current.status).toBe(200);
+      expect(current.body.permission_slugs).toEqual(["payroll:write"]);
+      const identity = await http().get("/auth/me").set("Cookie", writerCookie);
+      expect(identity.status).toBe(200);
+      expect(identity.body.user.permission_slugs).toEqual(["payroll:write"]);
+      expect((await http().post("/payroll/preview").set("Cookie", writerCookie).send(period)).status).toBe(403);
+      expect(await counts()).toEqual({ runs: 0, lines: 0, events: 0, audits: 0, finalized: 0 });
+    } finally {
+      await database().query("update roles set permissions=$1::jsonb where id=$2", [{ payroll: ["read", "write"] }, writerRoleId]);
+      await database().query(
+        "insert into role_permissions(role_id,permission_id) select $1,id from permissions where slug='payroll:read' on conflict do nothing",
+        [writerRoleId],
+      );
+      invalidate();
+    }
+  });
+
+  nativeTest("treats a now-unassigned account as having no grants, not its old token roles", async () => {
+    await database().query("update users set role_id=null where id=$1", [actorId]);
+    invalidate();
+    try {
+      const denied = await http().post("/payroll/preview").set("Cookie", writerCookie).send(period);
+      expect(denied.status).toBe(403);
+      expect((await counts()).runs).toBe(0);
+    } finally {
+      await database().query("update users set role_id=$1 where id=$2", [writerRoleId, actorId]);
+      invalidate();
+    }
+  });
+
+  nativeTest("cannot use a custom route guard to bypass an unavailable permission lookup", async () => {
+    await database().query("alter table roles rename column name to unavailable_role_name_242");
+    invalidate();
+    try {
+      const denied = await http().post("/payroll/preview").set("Cookie", writerCookie).send(period);
+      expect(denied.status).toBe(503);
+      expect(denied.body.error).toBe("Permission lookup unavailable");
+      expect(denied.body.outcome_uncertain).toBe(false);
+      expect((await counts()).runs).toBe(0);
+    } finally {
+      await database().query("alter table roles rename column unavailable_role_name_242 to name");
+      invalidate();
     }
   });
 });

@@ -35,7 +35,11 @@ export async function payrollFixtureDdl(): Promise<string> {
   const activityDdl = [...activity.matchAll(/^(?:CREATE TABLE IF NOT EXISTS public\.activity_logs|CREATE INDEX IF NOT EXISTS idx_activity_logs_\w+|ALTER TABLE public\.activity_logs ENABLE ROW LEVEL SECURITY)[\s\S]*?;/gm)]
     .map(([statement]) => statement);
   if (activityDdl.length !== 4) throw new Error("Expected the reviewed activity table, indexes and RLS declaration");
-  return ["CREATE EXTENSION IF NOT EXISTS pgcrypto;", ...tables, ...indexes, ...activityDdl].join("\n");
+  const settings = await readFile(join(__dirname, "..", "migrate-settings.ts"), "utf8");
+  const settingsColumns = [...settings.matchAll(/ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS (?:inventory_id_prefix|event_id_prefix) TEXT NOT NULL DEFAULT '(?:INV|EVT)';/g)]
+    .map(([statement]) => statement);
+  if (settingsColumns.length !== 2) throw new Error("Expected both reviewed settings prefix columns");
+  return ["CREATE EXTENSION IF NOT EXISTS pgcrypto;", ...tables, ...indexes, ...activityDdl, ...settingsColumns].join("\n");
 }
 
 export async function createDreamluxPayrollFixture(adminUrl: string) {

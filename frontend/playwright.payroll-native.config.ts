@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { isAbsolute } from "node:path";
-import { payrollSystemEnvironment } from "./payroll-qa-environment";
+import { payrollBrowserTestFiles, payrollSystemEnvironment } from "./payroll-qa-environment";
 
 for (const name of ["DREAMLUX_NATIVE_BROWSER_DESCRIPTOR", "DREAMLUX_PAYROLL_CONTROL_SCRIPT", "DREAMLUX_BUN_PATH", "DREAMLUX_PAYROLL_BROWSER_REPORT", "DREAMLUX_PAYROLL_BROWSER_OUTPUT"]) {
   const value = process.env[name];
@@ -12,7 +12,7 @@ if (process.env.DREAMLUX_E2E_BASELINE || process.env.DREAMLUX_NATIVE_USE_BASELIN
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "issue239-payroll-native.spec.ts",
+  testMatch: [...payrollBrowserTestFiles],
   fullyParallel: false,
   workers: 1,
   retries: 0,

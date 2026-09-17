@@ -28,7 +28,6 @@ import {
   getStores,
   getSalaryLevels,
   getEventTypes,
-  previewPayrollRun,
   savePayrollDraft,
   finalizePayrollRun,
   getPayrollRuns,
@@ -53,8 +52,10 @@ import { findRunForPeriod } from "@/utils/payroll-period";
 import { useLanguage } from "@/hooks/use-language";
 import ForbiddenState from "@/components/ForbiddenState";
 import PayrollMutationNotice from "@/components/PayrollMutationNotice";
+import PayrollPreviewSheet from "@/components/PayrollPreviewSheet";
 import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
 import { extractPayrollHttpError } from "@/lib/payroll-error";
+import { capturePayrollPreviewRequest, type PayrollPreviewRequest } from "@/lib/payroll-preview";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -65,6 +66,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save Draft": "Save Draft",
     "Previewing...": "Previewing...",
     "Preview": "Preview",
+    "Preview requires payroll read permission.": "Preview requires payroll read permission.",
+    "Setup totals are estimates. Use Preview to review the server calculation before saving.": "Setup totals are estimates. Use Preview to review the server calculation before saving.",
     "Finalizing...": "Finalizing...",
     "Finalize Run": "Finalize Run",
     "Saving draft...": "Saving draft...",
@@ -84,18 +87,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Sort: Dept": "Sort: Dept",
     "Sort: Pay": "Sort: Pay",
     "Manage Event Types": "Manage Event Types",
-    "Base Salary": "Base Salary",
-    "Events / Commissions": "Events / Commissions",
+    "Base Salary": "Base Salary (estimate)",
+    "Events / Commissions": "Events / Commissions (estimate)",
     "No events added for this employee yet.": "No events added for this employee yet.",
     "Select event": "Select event",
     "Decrease": "Decrease",
     "Increase": "Increase",
     "Remove Event": "Remove Event",
     "Add Event": "Add Event",
-    "Total Earnings": "Total Earnings",
-    "Base Salary Total": "Base Salary Total",
-    "Commission Total": "Commission Total",
-    "Grand Total Disbursement": "Grand Total Disbursement",
+    "Total Earnings": "Total Earnings (estimate)",
+    "Base Salary Total": "Base Salary Total (estimate)",
+    "Commission Total": "Commission Total (estimate)",
+    "Grand Total Disbursement": "Grand Total Disbursement (estimate)",
     "Loading payroll run...": "Loading payroll run...",
     "Existing draft loaded!": "Existing draft loaded!",
     "Draft saved": "Draft saved",
@@ -132,6 +135,8 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Save Draft": "ረቂቅ አስቀምጥ",
     "Previewing...": "ቅድመ-ዕይታ በማዘጋጀት ላይ...",
     "Preview": "ቅድመ-ዕይታ",
+    "Preview requires payroll read permission.": "ቅድመ እይታ የክፍያ ንባብ ፈቃድ ይፈልጋል።",
+    "Setup totals are estimates. Use Preview to review the server calculation before saving.": "የዝግጅቱ ድምሮች ግምቶች ናቸው። ከማስቀመጥዎ በፊት የአገልጋዩን ስሌት በቅድመ እይታ ያረጋግጡ።",
     "Finalizing...": "በማጠናቀቅ ላይ...",
     "Finalize Run": "ክፍያውን አጠናቅ",
     "Saving draft...": "ረቂቅ በመቀመጥ ላይ...",
@@ -151,18 +156,18 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Sort: Dept": "በክፍል ደርድር",
     "Sort: Pay": "በክፍያ ደርድር",
     "Manage Event Types": "የክስተት ዓይነቶችን ያስተዳድሩ",
-    "Base Salary": "መሠረታዊ ደመወዝ",
-    "Events / Commissions": "ክስተቶች / ኮሚሽኖች",
+    "Base Salary": "መሠረታዊ ደመወዝ (ግምት)",
+    "Events / Commissions": "ክስተቶች / ኮሚሽኖች (ግምት)",
     "No events added for this employee yet.": "ለዚህ ሠራተኛ እስካሁን የተጨመረ ክስተት የለም።",
     "Select event": "ክስተት ይምረጡ",
     "Decrease": "ቀንስ",
     "Increase": "ጨምር",
     "Remove Event": "ክስተት አስወግድ",
     "Add Event": "ክስተት ጨምር",
-    "Total Earnings": "አጠቃላይ ገቢ",
-    "Base Salary Total": "አጠቃላይ መሠረታዊ ደመወዝ",
-    "Commission Total": "አጠቃላይ ኮሚሽን",
-    "Grand Total Disbursement": "አጠቃላይ የተከፈለ ክፍያ",
+    "Total Earnings": "አጠቃላይ ገቢ (ግምት)",
+    "Base Salary Total": "አጠቃላይ መሠረታዊ ደመወዝ (ግምት)",
+    "Commission Total": "አጠቃላይ ኮሚሽን (ግምት)",
+    "Grand Total Disbursement": "አጠቃላይ የተከፈለ ክፍያ (ግምት)",
     "Loading payroll run...": "የክፍያ መዝገብ በመጫን ላይ...",
     "Existing draft loaded!": "ያለው ረቂቅ ተጭኗል!",
     "Draft saved": "ረቂቅ ተቀምጧል",
@@ -199,20 +204,6 @@ type EventLine = {
   price_override?: number | null;
   override_reason?: string | null;
   selected_level_id?: string | null;
-};
-
-type PreviewResponse = {
-  month: number;
-  year: number;
-  total_payroll_value: number;
-  employee_lines: Array<{
-    employee_id: string;
-    employee_name_snapshot: string;
-    compensation_mode_snapshot: "regular" | "commission_only";
-    snapshot_base_salary: number;
-    total_events_value: number;
-    total_line_pay: number;
-  }>;
 };
 
 function normalizeLevelLabel(rawLabel: string): string {
@@ -284,6 +275,11 @@ function PaymentRunProcessPageContent() {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<"name" | "department" | "pay">("name");
   const [errorMsg, setErrorMsg] = useState("");
+  const [previewRequest, setPreviewRequest] = useState<PayrollPreviewRequest | null>(null);
+  const previewSequence = useRef(0);
+  const previewButton = useRef<HTMLButtonElement>(null);
+  const previewAccessNote = useRef<HTMLParagraphElement>(null);
+  const closePreview = useCallback(() => setPreviewRequest(null), []);
   const { begin: beginWrite, complete: completeWrite, fail: failWrite,
     pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
   const [eventLinesByEmployee, setEventLinesByEmployee] = useState<Record<string, EventLine[]>>({});
@@ -315,6 +311,7 @@ function PaymentRunProcessPageContent() {
   }, []);
 
   const hasPayrollWrite = isAuthenticated && hasPermission("payroll:write");
+  const hasPayrollRead = isAuthenticated && hasPermission("payroll:read");
 
   const { data: employeesPayload, isLoading: employeesLoading } = useQuery({
     queryKey: ["payroll-run-employees", officeId],
@@ -421,6 +418,15 @@ function PaymentRunProcessPageContent() {
 
     return { start, end, kind };
   }, [selectedMonth, periodType, settings]);
+
+  const previewContextKey = JSON.stringify([
+    user?.id, !authLoading && hasPayrollRead && hasPayrollWrite, selectedMonth, periodType, officeId,
+    searchParams.get("date"), searchParams.get("period_type"), activeDates.start, activeDates.end, activeDates.kind,
+  ]);
+  const currentPreview = previewRequest?.contextKey === previewContextKey ? previewRequest : null;
+  // Clear before rendering so a changed owner/period/grant cannot expose or
+  // later reopen an old result, even when its transport ignores cancellation.
+  if (previewRequest && !currentPreview) setPreviewRequest(null);
 
   const { data: eligibleCommissions } = useQuery<{
     lines: Array<{ employee_id: string; event_type_id: string; quantity: number; commission_total: number }>;
@@ -610,14 +616,6 @@ function PaymentRunProcessPageContent() {
     };
   }, [employees, computeEmployeeTotals]);
 
-  const previewMutation = useMutation({
-    mutationFn: (payload: PayrollGenerateRequest) =>
-      previewPayrollRun(payload as unknown as Record<string, unknown>) as Promise<PreviewResponse>,
-    onError: (error: Error) => {
-      setErrorMsg(error.message || t("Failed to generate preview"));
-    },
-  });
-
   const saveDraftMutation = useMutation({
     retry: false,
     mutationFn: (payload: PayrollGenerateRequest & { created_by_user_id?: string }) =>
@@ -754,11 +752,14 @@ function PaymentRunProcessPageContent() {
   ]);
 
   const handlePreview = () => {
-    if (writePending || needsReload) return;
+    if (writePending || needsReload || employeesLoading || authLoading || !hasPayrollRead || !user?.id) return;
     setErrorMsg("");
     try {
       const payload = buildPayload();
-      previewMutation.mutate(payload);
+      setPreviewRequest(capturePayrollPreviewRequest({
+        sequence: ++previewSequence.current, userId: user.id, contextKey: previewContextKey, payload,
+        periodStart: activeDates.start, periodEnd: activeDates.end, periodKind: activeDates.kind,
+      }));
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
     }
@@ -893,11 +894,14 @@ function PaymentRunProcessPageContent() {
                 {saveDraftMutation.isPending ? t("Saving...") : t("Save Draft")}
               </button>
               <button
+                ref={previewButton}
+                type="button"
                 onClick={handlePreview}
-                disabled={previewMutation.isPending || writePending || needsReload || employeesLoading || authLoading}
-                className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card text-foreground shadow-premium hover:bg-card-alt transition-all disabled:opacity-50"
+                aria-describedby={!hasPayrollRead ? "payroll-preview-access" : undefined}
+                disabled={!hasPayrollRead || !user?.id || currentPreview !== null || writePending || needsReload || employeesLoading || authLoading}
+                className="min-h-12 min-w-12 px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-card text-foreground border border-border [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
               >
-                {previewMutation.isPending ? t("Previewing...") : t("Preview")}
+                {t("Preview")}
               </button>
               <button
                 onClick={handleFinalize}
@@ -914,6 +918,23 @@ function PaymentRunProcessPageContent() {
         </div>
 
         <PayrollMutationNotice failure={mutationFailure} pending={writePending} />
+        {!hasPayrollRead && (
+          <p id="payroll-preview-access" ref={previewAccessNote} tabIndex={-1} className="rounded-xl border border-border p-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-foreground">
+            {t("Preview requires payroll read permission.")}
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground">{t("Setup totals are estimates. Use Preview to review the server calculation before saving.")}</p>
+        {currentPreview && (
+          <PayrollPreviewSheet
+            request={currentPreview}
+            canRead={hasPayrollRead}
+            onClose={closePreview}
+            restoreFocus={() => {
+              if (previewButton.current && !previewButton.current.disabled) previewButton.current.focus();
+              else previewAccessNote.current?.focus();
+            }}
+          />
+        )}
         {runsHistoryError && (
           <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-card p-4 text-sm">
             <p>{lang === "am" ? "የክፍያ ታሪኩን መጫን አልተቻለም። ለውጥ ከማድረግዎ በፊት እንደገና ይሞክሩ።" : "Payroll history could not be loaded. Retry before making changes."}</p>

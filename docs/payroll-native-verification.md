@@ -122,12 +122,19 @@ assertion, iteration count, production cache logic or job cap was weakened;
 this is runner headroom, not a claim that cache performance was repaired.
 
 The native runner reuses `createDreamluxPayrollFixture` and the reviewed
-18-table CREATE-only DDL/index/activity-RLS bootstrap. It creates a new
+18-table DDL/index/activity-RLS bootstrap, including the two existing settings
+prefix columns from `migrate-settings.ts`. That migration program is never
+executed; only its reviewed column definitions are used in the fixture. This
+prevents successful-looking weekly defaults from hiding a failed settings read.
+The fixture creates a new
 `dreamlux_ephemeral_payroll_239_*` database and independent fresh application and
 REST signing secrets. It starts its own PostgREST process with five pooled
 connections and no anonymous database role. Readiness requires an
 unauthenticated401, not privileged anonymous access. The native test owns the
-REST prefix proxy, real auth/payroll API and synthetic SRD data. No seed
+REST prefix proxy, real auth/payroll API and synthetic SRD data. Native APIs run
+with `NODE_ENV=development` so database-backed authorization is exercised,
+rather than the application's unit-test shortcut. Environment loading remains
+blocked and all bindings remain synthetic loopback targets. No seed
 records or legacy instance data are copied.
 
 The Playwright test runner receives the private descriptor and native control
@@ -148,18 +155,19 @@ Putting `--config` before `test` previously returned exit zero with no tests on
 Bun 1.4. The runner therefore requires all of:
 
 - zero exit status, the native guard banner and expected source file;
-- at least **43 native tests**, zero failures/skips, one test file;
+- at least **56 native tests**, zero failures/skips, one test file;
 - matching JUnit totals and actual testcase entries;
 - a nonempty browser registry discovered with Playwright `--list` using the
   same snapshot, environment (apart from the private report path), serial
   desktop/mobile configuration and selection as execution;
+- both publication and preview files present in each browser project;
 - exact equality between discovered and executed test identities, including
   project, source location and title path: no omitted, substituted, duplicated
   or extra tests, and no skips, retries, flaky results or total disagreement.
 
 Browser counts are derived from discovery, not a fixed workflow count. The
-parent-observed registry currently contains 22 browser cases, including the
-parameterized light/dark layout checks, but neither 18 nor 22 is an execution
+parent-observed registry now contains publication and preview browser cases,
+including parameterized light/dark layout checks, but no prior case count is an execution
 threshold in the runner. Discovery itself executes no tests and is not counted
 as business coverage. The final receipt includes the requested count and registry
 digest alongside actual per-project results.
@@ -220,7 +228,7 @@ configuration/unit checks alone.
 
 ## Independently executed local evidence
 
-The repository-owned Linux pipeline was exercised with Bun 1.3.14, Node 22,
+For issue239, the repository-owned Linux pipeline was exercised with Bun 1.3.14, Node 22,
 PostgreSQL 16.15 and the checksum-verified PostgREST 16.3 binary. Its actual native
 stage passed 43 tests and its discovered desktop/mobile browser registry passed
 all 22 tests without retries/skips, using the single verified frontend artifact.
@@ -235,3 +243,17 @@ also corrected a pinned-runtime startup issue: Bun reports an initial local
 connection refusal as `ConnectionRefused`; readiness now waits within its
 existing deadline for that specific condition and still surfaces unknown errors.
 These are local results, not hosted Actions or live production smoke evidence.
+
+Issue233 extends the same registry with read-only preview, canonical metadata,
+250-person paging, cancellation/late results, Amharic, and actual permission
+revocation. Its discovery/receipt checks do not accept a publication-only run.
+Native preview assertions verify zero payroll writes and unchanged saved-line
+mappings, including a legacy employee without a usable human code.
+
+The real revocation exercise also exposed issue242: a current permission lookup
+could leave the old token map in force. Native fixtures now exercise the actual
+authorization path and invalidate the actual in-process cache after a synthetic
+role change. A timestamp-controlled unit case separately checks an invalidation
+that arrives during a permission lookup. Native controls cover revoked grants,
+removed roles and unavailable current-authority data. Earlier unit-test-mode
+role checks are not claimed as proof of runtime permission revocation.

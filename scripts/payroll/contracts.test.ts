@@ -2,17 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { join, sep } from "node:path";
 import {
   browserArguments, browserDescriptor, browserReceipt, browserRegistry, bunReceipt, nativeArguments, nativeEnvironment, nativePlan,
-  NATIVE_GUARD_BANNER, NATIVE_TEST, POSTGREST_LINUX_BINARY_SHA256, selectedFrontendFile,
+  MINIMUM_NATIVE_TESTS, NATIVE_GUARD_BANNER, NATIVE_TEST, POSTGREST_LINUX_BINARY_SHA256, selectedFrontendFile,
   verifyJunitReceipt,
 } from "./contracts";
-import { payrollPublicEnvironment, payrollSystemEnvironment, payrollUiEnvironment } from "../../frontend/payroll-qa-environment";
+import { payrollBrowserTestFiles, payrollPublicEnvironment, payrollSystemEnvironment, payrollUiEnvironment } from "../../frontend/payroll-qa-environment";
 import { CleanupStack, redact } from "./processes";
 
 const root = process.cwd();
 const admin = `postgresql://dreamlux_parity:${"a".repeat(64)}@127.0.0.1:55434/postgres?sslmode=disable`;
 const fixture = admin.replace("/postgres?", "/dreamlux_ephemeral_payroll_239_012345abcdef?");
 const args = ["--allow-disposable-postgres", "--postgrest", "tools/postgrest", "--frontend-build", ".qa-payroll-build"];
-const output = (passed = 43) => `${NATIVE_TEST}:\n${NATIVE_GUARD_BANNER}\n ${passed} pass\n 0 fail\nRan ${passed} tests across 1 file.\n`;
+const output = (passed = MINIMUM_NATIVE_TESTS) => `${NATIVE_TEST}:\n${NATIVE_GUARD_BANNER}\n ${passed} pass\n 0 fail\nRan ${passed} tests across 1 file.\n`;
 
 describe("payroll runner pre-client boundaries", () => {
   test("accepts only the explicit disposable target and pinned binary plan", () => {
@@ -54,6 +54,7 @@ describe("payroll runner pre-client boundaries", () => {
       PATH: source.PATH, TZ: "UTC", ...payrollPublicEnvironment, NEXT_TELEMETRY_DISABLED: "1", NODE_ENV: "production",
     });
     const child = nativeEnvironment(source, admin, fixture, "d".repeat(64), "e".repeat(64));
+    expect(child.NODE_ENV).toBe("development");
     expect(child.DATABASE_URL).toBe(fixture);
     expect(child.DATABASE_BACKUP_URL).toBe("");
     expect(child.DATABASE_DIRECT_URL).toBe("");
@@ -93,7 +94,8 @@ describe("credential-free snapshot selection", () => {
 
 describe("test receipts cannot confuse infrastructure with financial coverage", () => {
   test("accepts real nonzero native totals, and labels the one provider test separately", () => {
-    expect(bunReceipt(output(), 0, "native").passed).toBe(43);
+    expect(bunReceipt(output(), 0, "native").passed).toBe(MINIMUM_NATIVE_TESTS);
+    expect(() => bunReceipt(output(43), 0, "native")).toThrow();
     expect(bunReceipt(output(1), 0, "provider").passed).toBe(1);
     expect(() => bunReceipt(output(1), 0, "native")).toThrow();
   });
@@ -125,26 +127,31 @@ describe("test receipts cannot confuse infrastructure with financial coverage", 
     expect(() => browserDescriptor({ ...descriptor, apiOrigin: "https://unapproved.invalid" }, fixture)).toThrow();
     expect(() => browserDescriptor({ ...descriptor, shutdownKey: "invalid" }, fixture)).toThrow();
   });
-  const report = (perProject = 11, discovery = false) => ({
+  const report = (perFile = 11, discovery = false) => ({
     config: {
       workers: 1, fullyParallel: false, forbidOnly: true,
       projects: ["desktop", "mobile"].map((name) => ({ id: name, name, repeatEach: 1, retries: 0 })),
     },
-    errors: [], stats: { expected: discovery ? 0 : perProject * 2, unexpected: 0, skipped: discovery ? perProject * 2 : 0, flaky: 0 },
-    suites: [{ title: "issue239-payroll-native.spec.ts", specs: Array.from({ length: perProject }, (_, index) => ({
-      id: `synthetic-${index}`, title: `Synthetic contract ${index}`, ok: true,
-      file: "issue239-payroll-native.spec.ts", line: index + 1, column: 1,
+    errors: [], stats: { expected: discovery ? 0 : perFile * 4, unexpected: 0, skipped: discovery ? perFile * 4 : 0, flaky: 0 },
+    suites: [{ title: "payroll contracts", specs: payrollBrowserTestFiles.flatMap((file, fileIndex) => Array.from({ length: perFile }, (_, index) => ({
+      id: `synthetic-${fileIndex}-${index}`, title: `Synthetic contract ${fileIndex} ${index}`, ok: true,
+      file, line: index + 1, column: 1,
       tests: ["desktop", "mobile"].map((projectName) => ({
         projectId: projectName, projectName, expectedStatus: "passed", status: discovery ? "skipped" : "expected",
         results: discovery ? [] : [{ status: "passed", retry: 0 }],
       })),
-    })) }],
+    }))) }],
   });
-  test.each([1, 11, 14])("uses all %i discovered cases per project without a hard-coded coverage count", (count) => {
+  test.each([1, 11, 14])("uses all %i discovered cases per file/project without a hard-coded coverage count", (count) => {
     const requested = browserRegistry(report(count, true), 0);
     expect(browserReceipt(report(count), 0, requested)).toEqual({
-      desktop: count, mobile: count, requested: count * 2, passed: count * 2, retries: 0, skipped: 0,
+      desktop: count * 2, mobile: count * 2, requested: count * 4, passed: count * 4, retries: 0, skipped: 0,
     });
+  });
+  test("does not let discovery silently omit the preview workflow", () => {
+    const missingPreview = report(1, true);
+    missingPreview.suites[0].specs = missingPreview.suites[0].specs.filter((spec) => spec.file === "issue239-payroll-native.spec.ts");
+    expect(() => browserRegistry(missingPreview, 0)).toThrow("Missing required browser file coverage");
   });
   test("rejects the former workflow-only receipt when discovery also requested layout cases", () => {
     const requested = browserRegistry(report(11, true), 0);

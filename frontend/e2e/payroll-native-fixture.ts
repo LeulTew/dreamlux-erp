@@ -25,7 +25,7 @@ function state(value: unknown): value is State {
       && /^-?\d+(?:\.\d+)?$/.test(run.total) && typeof run.employees === "number")
     && ["audits", "lines", "event_lines"].every((key) => typeof value[key] === "number");
 }
-export async function control(action: "reset" | "change-source" | "reject-employee-inserts" | "clear-fault" | "state") {
+export async function control(action: "reset" | "change-source" | "reject-employee-inserts" | "clear-fault" | "state" | "preview-roster" | "empty-roster") {
   const script = process.env.DREAMLUX_PAYROLL_CONTROL_SCRIPT;
   if (!script) throw new Error("The explicit local payroll control script is missing");
   const result = await execute(process.env.DREAMLUX_BUN_PATH ?? "bun", ["--no-env-file", script, action], {
@@ -36,26 +36,28 @@ export async function control(action: "reset" | "change-source" | "reject-employ
   return parsed;
 }
 
-export async function installPayrollFixture(context: BrowserContext, page: Page, baseURL: string, reader = false, theme: "light" | "dark" = "light") {
+export async function installPayrollFixture(context: BrowserContext, page: Page, baseURL: string, reader = false, theme: "light" | "dark" = "light", language: "en" | "am" = "en") {
   if (baseURL !== "http://127.0.0.1:3126") throw new Error("Unexpected DreamLux browser target");
   const descriptorPath = process.env.DREAMLUX_NATIVE_BROWSER_DESCRIPTOR;
   if (!descriptorPath) throw new Error("The private native browser descriptor is missing");
   const descriptor: unknown = JSON.parse(await readFile(descriptorPath, "utf8"));
   if (!record(descriptor) || descriptor.apiOrigin !== "http://127.0.0.1:5326"
     || typeof descriptor.writerCookie !== "string" || typeof descriptor.readerCookie !== "string"
+    || typeof descriptor.shutdownKey !== "string" || !/^[a-f0-9]{48}$/.test(descriptor.shutdownKey)
     || typeof descriptor.database !== "string" || !/^dreamlux_ephemeral_payroll_239_[a-f0-9]{12}$/.test(descriptor.database)) {
     throw new Error("The private browser fixture does not match the attested synthetic target");
   }
   const cookie = reader ? descriptor.readerCookie : descriptor.writerCookie;
+  const shutdownKey = descriptor.shutdownKey;
   await context.addCookies(cookie.split("; ").map((part) => {
     const separator = part.indexOf("=");
     if (separator < 1) throw new Error("Malformed synthetic session cookie");
     return { url: baseURL, name: part.slice(0, separator), value: part.slice(separator + 1), httpOnly: true, sameSite: "Lax" as const };
   }));
-  await context.addInitScript((theme) => {
-    localStorage.setItem("lang", "en");
+  await context.addInitScript(({ theme, language }) => {
+    localStorage.setItem("lang", language);
     localStorage.setItem("theme", theme);
-  }, theme);
+  }, { theme, language });
   const unexpected: string[] = [];
   const errors: string[] = [];
   const consoleErrors: Array<{ text: string; url: string }> = [];
@@ -153,6 +155,13 @@ export async function installPayrollFixture(context: BrowserContext, page: Page,
   });
   return {
     writes,
+    async setPayrollRead(enabled: boolean) {
+      const response = await context.request.post("http://127.0.0.1:5326/__qa/payroll-read", {
+        headers: { "x-dreamlux-fixture-key": shutdownKey },
+        data: { enabled },
+      });
+      expect(response.status()).toBe(204);
+    },
     allowHttpError(status: number, path: string) {
       expectedHttpErrors.add(`${status} ${path}`);
     },

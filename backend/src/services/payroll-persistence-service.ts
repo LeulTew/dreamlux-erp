@@ -46,7 +46,7 @@ const SOURCE_SQL = `
   with eligible as (${ELIGIBLE_COMMISSIONS_SQL})
   select
     coalesce((select jsonb_agg(e order by e.id) from (
-      select id,full_name,salary_level,base_salary,profile_photo_key,event_prices,compensation_mode
+      select id,employee_id,full_name,salary_level,base_salary,profile_photo_key,event_prices,compensation_mode
         from public.employees where deleted_at is null
     ) e),'[]'::jsonb) as employees,
     coalesce((select jsonb_agg(e order by e.id) from (
