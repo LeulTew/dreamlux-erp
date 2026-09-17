@@ -15,6 +15,17 @@ The shared correction matches LeulTew/koti-catering#262 / LeulTew/koti-catering#
 without changing DreamLux's salary code/FK policy, compensation calculation,
 compatibility retries or historical payroll snapshots.
 
+Staff-payment employee selection uses the existing `active` (non-trashed) list
+contract, not an employment-eligibility or compensation filter. The picker
+searches the server in 50-row pages ordered by name and unique employee code;
+ordinary directory calls retain their default salary ordering. Saved and newly
+selected links remain visible across searches, pages and lookup failures.
+Loading, empty and failed lookups are distinct, with a deliberate retry and a
+10-second request timeout. The positional API arguments remain unchanged; an
+optional final request-options argument supplies cancellation and timeout only.
+This adapts LeulTew/koti-catering#268 / LeulTew/koti-catering#277 for Dream #232
+without changing finance payloads, permissions, month closure or payroll guards.
+
 Event commission is eligible only for verified work/attendance. `GET /payroll/eligible-commissions` groups attended assignments by employee and event type for the requested payroll dates, counting each event once and summing its recorded commission. Preview, draft, and finalize rebuild these lines server-side from the same query; client-submitted commission values are not authoritative. Corrections are made on the event assignment, preserving one audited source of truth. Unchecked attendance is excluded.
 
 Event completion records attended commission as the event's labor expense. Payroll snapshots the same earned commission as an employee liability/payment, but the monthly net-profit statement deducts only payroll base-salary snapshots because event commissions are already included in approved event labor expenses. This prevents the same commission from reducing profit twice.
