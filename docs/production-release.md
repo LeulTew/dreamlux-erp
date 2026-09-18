@@ -86,10 +86,13 @@ non-authenticating CLI-stub test runs on Linux without a database.
 
 This is source and synthetic recovery evidence, not a current production
 backup, RPO/RTO, Storage-object recovery or full provider-platform rehearsal.
-`backup:storage` and the combined `backup` command are separate existing
-surfaces and were not executed by this verification. Database SQL does not
-contain external Storage object contents. Keep original backup artifacts and
-their operational readiness evidence separate from a migration-source handoff.
+The [Storage snapshot command](storage-backup.md) separately exports external
+object bytes and verifies their manifests/checksums. Its synthetic SDK/HTTP
+tests are separate from SQL restoration; neither establishes a current live
+backup or an atomic cross-store snapshot. The combined `backup` command retains
+Storage-then-database ordering and stops on failure. Keep original backup
+artifacts and their operational readiness evidence separate from a
+migration-source handoff.
 
 ## Manual release sequence
 
