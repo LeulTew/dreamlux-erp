@@ -159,6 +159,21 @@ still valid. Optional historical photo lookup remains best-effort.
   false marker permits a `5xx` manual retry; `502`/`504` remain unknown regardless
   of that marker. Normal `4xx` failures retain manual recovery.
   Client-side navigation or a history refetch does not clear that guard.
+- Issue252 keeps response ownership separate from the write guard. Requests
+  capture their actor, record or setup context before dispatch. Every receipt
+  still settles its write and invalidates the appropriate saved-data queries,
+  but an unmounted or changed context cannot redirect the newer page, close its
+  dialog, load an older draft into it, or mark its period as saved. Returning
+  to the previous context does not revive an obsolete response.
+- The callers use `networkMode: "always"` with retries disabled: an offline
+  attempt reaches the bounded transport and its failure notice instead of
+  becoming a paused financial write that executes automatically on reconnect.
+  An unconfirmed transport failure remains blocked until explicit reconciliation.
+  This does not weaken the server's current permission checks or change pay.
+- A confirmed receipt releases the write guard before read revalidation. Slow
+  reads cannot hold an acknowledged write or clear a subsequent write's guard.
+  Saved and finalized setup metadata belongs only to its captured period and
+  actor; switching periods does not inherit a previous period's success state.
 - The unknown-outcome notice focuses **Reload payroll** when recovery first
   becomes required and when entering another caller with that persistent state.
   Known failures do not move manual editing focus.

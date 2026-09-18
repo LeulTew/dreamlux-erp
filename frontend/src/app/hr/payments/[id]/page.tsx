@@ -19,6 +19,7 @@ import ActivityDrawer from "@/components/ActivityDrawer";
 import PayrollMutationNotice from "@/components/PayrollMutationNotice";
 import { useAuth } from "@/hooks/useAuth";
 import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
+import { usePayrollResponseContext, type PayrollResponseOwner } from "@/hooks/usePayrollResponseContext";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -127,8 +128,9 @@ export default function PaymentRunDetailPage() {
   const { id } = useParams() as { id: string };
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { hasPermission, isAuthenticated } = useAuth();
+  const { user, hasPermission, isAuthenticated } = useAuth();
   const hasPayrollWrite = isAuthenticated && hasPermission("payroll:write");
+  const captureResponse = usePayrollResponseContext(JSON.stringify([user?.id, id, hasPayrollWrite]));
   const { begin: beginWrite, complete: completeWrite, fail: failWrite,
     pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -147,14 +149,17 @@ export default function PaymentRunDetailPage() {
 
   const statusMutation = useMutation({
     retry: false,
-    mutationFn: (status: "FINALIZED" | "FLAGGED_WRONG" | "TRASH") => updatePayrollRunStatus(id, status),
-    onSuccess: (data) => {
+    networkMode: "always",
+    mutationFn: (request: { id: string; status: "FINALIZED" | "FLAGGED_WRONG" | "TRASH"; ownsResponse: PayrollResponseOwner }) =>
+      updatePayrollRunStatus(request.id, request.status),
+    onSuccess: (data, request) => {
       completeWrite();
+      queryClient.invalidateQueries({ queryKey: ["payroll-run", request.id] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      if (!request.ownsResponse()) return;
       setIsDeleteModalOpen(false);
       setIsFlagModalOpen(false);
       setIsFinalizeModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["payroll-run", id] });
-      queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       if (data.status === "TRASH") {
         toast.success(t("Payroll run moved to trash"));
         router.push("/hr/payments");
@@ -162,8 +167,9 @@ export default function PaymentRunDetailPage() {
         toast.success(`${t("Status updated to")} ${t(data.status)}`);
       }
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown, request) => {
       failWrite(error, t("Failed to update status"));
+      if (!request.ownsResponse()) return;
       setIsDeleteModalOpen(false);
       setIsFlagModalOpen(false);
       setIsFinalizeModalOpen(false);
@@ -172,7 +178,7 @@ export default function PaymentRunDetailPage() {
 
   const handleStatus = (status: "FINALIZED" | "FLAGGED_WRONG" | "TRASH") => {
     if (!hasPayrollWrite || !beginWrite()) return;
-    statusMutation.mutate(status);
+    statusMutation.mutate({ id, status, ownsResponse: captureResponse() });
   };
 
   if (isLoading) {

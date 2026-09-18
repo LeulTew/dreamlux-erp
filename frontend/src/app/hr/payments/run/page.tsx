@@ -54,6 +54,7 @@ import ForbiddenState from "@/components/ForbiddenState";
 import PayrollMutationNotice from "@/components/PayrollMutationNotice";
 import PayrollPreviewSheet from "@/components/PayrollPreviewSheet";
 import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
+import { usePayrollResponseContext, type PayrollResponseOwner } from "@/hooks/usePayrollResponseContext";
 import { extractPayrollHttpError } from "@/lib/payroll-error";
 import { capturePayrollPreviewRequest, type PayrollPreviewRequest } from "@/lib/payroll-preview";
 
@@ -238,7 +239,6 @@ function PaymentRunProcessPageContent() {
   const hasAutoLoaded = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSaveSourceRef = useRef<"manual" | "auto" | null>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const fromQuery = searchParams.get("date");
@@ -284,7 +284,8 @@ function PaymentRunProcessPageContent() {
     pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
   const [eventLinesByEmployee, setEventLinesByEmployee] = useState<Record<string, EventLine[]>>({});
   const [isDraftDirty, setIsDraftDirty] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [savedDraft, setSavedDraft] = useState<{ contextKey: string; at: string | null } | null>(null);
+  const [finalizedContextKey, setFinalizedContextKey] = useState<string | null>(null);
   const [draftPeriodKey, setDraftPeriodKey] = useState<string | null>(null);
   const { user, isLoading: authLoading, hasPermission, isAuthenticated } = useAuth();
   const [isFloating, setIsFloating] = useState(false);
@@ -423,6 +424,10 @@ function PaymentRunProcessPageContent() {
     user?.id, !authLoading && hasPayrollRead && hasPayrollWrite, selectedMonth, periodType, officeId,
     searchParams.get("date"), searchParams.get("period_type"), activeDates.start, activeDates.end, activeDates.kind,
   ]);
+  const responseContextKey = JSON.stringify([previewContextKey, isAuthenticated, authLoading, hasPayrollWrite]);
+  const captureResponse = usePayrollResponseContext(responseContextKey, eventLinesByEmployee);
+  const lastSavedAt = savedDraft?.contextKey === responseContextKey ? savedDraft.at : null;
+  const finalizedCurrentSetup = finalizedContextKey === responseContextKey;
   const currentPreview = previewRequest?.contextKey === previewContextKey ? previewRequest : null;
   // Clear before rendering so a changed owner/period/grant cannot expose or
   // later reopen an old result, even when its transport ignores cancellation.
@@ -475,8 +480,11 @@ function PaymentRunProcessPageContent() {
   }, [settings, t]);
 
   const loadDraftMutation = useMutation({
-    mutationFn: (id: string) => getPayrollRun(id),
-    onSuccess: (data: PayrollRun) => {
+    retry: false,
+    networkMode: "always",
+    mutationFn: (request: { id: string; ownsResponse: PayrollResponseOwner }) => getPayrollRun(request.id),
+    onSuccess: (data: PayrollRun, request) => {
+      if (!request.ownsResponse()) return;
       const newLineMap: Record<string, EventLine[]> = {};
       data.employee_lines?.forEach((empLine: PayrollEmployeeLine) => {
         newLineMap[empLine.employee_id] = empLine.events.map((ev: PayrollRunLineEvent) => ({
@@ -488,23 +496,28 @@ function PaymentRunProcessPageContent() {
       });
       setEventLinesByEmployee(newLineMap);
       setIsDraftDirty(false);
-      setLastSavedAt(data.updated_at ?? null);
+      setSavedDraft({ contextKey: responseContextKey, at: data.updated_at ?? null });
       setDraftPeriodKey(`${selectedMonth}:${periodType}`);
       toast.success(t("Existing draft loaded!"));
+    },
+    onError: (_error: unknown, request) => {
+      if (!request.ownsResponse()) return;
+      console.error("[Payroll] Draft read failed");
+      setErrorMsg(lang === "am" ? "የክፍያ ረቂቁን መጫን አልተቻለም። እንደገና ይሞክሩ።" : "Payroll draft could not be loaded. Please try again.");
     }
   });
 
   // Auto-load draft data if detected for the selected period
   useEffect(() => {
     if (existingDraft && hasAutoLoaded.current !== existingDraft.id) {
-      loadDraftMutation.mutate(existingDraft.id);
+      loadDraftMutation.mutate({ id: existingDraft.id, ownsResponse: captureResponse() });
       hasAutoLoaded.current = existingDraft.id;
     }
     // If user changes period, we reset the auto-load tracker for that period
     if (!existingDraft) {
       hasAutoLoaded.current = null;
     }
-  }, [existingDraft, loadDraftMutation]);
+  }, [captureResponse, existingDraft, loadDraftMutation]);
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
@@ -618,42 +631,47 @@ function PaymentRunProcessPageContent() {
 
   const saveDraftMutation = useMutation({
     retry: false,
-    mutationFn: (payload: PayrollGenerateRequest & { created_by_user_id?: string }) =>
-      savePayrollDraft({ ...payload }),
-    onSuccess: (data) => {
+    networkMode: "always",
+    mutationFn: (request: { payload: PayrollGenerateRequest & { created_by_user_id?: string }; source: "manual" | "auto"; ownsResponse: PayrollResponseOwner }) =>
+      savePayrollDraft({ ...request.payload }),
+    onSuccess: (data, request) => {
       completeWrite();
+      queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
+      if (!request.ownsResponse()) return;
       setIsDraftDirty(false);
-      setLastSavedAt(new Date().toISOString());
+      setSavedDraft({ contextKey: responseContextKey, at: new Date().toISOString() });
       setDraftPeriodKey(`${selectedMonth}:${periodType}`);
       setErrorMsg("");
       hasAutoLoaded.current = data.id;
-      queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
-      queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
-      if (lastSaveSourceRef.current === "manual") {
+      if (request.source === "manual") {
         toast.success(t("Draft saved"));
       }
     },
-    onError: (error: unknown) => {
-      setErrorMsg("");
+    onError: (error: unknown, request) => {
       failWrite(error, t("Failed to save draft"));
+      if (request.ownsResponse()) setErrorMsg("");
     },
   });
 
   const finalizeMutation = useMutation({
     retry: false,
-    mutationFn: (payload: PayrollGenerateRequest & { created_by_user_id?: string }) => 
-      finalizePayrollRun({ ...payload }),
-    onSuccess: (data) => {
+    networkMode: "always",
+    mutationFn: (request: { payload: PayrollGenerateRequest & { created_by_user_id?: string }; ownsResponse: PayrollResponseOwner }) =>
+      finalizePayrollRun({ ...request.payload }),
+    onSuccess: (data, request) => {
       completeWrite();
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
+      if (!request.ownsResponse()) return;
+      setFinalizedContextKey(responseContextKey);
       router.push(`/hr/payments/${data.id}`);
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown, request) => {
       const { status } = extractPayrollHttpError(error);
-      setErrorMsg("");
       failWrite(error, status === 409
         ? t("A finalized payroll run already exists for this period. Move the existing run to trash before finalizing again.")
         : t("Failed to finalize payroll run"));
+      if (request.ownsResponse()) setErrorMsg("");
     },
   });
 
@@ -692,7 +710,7 @@ function PaymentRunProcessPageContent() {
   }, [activeDates.end, activeDates.kind, activeDates.start, employees, eventLinesByEmployee, getEmployeeEventPrice, selectedMonth]);
 
   const handleSaveDraft = useCallback((source: "manual" | "auto") => {
-    if (employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !hasPayrollWrite || needsReload || writePending || finalizeMutation.isSuccess) return;
+    if (employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !hasPayrollWrite || needsReload || writePending || finalizedCurrentSetup) return;
     if (source === "auto" && (saveDraftMutation.isError || mutationFailure)) return;
 
     setErrorMsg("");
@@ -705,17 +723,16 @@ function PaymentRunProcessPageContent() {
     }
     if (!beginWrite()) return;
     const createdByUserId = user?.id;
-    lastSaveSourceRef.current = source;
     saveDraftMutation.mutate({
-      ...payload,
-      ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
+      payload: { ...payload, ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}) },
+      source, ownsResponse: captureResponse(),
     });
-  }, [authLoading, beginWrite, buildPayload, employeesLoading, finalizeMutation.isSuccess, hasPayrollWrite, mutationFailure, needsReload, runsHistoryError, runsHistoryLoading, saveDraftMutation, user, writePending]);
+  }, [authLoading, beginWrite, buildPayload, captureResponse, employeesLoading, finalizedCurrentSetup, hasPayrollWrite, mutationFailure, needsReload, runsHistoryError, runsHistoryLoading, saveDraftMutation, user, writePending]);
 
   useEffect(() => {
     if (!isDraftDirty) return;
     if (employeesLoading || authLoading || runsHistoryLoading || runsHistoryError) return;
-    if (writePending || needsReload || mutationFailure || saveDraftMutation.isError || finalizeMutation.isSuccess) return;
+    if (writePending || needsReload || mutationFailure || saveDraftMutation.isError || finalizedCurrentSetup) return;
 
     const activePeriodKey = `${selectedMonth}:${periodType}`;
     if (!draftPeriodKey || draftPeriodKey !== activePeriodKey) return;
@@ -747,7 +764,7 @@ function PaymentRunProcessPageContent() {
     needsReload,
     mutationFailure,
     saveDraftMutation.isError,
-    finalizeMutation.isSuccess,
+    finalizedCurrentSetup,
     handleSaveDraft,
   ]);
 
@@ -766,7 +783,7 @@ function PaymentRunProcessPageContent() {
   };
 
   const handleFinalize = () => {
-    if (employeesLoading || authLoading || runsHistoryError || !hasPayrollWrite || writePending || needsReload || finalizeMutation.isSuccess) return;
+    if (employeesLoading || authLoading || runsHistoryError || !hasPayrollWrite || writePending || needsReload || finalizedCurrentSetup) return;
     setErrorMsg("");
 
     if (runsHistoryLoading) {
@@ -792,8 +809,8 @@ function PaymentRunProcessPageContent() {
     if (!beginWrite()) return;
     const createdByUserId = user?.id;
     finalizeMutation.mutate({
-      ...payload,
-      ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}),
+      payload: { ...payload, ...(createdByUserId ? { created_by_user_id: createdByUserId } : {}) },
+      ownsResponse: captureResponse(),
     });
   };
 
@@ -888,7 +905,7 @@ function PaymentRunProcessPageContent() {
               )}
               <button
                 onClick={() => handleSaveDraft("manual")}
-                disabled={writePending || needsReload || finalizeMutation.isSuccess || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError}
+                disabled={writePending || needsReload || finalizedCurrentSetup || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-amber-500/10 text-amber-700 border border-amber-500/20 shadow-premium hover:bg-amber-500/20 transition-all disabled:opacity-50"
               >
                 {saveDraftMutation.isPending ? t("Saving...") : t("Save Draft")}
@@ -905,7 +922,7 @@ function PaymentRunProcessPageContent() {
               </button>
               <button
                 onClick={handleFinalize}
-                disabled={writePending || needsReload || finalizeMutation.isSuccess || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !!existingFinalized}
+                disabled={writePending || needsReload || finalizedCurrentSetup || employeesLoading || authLoading || runsHistoryLoading || runsHistoryError || !!existingFinalized}
                 className="px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest bg-primary text-background shadow-premium hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {finalizeMutation.isPending ? t("Finalizing...") : t("Finalize Run")}
@@ -999,7 +1016,7 @@ function PaymentRunProcessPageContent() {
               </div>
               {existingDraft && (
                 <button
-                  onClick={() => loadDraftMutation.mutate(existingDraft.id)}
+                  onClick={() => loadDraftMutation.mutate({ id: existingDraft.id, ownsResponse: captureResponse() })}
                   disabled={loadDraftMutation.isPending}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all active:scale-95"
                 >
