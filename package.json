@@ -33,6 +33,7 @@
     "verify:payroll:local": "bun --no-env-file scripts/payroll/local-ci.ts",
     "backup:storage": "bun run --cwd backend src/db/backup-storage.ts",
     "backup:db": "bun run --cwd backend src/db/backup-db.ts",
+    "verify:backup:native": "DREAMLUX_BACKUP_TEST_REQUIRED=1 bun --no-env-file --config=backend/bunfig.backup.toml test backend/src/db/backup-db.integration.test.ts",
     "backup": "bun run backup:storage && bun run backup:db",
     "seed:demo": "bun run --cwd backend ../scripts/seed-demo.ts",
     "seed:demo:additive": "bun run --cwd backend src/db/seed-demo-additive.ts",

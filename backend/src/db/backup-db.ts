@@ -1,62 +1,56 @@
-import fs from "fs";
-import path from "path";
-import dns from "node:dns/promises";
+import { link, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { getEnv } from "../lib/env";
+import { postgresToolConnection, redactPostgresOutput, runPostgresTool } from "./postgres-tool";
 
-async function backupDatabase() {
-  const databaseUrl = getEnv("DATABASE_BACKUP_URL") || getEnv("DATABASE_URL");
-  const backupDir = path.join(process.cwd(), "..", "backups");
-  const timestamp = new Date().toISOString().replace(/[.:]/g, "-");
-  const outputPath = path.join(backupDir, `database-dump-${timestamp}.sql`);
-
-  if (!databaseUrl) {
-    console.error("❌ Missing DATABASE_URL environment variable.");
-    process.exit(1);
-  }
-
-  const dbHost = new URL(databaseUrl).hostname;
+export async function backupDatabase(
+  databaseUrl: string,
+  backupDir = join(process.cwd(), "..", "backups"),
+  now = new Date(),
+) {
+  postgresToolConnection(databaseUrl);
+  const timestamp = now.toISOString().replace(/[.:]/g, "-");
+  const outputPath = join(backupDir, `database-dump-${timestamp}.sql`);
+  await mkdir(backupDir, { recursive: true, mode: 0o700 });
+  const staging = await mkdtemp(join(backupDir, ".dreamlux-db-backup-"));
+  let result: { path: string; sizeBytes: number } | undefined;
+  let failure: unknown;
   try {
-    await dns.resolve4(dbHost);
-  } catch {
-    console.warn(`⚠️ No IPv4 DNS record found for ${dbHost}.`);
-    console.warn("⚠️ In WSL environments without IPv6, pg_dump may fail with network unreachable.");
-    console.warn("👉 Set DATABASE_BACKUP_URL to a Supabase pooler connection string (IPv4) and rerun.");
-  }
-
-  const pgDumpPath = Bun.which("pg_dump");
-  if (!pgDumpPath) {
-    console.error("❌ pg_dump is not installed or not available in PATH.");
-    process.exit(1);
-  }
-
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
-  }
-
-  console.log("📑 Running pg_dump...");
-
-  const proc = Bun.spawn([pgDumpPath, "--dbname", databaseUrl, "--no-owner", "--no-privileges"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).bytes(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    console.error("❌ Database backup failed.");
-    if (stderr.trim()) {
-      console.error(stderr.trim());
+    const stagedPath = join(staging, "database.sql");
+    await writeFile(stagedPath, "", { mode: 0o600, flag: "wx" });
+    await runPostgresTool("pg_dump", [
+      "--format=plain", "--no-owner", "--no-privileges", "--file", stagedPath,
+    ], databaseUrl);
+    const { size } = await stat(stagedPath);
+    if (size === 0) throw new Error("pg_dump produced an empty file; no backup was published");
+    // A same-filesystem link publishes atomically without overwriting a prior receipt.
+    await link(stagedPath, outputPath);
+    result = { path: outputPath, sizeBytes: size };
+  } catch (error) {
+    failure = error;
+  } finally {
+    try { await rm(staging, { recursive: true }); } catch (error) {
+      failure = new AggregateError(failure ? [failure, error] : [error], "Database backup staging cleanup failed");
     }
-    console.error("💡 If you are in WSL and using Supabase direct DB host, use DATABASE_BACKUP_URL with pooler host and port 6543.");
-    process.exit(exitCode || 1);
   }
-
-  await Bun.write(outputPath, stdout);
-  console.log(`✅ DB backup saved to: ${outputPath}`);
+  if (failure) throw failure;
+  if (!result) throw new Error("Database backup did not produce a verified result");
+  return result;
 }
 
-backupDatabase();
+async function main() {
+  const databaseUrl = getEnv("DATABASE_BACKUP_URL") || getEnv("DATABASE_URL");
+  if (!databaseUrl) throw new Error("DATABASE_BACKUP_URL or DATABASE_URL is required");
+  console.log("Running pg_dump...");
+  const result = await backupDatabase(databaseUrl);
+  console.log(`DB backup saved to: ${result.path} (${result.sizeBytes} bytes)`);
+}
+
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    console.error(redactPostgresOutput(error instanceof Error ? error.message : String(error), [
+      getEnv("DATABASE_BACKUP_URL"), getEnv("DATABASE_URL"),
+    ]));
+    process.exitCode = 1;
+  });
+}
