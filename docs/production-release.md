@@ -31,6 +31,66 @@ helpers, not permission to target a second database. Inspect its presence
 without revealing values; do not run those helpers with an unapproved override.
 Never retrieve non-readable provider secrets through a diagnostic deployment.
 
+## Database backup tooling
+
+`bun run backup:db` retains DreamLux's backup-only selection:
+`DATABASE_BACKUP_URL` first, otherwise `DATABASE_URL`. It writes plain SQL to
+`backups/database-dump-<timestamp>.sql`; it does not use Koti's custom-format
+archive or catering-only restore procedure. Attest the selected DreamLux
+provider/project before running it. The transport guard is not independent
+proof that a configured endpoint belongs to this product.
+
+The native process receives a password-free URI and a private password file,
+not a credential-bearing command argument. Inherited application secrets and
+`PG*` routing overrides are not forwarded. URI routing/credential overrides
+are rejected, normal TLS settings are retained, and connection timeouts are
+capped at ten seconds without relaxing shorter positive limits. Each tool is
+bounded to 120 seconds and each diagnostic/output pipe to 1 MiB.
+The SQL artifact streams directly to disk, so it is not constrained by the
+diagnostic limit or buffered in application memory.
+
+The artifact is staged privately and published only after successful nonempty
+output. Publication uses a same-filesystem hard link and refuses to overwrite
+an existing timestamped artifact. Failed dumps/empty output are not published;
+staging and credential-file cleanup failures remain errors. Use a private
+backup directory (including appropriate Windows ACLs), sufficient free space
+and a filesystem supporting hard links. Abrupt process/host loss can interrupt
+cleanup; review only the owned `.dreamlux-db-backup-*` staging directories,
+not unrelated backup files.
+
+If a connection fails, obtain the exact authorized endpoint from the
+DreamLux project's Connect panel. Use its direct connection or supported
+session pooler as appropriate for IPv4/IPv6 reachability. Do not invent a
+host, substitute a transaction-pooler port, weaken TLS, or reset credentials
+as a diagnostic shortcut. The legacy `backup-db-preflight.ts` is not the
+selected backup CLI and is not evidence that this command's chosen target,
+backup contents or restore path were verified.
+
+### Isolated backup verification
+
+`bun run verify:backup:native` requires a separate
+`DREAMLUX_BACKUP_TEST_ADMIN_URL` supplied privately and fails if it is absent.
+The existing native QA attester restricts it to an independently owned local
+service on `127.0.0.1:55434`, role `dreamlux_parity`, maintenance database
+`postgres` and a generated 64-hex password. The tests create only namespaced
+synthetic databases. Never use a live connection or copy production records
+or Auth data into the fixture.
+
+The Linux native suite requires compatible `pg_dump` and `psql` tools. Its
+independent plain-SQL restore uses the owned service's local socket and checks
+exact values, quoted identifiers and foreign keys. It also exercises CLI
+selection/output, a large streamed artifact, collisions, partial/empty failures,
+private process credentials and bounded termination. The ordinary backend
+suite keeps these native cases opt-in; a skip is not a pass. The separate
+non-authenticating CLI-stub test runs on Linux without a database.
+
+This is source and synthetic recovery evidence, not a current production
+backup, RPO/RTO, Storage-object recovery or full provider-platform rehearsal.
+`backup:storage` and the combined `backup` command are separate existing
+surfaces and were not executed by this verification. Database SQL does not
+contain external Storage object contents. Keep original backup artifacts and
+their operational readiness evidence separate from a migration-source handoff.
+
 ## Manual release sequence
 
 Keep `git.deploymentEnabled.main = false` in the root and both applications.

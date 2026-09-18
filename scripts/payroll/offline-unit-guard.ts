@@ -4,7 +4,7 @@ import net from "node:net";
 import tls from "node:tls";
 
 for (const name of Object.keys(process.env)) {
-  if (/^(?:DATABASE|DIRECT_DATABASE|PG|POSTGRES|PGRST|SUPABASE|NEXT_PUBLIC_|JWT|ADMIN_PASSWORD|DREAMLUX_NATIVE_|DREAMLUX_TEST_)/i.test(name)) delete process.env[name];
+  if (/^(?:DATABASE|DIRECT_DATABASE|PG|POSTGRES|PGRST|SUPABASE|NEXT_PUBLIC_|JWT|ADMIN_PASSWORD|DREAMLUX_NATIVE_|DREAMLUX_TEST_|DREAMLUX_BACKUP_)/i.test(name)) delete process.env[name];
 }
 Object.assign(process.env, {
   NODE_ENV: "test", JWT_SECRET: "test-secret", ADMIN_PASSWORD: "test-password",

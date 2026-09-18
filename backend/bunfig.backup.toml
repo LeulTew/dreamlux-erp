@@ -1,0 +1,2 @@
+[test]
+# The backup fixtures use real PostgreSQL, not the application's mocked pool.
