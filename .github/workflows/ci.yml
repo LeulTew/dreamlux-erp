@@ -40,6 +40,8 @@ jobs:
           SUPABASE_URL: https://test.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: test-key
           DATABASE_URL: postgresql://localhost:5432/test
+      - name: Verify synthetic Storage backup workflow
+        run: bun run test:storage
 
   frontend-build:
     name: Frontend lint, tests, and build
