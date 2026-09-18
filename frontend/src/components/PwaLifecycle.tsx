@@ -98,7 +98,7 @@ export default function PwaLifecycle() {
   return (
     <>
       {showInstallPrompt ? (
-        <div className="fixed bottom-4 left-4 right-4 z-[75] md:left-auto md:right-6 md:w-[360px]">
+        <div className="fixed bottom-4 left-4 right-4 z-40 md:left-auto md:right-6 md:w-[360px]">
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Install Dream Lux ERP</p>
             <p className="mt-1 text-sm text-foreground">
