@@ -1,0 +1,205 @@
+{
+  "formatVersion": 1,
+  "repository": "LeulTew/dreamlux-erp",
+  "sourceCommit": "75c2d427c1a77090e63c97ad29b0d9b4fcecc06d",
+  "status": "unknown-not-inspected",
+  "reason": "Authorized DreamLux dashboard/catalog inspection requires the owner's separate signed-in session. No remote query or migration was run.",
+  "sourceMechanism": "Legacy SQL scripts and inline helpers; no checksummed source-managed ledger located. Remote ledger presence and applied checksums are unknown.",
+  "migrations": [
+    {
+      "sourcePath": "backend/src/db/migrations/20260702_fuel_consumption_l_per_km.sql",
+      "sourceSha256": "8fcd6175e31b71a9ffb333d8659e8bd716e2a32e6c1fa16d2de8b77bc7686cfd",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/20260703_fuel_consumption_l_per_km.sql",
+      "sourceSha256": "8eede4c1ef461bfbd592ad6b36ca0ae7a2f6926cc1d90581cd9f5d1ddc1338fa",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/20260710_inventory_dispatch_permissions.sql",
+      "sourceSha256": "7b919c62b90eb2a77258362f6d5f72de2c06490c99026c9dc3d3a4bb23a6d344",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/20260711_offices_permissions.sql",
+      "sourceSha256": "68b2a9b829f1ea605d6a3588392eee1800c7b68156b677f41d2a46206688fc05",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/20260728_split_inventory_dispatch_permission.sql",
+      "sourceSha256": "013688dc6922dda85728a1f4407635cc0378a1c206f9a3c1e5d319d602a00d70",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/activity_logs.sql",
+      "sourceSha256": "cbb0f17828f2a6fde5f503b8f08dcd21a47c5b7fd27637113ed3f168bf917d7f",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/assignment_integrity.sql",
+      "sourceSha256": "e521914e646e216b7d49fd0a9e14c90a53924199961ec9d1c3a39ae172b78a57",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/capital_investments.sql",
+      "sourceSha256": "55b0f0f73fcce8a6c828a6b28aa1e0560498a022d7b8a96515aef356fcac81e6",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/db_rls_hardening.sql",
+      "sourceSha256": "4d60c2ed07d1afc4fe42a30846eb3dcb17b7b5a87c895c48892a98a6c96954f7",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/decentralized_event_pricing.sql",
+      "sourceSha256": "67c5a9a6856152785126a5ed4ac57e0bfbd104a3690851ef4bf41819a53e7a67",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/employee_compensation_modes.sql",
+      "sourceSha256": "671a4a0834564fdb808f9c7b39028df3096a363b122d8f0ae9749b26e148bebe",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_assignment_attendance.sql",
+      "sourceSha256": "21043256cb0dc3140a82424743328f16f387961feeb8973ba152aaaaaed685c4",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_dispatch_checklist.sql",
+      "sourceSha256": "d1e3b87b1aa3ed9276064a7519f98fc2e14c456508a0d01fe1c99c7927fe5001",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_level_pricing.sql",
+      "sourceSha256": "bf93d58a4b50849d3d77c77843339c40a084b5926bce2c3ca3fa15a88af4f5c9",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_lifecycle.sql",
+      "sourceSha256": "2ad38f00f0ab4e4f81bfec1c99973957d26da63b741c4804ebe954804a34d6ea",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_manager_allocation_grant.sql",
+      "sourceSha256": "3f0bb1196914d24469e2433d89b83c9f86da4287877c8204eabc3db4c509ce99",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_proposals.sql",
+      "sourceSha256": "da9ff520647557f2b144d4f9bc41ddba2184b5703830db753d003a9ebae4843e",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_returns.sql",
+      "sourceSha256": "dc13f28273675dc471bc2c6345c01f5d6d1f6b41ed99c9ea7e92b95b20f7b78f",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_saved_views.sql",
+      "sourceSha256": "7cc36fefe47e6986a2e7d0cb61b712cb96c19b1ed32c860d00d643116a2c7bb6",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/event_service_scopes.sql",
+      "sourceSha256": "6c15cea8053ebdfb87c7bdf3335488c5e6595595894019bd17ed6a3ec54b4166",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/finance_hisab.sql",
+      "sourceSha256": "9e8f7bef0d725d8b9db6c3674fac28691ef87715a3551eec01da34284c6c9820",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/finance_imports.sql",
+      "sourceSha256": "68937f4c769c0d5cdb4c9314ba23629fe14c94bb4cfc8ea182774af3e3fa1ee6",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/finance_overheads.sql",
+      "sourceSha256": "e0373dce087f1608e69c1a58821923172b6ddb8684177589f3e72d1b8044af3d",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/fleet_vehicle_permissions.sql",
+      "sourceSha256": "f127f073d06200ac0b7f4c4abe2e622a598fd1ab4cebd663b9fc1b3d24db6e89",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/hr_payments_expansion.sql",
+      "sourceSha256": "48b0a6bd2e0020b0be777e98609963bb139f61c6e1c0334daa770b1697d82493",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/inventory_movements.sql",
+      "sourceSha256": "4f7d163c91b49b43ed50ef6e10f7274dae6564a89b656d547494886dfdd4355a",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/inventory_offices_read.sql",
+      "sourceSha256": "07fc79c42c322b40c254a3e6d1f3c2bdf870d4734476b2c847734bbdcf324951",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/inventory_workflow_completion.sql",
+      "sourceSha256": "ed0115f5eb96332f86bb7a00525a5729d76454d8649523d489e1029d6b2ecb97",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/notifications.sql",
+      "sourceSha256": "3b90cbf983f3bddb2f2b91b35482daa3bbbb5701ba5df89c8f52f8aac7dc4924",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/performance_indexes.sql",
+      "sourceSha256": "40946cde5ce55031ed89ce504855f8daa8ae9b08de8d154a042d1fe018645b22",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/phase3_inventory_expansion.sql",
+      "sourceSha256": "0c2b94aba86d4ab26f7ccedae9ae3861c8f860aee20f503e92c47c548354b80b",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/rbac_hardening.sql",
+      "sourceSha256": "cd2a4ec05136ec5e25f2e146aabe80c7fee1ca9960ec95b169965c3c501aecb8",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/rbac_scopes_metadata.sql",
+      "sourceSha256": "5a663101486cf4acd33d7d7aa61595f8b9f800183b6b361d246f03905d26dace",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/reconciliation_audit.sql",
+      "sourceSha256": "48f6b5a84807ad6f56ffba8a055623fe938f3249e9da008188dc557471eb35f6",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/reconciliation_audit_hardening.sql",
+      "sourceSha256": "9cb522b6dea855fe54b0fc7ec82df19ed33fc21d04d90a69658288dc646c507c",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/record_list_preferences.sql",
+      "sourceSha256": "1020ff3d7b4988c9c5d5e8b254a965fa4632a1dd5e9a202f11c1f84872640c01",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/migrations/srd_parity.sql",
+      "sourceSha256": "ce7874f85dfce3b91947960f2c7ccf6c24b487508ce6d4c096bf0e498fe85467",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/schema.sql",
+      "sourceSha256": "ce4e4a0155fd718b35e808f7e2efa8693a95e7bf96d5a8c18de97609601045cb",
+      "applied": "unknown"
+    },
+    {
+      "sourcePath": "backend/src/db/verify-inventory-workflow.sql",
+      "sourceSha256": "ff2bfab36b91a2c58d1122a8d23e45c108b868cca1fae58839ea4b273daa89be",
+      "applied": "unknown"
+    }
+  ]
+}

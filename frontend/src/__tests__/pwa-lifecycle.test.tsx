@@ -58,13 +58,31 @@ describe("PwaLifecycle", () => {
     installEvent.preventDefault = vi.fn();
     installEvent.userChoice = Promise.resolve({ outcome: "dismissed", platform: "web" });
 
-    window.dispatchEvent(installEvent);
+    fireEvent(window, installEvent);
 
     expect(await screen.findByText("Install Dream Lux ERP")).toBeInTheDocument();
+    expect(screen.getByText("Install Dream Lux ERP").parentElement?.parentElement).toHaveClass("z-40");
 
     fireEvent.click(screen.getByRole("button", { name: "Later" }));
 
     expect(window.localStorage.getItem("dreamlux_pwa_install_dismissed")).toBe("1");
+  });
+
+  it("opens the browser install prompt only after the user chooses Install app", async () => {
+    render(<PwaLifecycle />);
+    const installEvent = Object.assign(new Event("beforeinstallprompt"), {
+      prompt: promptMock,
+      userChoice: Promise.resolve({ outcome: "accepted", platform: "web" }),
+    });
+    fireEvent(window, installEvent);
+    expect(promptMock).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Install app" }));
+
+    await waitFor(() => {
+      expect(promptMock).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText("Install Dream Lux ERP")).not.toBeInTheDocument();
+    });
   });
 
   it("shows offline queue status when offline", () => {
@@ -92,7 +110,7 @@ describe("PwaLifecycle", () => {
     installEvent.preventDefault = vi.fn();
     installEvent.userChoice = Promise.resolve({ outcome: "dismissed", platform: "web" });
 
-    window.dispatchEvent(installEvent);
+    fireEvent(window, installEvent);
     expect(screen.queryByText("Install Dream Lux ERP")).not.toBeInTheDocument();
   });
 

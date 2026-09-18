@@ -152,6 +152,7 @@ async function openEmployee(page: Page, mobile: boolean) {
 
 test.beforeEach(async ({ page, baseURL, isMobile }) => {
   await fixture(page, baseURL);
+  await page.emulateMedia({ reducedMotion: isMobile ? "reduce" : "no-preference" });
   expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(isMobile);
 });
 test.afterEach(async ({ page }, info) => {
@@ -244,6 +245,46 @@ test("keyboard modal, sibling activity and delete Escape preserve draft and open
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(opener).toBeFocused();
+  expect(states.get(page)?.writes).toEqual([]);
+});
+
+test("install prompt stays below the real employee editor actions", async ({ page, isMobile }) => {
+  await openEmployee(page, isMobile);
+  const dialog = page.getByRole("dialog", { name: "Edit Employee", exact: true });
+  await page.evaluate(() => {
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: () => Promise.resolve(),
+      userChoice: Promise.resolve({ outcome: "dismissed", platform: "web" }),
+    });
+    window.dispatchEvent(event);
+  });
+  const prompt = page.getByText("Install Dream Lux ERP", { exact: true });
+  await expect(prompt).toBeVisible();
+  const save = dialog.getByRole("button", { name: "Save Changes", exact: true });
+  await expect(save).toBeVisible();
+  await expect.poll(() => dialog.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return Math.abs(bounds.right - innerWidth) < 1 && Math.abs(bounds.bottom - innerHeight) < 1;
+  })).toBe(true);
+  const screenshot = test.info().outputPath("employee-editor-install-prompt.png");
+  await page.screenshot({ path: screenshot, scale: "css" });
+  await test.info().attach("employee-editor-install-prompt", { path: screenshot, contentType: "image/png" });
+  const promptLayer = await prompt.evaluate((element) => {
+    const layer = element.parentElement?.parentElement;
+    if (!layer) throw new Error("Missing install prompt layer");
+    return Number(getComputedStyle(layer).zIndex);
+  });
+  const editorLayer = await dialog.evaluate((element) => Number(getComputedStyle(element).zIndex));
+  expect(promptLayer).toBeLessThan(editorLayer);
+  await save.click({ trial: true });
+  await activate(dialog.getByRole("button", { name: "Activity", exact: true }), isMobile);
+  await expect(page.getByRole("dialog", { name: "Activity Timeline" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await activate(page.getByRole("button", { name: "Later", exact: true }), isMobile);
+  await expect(prompt).toHaveCount(0);
   expect(states.get(page)?.writes).toEqual([]);
 });
 
