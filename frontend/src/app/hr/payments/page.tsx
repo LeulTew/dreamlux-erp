@@ -18,6 +18,7 @@ import ForbiddenState from "@/components/ForbiddenState";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import PayrollMutationNotice from "@/components/PayrollMutationNotice";
 import { usePayrollMutationGuard } from "@/hooks/usePayrollMutationGuard";
+import { usePayrollResponseContext, type PayrollResponseOwner } from "@/hooks/usePayrollResponseContext";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -81,7 +82,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
 };
 
 function PaymentsPageContent() {
-  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { user, hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const searchParams = useSearchParams();
@@ -137,14 +138,18 @@ function PaymentsPageContent() {
   const [confirmState, setConfirmState] = useState<{ id: string; action: "trash" | "restore" | "delete" } | null>(null);
   const { begin: beginWrite, complete: completeWrite, fail: failWrite,
     pending: writePending, failure: mutationFailure, needsReload } = usePayrollMutationGuard();
-  const reportMutationFailure = (error: unknown, message: string) => {
+  const reportMutationFailure = (error: unknown, message: string, ownsResponse: PayrollResponseOwner) => {
     failWrite(error, message);
-    setConfirmState(null);
+    if (ownsResponse()) setConfirmState(null);
   };
   const highlightedId = searchParams.get("highlight");
 
   const hasPayrollAccess = hasPermission("payroll:read") || hasPermission("payroll:write");
   const hasPayrollWrite = hasPermission("payroll:write");
+  const captureResponse = usePayrollResponseContext(JSON.stringify([
+    user?.id, isAuthenticated, hasPayrollWrite, confirmState?.id, confirmState?.action,
+    view, page, yearFilter, statusFilter, sortBy, sortOrder,
+  ]));
 
   const { data: runsPayload, isLoading, isRefetching, isError: historyError, refetch } = useQuery<PayrollRunsResponse>({
     queryKey: ["payroll-runs", view, yearFilter, statusFilter, sortBy, sortOrder, page],
@@ -162,46 +167,52 @@ function PaymentsPageContent() {
 
   const trashMutation = useMutation({
     retry: false,
-    mutationFn: (id: string) => updatePayrollRunStatus(id, "TRASH"),
-    onSuccess: () => {
+    networkMode: "always",
+    mutationFn: (request: { id: string; ownsResponse: PayrollResponseOwner }) => updatePayrollRunStatus(request.id, "TRASH"),
+    onSuccess: (_data, request) => {
       completeWrite();
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
+      if (!request.ownsResponse()) return;
       toast.success("Payroll run moved to trash");
       setConfirmState(null);
     },
-    onError: (error: unknown) => {
-      reportMutationFailure(error, "Failed to trash payroll run");
+    onError: (error: unknown, request) => {
+      reportMutationFailure(error, "Failed to trash payroll run", request.ownsResponse);
     }
   });
 
   const restoreMutation = useMutation({
     retry: false,
-    mutationFn: (id: string) => updatePayrollRunStatus(id, "DRAFT"),
-    onSuccess: () => {
+    networkMode: "always",
+    mutationFn: (request: { id: string; ownsResponse: PayrollResponseOwner }) => updatePayrollRunStatus(request.id, "DRAFT"),
+    onSuccess: (_data, request) => {
       completeWrite();
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
+      if (!request.ownsResponse()) return;
       toast.success("Payroll run restored");
       setConfirmState(null);
     },
-    onError: (error: unknown) => {
-      reportMutationFailure(error, "Failed to restore payroll run");
+    onError: (error: unknown, request) => {
+      reportMutationFailure(error, "Failed to restore payroll run", request.ownsResponse);
     },
   });
 
   const permanentDeleteMutation = useMutation({
     retry: false,
-    mutationFn: (id: string) => permanentlyDeletePayrollRun(id),
-    onSuccess: () => {
+    networkMode: "always",
+    mutationFn: (request: { id: string; ownsResponse: PayrollResponseOwner }) => permanentlyDeletePayrollRun(request.id),
+    onSuccess: (_data, request) => {
       completeWrite();
       queryClient.invalidateQueries({ queryKey: ["payroll-runs"] });
       queryClient.invalidateQueries({ queryKey: ["payroll-run"] });
+      if (!request.ownsResponse()) return;
       toast.success("Payroll run permanently deleted");
       setConfirmState(null);
     },
-    onError: (error: unknown) => {
-      reportMutationFailure(error, "Failed to permanently delete payroll run");
+    onError: (error: unknown, request) => {
+      reportMutationFailure(error, "Failed to permanently delete payroll run", request.ownsResponse);
     },
   });
 
@@ -218,14 +229,14 @@ function PaymentsPageContent() {
   const executeConfirmAction = () => {
     if (!confirmState || !hasPayrollWrite || isLoading || historyError || !beginWrite()) return;
     if (confirmState.action === "trash") {
-      trashMutation.mutate(confirmState.id);
+      trashMutation.mutate({ id: confirmState.id, ownsResponse: captureResponse() });
       return;
     }
     if (confirmState.action === "restore") {
-      restoreMutation.mutate(confirmState.id);
+      restoreMutation.mutate({ id: confirmState.id, ownsResponse: captureResponse() });
       return;
     }
-    permanentDeleteMutation.mutate(confirmState.id);
+    permanentDeleteMutation.mutate({ id: confirmState.id, ownsResponse: captureResponse() });
   };
 
   const handleSync = async () => {

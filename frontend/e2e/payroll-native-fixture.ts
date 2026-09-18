@@ -62,6 +62,9 @@ export async function installPayrollFixture(context: BrowserContext, page: Page,
   const errors: string[] = [];
   const consoleErrors: Array<{ text: string; url: string }> = [];
   const expectedHttpErrors = new Set<string>();
+  const expectedNetworkErrors = new Set<string>();
+  const offlineResourceFailures = new Set<string>();
+  let offlineTestWindow = false;
   const writes: string[] = [];
   const observe = (target: Page) => {
     target.on("pageerror", (error) => errors.push(error.message));
@@ -75,6 +78,14 @@ export async function installPayrollFixture(context: BrowserContext, page: Page,
     const url = new URL(request.url());
     if (url.origin === baseURL && url.pathname.startsWith("/api/payroll/") && request.method() !== "GET") {
       writes.push(`${request.method()} ${url.pathname}`);
+    }
+  });
+  context.on("requestfailed", (request) => {
+    const url = new URL(request.url());
+    if (offlineTestWindow && request.method() === "GET" && url.origin === baseURL
+      && (url.pathname.startsWith("/_next/static/") || url.searchParams.has("_rsc"))
+      && /net::ERR_(?:INTERNET_DISCONNECTED|FAILED)/.test(request.failure()?.errorText ?? "")) {
+      offlineResourceFailures.add(url.href);
     }
   });
   let preference: Record<string, unknown> = {
@@ -165,10 +176,21 @@ export async function installPayrollFixture(context: BrowserContext, page: Page,
     allowHttpError(status: number, path: string) {
       expectedHttpErrors.add(`${status} ${path}`);
     },
+    allowOfflineFailure(path: string) {
+      expectedNetworkErrors.add(path);
+    },
+    setOfflineTestWindow(value: boolean) {
+      offlineTestWindow = value;
+    },
     assertClean() {
       expect(unexpected).toEqual([]);
       expect(errors).toEqual([]);
       const unexpectedConsole = consoleErrors.filter((message) => {
+        if (message.url.startsWith(baseURL)
+          && /^Failed to load resource: net::ERR_(?:INTERNET_DISCONNECTED|FAILED)$/.test(message.text)) {
+          const failed = new URL(message.url);
+          if (expectedNetworkErrors.has(failed.pathname) || offlineResourceFailures.has(failed.href)) return false;
+        }
         const status = /Failed to load resource: the server responded with a status of (\d+)/.exec(message.text)?.[1];
         if (!status || !message.url.startsWith(baseURL)) return true;
         return !expectedHttpErrors.has(`${status} ${new URL(message.url).pathname}`);

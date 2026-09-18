@@ -255,6 +255,158 @@ test("a pending receipt remains exclusive across client navigation and completes
   }
 });
 
+test("a late trash receipt cannot redirect a different current payroll record", async ({ page, context, baseURL }) => {
+  if (!baseURL) throw new Error("Missing isolated UI base URL");
+  const fixture = await installPayrollFixture(context, page, baseURL);
+  let release!: () => void;
+  let handled!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const completion = new Promise<void>((resolve) => { handled = resolve; });
+  let intercepted = false;
+  try {
+    await openPayrollRun(page);
+    const firstId = await saveDraft(page);
+    await page.goto(`/hr/payments/${firstId}`);
+    await finalizeDetail(page);
+    await expect(page.getByRole("button", { name: "Move to Trash", exact: true })).toBeEnabled();
+    const secondResponse = await context.request.post(`${baseURL}/api/payroll/drafts`, {
+      data: { month: 5, year: 2026, period_kind: "weekly", period_start: "2026-05-08", period_end: "2026-05-14" },
+    });
+    expect(secondResponse.status()).toBe(201);
+    const second: { id: string; status: string } = await secondResponse.json();
+    expect(second.id).not.toBe(firstId);
+    expect(second.status).toBe("DRAFT");
+    await page.goto("/hr/payments");
+    await page.evaluate(() => { document.documentElement.dataset.payrollContext = "same-document"; });
+    await page.locator(`a[href="/hr/payments/${firstId}"]`).first().click();
+    await expect(page).toHaveURL(`${baseURL}/hr/payments/${firstId}`);
+    await expect(page.getByRole("heading", { name: "Payroll Run Detail", exact: true })).toBeVisible();
+    await page.route(`**/api/payroll/runs/${firstId}/status`, async (route) => {
+      expect(route.request().method()).toBe("PATCH");
+      expect(route.request().postDataJSON()).toEqual({ status: "TRASH" });
+      const actual = await route.fetch();
+      expect(actual.status()).toBe(200);
+      intercepted = true;
+      try {
+        await gate;
+        await route.fulfill({ response: actual });
+      } finally { handled(); }
+    });
+    await page.getByRole("button", { name: "Move to Trash", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm Delete", exact: true }).click();
+    await expect.poll(() => intercepted).toBe(true);
+    await page.goBack();
+    await expect(page).toHaveURL(`${baseURL}/hr/payments`);
+    await page.locator(`a[href="/hr/payments/${second.id}"]`).first().click();
+    await expect(page).toHaveURL(`${baseURL}/hr/payments/${second.id}`);
+    expect(await page.locator("html").getAttribute("data-payroll-context")).toBe("same-document");
+    release();
+    await completion;
+    await expect(page.getByRole("status").filter({ hasText: "Updating payroll" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Finalize Payout", exact: true }).click({ timeout: 5_000 });
+    await expect(page.getByRole("button", { name: "Confirm Finalization", exact: true })).toBeVisible();
+    await expect(page).toHaveURL(`${baseURL}/hr/payments/${second.id}`);
+    const state = await control("state");
+    expect(state.runs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: firstId, status: "trashed" }),
+      expect.objectContaining({ id: second.id, status: "draft" }),
+    ]));
+    expect(fixture.writes.filter((write) => write === `PATCH /api/payroll/runs/${firstId}/status`)).toHaveLength(2);
+    expect(fixture.writes).not.toContain(`PATCH /api/payroll/runs/${second.id}/status`);
+  } finally {
+    release();
+    if (intercepted) await completion;
+    fixture.assertClean();
+  }
+});
+
+test("a completed old-period draft does not mark a newer setup as saved", async ({ page, context, baseURL }) => {
+  if (!baseURL) throw new Error("Missing isolated UI base URL");
+  const fixture = await installPayrollFixture(context, page, baseURL);
+  let release!: () => void;
+  let handled!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const completion = new Promise<void>((resolve) => { handled = resolve; });
+  let intercepted = false;
+  await page.route("**/api/payroll/drafts", async (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({
+      period_start: "2026-04-08", period_end: "2026-04-14",
+    });
+    const actual = await route.fetch();
+    expect(actual.status()).toBe(201);
+    intercepted = true;
+    try {
+      await gate;
+      await route.fulfill({ response: actual });
+    } finally { handled(); }
+  });
+  try {
+    await openPayrollRun(page);
+    await page.getByRole("button", { name: "Save Draft", exact: true }).click();
+    await expect.poll(() => intercepted).toBe(true);
+    await page.locator('input[type="month"]').fill("2026-05");
+    await expect(page.locator('input[type="month"]')).toHaveValue("2026-05");
+    await expect(page.getByText(/^Saved \d/)).toHaveCount(0);
+    release();
+    await completion;
+    await expect(page.getByRole("button", { name: "Save Draft", exact: true })).toBeEnabled();
+    await expect(page.getByText("Not saved yet", { exact: true })).toBeVisible();
+    await expect(page.locator('input[type="month"]')).toHaveValue("2026-05");
+    expect((await control("state")).runs).toEqual([
+      expect.objectContaining({ status: "draft", total: "17000.00" }),
+    ]);
+    expect(fixture.writes).toEqual(["POST /api/payroll/drafts"]);
+  } finally {
+    release();
+    if (intercepted) await completion;
+    fixture.assertClean();
+  }
+});
+
+test("offline submission settles visibly and reconnecting never dispatches it", async ({ page, context, baseURL }) => {
+  if (!baseURL) throw new Error("Missing isolated UI base URL");
+  const fixture = await installPayrollFixture(context, page, baseURL);
+  fixture.allowOfflineFailure("/api/payroll/drafts");
+  let offline = false;
+  let liveSubmissions = 0;
+  await page.route("**/api/payroll/drafts", async (route) => {
+    if (offline) return route.abort("internetdisconnected");
+    liveSubmissions += 1;
+    return route.fallback();
+  });
+  try {
+    await openPayrollRun(page);
+    await page.waitForLoadState("networkidle");
+    offline = true;
+    fixture.setOfflineTestWindow(true);
+    await context.setOffline(true);
+    await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
+    await page.getByRole("button", { name: "Save Draft", exact: true }).click();
+    await expect.soft(page.getByRole("alert").filter({ hasText: "Payroll change" }),
+      "Offline submission must settle visibly before reconnection").toBeVisible();
+    offline = false;
+    await context.setOffline(false);
+    fixture.setOfflineTestWindow(false);
+    await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(true);
+    await expect(page.getByRole("status").filter({ hasText: "Updating payroll" })).toHaveCount(0);
+    expect((await control("state")).runs).toEqual([]);
+    expect(liveSubmissions).toBe(0);
+    const reload = page.getByRole("button", { name: "Reload payroll" });
+    if (await reload.count()) await reload.click();
+    await expect(page.getByRole("button", { name: "Save Draft", exact: true })).toBeEnabled();
+    await saveDraft(page);
+    expect(liveSubmissions).toBe(1);
+    expect((await control("state")).runs).toEqual([
+      expect.objectContaining({ status: "draft", total: "17000.00" }),
+    ]);
+  } finally {
+    offline = false;
+    await context.setOffline(false);
+    fixture.setOfflineTestWindow(false);
+    fixture.assertClean();
+  }
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`uncertain recovery remains reachable and readable in ${theme} layouts`, async ({ page, context, baseURL }, testInfo) => {
     if (!baseURL) throw new Error("Missing isolated UI base URL");

@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ComponentType, ReactNode } from "react";
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AxiosAdapter } from "axios";
 
@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   },
   push: vi.fn(), replace: vi.fn(), success: vi.fn(), error: vi.fn(), markApplied: vi.fn(), savePreference: vi.fn(),
   permissions: ["payroll:read", "payroll:write"],
+  userId: "23900000-0000-4000-8000-000000000001",
+  recordId: "23900000-0000-4000-8000-000000000301",
   params: new URLSearchParams("date=2026-04&period_type=h1"),
 }));
 
@@ -22,13 +24,13 @@ vi.mock("@/lib/toast", () => ({ default: { success: mocks.success, error: mocks.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
   useSearchParams: () => mocks.params,
-  useParams: () => ({ id: "23900000-0000-4000-8000-000000000301" }),
+  useParams: () => ({ id: mocks.recordId }),
 }));
 vi.mock("next/link", () => ({ default: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => <a {...props} /> }));
 vi.mock("@/hooks/use-language", () => ({ useLanguage: () => ({ lang: "en" }) }));
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
-    user: { id: "23900000-0000-4000-8000-000000000001", roles: ["DECORATOR", "ACCOUNTANT"] },
+    user: { id: mocks.userId, roles: ["DECORATOR", "ACCOUNTANT"] },
     hasPermission: (permission: string) => mocks.permissions.includes(permission),
     isAuthenticated: true, isLoading: false,
   }),
@@ -106,7 +108,9 @@ function mount(Page: ComponentType) {
   // Explicit mutation retry:false on each caller must override this nonzero default.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 3, retryDelay: 1 } } });
   clients.push(client);
-  return render(<QueryClientProvider client={client}><Page /></QueryClientProvider>);
+  const tree = (Current: ComponentType) => <QueryClientProvider client={client}><Current /></QueryClientProvider>;
+  const result = render(tree(Page));
+  return { ...result, client, refresh: () => result.rerender(tree(Page)), navigate: (Current: ComponentType) => result.rerender(tree(Current)) };
 }
 
 function deferred<T>() {
@@ -127,6 +131,11 @@ beforeEach(() => {
   act(() => result.current.complete());
   unmount();
   historyRows = [];
+  onlineManager.setOnline(true);
+  mocks.userId = "23900000-0000-4000-8000-000000000001";
+  mocks.recordId = RUN_ID;
+  mocks.params = new URLSearchParams("date=2026-04&period_type=h1");
+  mocks.replace.mockImplementation((url: string) => { mocks.params = new URLSearchParams(url.split("?")[1]); });
   mocks.permissions = ["payroll:read", "payroll:write"];
   mocks.api.getEmployees.mockResolvedValue({ employees: [{
     id: "23900000-0000-4000-8000-000000000201", full_name: "Synthetic Operations Manager",
@@ -153,6 +162,125 @@ afterEach(() => {
   clients.splice(0).forEach((client) => client.clear());
   restoreAdapters.splice(0).reverse().forEach((restore) => restore());
   vi.useRealTimers();
+  onlineManager.setOnline(true);
+});
+
+describe("payroll response ownership", () => {
+  it("settles a late detail trash without navigating a newer page", async () => {
+    mocks.api.getPayrollRun.mockResolvedValue(run("FINALIZED"));
+    const pending = deferred<{ id: string; status: string }>();
+    mocks.api.updatePayrollRunStatus.mockReturnValueOnce(pending.promise);
+    const view = mount(DetailPage);
+    fireEvent.click(await screen.findByTitle("Move to Trash"));
+    await confirm();
+    await waitFor(() => expect(mocks.api.updatePayrollRunStatus).toHaveBeenCalledWith(RUN_ID, "TRASH"));
+    view.navigate(HistoryPage);
+    await act(async () => pending.resolve({ id: RUN_ID, status: "TRASH" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "New Payout" })).toBeEnabled());
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.success).not.toHaveBeenCalled();
+  });
+
+  it.each(["record", "actor", "grant"] as const)("does not apply detail UI effects after its %s changes", async (change) => {
+    const pending = deferred<{ id: string; status: string }>();
+    mocks.api.updatePayrollRunStatus.mockReturnValueOnce(pending.promise);
+    mocks.api.getPayrollRun.mockImplementation(async (id: string) => ({ ...run(), id }));
+    const view = mount(DetailPage);
+    const invalidation = vi.spyOn(view.client, "invalidateQueries");
+    fireEvent.click(await screen.findByRole("button", { name: "Finalize Payout" }));
+    await confirm("Confirm Finalization");
+    await waitFor(() => expect(mocks.api.updatePayrollRunStatus).toHaveBeenCalledTimes(1));
+    if (change === "record") mocks.recordId = "23900000-0000-4000-8000-000000000302";
+    else if (change === "actor") mocks.userId = "23900000-0000-4000-8000-000000000002";
+    else mocks.permissions = ["payroll:read"];
+    view.refresh();
+    await act(async () => pending.resolve({ id: RUN_ID, status: "FINALIZED" }));
+    expect(invalidation).toHaveBeenCalledWith({ queryKey: ["payroll-run", RUN_ID] });
+    expect(mocks.success).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it.each(["save", "finalize"] as const)("does not let an old-period %s receipt overwrite the new setup", async (action) => {
+    const pending = deferred<{ id: string; status: string }>();
+    const mutation = action === "save" ? mocks.api.savePayrollDraft : mocks.api.finalizePayrollRun;
+    mutation.mockReturnValueOnce(pending.promise);
+    const view = mount(RunPage);
+    const trigger = await screen.findByRole("button", { name: action === "save" ? "Save Draft" : "Finalize Run" });
+    await waitFor(() => expect(trigger).toBeEnabled());
+    fireEvent.click(trigger);
+    await waitFor(() => expect(mutation).toHaveBeenCalledTimes(1));
+    const month = view.container.querySelector<HTMLInputElement>('input[type="month"]');
+    if (!month) throw new Error("Missing payroll month control");
+    fireEvent.change(month, { target: { value: "2026-05" } });
+    view.refresh();
+    await waitFor(() => expect(month).toHaveValue("2026-05"));
+    await act(async () => pending.resolve({ id: RUN_ID, status: action === "save" ? "DRAFT" : "FINALIZED" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save Draft" })).toBeEnabled());
+    expect(screen.getByText("Not saved yet")).toBeVisible();
+    expect(mocks.success).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("does not hydrate an old draft after the selected period changes", async () => {
+    const pending = deferred<ReturnType<typeof run>>();
+    historyRows = [run()];
+    mocks.api.getPayrollRun.mockReturnValueOnce(pending.promise);
+    const view = mount(RunPage);
+    await waitFor(() => expect(mocks.api.getPayrollRun).toHaveBeenCalledWith(RUN_ID));
+    const month = view.container.querySelector<HTMLInputElement>('input[type="month"]');
+    if (!month) throw new Error("Missing payroll month control");
+    fireEvent.change(month, { target: { value: "2026-05" } });
+    view.refresh();
+    await act(async () => pending.resolve(run()));
+    expect(screen.getByText("Not saved yet")).toBeVisible();
+    expect(mocks.success).not.toHaveBeenCalledWith("Existing draft loaded!");
+  });
+
+  it("reports an offline submission immediately and does not replay it when reconnected", async () => {
+    mocks.api.savePayrollDraft.mockRejectedValueOnce(new Error("Synthetic offline response"));
+    mount(RunPage);
+    const save = await screen.findByRole("button", { name: "Save Draft" });
+    await waitFor(() => expect(save).toBeEnabled());
+    act(() => onlineManager.setOnline(false));
+    fireEvent.click(save);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Payroll change not confirmed");
+    expect(mocks.api.savePayrollDraft).toHaveBeenCalledTimes(1);
+    await act(async () => onlineManager.setOnline(true));
+    expect(mocks.api.savePayrollDraft).toHaveBeenCalledTimes(1);
+    expect(save).toBeDisabled();
+  });
+
+  it("does not redirect a write-only actor after their write grant is revoked", async () => {
+    mocks.permissions = ["payroll:write"];
+    const pending = deferred<{ id: string; status: string }>();
+    mocks.api.finalizePayrollRun.mockReturnValueOnce(pending.promise);
+    const view = mount(RunPage);
+    const finalize = await screen.findByRole("button", { name: "Finalize Run" });
+    await waitFor(() => expect(finalize).toBeEnabled());
+    fireEvent.click(finalize);
+    await waitFor(() => expect(mocks.api.finalizePayrollRun).toHaveBeenCalledTimes(1));
+    mocks.permissions = [];
+    view.refresh();
+    expect(screen.getByText("Forbidden")).toBeVisible();
+    await act(async () => pending.resolve({ id: RUN_ID, status: "FINALIZED" }));
+    expect(mocks.push).not.toHaveBeenCalled();
+    view.navigate(HistoryPage);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("settles the acknowledged write without waiting for a slow read refresh", async () => {
+    const view = mount(DetailPage);
+    const pendingRead = deferred<void>();
+    const invalidation = vi.spyOn(view.client, "invalidateQueries").mockReturnValueOnce(pendingRead.promise);
+    fireEvent.click(await screen.findByRole("button", { name: "Finalize Payout" }));
+    await confirm("Confirm Finalization");
+    await waitFor(() => expect(invalidation).toHaveBeenCalled());
+    view.navigate(HistoryPage);
+    await waitFor(() => expect(screen.getByRole("button", { name: "New Payout" })).toBeEnabled());
+    await act(async () => pendingRead.resolve());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    invalidation.mockRestore();
+  });
 });
 
 describe("run payroll recovery", () => {
