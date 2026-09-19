@@ -121,10 +121,65 @@ Keep original failures, fixture/setup corrections, final passes, and unrun check
 | C2 | **Low-Stock Alert** | Locate the **Low-Stock** page. Edit an item to drop its quantity below the threshold. | The item immediately highlights in yellow with a warning badge on the Low-Stock screen. | |
 | C3 | **Reconciliation** | Go to `/assets/reconcile`. Select a warehouse store location. Input a manual counted count. | The system audits physical count discrepancies and generates a log. | |
 | C4 | **Asset Allocation** | From an event workspace, allocate inventory to the event. Try allocating more than available. | Valid allocation saves; over-allocation is blocked with a clear message. | |
-| C5 | **Asset Trash** | Move an asset to trash if allowed by your role. | Item disappears from active lists; restore/permanent delete actions obey permissions. | |
+| C5 | **Asset Trash** | Move an asset to trash if allowed by your role. Restore it, then try permanent deletion of separate unused and referenced trashed items. | Existing soft-trash/restore behavior is retained. Permanent deletion requires current `assets:delete` authority, an already-trashed item, and no operational references; referenced items and their history remain intact. | |
 | C6 | **Dispatch Checklist** | Log in as `inv` (Inventory Officer). Navigate to `/assets/dispatch`. Find an active event. Check off all allocations. | The "Mark Departed" button remains disabled until every checklist item is checked. Clicking it updates the event dispatch status. | |
 | C7 | **Stock Recount Pagination**| View `/assets/history` with more than 10 recount sessions. Scroll/navigate pages. | Recount history lists paginate correctly and virtualized views render without lag. | |
 
+#### Permanent equipment deletion (#259)
+
+Run these checks only with independently attested synthetic resources, never
+production data or credential-bearing seeds. Source and mock tests do not prove
+live-schema parity or native transaction behavior.
+
+- Establish successful unused-trash cleanup, then independently reproduce the
+  original custody/history loss without the fix before checking the fixed path.
+- Protect references in `event_allocations`, `event_return_receipts`,
+  `event_return_corrections`, `inventory_condition_resolutions`,
+  `inventory_movements`, `inventory_reconciliation_items`, and
+  `capital_investments.asset_id`, including returned allocations and retained or
+  trashed parents. Do not remove dependent evidence to make deletion succeed.
+- Verify the item row is locked before the unfiltered history check; test both
+  orderings of concurrent reference insertion and deletion against PostgreSQL.
+  Required `activity_logs` evidence and deletion must commit together, using the
+  canonical stored item UUID even when the request uses uppercase UUID text.
+- A required audit must acknowledge exactly one inserted row. A suppressed
+  insert also rolls back deletion; an audit-actor foreign-key failure must not
+  be mislabeled as item history. Denied operations and unknown commit
+  outcomes must not call image cleanup. An unknown commit returns HTTP 503 with
+  `ITEM_DELETE_UNCONFIRMED` and `outcome_uncertain: true`; reload trash before any
+  deliberate retry.
+- Confirmed deletion returns `success: true, permanently_deleted: true`.
+  Post-commit storage failure adds `storage_cleanup_pending: true`: the item is
+  already deleted and image cleanup requires administrator follow-up, not a
+  replay of the destructive request.
+- Check English/Amharic in-dialog conflicts, current permission revocation,
+  pending/cancel/focus behavior, and no automatic retry or offline-paused replay.
+  Measure changed destructive controls at least 48px and their labels at least
+  4.5:1 in both themes, including pending and hover states.
+- Check the actual `Planned`, `Ongoing`, and `Completed` event states. A canceled
+  proposal is not a canceled event. A real conflicting item lock must return the
+  bounded busy response without changing the item.
+
+The dedicated equipment verifier runs 26 native database/API cases and eight
+desktop/mobile browser cases (six explicitly mocked presentation checks and two
+actual API/SQL workflows). Its separate one-case provider is infrastructure, not
+additional business coverage. Run
+`bun --no-env-file scripts/equipment/run.ts --allow-disposable-postgres --postgrest <verified-local-binary> --frontend-build .qa-payroll-build`
+with the independently attested synthetic `DREAMLUX_NATIVE_TEST_ADMIN_URL`.
+Do not load a provider environment or copy seed credentials.
+
+CI and the local CI entry point execute payroll and equipment verification
+serially against the same frontend artifact. Dedicated native specs do not run
+in the mock-only Playwright configuration. The existing three job caps remain
+3, 3, and 5 minutes: an upper bound of 11 summed runner-minutes per complete
+workflow, not 11 minutes of elapsed wall time. A fresh 2,000-minute allowance
+corresponds to roughly 181 runs at those caps (about 90 PR-plus-main pairs),
+before other repositories/workflows, billing rounding, or reruns. This is budget
+arithmetic, not a billing guarantee. Do not rerun unchanged hosted heads.
+The disposable PostgreSQL 16.15 service has a bounded 1 GiB temporary data
+filesystem and a 2 GiB container limit. Durability settings remain enabled.
+This synthetic-fixture optimization is not production durability, backup, or
+recovery evidence.
 
 ---
 
@@ -207,7 +262,7 @@ Keep original failures, fixture/setup corrections, final passes, and unrun check
 | I2 | **Activity logs** | Create/Update an asset or event. Go to `/assets` or `/events` and open the **Activity Timeline** side drawer. | The activity log records the operation, user account, timestamp, and field level audit details. | |
 | I3 | **Security Posture**| Log in as `ceo` or `admin`. Go to `/settings/security`. | Shows traffic-light security posture cards, plain language access overview, database indicators, and no raw jargon. | |
 | I4 | **PWA Offline Mode** | Simulating offline connection using Chrome devtools. Load the site. | The PWA install bottom sheet prompt displays correctly; offline mode opens the offline fallback shell showing a friendly offline warning. | |
-| I5 | **Unified Trash page**| Go to `/events/trash` or `/assets/trash`. Trash an active item, then click **Restore**. | Soft deleted items appear in the trash queue; clicking restore returns them to active tables; permanent deletion destroys them. | |
+| I5 | **Unified Trash page**| Go to `/events/trash` or `/assets/trash`. Trash an active item, then click **Restore**. | Soft deleted items appear in the trash queue; clicking restore returns them to active tables. Permanent equipment deletion is limited to unused trashed items; operational history is retained. Event policy is unchanged. | |
 | I6 | **Record Duplication**| Go to `/employees` or `/assets`. Click **Clone** / **Duplicate**. | Cloned record duplicates field data (names, classifications, details) and images dynamically. | |
 
 ---

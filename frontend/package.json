@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:e2e": "node node_modules/playwright/cli.js test",
     "test:e2e:payroll": "node node_modules/playwright/cli.js test --config=playwright.payroll-native.config.ts",
+    "test:e2e:equipment": "node node_modules/playwright/cli.js test --config=playwright.equipment-native.config.ts",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

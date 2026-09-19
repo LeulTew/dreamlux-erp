@@ -6,6 +6,7 @@ import { nativePlan } from "./contracts";
 import { repositoryRoot } from "./files";
 import { ManagedProcess, redact } from "./processes";
 import { verifyPayroll } from "./run";
+import { verifyEquipment } from "../equipment/run";
 
 export async function localPayrollCi(args: readonly string[]) {
   const plan = nativePlan(args, process.env, repositoryRoot);
@@ -22,7 +23,7 @@ export async function localPayrollCi(args: readonly string[]) {
   process.once("SIGTERM", interrupt);
   try {
     const boundaries = new ManagedProcess("release hold and runner boundary tests", process.execPath,
-      ["--no-env-file", "test", join("scripts", "release-hold.test.ts"), join("scripts", "payroll"),
+      ["--no-env-file", "test", join("scripts", "release-hold.test.ts"), join("scripts", "payroll"), join("scripts", "equipment"),
         join("backend", "src", "db", "testing", "dreamlux-native-target.test.ts")],
       { cwd: repositoryRoot, env });
     children.push(boundaries);
@@ -45,6 +46,8 @@ export async function localPayrollCi(args: readonly string[]) {
     await buildPayrollUi(plan.artifact, true);
     checkInterrupted();
     await verifyPayroll(plan);
+    checkInterrupted();
+    await verifyEquipment(plan);
     checkInterrupted();
   } catch (error) {
     failure = error;
