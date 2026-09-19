@@ -6,6 +6,11 @@ const browserChannel =
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: [
+    "**/issue239-payroll-native.spec.ts",
+    "**/issue233-payroll-preview-native.spec.ts",
+    "**/issue259-equipment-native.spec.ts",
+  ],
   timeout: 30_000,
   expect: {
     timeout: 7_500,

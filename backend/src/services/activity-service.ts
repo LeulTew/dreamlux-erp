@@ -1,5 +1,17 @@
 import { pool } from "../db/pool";
 import { hasPermissionSlug } from "../lib/permissions";
+import type { Pool } from "pg";
+
+export type ActivityLogInput = {
+  entity_type: string;
+  entity_id: string;
+  user_id: string | null;
+  action: string;
+  field_changed?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  note?: string | null;
+};
 
 export interface ActivityLogEntry {
   id: string;
@@ -19,18 +31,9 @@ export interface ActivityLogEntry {
 
 export class ActivityService {
   /**
-   * Log an activity transactionally or directly.
+   * Required audit writes use the caller's transaction and propagate failures.
    */
-  static async logActivity(params: {
-    entity_type: string;
-    entity_id: string;
-    user_id: string | null;
-    action: string;
-    field_changed?: string | null;
-    old_value?: string | null;
-    new_value?: string | null;
-    note?: string | null;
-  }): Promise<boolean> {
+  static async writeActivity(client: Pick<Pool, "query">, params: ActivityLogInput): Promise<void> {
     const {
       entity_type,
       entity_id,
@@ -42,13 +45,18 @@ export class ActivityService {
       note = null,
     } = params;
 
+    const written = await client.query(
+      `INSERT INTO public.activity_logs
+        (entity_type, entity_id, user_id, action, field_changed, old_value, new_value, note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [entity_type, entity_id, user_id, action, field_changed, old_value, new_value, note]
+    );
+    if (written.rowCount !== 1) throw new Error("Activity write was not acknowledged");
+  }
+
+  static async logActivity(params: ActivityLogInput): Promise<boolean> {
     try {
-      await pool.query(
-        `INSERT INTO public.activity_logs 
-          (entity_type, entity_id, user_id, action, field_changed, old_value, new_value, note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [entity_type, entity_id, user_id, action, field_changed, old_value, new_value, note]
-      );
+      await ActivityService.writeActivity(pool, params);
       return true;
     } catch (error) {
       console.error("[ActivityService] Failed to write log activity:", error);

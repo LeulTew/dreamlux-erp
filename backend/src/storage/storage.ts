@@ -20,10 +20,11 @@ export async function uploadImage(
   }
 }
 
-export async function deleteImage(key: string): Promise<void> {
+export async function deleteImage(key: string, options: { requireSuccess?: boolean } = {}): Promise<void> {
   const { error } = await supabase.storage.from(BUCKET).remove([key]);
 
   if (error) {
+    if (options.requireSuccess) throw new Error("Storage image deletion failed");
     console.error(`Storage delete warning: ${error.message}`);
   }
 }

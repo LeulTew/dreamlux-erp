@@ -6,6 +6,7 @@ import {
 } from "./contracts";
 import { repositoryRoot } from "./files";
 import { attestDreamluxNativeTarget } from "../../backend/src/db/testing/dreamlux-native-target";
+import { RUNNER_TIMEOUT_MS as EQUIPMENT_TIMEOUT_MS } from "../equipment/contracts";
 
 function object(value: unknown): Record<string, unknown> {
   if (!record(value)) throw new Error("Missing workflow contract object");
@@ -58,6 +59,25 @@ describe("local, unbilled CI definition contracts", () => {
     expect(native.some((step) => /build-ui\.ts|bun run build|next build/.test(String(step.run)))).toBe(false);
     expect(native.find((step) => String(step.run).includes("scripts/payroll/run.ts"))?.run).toContain("--allow-disposable-postgres");
   });
+  test("runs both complete domain verifiers against the same build without adding runner jobs", async () => {
+    const workflow = object(Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8")));
+    const jobs = object(workflow.jobs);
+    expect(Object.keys(jobs).sort()).toEqual(["backend-test", "frontend-build", "native-payroll"]);
+    expect(Object.values(jobs).map(object).reduce((sum, job) => sum + Number(job["timeout-minutes"]), 0)).toBe(11);
+    const native = steps(object(jobs["native-payroll"])).map((step) => String(step.run)).join("\n");
+    expect(native.match(/scripts\/payroll\/run\.ts/g)).toHaveLength(1);
+    expect(native.match(/scripts\/equipment\/run\.ts/g)).toHaveLength(1);
+    expect(native.match(/--frontend-build \.qa-payroll-build/g)).toHaveLength(2);
+    const local = await readFile(join(repositoryRoot, "scripts", "payroll", "local-ci.ts"), "utf8");
+    expect(local).toContain("await verifyEquipment(plan)");
+    expect(local).toContain('"run", "test:storage"');
+    expect(local.indexOf("await verifyEquipment(plan)")).toBeGreaterThan(local.indexOf("await verifyPayroll(plan)"));
+    const config = await readFile(join(repositoryRoot, "frontend", "playwright.equipment-native.config.ts"), "utf8");
+    const runner = await readFile(join(repositoryRoot, "scripts", "equipment", "run.ts"), "utf8");
+    expect(config).toContain("globalTimeout: 120_000");
+    expect(runner).toContain("browser.requireSuccess(budget(125_000))");
+    expect(EQUIPMENT_TIMEOUT_MS).toBe(170_000);
+  });
   test("pins the disposable server's physical port and verifies both binary hashes before native QA", async () => {
     const workflow = object(Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8")));
     const native = object(object(workflow.jobs)["native-payroll"]);
@@ -66,6 +86,9 @@ describe("local, unbilled CI definition contracts", () => {
     expect(postgres.ports).toEqual(["55434:55434"]);
     expect(object(postgres.env).PGPORT).toBe("55434");
     expect(object(postgres.env).POSTGRES_USER).toBe("dreamlux_parity");
+    expect(String(postgres.options)).toContain("--tmpfs /var/lib/postgresql/data:rw,size=1g");
+    expect(String(postgres.options)).toContain("--memory 2g");
+    expect(String(postgres.options)).not.toMatch(/fsync=off|full_page_writes=off|synchronous_commit=off/);
     const commands = steps(native);
     const download = String(commands.find((step) => String(step.run).includes("curl --fail"))?.run);
     expect(download).toContain(POSTGREST_LINUX_ARCHIVE_URL);

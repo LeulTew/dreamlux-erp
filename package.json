@@ -31,6 +31,7 @@
     "verify:payroll:build": "bun --no-env-file scripts/payroll/build-ui.ts",
     "verify:payroll:native": "bun --no-env-file scripts/payroll/run.ts",
     "verify:payroll:local": "bun --no-env-file scripts/payroll/local-ci.ts",
+    "verify:equipment:native": "bun --no-env-file scripts/equipment/run.ts",
     "backup:storage": "bun run --cwd backend src/db/backup-storage.ts",
     "verify:storage": "bun --no-env-file run --cwd backend verify:storage",
     "test:storage": "bun --no-env-file run --cwd backend test:storage",

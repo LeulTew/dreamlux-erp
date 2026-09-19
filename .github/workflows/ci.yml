@@ -31,7 +31,7 @@ jobs:
       - name: Verify temporary production release hold
         run: bun --no-env-file test scripts/release-hold.test.ts
       - name: Verify payroll runner boundaries
-        run: bun --no-env-file test scripts/payroll backend/src/db/testing/dreamlux-native-target.test.ts
+        run: bun --no-env-file test scripts/payroll scripts/equipment backend/src/db/testing/dreamlux-native-target.test.ts
       - name: Run tests
         run: cd backend && bun --no-env-file test --timeout=30000 --preload ../scripts/payroll/offline-unit-guard.ts
         env:
@@ -73,7 +73,7 @@ jobs:
           retention-days: 1
 
   native-payroll:
-    name: Native payroll and real browser contracts
+    name: Native payroll, equipment and real browser contracts
     needs: [backend-test, frontend-build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -89,6 +89,8 @@ jobs:
         ports:
           - 55434:55434
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw,size=1g
+          --memory 2g
           --health-cmd "pg_isready -h 127.0.0.1 -p 55434 -U dreamlux_parity -d postgres"
           --health-interval 2s
           --health-timeout 3s
@@ -130,6 +132,10 @@ jobs:
       - name: Run native assertions, then serial browsers against the reused build
         run: |
           bun --no-env-file scripts/payroll/run.ts \
+            --allow-disposable-postgres \
+            --postgrest "$PWD/.qa-payroll-postgrest/postgrest" \
+            --frontend-build .qa-payroll-build
+          bun --no-env-file scripts/equipment/run.ts \
             --allow-disposable-postgres \
             --postgrest "$PWD/.qa-payroll-postgrest/postgrest" \
             --frontend-build .qa-payroll-build

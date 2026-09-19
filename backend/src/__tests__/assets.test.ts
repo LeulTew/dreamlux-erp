@@ -4,9 +4,12 @@ import {
   getToken,
 } from "./setup_helpers";
 import "./setup";
-import { describe, test, expect, mock, beforeEach, beforeAll } from "bun:test";
+import { describe, test, expect, mock, beforeEach, beforeAll, afterEach, spyOn } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import type { PoolClient, QueryResult } from "pg";
+import { pool } from "../db/pool";
+import * as storage from "../storage/storage";
 
 const mockQuery = mock(() => Promise.resolve({ rows: [] as any[] }));
 
@@ -625,20 +628,83 @@ describe("Assets", () => {
   });
 
   describe("DELETE /assets/:id/permanent", () => {
-    test("returns 404 for non-existent item", async () => {
-      mockQuery.mockResolvedValueOnce({ rows: [] });
+    const empty: QueryResult<Record<string, unknown>> = { rows: [], rowCount: 0, command: "SELECT", fields: [], oid: 0 };
+    const deletionQuery = mock(async (_text: string, _values?: unknown[]) => empty);
+    const release = mock((_discard?: boolean) => {});
+    const client = { query: deletionQuery, release } as unknown as PoolClient;
+    const connectionTarget: { connect: () => Promise<PoolClient> } = pool;
+    let restoreSpies = () => {};
+    let storageFailure: Error | null = null;
+    let cleanupAfterCommit = false;
 
+    beforeEach(() => {
+      deletionQuery.mockReset().mockImplementation(async (text) =>
+        text.toLowerCase().startsWith("insert into public.activity_logs")
+          ? { ...empty, command: "INSERT", rowCount: 1 }
+          : empty);
+      release.mockClear();
+      storageFailure = null;
+      cleanupAfterCommit = false;
+      const connect = spyOn(connectionTarget, "connect").mockResolvedValue(client);
+      const cleanup = spyOn(storage, "deleteImage").mockImplementation(async () => {
+        cleanupAfterCommit = deletionQuery.mock.calls.at(-1)?.[0] === "commit";
+        if (storageFailure) throw storageFailure;
+      });
+      connect.mockClear();
+      cleanup.mockClear();
+      restoreSpies = () => {
+        cleanup.mockRestore();
+        connect.mockRestore();
+      };
+    });
+
+    afterEach(() => restoreSpies());
+
+    function unusedTrash(imageKey: string | null = "synthetic/item.webp") {
+      return deletionQuery
+        .mockResolvedValueOnce(empty)
+        .mockResolvedValueOnce(empty)
+        .mockResolvedValueOnce({
+          ...empty,
+          rows: [{ id: VALID_UUID, name: "Unused item", quantity: 1, image_key: imageKey, deleted_at: new Date("2030-01-15T00:00:00Z") }],
+          rowCount: 1,
+        })
+        .mockResolvedValueOnce({ ...empty, rows: [{ has_history: false }], rowCount: 1 })
+        .mockResolvedValueOnce({ ...empty, rows: [{ id: VALID_UUID }], rowCount: 1 });
+    }
+
+    test("validates UUID before opening a deletion transaction", async () => {
+      const res = await request(app)
+        .delete("/assets/not-a-uuid/permanent")
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(400);
+      expect(connectionTarget.connect).not.toHaveBeenCalled();
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+    });
+
+    test("denies an actor without assets:delete before database or storage work", async () => {
+      const res = await request(app)
+        .delete(`/assets/${VALID_UUID}/permanent`)
+        .set("Authorization", `Bearer ${getNoAssetsReadToken()}`);
+
+      expect(res.status).toBe(403);
+      expect(connectionTarget.connect).not.toHaveBeenCalled();
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+    });
+
+    test("returns 404 for non-existent item", async () => {
       const res = await request(app)
         .delete(`/assets/${VALID_UUID}/permanent`)
         .set("Authorization", `Bearer ${getToken()}`);
 
       expect(res.status).toBe(404);
+      expect(res.body.code).toBe("ITEM_NOT_FOUND");
+      expect(storage.deleteImage).not.toHaveBeenCalled();
     });
 
     test("permanently deletes item", async () => {
-      mockQuery
-        .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, image_key: "k1" }] })
-        .mockResolvedValueOnce({ rows: [] });
+      unusedTrash();
 
       const res = await request(app)
         .delete(`/assets/${VALID_UUID}/permanent`)
@@ -647,6 +713,96 @@ describe("Assets", () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.permanently_deleted).toBe(true);
+      expect(res.body.storage_cleanup_pending).toBeUndefined();
+      expect(storage.deleteImage).toHaveBeenCalledWith("synthetic/item.webp", { requireSuccess: true });
+      expect(cleanupAfterCommit).toBe(true);
+      expect(release).toHaveBeenCalledWith(false);
+    });
+
+    test("does not try storage cleanup for an item without an image", async () => {
+      unusedTrash(null);
+      const res = await request(app)
+        .delete(`/assets/${VALID_UUID}/permanent`)
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ success: true, permanently_deleted: true });
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+    });
+
+    test("returns a recoverable history conflict without touching storage", async () => {
+      deletionQuery
+        .mockResolvedValueOnce(empty)
+        .mockResolvedValueOnce(empty)
+        .mockResolvedValueOnce({
+          ...empty,
+          rows: [{ id: VALID_UUID, name: "Retained equipment", quantity: 10, image_key: "synthetic/item.webp", deleted_at: new Date() }],
+        })
+        .mockResolvedValueOnce({ ...empty, rows: [{ has_history: true }] });
+      const res = await request(app)
+        .delete(`/assets/${VALID_UUID}/permanent`)
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe("ITEM_HAS_HISTORY");
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+      expect(deletionQuery.mock.calls.some(([sql]) => sql.startsWith("delete from"))).toBe(false);
+    });
+
+    test("does not use permanent deletion to bypass trash", async () => {
+      deletionQuery
+        .mockResolvedValueOnce(empty)
+        .mockResolvedValueOnce(empty)
+        .mockResolvedValueOnce({
+          ...empty,
+          rows: [{ id: VALID_UUID, name: "Active equipment", quantity: 10, image_key: "synthetic/item.webp", deleted_at: null }],
+        });
+      const res = await request(app)
+        .delete(`/assets/${VALID_UUID}/permanent`)
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe("ITEM_NOT_TRASHED");
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+    });
+
+    test("reports committed deletion separately from storage cleanup failure", async () => {
+      unusedTrash();
+      storageFailure = new Error("Synthetic cleanup failure");
+      const res = await request(app)
+        .delete(`/assets/${VALID_UUID}/permanent`)
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ success: true, permanently_deleted: true, storage_cleanup_pending: true });
+      expect(cleanupAfterCommit).toBe(true);
+      expect(deletionQuery.mock.calls.some(([sql]) => sql === "rollback")).toBe(false);
+    });
+
+    test("rolls back a required audit failure without exposing internals or deleting the image", async () => {
+      unusedTrash().mockRejectedValueOnce(new Error("Synthetic private audit failure"));
+      const res = await request(app)
+        .delete(`/assets/${VALID_UUID}/permanent`)
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: "Permanent delete failed" });
+      expect(deletionQuery.mock.calls.at(-1)?.[0]).toBe("rollback");
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+    });
+
+    test("marks an unknown commit for reload and leaves the image untouched", async () => {
+      unusedTrash().mockResolvedValueOnce({ ...empty, command: "INSERT", rowCount: 1 })
+        .mockRejectedValueOnce(new Error("Synthetic commit connection loss"));
+      const res = await request(app)
+        .delete(`/assets/${VALID_UUID}/permanent`)
+        .set("Authorization", `Bearer ${getToken()}`);
+
+      expect(res.status).toBe(503);
+      expect(res.body).toMatchObject({ code: "ITEM_DELETE_UNCONFIRMED", outcome_uncertain: true });
+      expect(res.body.permanently_deleted).toBeUndefined();
+      expect(storage.deleteImage).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledWith(true);
     });
   });
 

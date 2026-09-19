@@ -18,6 +18,7 @@ interface DeleteConfirmModalProps {
   confirmLabel?: string;
   pendingLabel?: string;
   confirmDisabled?: boolean;
+  errorMessage?: string | null;
 }
 
 export default function DeleteConfirmModal({
@@ -31,7 +32,8 @@ export default function DeleteConfirmModal({
   variant = "danger",
   confirmLabel,
   pendingLabel,
-  confirmDisabled = false
+  confirmDisabled = false,
+  errorMessage,
 }: DeleteConfirmModalProps) {
   const isDanger = variant === "danger";
   const modalFocus = useModalFocus();
@@ -96,13 +98,19 @@ export default function DeleteConfirmModal({
                 </Dialog.Description>
               </div>
 
+              {errorMessage && (
+                <p role="alert" className="w-full break-words rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm font-medium text-danger">
+                  {errorMessage}
+                </p>
+              )}
+
               <div className="w-full flex flex-col gap-3 pt-4">
                 {!confirmDisabled && (
                   <button
                     type="button"
                     onClick={onConfirm}
                     disabled={isDeleting}
-                    className={`w-full min-h-12 rounded-xl font-semibold text-sm [@media(hover:hover)]:hover:opacity-90 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 ${isDanger ? 'bg-destructive text-destructive-foreground' : 'bg-emerald-600 text-white'}`}
+                    className={`w-full min-h-12 rounded-xl font-semibold text-sm [@media(hover:hover)_and_(pointer:fine)]:hover:opacity-90 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isDanger ? 'bg-danger text-background disabled:cursor-wait' : 'bg-emerald-600 text-white disabled:opacity-50'}`}
                   >
                     {isDeleting ? (pendingLabel || (isDanger ? "Deleting..." : "Restoring...")) : (confirmLabel || (isDanger ? "Confirm Delete" : "Confirm Restore"))}
                   </button>
