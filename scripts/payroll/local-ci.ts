@@ -7,6 +7,7 @@ import { repositoryRoot } from "./files";
 import { ManagedProcess, redact } from "./processes";
 import { verifyPayroll } from "./run";
 import { verifyEquipment } from "../equipment/run";
+import { verifyImportBrowser } from "../imports/browser";
 
 export async function localPayrollCi(args: readonly string[]) {
   const plan = nativePlan(args, process.env, repositoryRoot);
@@ -23,8 +24,8 @@ export async function localPayrollCi(args: readonly string[]) {
   process.once("SIGTERM", interrupt);
   try {
     const boundaries = new ManagedProcess("release hold and runner boundary tests", process.execPath,
-      ["--no-env-file", "test", join("scripts", "release-hold.test.ts"), join("scripts", "payroll"), join("scripts", "equipment"),
-        join("backend", "src", "db", "testing", "dreamlux-native-target.test.ts")],
+      ["--no-env-file", "test", join("scripts", "release-hold.test.ts"), join("scripts", "payroll"), join("scripts", "equipment"), join("scripts", "imports"),
+        join("backend", "src", "db", "testing", "dreamlux-native-target.test.ts"), join("backend", "src", "db", "testing", "dreamlux-import-fixture.test.ts")],
       { cwd: repositoryRoot, env });
     children.push(boundaries);
     await boundaries.requireSuccess(60_000);
@@ -57,6 +58,20 @@ export async function localPayrollCi(args: readonly string[]) {
     await verifyPayroll(plan);
     checkInterrupted();
     await verifyEquipment(plan);
+    checkInterrupted();
+    const imports = new ManagedProcess("native workbook imports", process.execPath,
+      ["--no-env-file", "run", "verify:imports:native"], {
+        cwd: repositoryRoot, env: { ...env, DREAMLUX_NATIVE_TEST_ADMIN_URL: plan.adminUrl },
+        secrets: [plan.adminUrl],
+      });
+    children.push(imports);
+    const importsResult = await imports.requireSuccess(60_000);
+    const importsOutput = stripVTControlCharacters(importsResult.output);
+    if (!/^\s*11 pass\s*$/m.test(importsOutput) || /^\s*[1-9]\d* (?:skip|fail)\s*$/m.test(importsOutput)) {
+      throw new Error("Native import verification produced an incomplete receipt");
+    }
+    checkInterrupted();
+    await verifyImportBrowser(["--frontend-build", plan.artifact]);
     checkInterrupted();
   } catch (error) {
     failure = error;

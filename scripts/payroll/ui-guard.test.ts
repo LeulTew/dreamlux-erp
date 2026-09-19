@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Script } from "node:vm";
 import { repositoryRoot } from "./files";
 
-async function guard(serve: boolean) {
+async function guard(serve: boolean, serverPorts?: number[]) {
   const calls: string[] = [];
   const diagnostics: string[] = [];
   class Socket { connect() { calls.push("TCP"); return this; } }
@@ -29,7 +29,7 @@ async function guard(serve: boolean) {
   };
   new Script(await readFile(join(repositoryRoot, "scripts", "payroll", "ui-http-guard.cjs"), "utf8")).runInNewContext(context);
   if (typeof exported.exports !== "function") throw new Error("Missing network guard installer");
-  exported.exports(serve);
+  exported.exports(serve, serverPorts);
   return { context, calls, diagnostics, http, https, tls, Socket };
 }
 
@@ -56,5 +56,14 @@ describe("UI transport guard with no real sockets or HTTP", () => {
     expect(() => new wrapped.context.WebSocket()).toThrow("blocked");
     expect(wrapped.calls).toEqual([]);
     expect(wrapped.diagnostics).toHaveLength(3);
+  });
+  test("mocked import UI permits only its own port, not payroll API or REST services", async () => {
+    const wrapped = await guard(true, [3261]);
+    await expect(wrapped.context.fetch("http://127.0.0.1:3261/login", {})).resolves.toEqual({ redirect: "error" });
+    for (const port of [3126, 5326, 54334, 54335, 55434]) {
+      expect(() => wrapped.context.fetch(`http://127.0.0.1:${port}`, {})).toThrow("blocked");
+    }
+    expect(wrapped.calls).toEqual(["fetch"]);
+    await expect(guard(true, [0])).rejects.toThrow("explicit valid loopback ports");
   });
 });

@@ -225,16 +225,66 @@ function collectFormulaMismatches(sheet: ExcelJS.Worksheet, sheetName: KnownShee
   return mismatches;
 }
 
-function parseSheetRows(sheet: ExcelJS.Worksheet, sheetName: KnownSheet, fallbackMonth?: string): ParsedHisabImportRow[] {
+function supportedFormulaResult(value: unknown): boolean {
+  return typeof value === "string" || typeof value === "boolean"
+    || (typeof value === "number" && Number.isFinite(value))
+    || (value instanceof Date && !Number.isNaN(value.getTime()));
+}
+
+function parseSheetRows(sheet: ExcelJS.Worksheet, sheetName: KnownSheet, fallbackMonth?: string): {
+  rows: ParsedHisabImportRow[];
+  blockingErrors: string[];
+} {
   const rows: ParsedHisabImportRow[] = [];
+  const blockingErrors: string[] = [];
+  let amountColumn: number | undefined;
+  let dateColumn: number | undefined;
 
   sheet.eachRow((row) => {
     const values = rowCells(row);
-    if (values.some((value) => value && typeof value === "object" && "formula" in (value as Record<string, unknown>))) return;
+    const formulas: Array<{ cell: ExcelJS.Cell; column: number; result: unknown }> = [];
+    row.eachCell((cell, column) => {
+      if (cell.type !== ExcelJS.ValueType.Formula) return;
+      const result: unknown = cell.result;
+      formulas.push({ cell, column: column - 1, result });
+      values[column - 1] = supportedFormulaResult(result) ? result : undefined;
+    });
+    const headings = values.map((value) => normalizeKey(textValue(value)));
+    const headerAmount = headings.findIndex((value) => value === "amount" || value === "amount etb");
+    const headerDate = headings.findIndex((value) => value === "date" || value === "month");
+    if (headerAmount >= 0 && headerDate >= 0) {
+      amountColumn = headerAmount;
+      dateColumn = headerDate;
+      return;
+    }
     const joined = values.map(textValue).filter(Boolean).join(" ");
-    if (!joined || /total|grand total/i.test(joined)) return;
-    const amount = values.map(numberValue).filter((value): value is number => value != null && value > 0).at(-1);
-    if (amount == null) return;
+    if (/total|grand total/i.test(joined)) return;
+    const hasTransactionContext = values.some((value) =>
+      value instanceof Date || (textValue(value) !== "" && numberValue(value) === null));
+    if (formulas.length > 0 && !hasTransactionContext
+      && formulas.every(({ cell }) => /^=?SUM\s*\(/i.test(cell.formula.trim()))) return;
+    const amountFormula = formulas.find(({ column }) => column === amountColumn);
+    if (amountFormula && dateColumn !== undefined && dateValue(values[dateColumn]) === null) {
+      const range = amountFormula.cell.formula.replace(/\s|\$/g, "").match(/^=?SUM\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)$/i);
+      if (range && range[1].toUpperCase() === range[3].toUpperCase()
+        && sheet.getColumn(range[1].toUpperCase()).number === amountFormula.column + 1
+        && Number(range[2]) <= Number(range[4]) && Number(range[4]) < row.number) return;
+    }
+    const missingResults = formulas.filter(({ result }) => !supportedFormulaResult(result));
+    if (missingResults.length > 0) {
+      blockingErrors.push(...missingResults.map(({ cell }) =>
+        `${sheetName}!${cell.address}: formula has no supported cached result. Recalculate the workbook and upload it again.`));
+      return;
+    }
+    if (!joined) return;
+    const amount = amountColumn === undefined
+      ? values.map(numberValue).filter((value): value is number => value != null && value > 0).at(-1)
+      : numberValue(values[amountColumn]);
+    if (amount == null && amountColumn !== undefined && formulas.some(({ column }) => column === amountColumn)) {
+      blockingErrors.push(`${sheetName}!${row.getCell(amountColumn + 1).address}: cached formula amount is not numeric. Recalculate the workbook and upload it again.`);
+      return;
+    }
+    if (amount == null || amount <= 0) return;
 
     const firstDate = values.map((value) => dateValue(value, undefined)).find(Boolean);
     const date = firstDate || (fallbackMonth ? `${fallbackMonth}-01` : "2026-01-01");
@@ -324,7 +374,7 @@ function parseSheetRows(sheet: ExcelJS.Worksheet, sheetName: KnownSheet, fallbac
     });
   });
 
-  return rows;
+  return { rows, blockingErrors };
 }
 
 export async function parseHisabWorkbook(buffer: Buffer | Uint8Array, sourceFilename?: string | null): Promise<HisabImportPreview> {
@@ -336,16 +386,20 @@ export async function parseHisabWorkbook(buffer: Buffer | Uint8Array, sourceFile
   const missingSheets = KNOWN_SHEETS.filter((sheetName) => !workbook.getWorksheet(sheetName));
   const rows: ParsedHisabImportRow[] = [];
   const formulaMismatches: HisabFormulaMismatch[] = [];
+  const formulaErrors: string[] = [];
 
   for (const sheetName of knownSheets) {
     const sheet = workbook.getWorksheet(sheetName);
     if (!sheet) continue;
-    rows.push(...parseSheetRows(sheet, sheetName));
+    const parsed = parseSheetRows(sheet, sheetName);
+    rows.push(...parsed.rows);
+    formulaErrors.push(...parsed.blockingErrors);
     formulaMismatches.push(...collectFormulaMismatches(sheet, sheetName));
   }
 
   const unmatched = rows.flatMap((row) => row.requiresResolution);
   const blockingErrors = [
+    ...formulaErrors,
     ...(knownSheets.length === 0 ? ["Workbook does not contain any known Hisab sheets"] : []),
     ...(rows.length === 0 ? ["Workbook did not contain importable finance rows"] : []),
   ];

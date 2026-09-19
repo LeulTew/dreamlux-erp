@@ -59,7 +59,7 @@ describe("local, unbilled CI definition contracts", () => {
     expect(native.some((step) => /build-ui\.ts|bun run build|next build/.test(String(step.run)))).toBe(false);
     expect(native.find((step) => String(step.run).includes("scripts/payroll/run.ts"))?.run).toContain("--allow-disposable-postgres");
   });
-  test("runs both complete domain verifiers against the same build without adding runner jobs", async () => {
+  test("runs the complete domain and import verifiers against the same build without adding runner jobs", async () => {
     const workflow = object(Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8")));
     const jobs = object(workflow.jobs);
     expect(Object.keys(jobs).sort()).toEqual(["backend-test", "frontend-build", "native-payroll"]);
@@ -67,11 +67,15 @@ describe("local, unbilled CI definition contracts", () => {
     const native = steps(object(jobs["native-payroll"])).map((step) => String(step.run)).join("\n");
     expect(native.match(/scripts\/payroll\/run\.ts/g)).toHaveLength(1);
     expect(native.match(/scripts\/equipment\/run\.ts/g)).toHaveLength(1);
-    expect(native.match(/--frontend-build \.qa-payroll-build/g)).toHaveLength(2);
+    expect(native.match(/--frontend-build \.qa-payroll-build/g)).toHaveLength(3);
+    expect(native.match(/verify:imports:native/g)).toHaveLength(1);
+    expect(native.match(/verify:imports:browser/g)).toHaveLength(1);
     const local = await readFile(join(repositoryRoot, "scripts", "payroll", "local-ci.ts"), "utf8");
     expect(local).toContain("await verifyEquipment(plan)");
     expect(local).toContain('"run", "test:storage"');
     expect(local.indexOf("await verifyEquipment(plan)")).toBeGreaterThan(local.indexOf("await verifyPayroll(plan)"));
+    expect(local).toContain('"run", "verify:imports:native"');
+    expect(local.indexOf("await verifyImportBrowser(")).toBeGreaterThan(local.indexOf("await verifyEquipment(plan)"));
     const config = await readFile(join(repositoryRoot, "frontend", "playwright.equipment-native.config.ts"), "utf8");
     const runner = await readFile(join(repositoryRoot, "scripts", "equipment", "run.ts"), "utf8");
     expect(config).toContain("globalTimeout: 120_000");

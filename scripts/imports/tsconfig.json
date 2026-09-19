@@ -1,0 +1,7 @@
+{
+  "extends": "../payroll/tsconfig.json",
+  "include": [
+    "./*.ts",
+    "../../frontend/e2e/imports-browser.config.ts"
+  ]
+}

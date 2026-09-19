@@ -30,8 +30,8 @@ jobs:
         run: cd backend && bun install --frozen-lockfile
       - name: Verify temporary production release hold
         run: bun --no-env-file test scripts/release-hold.test.ts
-      - name: Verify payroll runner boundaries
-        run: bun --no-env-file test scripts/payroll scripts/equipment backend/src/db/testing/dreamlux-native-target.test.ts
+      - name: Verify native runner boundaries
+        run: bun --no-env-file test scripts/payroll scripts/equipment scripts/imports backend/src/db/testing/dreamlux-native-target.test.ts backend/src/db/testing/dreamlux-import-fixture.test.ts
       - name: Run tests
         run: cd backend && bun --no-env-file test --timeout=30000 --preload ../scripts/payroll/offline-unit-guard.ts
         env:
@@ -111,7 +111,9 @@ jobs:
           bun install --cwd backend --frozen-lockfile
           bun install --cwd frontend --frozen-lockfile
       - name: Type-check portable verification infrastructure
-        run: bun --no-env-file backend/node_modules/typescript/bin/tsc --project scripts/payroll/tsconfig.json --noEmit
+        run: |
+          bun --no-env-file backend/node_modules/typescript/bin/tsc --project scripts/payroll/tsconfig.json --noEmit
+          bun --no-env-file backend/node_modules/typescript/bin/tsc --project scripts/imports/tsconfig.json --noEmit
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -129,7 +131,7 @@ jobs:
           tar -xJf .qa-payroll-postgrest/postgrest.tar.xz -C .qa-payroll-postgrest --no-same-owner
           printf '%s  %s\n' '0cf367dc2ee47d5c648baa2952e25bdf299de4e1998d31e251bb00d129262d71' '.qa-payroll-postgrest/postgrest' | sha256sum --check -
           .qa-payroll-postgrest/postgrest --version | grep -E '^PostgREST 16\.3($|[[:space:]])'
-      - name: Run native assertions, then serial browsers against the reused build
+      - name: Verify payroll, equipment and imports against the reused build
         run: |
           bun --no-env-file scripts/payroll/run.ts \
             --allow-disposable-postgres \
@@ -139,5 +141,7 @@ jobs:
             --allow-disposable-postgres \
             --postgrest "$PWD/.qa-payroll-postgrest/postgrest" \
             --frontend-build .qa-payroll-build
+          bun run verify:imports:native
+          bun run verify:imports:browser -- --frontend-build .qa-payroll-build
         env:
           DREAMLUX_NATIVE_TEST_ADMIN_URL: postgresql://dreamlux_parity:0000000000000000000000000000000000000000000000000000000000000239@127.0.0.1:55434/postgres?sslmode=disable

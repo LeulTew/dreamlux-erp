@@ -192,10 +192,14 @@ export class ManagedProcess {
   }
 }
 
-export async function reservePayrollPorts() {
+export async function reserveLocalPorts(requested: readonly number[]) {
+  if (requested.length === 0 || new Set(requested).size !== requested.length
+      || requested.some((port) => !Number.isInteger(port) || port < 1 || port > 65535)) {
+    throw new Error("Expected distinct explicit local QA ports");
+  }
   const reservations = new Map<number, ReturnType<typeof createServer>>();
   try {
-    for (const port of [3126, 5326, 54334, 54335]) {
+    for (const port of requested) {
       const server = createServer((socket) => socket.destroy());
       await new Promise<void>((resolve, reject) => {
         server.once("error", reject);
@@ -220,15 +224,20 @@ export async function reservePayrollPorts() {
   };
 }
 
+export function reservePayrollPorts() {
+  return reserveLocalPorts([3126, 5326, 54334, 54335]);
+}
+
 export async function waitForHttp(origin: string, process: Pick<ManagedProcess, "assertRunning">, timeoutMs: number) {
-  if (!["http://127.0.0.1:54334", "http://127.0.0.1:3126"].includes(origin)) throw new Error("Refusing an unowned readiness target");
+  if (!["http://127.0.0.1:54334", "http://127.0.0.1:3126", "http://127.0.0.1:3261"].includes(origin)) throw new Error("Refusing an unowned readiness target");
+  const rest = origin === "http://127.0.0.1:54334";
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
     process.assertRunning();
     try {
-      const response = await fetch(origin === "http://127.0.0.1:3126" ? `${origin}/login` : origin,
+      const response = await fetch(rest ? origin : `${origin}/login`,
         { redirect: "error", signal: AbortSignal.timeout(1_000) });
-      const expected = origin === "http://127.0.0.1:54334" ? 401 : 200;
+      const expected = rest ? 401 : 200;
       if (response.status === expected) {
         await response.body?.cancel();
         process.assertRunning();

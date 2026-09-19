@@ -11,6 +11,7 @@
   "include": [
     "./*.ts",
     "../equipment/*.ts",
+    "../imports/*.ts",
     "../../frontend/payroll-qa-environment.ts",
     "../../frontend/next.payroll-native.config.ts",
     "../../frontend/playwright.payroll-native.config.ts",

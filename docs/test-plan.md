@@ -60,6 +60,13 @@ Use this table to decide which blackbox suites matter most after a release. A re
 
 ## 4. Test Suites (Verification Tables)
 
+### Calculated Hisab imports (Issue #261)
+
+Follow [Hisab workbook imports](hisab-workbook-import.md) for calculated-row
+preservation, subtotal review, explicit recalculation blockers and historical
+duplicate safety. Its native persistence and mocked desktop/mobile caller
+checks are separate evidence; neither certifies a production deployment.
+
 ### Focused drawer lifecycle verification (Issue #234)
 
 `ResponsiveDrawer` treats parent-driven `isOpen=false` as immediate removal, not a new user dismissal. A close button, backdrop, Escape, or mobile handle swipe preserves the exit animation and reports `onClose` once. Reopening or unmounting during exit cancels the old callback.
