@@ -1,0 +1,2 @@
+[test]
+# The import suite creates real, attested PostgreSQL and authenticated HTTP fixtures.

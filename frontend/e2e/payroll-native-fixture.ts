@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { fulfillJson } from "./helpers";
+import { mockIdleRealtime } from "./idle-realtime-fixture";
 
 const execute = promisify(execFile);
 export const plannerId = "23900000-0000-4000-8000-000000000006";
@@ -92,34 +93,7 @@ export async function installPayrollFixture(context: BrowserContext, page: Page,
     record_type: "payroll", sort: null, filters: {}, pageSize: null,
     visibleColumns: [], density: null, activeTab: null, updated_at: null,
   };
-  await context.routeWebSocket("**/*", (socket) => {
-    const url = new URL(socket.url());
-    if (url.origin === baseURL.replace("http:", "ws:") && url.pathname === "/_next/webpack-hmr") {
-      socket.connectToServer();
-      return;
-    }
-    if (url.origin !== "ws://127.0.0.1:54335" || url.pathname !== "/realtime/v1/websocket") {
-      unexpected.push("Unconfigured WebSocket");
-      void socket.close();
-      return;
-    }
-    socket.onMessage((message) => {
-      const parsed: unknown = JSON.parse(message.toString());
-      if (!Array.isArray(parsed) || parsed.length !== 5) throw new Error("Unexpected synthetic realtime envelope");
-      const [joinRef, ref, topic, event, payload] = parsed;
-      if (!["phx_join", "phx_leave", "heartbeat", "access_token"].includes(event)) {
-        unexpected.push("Unconfigured realtime event");
-        return;
-      }
-      const changes = record(payload) && record(payload.config) && Array.isArray(payload.config.postgres_changes)
-        ? payload.config.postgres_changes : [];
-      const response = event === "phx_join" ? { postgres_changes: changes.map((change: unknown, id: number) => {
-        if (!record(change)) throw new Error("Malformed synthetic realtime subscription");
-        return { ...change, id };
-      }) } : {};
-      socket.send(JSON.stringify([joinRef, ref, topic, "phx_reply", { status: "ok", response }]));
-    });
-  });
+  await mockIdleRealtime(context, baseURL, unexpected);
   await context.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());

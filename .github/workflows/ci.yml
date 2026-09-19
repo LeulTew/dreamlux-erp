@@ -31,7 +31,7 @@ jobs:
       - name: Verify temporary production release hold
         run: bun --no-env-file test scripts/release-hold.test.ts
       - name: Verify payroll runner boundaries
-        run: bun --no-env-file test scripts/payroll backend/src/db/testing/dreamlux-native-target.test.ts
+        run: bun --no-env-file test scripts/payroll scripts/imports backend/src/db/testing/dreamlux-native-target.test.ts backend/src/db/testing/dreamlux-import-fixture.test.ts
       - name: Run tests
         run: cd backend && bun --no-env-file test --timeout=30000 --preload ../scripts/payroll/offline-unit-guard.ts
         env:
@@ -109,7 +109,9 @@ jobs:
           bun install --cwd backend --frozen-lockfile
           bun install --cwd frontend --frozen-lockfile
       - name: Type-check portable verification infrastructure
-        run: bun --no-env-file backend/node_modules/typescript/bin/tsc --project scripts/payroll/tsconfig.json --noEmit
+        run: |
+          bun --no-env-file backend/node_modules/typescript/bin/tsc --project scripts/payroll/tsconfig.json --noEmit
+          bun --no-env-file backend/node_modules/typescript/bin/tsc --project scripts/imports/tsconfig.json --noEmit
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -133,5 +135,7 @@ jobs:
             --allow-disposable-postgres \
             --postgrest "$PWD/.qa-payroll-postgrest/postgrest" \
             --frontend-build .qa-payroll-build
+          bun run verify:imports:native
+          bun run verify:imports:browser -- --frontend-build .qa-payroll-build
         env:
           DREAMLUX_NATIVE_TEST_ADMIN_URL: postgresql://dreamlux_parity:0000000000000000000000000000000000000000000000000000000000000239@127.0.0.1:55434/postgres?sslmode=disable

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { fulfillJson, mockAuth, mockCommonShellData, seedAuthenticatedSession } from "./helpers";
+import { fulfillJson, mockAuth, seedAuthenticatedSession } from "./helpers";
+import { mockImportShellData } from "./imports-shell-fixture";
 
 const PREVIEW_MOCK = {
   workbookHash: "a50f26f0435696e3b8f9ce0b8b1a2f65b2e79ce78a389d6a93626429353f6294",
@@ -59,8 +60,8 @@ const PREVIEW_MOCK = {
 
 const EVENTS_LOOKUP = {
   events: [
-    { id: "evt-e2e-111", name: "Wedding Celebration", event_id_display: "EVT-2026-001" },
-    { id: "evt-e2e-222", name: "Corporate Launch", event_id_display: "EVT-2026-002" },
+    { id: "26100000-0000-4000-8000-000000000004", name: "Wedding Celebration", event_id_display: "EVT-2026-001" },
+    { id: "26100000-0000-4000-8000-000000000005", name: "Corporate Launch", event_id_display: "EVT-2026-002" },
   ],
   total: 2,
   page: 1,
@@ -69,7 +70,7 @@ const EVENTS_LOOKUP = {
 };
 
 const COMMIT_SUCCESS_MOCK = {
-  importId: "import-batch-12345",
+  importId: "26100000-0000-4000-8000-000000000006",
   inserted: {
     eventExpenses: 1,
     operationalExpenses: 1,
@@ -80,33 +81,58 @@ const COMMIT_SUCCESS_MOCK = {
 
 test.describe("Issue 113 Hisab Workbook Import E2E", () => {
   test("Accountant uploads workbook, resolves unmatched event, reviews formula mismatches, and commits successfully", async ({
-    page,
+    page, baseURL,
   }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, {
       permissions: ["finance:imports:write"],
     });
-    await mockCommonShellData(page);
+    const unexpected: string[] = [];
+    await mockImportShellData(page, baseURL, unexpected);
 
     // Mock preview endpoints
     await page.route(
-      (url) => url.pathname === "/finance/imports/hisab/preview",
-      (route) => fulfillJson(route, PREVIEW_MOCK)
+      (url) => url.pathname === "/api/finance/imports/hisab/preview",
+      (route) => {
+        expect(route.request().method()).toBe("POST");
+        expect(new URL(route.request().url()).search).toBe("");
+        return fulfillJson(route, PREVIEW_MOCK);
+      }
     );
 
     // Mock events lookup endpoint
     await page.route(
-      (url) => url.pathname === "/events",
-      (route) => fulfillJson(route, EVENTS_LOOKUP)
+      (url) => url.pathname === "/api/events",
+      (route) => {
+        expect(route.request().method()).toBe("GET");
+        const url = new URL(route.request().url());
+        expect(url.searchParams.get("page")).toBe("1");
+        expect(url.searchParams.get("limit")).toBe("100");
+        return fulfillJson(route, EVENTS_LOOKUP);
+      }
     );
 
     // Mock commit endpoint
     await page.route(
-      (url) => url.pathname === "/finance/imports/hisab/commit",
-      (route) => fulfillJson(route, COMMIT_SUCCESS_MOCK)
+      (url) => url.pathname === "/api/finance/imports/hisab/commit",
+      (route) => {
+        expect(route.request().method()).toBe("POST");
+        expect(new URL(route.request().url()).search).toBe("");
+        const body: unknown = route.request().postDataJSON();
+        expect(body).toMatchObject({
+          workbookHash: PREVIEW_MOCK.workbookHash,
+          acceptFormulaMismatches: true,
+          preview: { rows: PREVIEW_MOCK.rows, summary: PREVIEW_MOCK.summary },
+          resolutions: {
+            events: { "row-2": { eventId: EVENTS_LOOKUP.events[0].id, eventName: EVENTS_LOOKUP.events[0].name } },
+            categories: {},
+          },
+        });
+        return fulfillJson(route, COMMIT_SUCCESS_MOCK, 201);
+      }
     );
 
-    await page.goto("/hr/finance/imports");
+    await page.goto("/hr/finance/hisab/imports");
     await expect(page.locator("main h1")).toContainText("Hisab Workbook Import");
 
     // Simulating workbook file upload
@@ -145,16 +171,19 @@ test.describe("Issue 113 Hisab Workbook Import E2E", () => {
     await commitBtn.click();
     await expect(page.locator("text=Commit successful!").first()).toBeVisible();
     await expect(page.locator("text=Successfully imported:")).toBeVisible();
+    expect(unexpected).toEqual([]);
   });
 
-  test("Unauthorized user cannot access imports page and sees Forbidden screen", async ({ page }) => {
+  test("Unauthorized user cannot access imports page and sees Forbidden screen", async ({ page, baseURL }) => {
     await seedAuthenticatedSession(page);
     await mockAuth(page, {
       permissions: ["finance:hisab:read"], // No imports write permission
     });
-    await mockCommonShellData(page);
+    const unexpected: string[] = [];
+    await mockImportShellData(page, baseURL, unexpected);
 
-    await page.goto("/hr/finance/imports");
+    await page.goto("/hr/finance/hisab/imports");
     await expect(page.locator("text=Forbidden")).toBeVisible();
+    expect(unexpected).toEqual([]);
   });
 });

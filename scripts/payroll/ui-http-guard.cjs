@@ -1,6 +1,9 @@
 "use strict";
 
-module.exports = function installPayrollUiGuard(serve) {
+module.exports = function installPayrollUiGuard(serve, serverPorts = [3126, 5326, 54335]) {
+  if (!Array.isArray(serverPorts) || serverPorts.some((port) => !Number.isInteger(port) || port < 1 || port > 65535)) {
+    throw new Error("UI guards require explicit valid loopback ports");
+  }
   const http = require("node:http");
   const https = require("node:https");
   const { AsyncLocalStorage } = require("node:async_hooks");
@@ -9,7 +12,7 @@ module.exports = function installPayrollUiGuard(serve) {
   const originalConnect = net.Socket.prototype.connect;
   const originalTls = tls.connect;
   const originalFetch = globalThis.fetch;
-  const allowedPorts = new Set(serve ? [3126, 5326, 54335] : []);
+  const allowedPorts = new Set(serve ? serverPorts : []);
   const fonts = new Set(serve ? [] : ["fonts.googleapis.com", "fonts.gstatic.com"]);
   const approvedRequest = new AsyncLocalStorage();
   const sockets = new WeakSet();
