@@ -13,6 +13,8 @@ test("ordinary offline verification strips native backup opt-ins and target vari
       '  expect(process.env.DREAMLUX_BACKUP_TEST_ADMIN_URL).toBeUndefined();',
       '  expect(process.env.DREAMLUX_BACKUP_TEST_REQUIRED).toBeUndefined();',
       '  expect(process.env.DREAMLUX_STORAGE_HTTP_TESTS).toBeUndefined();',
+      '  expect(process.env.DREAMLUX_EQUIPMENT_BROWSER_SERVER).toBeUndefined();',
+      '  expect(process.env.DREAMLUX_EQUIPMENT_BROWSER_DESCRIPTOR).toBeUndefined();',
       '});',
     ].join("\n"));
     const env = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
@@ -20,7 +22,10 @@ test("ordinary offline verification strips native backup opt-ins and target vari
     const guard = join(__dirname, "..", "..", "..", "scripts", "payroll", "offline-unit-guard.ts");
     const child = Bun.spawn([process.execPath, "--no-env-file", "test", "--preload", guard, entry], {
       cwd: directory,
-      env: { ...env, DREAMLUX_BACKUP_TEST_ADMIN_URL: "not-a-connection-fixture", DREAMLUX_BACKUP_TEST_REQUIRED: "1", DREAMLUX_STORAGE_HTTP_TESTS: "1" },
+      env: {
+        ...env, DREAMLUX_BACKUP_TEST_ADMIN_URL: "not-a-connection-fixture", DREAMLUX_BACKUP_TEST_REQUIRED: "1",
+        DREAMLUX_STORAGE_HTTP_TESTS: "1", DREAMLUX_EQUIPMENT_BROWSER_SERVER: "1", DREAMLUX_EQUIPMENT_BROWSER_DESCRIPTOR: "not-a-fixture",
+      },
       stdout: "pipe", stderr: "pipe", timeout: 10_000,
     });
     const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);

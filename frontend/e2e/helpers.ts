@@ -66,22 +66,29 @@ export async function fulfillJson(route: Route, data: unknown, status = 200) {
   });
 }
 
-export async function mockCommonShellData(page: Page) {
-  await page.route("http://localhost:4000/employees**", (route) =>
-    fulfillJson(route, { employees: [], total: 0, page: 1, limit: 5 }),
+export async function mockCommonShellData(page: Page, apiOrigin = "http://localhost:4000") {
+  const read = async (route: Route, data: unknown) => {
+    if (route.request().method() !== "GET") {
+      await route.abort("failed");
+      throw new Error("A common read fixture cannot acknowledge a write");
+    }
+    await fulfillJson(route, data);
+  };
+  await page.route(`${apiOrigin}/employees**`, (route) =>
+    read(route, { employees: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("http://localhost:4000/assets**", (route) =>
-    fulfillJson(route, { items: [], total: 0, page: 1, limit: 5 }),
+  await page.route(`${apiOrigin}/assets**`, (route) =>
+    read(route, { items: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("http://localhost:4000/events?**", (route) =>
-    fulfillJson(route, { events: [], total: 0, page: 1, limit: 5 }),
+  await page.route(`${apiOrigin}/events?**`, (route) =>
+    read(route, { events: [], total: 0, page: 1, limit: 5 }),
   );
-  await page.route("http://localhost:4000/salary-levels**", (route) => fulfillJson(route, []));
-  await page.route("http://localhost:4000/payroll/runs**", (route) => fulfillJson(route, []));
-  await page.route("http://localhost:4000/api/notifications**", (route) =>
-    fulfillJson(route, { notifications: [], total: 0 }),
+  await page.route(`${apiOrigin}/salary-levels**`, (route) => read(route, []));
+  await page.route(`${apiOrigin}/payroll/runs**`, (route) => read(route, []));
+  await page.route(`${apiOrigin}/api/notifications**`, (route) =>
+    read(route, { notifications: [], total: 0 }),
   );
-  await page.route("http://localhost:4000/api/notifications/unread-count", (route) =>
-    fulfillJson(route, { count: 0 }),
+  await page.route(`${apiOrigin}/api/notifications/unread-count`, (route) =>
+    read(route, { count: 0 }),
   );
 }

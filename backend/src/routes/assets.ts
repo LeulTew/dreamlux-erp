@@ -9,6 +9,7 @@ import { uploadImage, deleteImage, getPublicUrl, downloadImage } from "../storag
 import { AuthRequest, requirePermissions, requireAuth } from "../middleware/auth";
 import { NotificationsService } from "../services/notifications-service";
 import { ActivityService } from "../services/activity-service";
+import { ItemDeletionError, permanentlyDeleteUnusedItem } from "../services/item-deletion-service";
 import {
   createItemSchema,
   updateItemSchema,
@@ -17,7 +18,7 @@ import {
   inventoryMovementListQuerySchema,
   reconcileItemsSchema,
 } from "../lib/validation";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { pool } from "../db/pool";
 import {
   addLegacyRunsToDeletedFallback,
@@ -2743,41 +2744,32 @@ router.delete(
   requirePermissions("assets", "delete"),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { id } = req.params;
-
-      const { data: existing, error: fetchError } = await supabase
-        .from("items")
-        .select("id, image_key")
-        .eq("id", id)
-        .single();
-
-      if (fetchError || !existing) {
-        res.status(404).json({ error: "Item not found" });
+      const parsed = z.string().uuid().safeParse(req.params.id);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid item ID" });
         return;
       }
-
-      const { error: deleteError } = await supabase
-        .from("items")
-        .delete()
-        .eq("id", id);
-
-      if (deleteError) throw deleteError;
-
+      const existing = await permanentlyDeleteUnusedItem(parsed.data, req.user?.id ?? null);
+      let storageCleanupPending = false;
       if (existing.image_key) {
         try {
-          await deleteImage(existing.image_key);
-        } catch (storageError) {
-          console.warn("Permanent delete succeeded but storage cleanup failed:", storageError);
+          await deleteImage(existing.image_key, { requireSuccess: true });
+        } catch {
+          storageCleanupPending = true;
+          console.warn("[ItemDeletion] Item deleted; image cleanup requires follow-up", { itemId: existing.id });
         }
       }
-
-      res.json({ success: true, permanently_deleted: true });
+      res.json({ success: true, permanently_deleted: true, ...(storageCleanupPending ? { storage_cleanup_pending: true } : {}) });
     } catch (error: unknown) {
-      console.error("Failed to permanently delete item:", error);
-      res.status(500).json({
-        error: "Permanent delete failed",
-        details: error instanceof Error ? error.message : String(error),
-      });
+      if (error instanceof ItemDeletionError) {
+        res.status(error.status).json({
+          error: error.message, code: error.code,
+          ...(error.code === "ITEM_DELETE_UNCONFIRMED" ? { outcome_uncertain: true } : {}),
+        });
+        return;
+      }
+      console.error("[ItemDeletion] Permanent delete failed", { itemId: req.params.id });
+      res.status(500).json({ error: "Permanent delete failed" });
     }
   }
 );

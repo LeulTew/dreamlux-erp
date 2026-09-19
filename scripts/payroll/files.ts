@@ -64,7 +64,7 @@ export async function frontendSourceFiles(root: string): Promise<string[]> {
 
 export function productionInput(file: string) {
   return !file.startsWith("e2e/") && !/\.(?:test|spec|vitest)\.[cm]?[jt]sx?$/.test(file)
-    && file !== "playwright.payroll-native.config.ts" && file !== "vitest.config.ts";
+    && !/^playwright\.[a-z-]+\.config\.ts$/.test(file) && file !== "vitest.config.ts";
 }
 
 export async function createFrontendSnapshot(root: string, destination: string, listed?: string[]) {

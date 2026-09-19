@@ -34,6 +34,7 @@ const SAFE_CONFIGS = new Set([
   "package.json", "bun.lock", "tsconfig.json", "next-env.d.ts",
   "postcss.config.mjs", "eslint.config.mjs", "vitest.config.ts",
   "payroll-qa-environment.ts", "next.payroll-native.config.ts", "playwright.payroll-native.config.ts",
+  "playwright.equipment-native.config.ts",
 ]);
 
 export function forbiddenFile(path: string): boolean {
@@ -178,7 +179,9 @@ export function browserArguments(discover = false): string[] {
   return ["--no-env-file", "run", "test:e2e:payroll", ...(discover ? ["--list"] : [])];
 }
 
-function browserReportCases(value: unknown, exitCode: number, purpose: "discovery" | "execution"): BrowserIdentity[] {
+function browserReportCases(
+  value: unknown, exitCode: number, purpose: "discovery" | "execution", files: readonly string[],
+): BrowserIdentity[] {
   if (!record(value) || !Array.isArray(value.suites) || !Array.isArray(value.errors) || value.errors.length || exitCode !== 0) {
     throw new Error("Browser QA did not return a successful structured report");
   }
@@ -196,7 +199,7 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
   }
   if (new Set(projectIds.values()).size !== projectIds.size) throw new Error("Duplicate configured browser project identity");
   const counts: Record<string, number> = { desktop: 0, mobile: 0 };
-  const requiredFiles = new Set<string>(payrollBrowserTestFiles);
+  const requiredFiles = new Set<string>(files);
   const coveredFiles = new Set<string>();
   const cases: BrowserIdentity[] = [];
   const keys = new Set<string>();
@@ -222,7 +225,7 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
           if (purpose === "discovery" ? test.results.length !== 0
             : test.status !== "expected" || test.results.length !== 1
             || !record(test.results[0]) || test.results[0].status !== "passed" || test.results[0].retry !== 0) {
-            throw new Error("Payroll browser QA requires every test to pass once, without retries or skips");
+            throw new Error("Browser QA requires every test to pass once, without retries or skips");
           }
           const key = JSON.stringify([test.projectName, test.projectId, spec.id, spec.file.replace(/\\/g, "/"),
             ...titlePath, spec.title, spec.line, spec.column]);
@@ -239,8 +242,8 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
   visit(value.suites, []);
   if (Object.values(counts).some((count) => count === 0)) throw new Error("Missing nonzero desktop/mobile browser coverage");
   for (const project of ["desktop", "mobile"]) {
-    if (payrollBrowserTestFiles.some((file) => !coveredFiles.has(`${project}:${file}`))) {
-      throw new Error("Missing required browser file coverage for publication or preview");
+    if (files.some((file) => !coveredFiles.has(`${project}:${file}`))) {
+      throw new Error("Missing required browser file coverage");
     }
   }
   if (!record(value.stats) || value.stats.unexpected !== 0 || value.stats.flaky !== 0
@@ -250,12 +253,14 @@ function browserReportCases(value: unknown, exitCode: number, purpose: "discover
   return cases.sort((a, b) => a.key.localeCompare(b.key));
 }
 
-export function browserRegistry(value: unknown, exitCode: number): BrowserRegistry {
-  return { tests: browserReportCases(value, exitCode, "discovery") };
+export function browserRegistry(value: unknown, exitCode: number, files: readonly string[] = payrollBrowserTestFiles): BrowserRegistry {
+  return { tests: browserReportCases(value, exitCode, "discovery", files) };
 }
 
-export function browserReceipt(value: unknown, exitCode: number, requested: BrowserRegistry) {
-  const cases = browserReportCases(value, exitCode, "execution");
+export function browserReceipt(
+  value: unknown, exitCode: number, requested: BrowserRegistry, files: readonly string[] = payrollBrowserTestFiles,
+) {
+  const cases = browserReportCases(value, exitCode, "execution", files);
   const expected = new Set(requested.tests.map((test) => test.key));
   if (!expected.size || expected.size !== requested.tests.length
       || cases.length !== expected.size || cases.some((test) => !expected.has(test.key))) {

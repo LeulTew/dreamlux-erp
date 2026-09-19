@@ -16,6 +16,7 @@ import Select from "@/components/ui/Select";
 import DatePicker from "@/components/ui/DatePicker";
 import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
+import { isAxiosError } from "axios";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -46,6 +47,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Failed to restore item": "Failed to restore item",
     "Item permanently deleted": "Item permanently deleted",
     "Permanent delete failed": "Permanent delete failed",
+    "Confirm Delete": "Confirm Delete",
+    "Deleting...": "Deleting...",
+    "This item has operational history and cannot be permanently deleted. Keep it in trash or restore it.": "This item has operational history and cannot be permanently deleted. Keep it in trash or restore it.",
+    "Move the item to trash before permanently deleting it.": "Move the item to trash before permanently deleting it.",
+    "This item is being changed. Reload trash and try again.": "This item is being changed. Reload trash and try again.",
+    "Item deletion could not be confirmed. Reload trash before trying again.": "Item deletion could not be confirmed. Reload trash before trying again.",
+    "Item deleted. Image cleanup needs administrator follow-up.": "Item deleted. Image cleanup needs administrator follow-up.",
+    "This item no longer exists. Reload trash.": "This item no longer exists. Reload trash.",
   },
   am: {
     "Trash": "ቆሻሻ መጣያ",
@@ -73,6 +82,14 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Failed to restore item": "እቃውን መመለስ አልተሳካም",
     "Item permanently deleted": "እቃው በቋሚነት ተሰርዟል",
     "Permanent delete failed": "በቋሚነት መሰረዝ አልተሳካም",
+    "Confirm Delete": "መሰረዝን አረጋግጥ",
+    "Deleting...": "በመሰረዝ ላይ...",
+    "This item has operational history and cannot be permanently deleted. Keep it in trash or restore it.": "ይህ እቃ የሥራ ታሪክ ስላለው በቋሚነት መሰረዝ አይቻልም። በቆሻሻ መጣያ ያቆዩት ወይም ይመልሱት።",
+    "Move the item to trash before permanently deleting it.": "እቃውን በቋሚነት ከመሰረዝዎ በፊት ወደ ቆሻሻ መጣያ ያንቀሳቅሱት።",
+    "This item is being changed. Reload trash and try again.": "ይህ እቃ እየተቀየረ ነው። ቆሻሻ መጣያውን እንደገና ይጫኑና ይሞክሩ።",
+    "Item deletion could not be confirmed. Reload trash before trying again.": "እቃው መሰረዙን ማረጋገጥ አልተቻለም። እንደገና ከመሞከርዎ በፊት ቆሻሻ መጣያውን እንደገና ይጫኑ።",
+    "Item deleted. Image cleanup needs administrator follow-up.": "እቃው ተሰርዟል። ምስሉን ለማስወገድ የአስተዳዳሪ ክትትል ያስፈልጋል።",
+    "This item no longer exists. Reload trash.": "ይህ እቃ ከእንግዲህ የለም። ቆሻሻ መጣያውን እንደገና ይጫኑ።",
   }
 };
 
@@ -91,6 +108,8 @@ export default function TrashPage() {
   const [page, setPage] = useState(1);
   const [itemToRecover, setItemToRecover] = useState<Item | null>(null);
   const [itemToPermanentlyDelete, setItemToPermanentlyDelete] = useState<Item | null>(null);
+  const [deleteFailure, setDeleteFailure] = useState<{ id: string; message: string } | null>(null);
+  const canDelete = isAuthenticated && !authLoading && hasPermission("assets:delete");
 
   const { data: stores = [] } = useQuery<Store[]>({
     queryKey: ["offices"],
@@ -132,15 +151,30 @@ export default function TrashPage() {
   });
 
   const permanentDeleteMutation = useMutation({
+    retry: false,
+    networkMode: "always",
     mutationFn: (id: string) => permanentlyDeleteItem(id),
-    onSuccess: () => {
-      toast.success(t("Item permanently deleted"));
-      setItemToPermanentlyDelete(null);
+    onMutate: () => setDeleteFailure(null),
+    onSuccess: (receipt, id) => {
+      if (receipt.storage_cleanup_pending) toast.error(t("Item deleted. Image cleanup needs administrator follow-up."));
+      else toast.success(t("Item permanently deleted"));
+      setItemToPermanentlyDelete((current) => current?.id === id ? null : current);
       queryClient.invalidateQueries({ queryKey: ["trash"] });
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       queryClient.invalidateQueries({ queryKey: ["inventoryStats"] });
     },
-    onError: () => toast.error(t("Permanent delete failed")),
+    onError: (error: unknown, id) => {
+      const data: unknown = isAxiosError(error) ? error.response?.data : undefined;
+      const code = data && typeof data === "object" && "code" in data ? data.code : undefined;
+      const messages: Record<string, string> = {
+        ITEM_HAS_HISTORY: "This item has operational history and cannot be permanently deleted. Keep it in trash or restore it.",
+        ITEM_NOT_TRASHED: "Move the item to trash before permanently deleting it.",
+        ITEM_DELETE_BUSY: "This item is being changed. Reload trash and try again.",
+        ITEM_DELETE_UNCONFIRMED: "Item deletion could not be confirmed. Reload trash before trying again.",
+        ITEM_NOT_FOUND: "This item no longer exists. Reload trash.",
+      };
+      setDeleteFailure({ id, message: typeof code === "string" && Object.hasOwn(messages, code) ? messages[code] : "Permanent delete failed" });
+    },
   });
 
   if (authLoading) {
@@ -292,12 +326,13 @@ export default function TrashPage() {
                           <HiMiniArrowUturnLeft className="w-4 h-4" />
                           {t("Restore")}
                         </button>
-                        <button
-                          onClick={() => setItemToPermanentlyDelete(item)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-600/10 text-rose-600 border border-rose-600/20 text-xs font-semibold hover:bg-rose-600 hover:text-white transition-all active:scale-[0.98]"
+                        {canDelete && <button
+                          onClick={() => { setDeleteFailure(null); setItemToPermanentlyDelete(item); }}
+                          disabled={permanentDeleteMutation.isPending}
+                          className="min-h-12 min-w-12 flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-danger text-background border border-danger text-xs font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:opacity-90 transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait"
                         >
                           {t("Permanent Delete")}
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>
@@ -328,12 +363,13 @@ export default function TrashPage() {
                     >
                       {t("Restore")}
                     </button>
-                    <button
-                      onClick={() => setItemToPermanentlyDelete(item)}
-                      className="flex-1 px-3 py-2 rounded-xl bg-danger text-white text-[11px] font-black uppercase tracking-wider"
+                    {canDelete && <button
+                      onClick={() => { setDeleteFailure(null); setItemToPermanentlyDelete(item); }}
+                      disabled={permanentDeleteMutation.isPending}
+                      className="min-h-12 min-w-12 flex-1 px-3 py-2 rounded-xl bg-danger text-background text-[11px] font-black uppercase tracking-wider focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait"
                     >
                       {t("Permanent Delete")}
-                    </button>
+                    </button>}
                   </div>
                 </div>
               ))
@@ -359,13 +395,17 @@ export default function TrashPage() {
 
         <DeleteConfirmModal
           isOpen={!!itemToPermanentlyDelete}
-          onClose={() => setItemToPermanentlyDelete(null)}
+          onClose={() => { setItemToPermanentlyDelete(null); setDeleteFailure(null); }}
           onConfirm={() => {
-            if (itemToPermanentlyDelete) {
+            if (canDelete && itemToPermanentlyDelete && !permanentDeleteMutation.isPending) {
               permanentDeleteMutation.mutate(itemToPermanentlyDelete.id);
             }
           }}
           isDeleting={permanentDeleteMutation.isPending}
+          confirmDisabled={!canDelete}
+          errorMessage={deleteFailure?.id === itemToPermanentlyDelete?.id ? t(deleteFailure?.message ?? "") : null}
+          confirmLabel={t("Confirm Delete")}
+          pendingLabel={t("Deleting...")}
           title={t("Permanent Delete")}
           message={t("This will permanently remove")}
           itemName={itemToPermanentlyDelete?.name || ""}

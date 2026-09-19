@@ -1,21 +1,13 @@
 import type { Page } from "@playwright/test";
-import { fulfillJson } from "./helpers";
-import { mockIdleRealtime } from "./idle-realtime-fixture";
+import { fulfillJson, mockCommonShellData } from "./helpers";
+import { installSyntheticRealtime } from "./payroll-native-fixture";
 
 export async function mockImportShellData(page: Page, origin: string | undefined, unexpected: string[]) {
   if (!origin) throw new Error("The import shell fixture requires its owned app origin");
-  await mockIdleRealtime(page, origin, unexpected);
-  const reads = new Map<string, unknown>([
-    ["/api/employees", { employees: [], total: 0, page: 1, limit: 5 }],
-    ["/api/assets", { items: [], total: 0, page: 1, limit: 5 }],
-    ["/api/events", { events: [], total: 0, page: 1, limit: 100 }],
-    ["/api/salary-levels", []],
-    ["/api/payroll/runs", []],
-    ["/api/api/notifications", { notifications: [], total: 0, totalPages: 0 }],
-    ["/api/api/notifications/unread-count", { unread_count: 0 }],
-  ]);
-  await page.route((url) => reads.has(url.pathname), (route) =>
+  await installSyntheticRealtime(page.context(), origin, unexpected);
+  await mockCommonShellData(page, `${origin}/api`);
+  await page.route((url) => url.pathname === "/api/api/notifications/unread-count", (route) =>
     route.request().method() === "GET"
-      ? fulfillJson(route, reads.get(new URL(route.request().url()).pathname))
+      ? fulfillJson(route, { unread_count: 0 })
       : route.fallback());
 }

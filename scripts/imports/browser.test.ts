@@ -71,8 +71,8 @@ describe("bounded import verification", () => {
 
   test("the explicit native command cannot succeed by skipping an absent target", async () => {
     const child = new ManagedProcess("missing import target guard", process.execPath, [
-      "--no-env-file", "--config=backend/bunfig.imports.toml", "test", "backend/src/db/hisab-formula-import.integration.test.ts",
-    ], { cwd: repositoryRoot, env: { ...payrollSystemEnvironment(process.env), DREAMLUX_NATIVE_IMPORT_REQUIRED: "1" } });
+      "--no-env-file", "run", "verify:imports:native",
+    ], { cwd: repositoryRoot, env: payrollSystemEnvironment(process.env) });
     try {
       const result = await child.wait(15_000);
       expect(result.exitCode).not.toBe(0);

@@ -516,7 +516,7 @@ export const deleteItem = (id: string) =>
   api.delete(`/assets/${id}`).then((r) => r.data);
 
 export const permanentlyDeleteItem = (id: string) =>
-  api.delete(`/assets/${id}/permanent`).then((r) => r.data);
+  api.delete<{ success: true; permanently_deleted: true; storage_cleanup_pending?: boolean }>(`/assets/${id}/permanent`).then((r) => r.data);
 
 // Reconcile
 export const getReconcilePreview = (params: {

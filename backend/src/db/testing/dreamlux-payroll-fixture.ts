@@ -1,8 +1,6 @@
-import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Client } from "pg";
-import { attestDreamluxNativeTarget, dreamluxFixtureTarget } from "./dreamlux-native-target";
+import { createDreamluxNativeFixture, reviewedSchemaTables } from "./dreamlux-native-fixture";
 
 const TABLES = [
   "roles", "permissions", "role_permissions", "users", "stores", "departments",
@@ -21,11 +19,7 @@ const INDEXES = [
 
 export async function payrollFixtureDdl(): Promise<string> {
   const schema = await readFile(join(__dirname, "..", "schema.sql"), "utf8");
-  const tables = TABLES.map((table) => {
-    const matches = [...schema.matchAll(new RegExp(`^CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?^\\);`, "gm"))];
-    if (matches.length !== 1) throw new Error(`Expected one reviewed DreamLux DDL definition for ${table}`);
-    return matches[0][0];
-  });
+  const tables = reviewedSchemaTables(schema, TABLES);
   const indexes = INDEXES.map((index) => {
     const matches = [...schema.matchAll(new RegExp(`^CREATE (?:UNIQUE )?INDEX IF NOT EXISTS ${index}\\s[\\s\\S]*?;`, "gm"))];
     if (matches.length !== 1) throw new Error(`Expected one reviewed DreamLux index definition for ${index}`);
@@ -43,46 +37,5 @@ export async function payrollFixtureDdl(): Promise<string> {
 }
 
 export async function createDreamluxPayrollFixture(adminUrl: string) {
-  const adminTarget = attestDreamluxNativeTarget(adminUrl, "admin");
-  const target = dreamluxFixtureTarget(adminUrl, `payroll_239_${randomBytes(6).toString("hex")}`);
-  const ddl = await payrollFixtureDdl();
-  const admin = new Client({ connectionString: adminTarget.href, ssl: { rejectUnauthorized: false } });
-  const database = target.pathname.slice(1);
-  await admin.connect();
-  let created = false;
-  try {
-    await admin.query(`CREATE DATABASE "${database}"`);
-    created = true;
-    const client = new Client({ connectionString: target.href, ssl: { rejectUnauthorized: false } });
-    try {
-      await client.connect();
-      await client.query(ddl);
-    } finally {
-      await client.end();
-    }
-  } catch (error) {
-    if (created) {
-      try {
-        await admin.query(`DROP DATABASE "${database}" WITH (FORCE)`);
-      } catch (cleanupError) {
-        throw new AggregateError([error, cleanupError], "DreamLux fixture setup and cleanup both failed", { cause: cleanupError });
-      }
-    }
-    throw error;
-  } finally {
-    await admin.end();
-  }
-  return {
-    url: target.href,
-    async dispose() {
-      attestDreamluxNativeTarget(target.href, "fixture");
-      const cleanup = new Client({ connectionString: adminTarget.href, ssl: { rejectUnauthorized: false } });
-      await cleanup.connect();
-      try {
-        await cleanup.query(`DROP DATABASE "${database}" WITH (FORCE)`);
-      } finally {
-        await cleanup.end();
-      }
-    },
-  };
+  return createDreamluxNativeFixture(adminUrl, "payroll_239", await payrollFixtureDdl());
 }
