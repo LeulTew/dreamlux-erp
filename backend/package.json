@@ -11,7 +11,9 @@
     "verify:supabase-rls": "bun src/db/verify-supabase-rls.ts",
     "verify:seed-execution": "bun src/db/verify-seed-execution.ts",
     "test": "bun test",
-    "lint": "eslint . && tsc --noEmit"
+    "lint": "eslint . && tsc --noEmit",
+    "verify:storage": "bun --no-env-file src/db/verify-storage-snapshot.ts",
+    "test:storage": "DREAMLUX_STORAGE_HTTP_TESTS=1 bun --no-env-file --config=bunfig.backup.toml test src/db/storage-snapshot.integration.test.ts src/db/storage-cli-regression.integration.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

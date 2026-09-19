@@ -70,6 +70,7 @@ describe("local, unbilled CI definition contracts", () => {
     expect(native.match(/--frontend-build \.qa-payroll-build/g)).toHaveLength(2);
     const local = await readFile(join(repositoryRoot, "scripts", "payroll", "local-ci.ts"), "utf8");
     expect(local).toContain("await verifyEquipment(plan)");
+    expect(local).toContain('"run", "test:storage"');
     expect(local.indexOf("await verifyEquipment(plan)")).toBeGreaterThan(local.indexOf("await verifyPayroll(plan)"));
     const config = await readFile(join(repositoryRoot, "frontend", "playwright.equipment-native.config.ts"), "utf8");
     const runner = await readFile(join(repositoryRoot, "scripts", "equipment", "run.ts"), "utf8");
