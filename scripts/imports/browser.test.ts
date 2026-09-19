@@ -80,7 +80,7 @@ describe("bounded import verification", () => {
     } finally {
       await child.stop();
     }
-  });
+  }, 20_000);
 
   test("wires both import layers into the existing capped native job without rebuilding or retrying", async () => {
     const workflow: unknown = Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8"));

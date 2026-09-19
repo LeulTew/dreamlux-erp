@@ -63,7 +63,9 @@ environment, migration baseline or provider connection is copied.
   skipped tests, retries and occupied ports fail rather than become success.
 - `bun run verify:imports:infra` checks the fixture/runner contracts. Import
   verification is appended to the existing CI native job without another build,
-  job or increased timeout. No hosted CI rerun is implied by local execution.
+  job or increased job timeout. No hosted CI rerun is implied by local execution.
+  The missing-target check gives its 15-second subprocess guard and owned cleanup
+  a 20-second parent-test budget; CI job deadlines remain unchanged.
 
 No production schema migration, new runtime configuration or historical
 backfill is required by this parser correction.
