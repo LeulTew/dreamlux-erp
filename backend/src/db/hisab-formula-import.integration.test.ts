@@ -8,7 +8,7 @@ import { Client, type Pool } from "pg";
 import { z } from "zod";
 import { createDreamluxImportFixture } from "./testing/dreamlux-import-fixture";
 import { attestDreamluxNativeTarget } from "./testing/dreamlux-native-target";
-import { fourSheetFormulaWorkbook, weeklyFormulaWorkbook } from "./testing/hisab-formula-workbook";
+import { fourSheetFormulaWorkbook, weeklyFormulaWorkbook, wideRangeFormulaWorkbook } from "./testing/hisab-formula-workbook";
 
 const adminUrl = process.env.DREAMLUX_NATIVE_TEST_ADMIN_URL?.trim();
 if (process.env.DREAMLUX_NATIVE_IMPORT_REQUIRED === "1" && !adminUrl) {
@@ -184,6 +184,19 @@ describe("native DreamLux formula workbook preview-to-commit workflow", () => {
     expect((await database().query("select amount::text,status from finance_overhead_expenses where source_import_id=$1 order by amount", [receipt.importId])).rows).toEqual([
       { amount: "150.00", status: "Pending" }, { amount: "200.00", status: "Pending" },
     ]);
+  });
+
+  nativeTest("commits the same exact Pending amounts when a subtotal references many empty rows", async () => {
+    const value = await preview(await wideRangeFormulaWorkbook());
+    expect(value.summary).toMatchObject({ totalRows: 2, totalAmount: 200 });
+    expect(value.formulaMismatches).toEqual([]);
+    const response = await commit(value);
+    expect(response.status).toBe(201);
+    const receipt = receiptSchema.parse(response.body);
+    expect(receipt.inserted.operationalExpenses).toBe(2);
+    expect((await database().query(`select amount::text,status,created_by,source_import_id
+      from finance_operational_expenses where source_import_id=$1 order by expense_date`, [receipt.importId])).rows)
+      .toEqual([1, 2].map(() => ({ amount: "100.00", status: "Pending", created_by: actorId, source_import_id: receipt.importId })));
   });
 
   nativeTest("requires event mapping and persists the calculated event expense under the resolved event", async () => {

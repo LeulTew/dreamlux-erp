@@ -54,3 +54,13 @@ export async function fourSheetFormulaWorkbook(mode: "literal" | "cached", tag =
   total.addRow(["2026-05", "Synthetic supplier", "office rent", price(150, mode)]);
   return Buffer.from(await value.xlsx.writeBuffer());
 }
+
+export async function wideRangeFormulaWorkbook() {
+  const value = workbook("wide-subtotal-range");
+  const sheet = value.addWorksheet("HISAB WEEKLY MONTHLY");
+  sheet.addRow(["Date", "Description", "Amount"]);
+  sheet.addRow(["2026-05-04", "Office lunch", 100]);
+  sheet.addRow(["2026-05-05", "Office lunch", price(100, "cached")]);
+  sheet.addRow(["Total", "", null, { formula: "SUM(C2:C10000)", result: 200 }]);
+  return Buffer.from(await value.xlsx.writeBuffer());
+}

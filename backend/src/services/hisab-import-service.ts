@@ -204,9 +204,11 @@ function collectFormulaMismatches(sheet: ExcelJS.Worksheet, sheetName: KnownShee
       const endRow = Number(endRowText);
       const col = sheet.getColumn(startCol).number;
       let expected = 0;
-      for (let rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
-        expected += numberValue(sheet.getRow(rowNumber).getCell(col).value) || 0;
-      }
+      sheet.eachRow((sourceRow, rowNumber) => {
+        if (rowNumber >= startRow && rowNumber <= endRow) {
+          expected += numberValue(sourceRow.findCell(col)?.value) || 0;
+        }
+      });
       const actual = numberValue(value.result);
       if (actual == null) return;
       const delta = roundMoney(actual - expected);
