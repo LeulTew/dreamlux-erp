@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { NATIVE_GUARD_BANNER } from "../payroll/contracts";
 import {
   BROWSER_FILES, browserReceipt, browserRegistry, equipmentDescriptor, equipmentEnvironment,
-  NATIVE_TEST, NATIVE_TEST_COUNT, nativeArguments, nativeReceipt,
+  CONDITION_TEST, CONDITION_TEST_COUNT, NATIVE_TEST, NATIVE_TEST_COUNT, nativeArguments, nativeReceipt,
 } from "./contracts";
 
 const admin = `postgresql://dreamlux_parity:${"a".repeat(64)}@127.0.0.1:55434/postgres?sslmode=disable`;
@@ -45,7 +45,7 @@ describe("independent equipment verification contracts", () => {
 
   test("requires exact native completion and distinguishes the provider from domain assertions", () => {
     expect(nativeReceipt(nativeOutput(), 0)).toEqual({ passed: 26, failed: 0, skipped: 0, tests: 26, files: 1 });
-    expect(nativeReceipt(nativeOutput(1), 0, true).passed).toBe(1);
+    expect(nativeReceipt(nativeOutput(1), 0, { infrastructure: true }).passed).toBe(1);
     expect(() => nativeReceipt(nativeOutput(1), 0)).toThrow();
     expect(() => nativeReceipt(nativeOutput(25), 0)).toThrow();
     expect(() => nativeReceipt(`${nativeOutput()}1 skip\n`, 0)).toThrow();
@@ -53,6 +53,19 @@ describe("independent equipment verification contracts", () => {
     expect(() => nativeReceipt(nativeOutput(), 1)).toThrow();
     expect(nativeArguments("test.junit.xml")[1]).toBe("test");
     expect(nativeArguments("test.junit.xml").some((arg) => arg.startsWith("--timeout"))).toBe(false);
+  });
+
+  test("requires the entire separate condition suite rather than reusing a deletion receipt", () => {
+    const output = nativeOutput(CONDITION_TEST_COUNT).replace(NATIVE_TEST, CONDITION_TEST);
+    expect(nativeReceipt(output, 0, { suite: "conditions" })).toEqual({
+      passed: 23, failed: 0, skipped: 0, tests: 23, files: 1,
+    });
+    expect(nativeArguments("condition.junit.xml", "conditions").at(-1)?.replaceAll("\\", "/")).toBe(CONDITION_TEST);
+    expect(() => nativeReceipt(nativeOutput(CONDITION_TEST_COUNT), 0, { suite: "conditions" })).toThrow();
+    expect(() => nativeReceipt(nativeOutput(CONDITION_TEST_COUNT - 1).replace(NATIVE_TEST, CONDITION_TEST), 0, { suite: "conditions" })).toThrow();
+    expect(() => nativeReceipt(`${output}1 skip\n`, 0, { suite: "conditions" })).toThrow();
+    expect(() => nativeReceipt(output, 1, { suite: "conditions" })).toThrow();
+    expect(() => nativeReceipt(output, 0, { suite: "conditions", infrastructure: true })).toThrow();
   });
 
   test("binds browser readiness to the exact fixture without accepting injected cookies", () => {

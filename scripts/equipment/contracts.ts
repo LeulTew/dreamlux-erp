@@ -9,6 +9,9 @@ import {
 
 export const NATIVE_TEST = "src/db/equipment-deletion.integration.test.ts";
 export const NATIVE_TEST_COUNT = 26;
+export const CONDITION_TEST = "src/db/inventory-condition-resolution.integration.test.ts";
+export const CONDITION_TEST_COUNT = 23;
+type NativeSuite = "deletion" | "conditions";
 export const BROWSER_FILES = ["issue259-equipment-deletion.spec.ts", "issue259-equipment-native.spec.ts"] as const;
 export const RUNNER_TIMEOUT_MS = 170_000;
 export type EquipmentDescriptor = { apiOrigin: string; database: string; writerCookie: string; shutdownKey: string };
@@ -32,12 +35,19 @@ export function equipmentEnvironment(
   };
 }
 
-export function nativeArguments(report: string): string[] {
+export function nativeArguments(report: string, suite: NativeSuite = "deletion"): string[] {
+  const file = suite === "conditions" ? CONDITION_TEST : NATIVE_TEST;
   return ["--no-env-file", "test", `--config=.${sep}bunfig.native.toml`,
-    "--reporter=junit", `--reporter-outfile=${report}`, NATIVE_TEST.split("/").join(sep)];
+    "--reporter=junit", `--reporter-outfile=${report}`, file.split("/").join(sep)];
 }
 
-export function nativeReceipt(output: string, exitCode: number, infrastructure = false): BunReceipt {
+export function nativeReceipt(
+  output: string, exitCode: number,
+  { suite = "deletion", infrastructure = false }: { suite?: NativeSuite; infrastructure?: boolean } = {},
+): BunReceipt {
+  if (infrastructure && suite !== "deletion") throw new Error("Only the deletion suite provides a browser server");
+  const file = suite === "conditions" ? CONDITION_TEST : NATIVE_TEST;
+  const expected = suite === "conditions" ? CONDITION_TEST_COUNT : NATIVE_TEST_COUNT;
   const plain = stripVTControlCharacters(output);
   const count = (kind: string) => Number([...plain.matchAll(new RegExp(`^\\s*(\\d+) ${kind}\\s*$`, "gm"))].at(-1)?.[1] ?? (kind === "skip" ? 0 : NaN));
   const passed = count("pass");
@@ -46,8 +56,8 @@ export function nativeReceipt(output: string, exitCode: number, infrastructure =
   const run = [...plain.matchAll(/Ran (\d+) tests? across (\d+) files?/g)].at(-1);
   const tests = Number(run?.[1]);
   const files = Number(run?.[2]);
-  if (exitCode !== 0 || !plain.includes(NATIVE_GUARD_BANNER) || !plain.replace(/\\/g, "/").includes(NATIVE_TEST)
-    || passed !== (infrastructure ? 1 : NATIVE_TEST_COUNT) || failed !== 0 || skipped !== 0 || tests !== passed || files !== 1) {
+  if (exitCode !== 0 || !plain.includes(NATIVE_GUARD_BANNER) || !plain.replace(/\\/g, "/").includes(file)
+    || passed !== (infrastructure ? 1 : expected) || failed !== 0 || skipped !== 0 || tests !== passed || files !== 1) {
     throw new Error("Equipment QA did not return its complete non-skipped native receipt");
   }
   return { passed, failed, skipped, tests, files };

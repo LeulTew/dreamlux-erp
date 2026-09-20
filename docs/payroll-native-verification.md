@@ -264,3 +264,27 @@ role change. A timestamp-controlled unit case separately checks an invalidation
 that arrives during a permission lookup. Native controls cover revoked grants,
 removed roles and unavailable current-authority data. Earlier unit-test-mode
 role checks are not claimed as proof of runtime permission revocation.
+
+## Equipment condition-resolution coverage (issue 268)
+
+The equipment runner now executes the separate 23-case native condition suite
+after its 26 deletion assertions and before starting the browser provider.
+Each process must supply an exact non-skipped Bun receipt and matching JUnit
+testcases; the provider's one infrastructure assertion is not domain coverage.
+The same independently created equipment database and reviewed DreamLux DDL
+are used, with fresh synthetic actors for each process. No Koti schema, seed
+identities, or connection configuration is imported.
+
+The suite covers all eight existing damaged/repair transitions, current
+reconciliation permission, invalid/missing/trashed items, duplicate requests,
+concurrent balance checks, a real ten-second item-lock timeout, suppressed
+resolution/stock/movement writes, and acquisition/BEGIN/rollback/COMMIT failures.
+An observer checks that a lost BEGIN acknowledgement cannot return an open
+transaction to the connection pool.
+The existing 170-second equipment-driver and three-/five-minute hosted job
+caps are unchanged. This additional work does not certify hosted runtime
+or production readiness.
+
+The normal return-checklist browser suite remains an adjacent presentation
+check, not proof of a condition-resolution screen. That follow-on operator
+interface is still missing and tracked separately from this API repair.

@@ -73,6 +73,7 @@ beforeEach(() => {
   mockQuery.mockReset();
   mockQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockConnect.mockClear();
+  mockRelease.mockClear();
 });
 
 describe("Return queue and detail (issue #173)", () => {
@@ -399,7 +400,10 @@ describe("Resolving unavailable inventory conditions", () => {
       .send({ source_condition: "repair", outcome: "good", quantity: 2, idempotency_key: "repair-1" });
 
     expect(res.status).toBe(201);
-    expect(executed.some(({ sql }) => sql.includes("unavailable_repair_quantity = unavailable_repair_quantity - $2"))).toBe(true);
+    const update = executed.find(({ sql }) => sql.startsWith("UPDATE items SET"));
+    expect(update?.params).toEqual([LINKED_ITEM.id, 0, -2, 0]);
+    expect(update?.sql.match(/unavailable_damaged_quantity\s*=/g)).toHaveLength(1);
+    expect(update?.sql.match(/unavailable_repair_quantity\s*=/g)).toHaveLength(1);
     expect(executed.some(({ sql }) => sql.includes("INSERT INTO inventory_movements"))).toBe(false);
   });
 
@@ -415,6 +419,19 @@ describe("Resolving unavailable inventory conditions", () => {
       .set("Authorization", `Bearer ${getToken()}`)
       .send({ source_condition: "repair", outcome: "good", quantity: 2 });
     expect(res.status).toBe(409);
+  });
+
+  test("rejects unauthorized or invalid condition requests before leasing a transaction", async () => {
+    const path = `/events/returns/items/${LINKED_ITEM.id}/condition-resolutions`;
+    expect((await request(app).post(path).set("Authorization", `Bearer ${getToken("VIEWER")}`)
+      .send({ source_condition: "repair", outcome: "good", quantity: 1 })).status).toBe(403);
+    expect((await request(app).post("/events/returns/items/not-a-uuid/condition-resolutions")
+      .set("Authorization", `Bearer ${getToken()}`).send({ source_condition: "repair", outcome: "good", quantity: 1 })).status).toBe(400);
+    expect((await request(app).post(path).set("Authorization", `Bearer ${getToken()}`)
+      .send({ source_condition: "repair", outcome: "good", quantity: 0 })).status).toBe(400);
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockRelease).not.toHaveBeenCalled();
   });
 });
 

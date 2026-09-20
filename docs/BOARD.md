@@ -24,6 +24,12 @@ This document represents the project board mapping our user stories, tasks, and 
 
 ---
 
+## Functionality audit tracking
+
+[Issue #268: Restore atomic condition resolutions](https://github.com/LeulTew/dreamlux-erp/issues/268)
+holds the current implementation status, acceptance evidence, and postmerge
+verification for unavailable equipment stock.
+
 ## Active Label Legend
 
 - `type:epic`: Large features spanning multiple milestones.
