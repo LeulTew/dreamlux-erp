@@ -6,13 +6,13 @@ import { payrollSystemEnvironment } from "../../frontend/payroll-qa-environment"
 import { assertImportBrowserReceipt, verifyImportBrowser } from "./browser";
 import { repositoryRoot } from "../payroll/files";
 import { record } from "../payroll/contracts";
-import { ManagedProcess, reserveLocalPorts, waitForHttp } from "../payroll/processes";
+import { ManagedProcess, redact, reserveLocalPorts, waitForHttp } from "../payroll/processes";
 
 function receipt() {
   return {
-    stats: { expected: 14, unexpected: 0, flaky: 0, skipped: 0 },
+    stats: { expected: 30, unexpected: 0, flaky: 0, skipped: 0 },
     errors: [],
-    suites: [{ file: "issue113-imports.spec.ts" }, { file: "issue261-formula-imports.spec.ts" }],
+    suites: [{ file: "issue113-imports.spec.ts" }, { file: "issue261-formula-imports.spec.ts" }, { file: "issue265-finance-search.spec.ts" }],
     config: { projects: [{ name: "chromium" }, { name: "mobile-chromium" }] },
   };
 }
@@ -49,10 +49,10 @@ describe("bounded import verification", () => {
     }
   });
 
-  test("requires a complete two-file, two-viewport browser receipt", () => {
+  test("requires the complete three-file, two-viewport finance/browser receipt", () => {
     expect(() => assertImportBrowserReceipt(receipt())).not.toThrow();
     for (const stats of [
-      { expected: 0 }, { expected: 13 }, { unexpected: 1 }, { flaky: 1 }, { skipped: 1 },
+      { expected: 0 }, { expected: 14 }, { expected: 29 }, { unexpected: 1 }, { flaky: 1 }, { skipped: 1 },
     ]) {
       const value = receipt();
       Object.assign(value.stats, stats);
@@ -81,6 +81,37 @@ describe("bounded import verification", () => {
       await child.stop();
     }
   }, 20_000);
+
+  test("preflight validates the owned target before an application phase can run", async () => {
+    const target = new URL("postgresql://127.0.0.1:55434/postgres?sslmode=disable");
+    target.username = "dreamlux_parity";
+    target.password = "a".repeat(64);
+    for (const allowed of [true, false]) {
+      const selected = new URL(target);
+      if (!allowed) selected.username = "postgres";
+      const child = new ManagedProcess("isolated import preflight", process.execPath, [
+        "--no-env-file", "--preload", join(repositoryRoot, "backend", "src", "db", "testing", "imports-preflight.ts"),
+        "-e", "console.log('application phase reached')",
+      ], {
+        cwd: repositoryRoot,
+        env: { ...payrollSystemEnvironment(process.env), DREAMLUX_NATIVE_IMPORT_REQUIRED: "1", DREAMLUX_NATIVE_TEST_ADMIN_URL: selected.href },
+        secrets: [selected.href],
+      });
+      try {
+        const result = await child.wait(10_000);
+        if (allowed) {
+          expect(result.exitCode, redact(result.output, [selected.href])).toBe(0);
+          expect(result.output).toContain("application phase reached");
+        } else {
+          expect(result.exitCode).not.toBe(0);
+          expect(result.output).toContain("Refusing a target outside the independently owned DreamLux QA cluster");
+          expect(result.output).not.toContain("application phase reached");
+        }
+      } finally {
+        await child.stop();
+      }
+    }
+  }, 30_000);
 
   test("wires both import layers into the existing capped native job without rebuilding or retrying", async () => {
     const workflow: unknown = Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8"));

@@ -189,7 +189,7 @@ describe("sidebar permission navigation", () => {
     const nav = navFor("/hr/finance/hisab", ["finance:hisab:read"]);
     const hrefs = nav.financeLinks.map((l) => l.href);
     expect(hrefs).toContain("/hr/finance/hisab");
-    expect(hrefs).not.toContain("/hr/finance/net-profit");
+    expect(hrefs).not.toContain("/hr/finance/hisab/net-profit");
   });
 
   it("shows overhead register for finance:overheads:read", () => {
@@ -204,7 +204,6 @@ describe("sidebar permission navigation", () => {
 
   it("hides hisab import from sidebar for finance:imports:write (import is subpage button)", () => {
     const nav = navFor("/", ["finance:imports:write"]);
-    expect(nav.financeLinks.some((l) => l.href === "/hr/finance/imports")).toBe(false);
+    expect(nav.financeLinks.some((l) => l.href === "/hr/finance/hisab/imports")).toBe(false);
   });
 });
-

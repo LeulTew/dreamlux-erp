@@ -981,7 +981,7 @@ export default function SettingsPage() {
                           </thead>
                           <tbody className="divide-y divide-border/40">
                             <tr>
-                              <td className="px-4 py-2 font-bold text-foreground">/hr/finance/net-profit</td>
+                              <td className="px-4 py-2 font-bold text-foreground">/hr/finance/hisab/net-profit</td>
                               <td className="px-4 py-2 text-amber-600">finance:hisab:read</td>
                               <td className="px-4 py-2 text-emerald-500">✓ Yes</td>
                               <td className="px-4 py-2 text-emerald-500">✓ Yes</td>

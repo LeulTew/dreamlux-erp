@@ -10,7 +10,7 @@ if (!report || !output || !isAbsolute(report) || !isAbsolute(output)) {
 
 export default defineConfig({
   testDir: ".",
-  testMatch: ["issue113-imports.spec.ts", "issue261-formula-imports.spec.ts"],
+  testMatch: ["issue113-imports.spec.ts", "issue261-formula-imports.spec.ts", "issue265-finance-search.spec.ts"],
   fullyParallel: true,
   workers: 2,
   retries: 0,
