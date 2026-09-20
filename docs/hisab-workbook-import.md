@@ -5,6 +5,11 @@ workbook, inspect its preview, resolve unmatched events/categories, and review
 subtotal mismatches before committing. New financial rows remain **Pending**
 with import provenance; importing does not approve expenses or create stock.
 
+Global search's **Hisab Import** result opens the same workflow at
+`/hr/finance/hisab/imports`; **Net Profit** opens
+`/hr/finance/hisab/net-profit`. Their existing permission checks and
+English/Amharic labels apply. They remain Hisab subpages, not extra sidebar items.
+
 ## Calculated transactions
 
 The supported worksheets are `HISAB WEEKLY MONTHLY`, `MONTHLY WECHI`,
@@ -46,7 +51,8 @@ environment, migration baseline or provider connection is copied.
   all four layouts, cached metadata, shared formulas, subtotals and 5,000 rows.
 - `bun run verify:imports:native` requires the existing explicit
   `DREAMLUX_NATIVE_TEST_ADMIN_URL`, validated by `attestDreamluxNativeTarget`.
-  It cannot pass by skipping a missing target. The test creates its own
+  Its preload refuses missing or invalid targets before loading application
+  test dependencies; it cannot pass by skipping a missing target. The test creates its own
   disposable database using DreamLux's reviewed, version-controlled DDL and
   existing native fixture boundary, not a production dump. Real login cookies,
   routes and PostgreSQL verify amounts/status/provenance, mapping gates,
@@ -56,7 +62,7 @@ environment, migration baseline or provider connection is copied.
   the existing source-isolated, credential-free frontend artifact.
 - `bun run verify:imports:browser -- --frontend-build .qa-payroll-build` reuses
   that exact validated production artifact, reserves its own UI port 3261,
-  runs 14 desktop/mobile cases, and removes its owned UI/private snapshot.
+  runs 30 import/navigation desktop/mobile cases, and removes its owned UI/private snapshot.
   It denies network access to the separate payroll API/REST ports. Browser
   transport is explicitly mocked; this is caller proof, separate from
   native persistence proof. Unexpected requests, malformed/partial receipts,

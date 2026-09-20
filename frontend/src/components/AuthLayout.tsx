@@ -87,8 +87,8 @@ const SEARCH_ITEMS = [
   { label: "Hisab Reports", amLabel: "የሂሳብ ሪፖርቶች", href: "/hr/finance/hisab", category: "Finance", permissions: ["finance:hisab:read"] },
   { label: "Overhead Register", amLabel: "የወጪ መዝገብ", href: "/hr/finance/overheads", category: "Finance", permissions: ["finance:overheads:read"] },
   { label: "Capital Register", amLabel: "የካፒታል መዝገብ", href: "/hr/finance/investments", category: "Finance", permissions: ["finance:investments:read"] },
-  { label: "Net Profit", amLabel: "የተጣራ ትርፍ", href: "/hr/finance/net-profit", category: "Finance", permissions: ["finance:hisab:read"] },
-  { label: "Hisab Import", amLabel: "የሂሳብ ማስገቢያ", href: "/hr/finance/imports", category: "Finance", permissions: ["finance:imports:write"] },
+  { label: "Net Profit", amLabel: "የተጣራ ትርፍ", href: "/hr/finance/hisab/net-profit", category: "Finance", permissions: ["finance:hisab:read"] },
+  { label: "Hisab Import", amLabel: "የሂሳብ ማስገቢያ", href: "/hr/finance/hisab/imports", category: "Finance", permissions: ["finance:imports:write"] },
   { label: "Admin Settings", amLabel: "አስተዳዳሪ ቅንብሮች", href: "/settings", category: "Admin", permissions: ["users:manage", "settings:write"] },
 ];
 

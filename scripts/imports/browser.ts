@@ -5,12 +5,12 @@ import { boundedJson, createFrontendSnapshot, installFrontendArtifact, ownedDire
 import { ManagedProcess, redact, reserveLocalPorts, waitForHttp } from "../payroll/processes";
 
 export function assertImportBrowserReceipt(value: unknown) {
-  if (!record(value) || !record(value.stats) || value.stats.expected !== 14
+  if (!record(value) || !record(value.stats) || value.stats.expected !== 30
       || value.stats.unexpected !== 0 || value.stats.flaky !== 0 || value.stats.skipped !== 0
       || !Array.isArray(value.errors) || value.errors.length !== 0
-      || !Array.isArray(value.suites) || value.suites.length !== 2
+      || !Array.isArray(value.suites) || value.suites.length !== 3
       || !record(value.config) || !Array.isArray(value.config.projects)) {
-    throw new Error("Expected all 14 import browser cases to pass without skips, retries or global errors");
+    throw new Error("Expected all 30 finance/import browser cases to pass without skips, retries or global errors");
   }
   const files = value.suites.map((suite) => {
     if (!record(suite) || typeof suite.file !== "string") throw new Error("Missing browser source file identity");
@@ -20,7 +20,7 @@ export function assertImportBrowserReceipt(value: unknown) {
     if (!record(project) || typeof project.name !== "string") throw new Error("Missing browser project identity");
     return project.name;
   }).sort();
-  if (JSON.stringify(files) !== JSON.stringify(["issue113-imports.spec.ts", "issue261-formula-imports.spec.ts"])
+  if (JSON.stringify(files) !== JSON.stringify(["issue113-imports.spec.ts", "issue261-formula-imports.spec.ts", "issue265-finance-search.spec.ts"])
       || JSON.stringify(projects) !== JSON.stringify(["chromium", "mobile-chromium"])) {
     throw new Error("Import browser verification used the wrong files or viewports");
   }
@@ -110,7 +110,7 @@ export async function verifyImportBrowser(args: readonly string[]) {
     if (errors.length) failure = new AggregateError(failure ? [failure, ...errors] : errors, "Import browser verification cleanup failed");
   }
   if (failure) throw failure;
-  console.log("DreamLux import browser callers: 14 passed, no skips or retries; owned UI and private snapshot removed.");
+  console.log("DreamLux finance/import browser callers: 30 passed, no skips or retries; owned UI and private snapshot removed.");
 }
 
 if (import.meta.main) {

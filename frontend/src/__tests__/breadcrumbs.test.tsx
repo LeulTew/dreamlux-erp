@@ -100,6 +100,24 @@ describe("Breadcrumbs Component", () => {
     expect(screen.getByRole("link", { name: "Event Proposals" })).toHaveAttribute("href", "/events/proposals");
   });
 
+  it.each([
+    { path: "/hr/finance/hisab/imports", lang: "en", label: "Hisab Import", permission: "finance:imports:write" },
+    { path: "/hr/finance/hisab/imports", lang: "am", label: "የሂሳብ ማስገቢያ", permission: "finance:imports:write" },
+    { path: "/hr/finance/hisab/net-profit", lang: "en", label: "Net Profit", permission: "finance:hisab:read" },
+    { path: "/hr/finance/hisab/net-profit", lang: "am", label: "የተጣራ ትርፍ", permission: "finance:hisab:read" },
+  ])("labels the implemented $path leaf in $lang", ({ path, lang, label, permission }) => {
+    mockPathname = path;
+    mockLang = lang;
+    mockPermissions = [permission];
+    render(<Breadcrumbs />);
+    const leaf = screen.getByText(label, { exact: true });
+    expect(leaf).toHaveAttribute("aria-current", "page");
+    expect(leaf.closest("a")).toBeNull();
+    if (permission === "finance:imports:write") {
+      expect(screen.getByText(lang === "en" ? "Hisab Reports" : "የሂሳብ ሪፖርቶች").closest("a")).toBeNull();
+    }
+  });
+
   it.each(["/hr/expenses/approve", "/hr/reports/profit"])("does not link nonexistent grouping paths on %s", (path) => {
     mockPathname = path;
     mockIsSuperuser = true;
