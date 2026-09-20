@@ -33,6 +33,11 @@ its label resembles an expense category. Explicitly dated SUM-priced
 transactions are retained. Existing supported same-column SUM mismatch checks
 remain a separate review step, not a general formula evaluator.
 
+Supported SUM ranges read existing populated rows in worksheet order and use
+non-creating cell lookups. Empty referenced positions contribute zero without
+materializing rows or cells, even when a small workbook references Excel's
+last row. This does not change cached values, range boundaries or rounding.
+
 ## Historical safety and parity
 
 The fingerprint remains a hash of the original uploaded bytes. Previously
@@ -41,7 +46,8 @@ This change does not replay, delete or rewrite historical batches. Reconcile
 missing historical transactions through a separately reviewed, audited
 correction; do not bypass duplicate protection by modifying/reimporting a file.
 
-The shared parser behavior matches LeulTew/koti-catering#346. DreamLux keeps its
+The shared parser behavior matches LeulTew/koti-catering#346 and the bounded
+SUM verification in LeulTew/koti-catering#363. DreamLux keeps its
 own authentication, schema, configuration, data and deployments. No Koti
 environment, migration baseline or provider connection is copied.
 
@@ -49,6 +55,8 @@ environment, migration baseline or provider connection is copied.
 
 - `hisab-formula-transactions.test.ts` verifies real synthetic workbook parsing,
   all four layouts, cached metadata, shared formulas, subtotals and 5,000 rows.
+- `hisab-formula-ranges.test.ts` verifies actual worksheet allocation, sparse
+  range boundaries, cached numbers and rounding without an unbounded test load.
 - `bun run verify:imports:native` requires the existing explicit
   `DREAMLUX_NATIVE_TEST_ADMIN_URL`, validated by `attestDreamluxNativeTarget`.
   Its preload refuses missing or invalid targets before loading application
@@ -58,6 +66,8 @@ environment, migration baseline or provider connection is copied.
   routes and PostgreSQL verify amounts/status/provenance, mapping gates,
   historical duplicates, permission denial and audit rollback. All other
   network destinations are refused.
+  The local CI receipt requires all 12 native import cases, including the
+  wide sparse subtotal, with no skips, failures or unhandled runner errors.
 - `bun run verify:payroll:build -- --checks --output .qa-payroll-build` produces
   the existing source-isolated, credential-free frontend artifact.
 - `bun run verify:imports:browser -- --frontend-build .qa-payroll-build` reuses
