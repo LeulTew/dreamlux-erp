@@ -8,6 +8,7 @@ import { ManagedProcess, redact } from "./processes";
 import { verifyPayroll } from "./run";
 import { verifyEquipment } from "../equipment/run";
 import { verifyImportBrowser } from "../imports/browser";
+import { assertImportNativeReceipt } from "../imports/native-receipt";
 
 export async function localPayrollCi(args: readonly string[]) {
   const plan = nativePlan(args, process.env, repositoryRoot);
@@ -66,10 +67,7 @@ export async function localPayrollCi(args: readonly string[]) {
       });
     children.push(imports);
     const importsResult = await imports.requireSuccess(60_000);
-    const importsOutput = stripVTControlCharacters(importsResult.output);
-    if (!/^\s*11 pass\s*$/m.test(importsOutput) || /^\s*[1-9]\d* (?:skip|fail)\s*$/m.test(importsOutput)) {
-      throw new Error("Native import verification produced an incomplete receipt");
-    }
+    assertImportNativeReceipt(importsResult.output);
     checkInterrupted();
     await verifyImportBrowser(["--frontend-build", plan.artifact]);
     checkInterrupted();
