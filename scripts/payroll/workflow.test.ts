@@ -80,6 +80,10 @@ describe("local, unbilled CI definition contracts", () => {
     const runner = await readFile(join(repositoryRoot, "scripts", "equipment", "run.ts"), "utf8");
     expect(config).toContain("globalTimeout: 120_000");
     expect(runner).toContain("browser.requireSuccess(budget(125_000))");
+    expect(runner).toContain('nativeArguments(conditionReport, "conditions")');
+    expect(runner).toContain('nativeReceipt(conditionResult.output, conditionResult.exitCode, { suite: "conditions" })');
+    expect(runner.indexOf("const conditionReport")).toBeGreaterThan(runner.indexOf("const nativeSummary"));
+    expect(runner.indexOf("const descriptorPath")).toBeGreaterThan(runner.indexOf("const conditionSummary"));
     expect(EQUIPMENT_TIMEOUT_MS).toBe(170_000);
   });
   test("pins the disposable server's physical port and verifies both binary hashes before native QA", async () => {

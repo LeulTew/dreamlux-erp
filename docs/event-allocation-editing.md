@@ -90,3 +90,33 @@ The Event Workspace → Inventory Allocation tab exposes an inline Edit control 
 Locked rows show a short reason (`Locked after departure` / `Locked after return`) instead of a
 control that would always fail. On success the workspace, item-picker availability, inventory, and
 dispatch-queue caches are all invalidated. All new strings are translated in English and Amharic.
+
+## Unavailable stock after returns
+
+`POST /events/returns/items/:itemId/condition-resolutions` resolves previously
+returned damaged or repair stock. It requires the current `assets:reconcile`
+permission and an active item UUID. The existing request accepts
+`source_condition` (`damaged` or `repair`), `outcome` (`good`, `damaged`, `repair`,
+or `lost`), a positive integer `quantity` up to 1,000,000, and optional notes
+and an idempotency key. Quantity cannot exceed the selected unavailable balance.
+Recording an inspection with an unchanged condition remains supported.
+
+A successful `201 { resolved, outcome }` means one transaction acknowledged
+the resolution record, the net damaged/repair balance update, and a stock
+movement if the outcome was loss. Restoring good stock releases availability
+without increasing owned quantity; loss reduces owned quantity. Prior return
+receipts, item condition metadata, and immutable historical ledgers are not
+rewritten. A repeated item/idempotency key remains a `409`, not a second write.
+
+Item locking is bounded by a transaction-local ten-second timeout. Contention
+returns `409 CONDITION_RESOLUTION_BUSY`. A lost COMMIT acknowledgement returns
+`503 CONDITION_RESOLUTION_UNCONFIRMED` with `outcome_uncertain: true` and no
+`resolved` receipt: verify stored inventory before retrying, rather than assuming
+nothing committed. Missing or rejected required writes roll back together.
+An unacknowledged BEGIN also triggers rollback before the connection can be
+reused; a failed rollback causes that connection to be discarded.
+
+Issue #268 repairs this existing API. It does not add an operator screen:
+the current returns checklist records incoming event returns, not this
+follow-on damaged/repair resolution workflow. The shared interface gap is
+tracked by LeulTew/koti-catering#362 and needs corresponding DreamLux coverage.

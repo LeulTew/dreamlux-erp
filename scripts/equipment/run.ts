@@ -103,6 +103,14 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
     verifyJunitReceipt(await readFile(nativeReport, "utf8"), nativeSummary);
     console.log(`Native equipment: ${nativeSummary.passed} passed, zero failed/skipped.`);
 
+    const conditionReport = join(work, "conditions.native.private.junit.xml");
+    const conditions = start("native condition assertions", process.execPath,
+      nativeArguments(conditionReport, "conditions"), join(root, "backend"), env);
+    const conditionResult = await conditions.requireSuccess(budget(60_000));
+    const conditionSummary = nativeReceipt(conditionResult.output, conditionResult.exitCode, { suite: "conditions" });
+    verifyJunitReceipt(await readFile(conditionReport, "utf8"), conditionSummary);
+    console.log(`Native conditions: ${conditionSummary.passed} passed, zero failed/skipped.`);
+
     await ports.release(5326);
     const descriptorPath = join(work, "equipment.browser.private.json");
     const providerReport = join(work, "equipment.provider.private.junit.xml");
@@ -120,7 +128,7 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
       });
       if (response.status !== 204) throw new Error("Owned equipment provider rejected graceful shutdown");
       const result = await provider.requireSuccess(15_000);
-      const summary = nativeReceipt(result.output, result.exitCode, true);
+      const summary = nativeReceipt(result.output, result.exitCode, { infrastructure: true });
       verifyJunitReceipt(await readFile(providerReport, "utf8"), summary);
       providerStopped = true;
       return summary;
@@ -157,7 +165,7 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
     budget(1);
     const infrastructure = await stopProvider();
     receipt = {
-      schema: 1, purpose: "dreamlux-equipment-259", native: nativeSummary, browsers,
+      schema: 1, purpose: "dreamlux-equipment-259", native: nativeSummary, conditions: conditionSummary, browsers,
       browserRegistryDigest: hash(JSON.stringify(registry)), providerInfrastructureOnly: infrastructure,
       frontend: build, testSourceDigest: snapshot.testDigest,
     };

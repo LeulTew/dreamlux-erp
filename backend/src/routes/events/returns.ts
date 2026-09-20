@@ -1,4 +1,6 @@
 import { Router, Response } from "express";
+import type { PoolClient } from "pg";
+import { z } from "zod";
 import { pool } from "../../db/pool";
 import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from "../../middleware/auth";
 import { hasPermissionSlug } from "../../lib/permissions";
@@ -38,26 +40,41 @@ export function createEventReturnsRouter(): Router {
   const router = Router();
 
   router.post("/returns/items/:itemId/condition-resolutions", requireAuth, async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    if (!hasPermission(req, "assets:reconcile")) {
+      res.status(403).json({ error: "Forbidden: Missing inventory reconciliation privileges" });
+      return;
+    }
+    const itemId = z.string().uuid().safeParse(req.params.itemId);
+    if (!itemId.success) {
+      res.status(400).json({ error: "Invalid inventory item ID" });
+      return;
+    }
+    const parsed = resolveInventoryConditionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    const input = parsed.data;
+    let client: PoolClient | undefined;
+    let transactionOpen = false;
+    let committing = false;
+    let discard = false;
     try {
-      if (!hasPermission(req, "assets:reconcile")) {
-        res.status(403).json({ error: "Forbidden: Missing inventory reconciliation privileges" });
-        return;
-      }
-      const parsed = resolveInventoryConditionSchema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.errors[0].message });
-        return;
-      }
-      const input = parsed.data;
+      client = await pool.connect();
+      // BEGIN can succeed at PostgreSQL even if its acknowledgement is lost.
+      transactionOpen = true;
       await client.query("BEGIN");
-      const itemResult = await client.query(
+      await client.query("SET LOCAL lock_timeout = '10s'");
+      const itemResult = await client.query<{
+        id: string; quantity: number; unavailable_damaged_quantity: number; unavailable_repair_quantity: number;
+      }>(
         `SELECT id, quantity, unavailable_damaged_quantity, unavailable_repair_quantity
          FROM items WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
-        [req.params.itemId],
+        [itemId.data],
       );
       if (itemResult.rowCount === 0) {
         await client.query("ROLLBACK");
+        transactionOpen = false;
         res.status(404).json({ error: "Inventory item not found" });
         return;
       }
@@ -66,43 +83,73 @@ export function createEventReturnsRouter(): Router {
         ? "unavailable_damaged_quantity"
         : "unavailable_repair_quantity";
       const { lost, damaged, repair } = calculateConditionResolutionEffect(Number(item[sourceColumn]), input);
-      const resolutionResult = await client.query(
+      const resolutionResult = await client.query<{ id: string }>(
         `INSERT INTO inventory_condition_resolutions
            (item_id, source_condition, outcome, quantity, notes, idempotency_key, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
         [item.id, input.source_condition, input.outcome, input.quantity, input.notes ?? null, input.idempotency_key ?? null, req.user?.id || null],
       );
-      await client.query(
-        `UPDATE items SET ${sourceColumn} = ${sourceColumn} - $2,
-           unavailable_damaged_quantity = unavailable_damaged_quantity + $3,
-           unavailable_repair_quantity = unavailable_repair_quantity + $4,
-           quantity = quantity - $5, updated_at = NOW() WHERE id = $1`,
-        [item.id, input.quantity, damaged, repair, lost],
+      if (resolutionResult.rowCount !== 1 || resolutionResult.rows.length !== 1 || !resolutionResult.rows[0].id) {
+        throw new Error("Condition resolution was not acknowledged");
+      }
+      const updated = await client.query(
+        `UPDATE items SET unavailable_damaged_quantity = unavailable_damaged_quantity + $2,
+           unavailable_repair_quantity = unavailable_repair_quantity + $3,
+           quantity = quantity - $4, updated_at = NOW() WHERE id = $1`,
+        [
+          item.id, damaged - (input.source_condition === "damaged" ? input.quantity : 0),
+          repair - (input.source_condition === "repair" ? input.quantity : 0), lost,
+        ],
       );
+      if (updated.rowCount !== 1) throw new Error("Condition stock update was not acknowledged");
       if (lost > 0) {
-        await client.query(
+        const movement = await client.query(
           `INSERT INTO inventory_movements
              (item_id, quantity_delta, quantity_before, quantity_after, source_type, source_id, notes, created_by)
            VALUES ($1, $2, $3, $4, 'condition_resolution', $5, $6, $7)`,
           [item.id, -lost, Number(item.quantity), Number(item.quantity) - lost, resolutionResult.rows[0].id, input.notes ?? "Condition resolved as lost", req.user?.id || null],
         );
+        if (movement.rowCount !== 1) throw new Error("Condition loss movement was not acknowledged");
       }
+      committing = true;
       await client.query("COMMIT");
+      transactionOpen = false;
       res.status(201).json({ resolved: input.quantity, outcome: input.outcome });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
+    } catch (error: unknown) {
+      if (client && transactionOpen) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          discard = true;
+          console.error("[resolve-inventory-condition] Rollback failed; discarding connection", { itemId: itemId.data });
+        }
+      }
+      if (committing) {
+        discard = true;
+        console.error("[resolve-inventory-condition] Commit acknowledgement failed", { itemId: itemId.data });
+        res.status(503).json({
+          error: "Condition resolution could not be confirmed. Verify inventory before retrying.",
+          code: "CONDITION_RESOLUTION_UNCONFIRMED", outcome_uncertain: true,
+        });
+        return;
+      }
       if (error instanceof ReturnConflictError) {
         res.status(409).json({ error: error.message });
         return;
       }
-      if (error?.code === "23505") {
+      const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+      if (code === "23505") {
         res.status(409).json({ error: "This condition resolution was already recorded" });
         return;
       }
-      console.error("[resolve-inventory-condition] Error:", error?.message || error);
+      if (code === "55P03" || code === "40P01") {
+        res.status(409).json({ error: "Inventory is being changed. Reload and try again.", code: "CONDITION_RESOLUTION_BUSY" });
+        return;
+      }
+      console.error("[resolve-inventory-condition] Failed", { itemId: itemId.data, code });
       res.status(500).json({ error: "Failed to resolve inventory condition" });
     } finally {
-      client.release();
+      client?.release(discard);
     }
   });
 
