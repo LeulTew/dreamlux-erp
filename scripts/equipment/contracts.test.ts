@@ -3,6 +3,7 @@ import { NATIVE_GUARD_BANNER } from "../payroll/contracts";
 import {
   BROWSER_FILES, browserReceipt, browserRegistry, equipmentDescriptor, equipmentEnvironment,
   CONDITION_TEST, CONDITION_TEST_COUNT, NATIVE_TEST, NATIVE_TEST_COUNT, nativeArguments, nativeReceipt,
+  RETURN_TEST, RETURN_TEST_COUNT,
 } from "./contracts";
 
 const admin = `postgresql://dreamlux_parity:${"a".repeat(64)}@127.0.0.1:55434/postgres?sslmode=disable`;
@@ -15,6 +16,8 @@ function browserReport(executed: boolean) {
   const specs = [
     ...Array.from({ length: 3 }, (_, index) => ({ file: BROWSER_FILES[0], title: `Presentation ${index}` })),
     { file: BROWSER_FILES[1], title: "Actual custody and restoration" },
+    { file: BROWSER_FILES[2], title: "Actual return correction and receipt workflow" },
+    { file: BROWSER_FILES[2], title: "Actual reserved capacity conflict" },
   ].map((spec, index) => ({
     ...spec, id: `equipment-${index}`, line: index + 1, column: 1, ok: true,
     tests: projects.map((project) => ({
@@ -24,7 +27,7 @@ function browserReport(executed: boolean) {
   }));
   return {
     config: { workers: 1, fullyParallel: false, forbidOnly: true, projects },
-    errors: [], stats: { unexpected: 0, flaky: 0, expected: executed ? 8 : 0, skipped: 0 },
+    errors: [], stats: { unexpected: 0, flaky: 0, expected: executed ? 12 : 0, skipped: 0 },
     suites: [{ title: "Equipment QA", specs }],
   };
 }
@@ -79,21 +82,35 @@ describe("independent equipment verification contracts", () => {
     expect(() => equipmentDescriptor({ ...value, apiOrigin: "https://unexpected.invalid" }, fixture)).toThrow();
   });
 
-  test("exhausts the exact discovered eight-case desktop/mobile registry", () => {
+  test("requires every return regression in its own process and rejects partial receipts", () => {
+    const output = nativeOutput(RETURN_TEST_COUNT).replace(NATIVE_TEST, RETURN_TEST);
+    expect(nativeReceipt(output, 0, { suite: "returns" })).toEqual({
+      passed: 35, failed: 0, skipped: 0, tests: 35, files: 1,
+    });
+    expect(nativeArguments("returns.junit.xml", "returns").at(-1)?.replaceAll("\\", "/")).toBe(RETURN_TEST);
+    expect(() => nativeReceipt(nativeOutput(RETURN_TEST_COUNT), 0, { suite: "returns" })).toThrow();
+    expect(() => nativeReceipt(nativeOutput(RETURN_TEST_COUNT - 1).replace(NATIVE_TEST, RETURN_TEST), 0, { suite: "returns" })).toThrow();
+    expect(() => nativeReceipt(`${output}1 skip\n`, 0, { suite: "returns" })).toThrow();
+    expect(() => nativeReceipt(output, 1, { suite: "returns" })).toThrow();
+    expect(() => nativeReceipt(output, 0, { suite: "returns", infrastructure: true })).toThrow();
+  });
+
+  test("exhausts the exact discovered twelve-case desktop/mobile registry", () => {
     const registry = browserRegistry(browserReport(false), 0);
     expect(browserReceipt(browserReport(true), 0, registry)).toEqual({
-      desktop: 4, mobile: 4, requested: 8, passed: 8, retries: 0, skipped: 0,
+      desktop: 6, mobile: 6, requested: 12, passed: 12, retries: 0, skipped: 0,
     });
   });
 
-  test.each(["skip", "retry", "missing-native", "wrong-total", "stale-registry"] as const)(
+  test.each(["skip", "retry", "missing-native", "missing-return", "wrong-total", "stale-registry"] as const)(
     "rejects %s browser evidence", (kind) => {
       const registry = browserRegistry(browserReport(false), 0);
       const report = browserReport(true);
       if (kind === "skip") report.suites[0].specs[0].tests[0].expectedStatus = "skipped";
       if (kind === "retry") report.suites[0].specs[0].tests[0].results[0].retry = 1;
-      if (kind === "missing-native") report.suites[0].specs.pop();
-      if (kind === "wrong-total") report.stats.expected = 7;
+      if (kind === "missing-native") report.suites[0].specs.splice(3, 1);
+      if (kind === "missing-return") report.suites[0].specs.pop();
+      if (kind === "wrong-total") report.stats.expected = 11;
       if (kind === "stale-registry") report.suites[0].specs[0].id = "different-case";
       expect(() => browserReceipt(report, 0, registry)).toThrow();
     },

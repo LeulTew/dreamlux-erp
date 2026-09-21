@@ -4,12 +4,14 @@ import { createDreamluxNativeFixture, reviewedSchemaTables } from "./dreamlux-na
 import { payrollFixtureDdl } from "./dreamlux-payroll-fixture";
 
 const TABLES = [
+  "event_logs", "event_checklist", "vehicles", "vehicle_assignments", "trips",
   "categories", "items", "inventory_reconciliation_runs", "inventory_reconciliation_items",
   "finance_import_batches", "event_allocations", "event_return_receipts",
   "inventory_condition_resolutions", "event_return_corrections", "capital_investments",
   "inventory_movements",
 ] as const;
 const INDEXES = [
+  "idx_event_logs_event_id", "idx_event_allocations_event",
   "idx_items_deleted_at", "idx_recon_items_item_id", "idx_event_allocations_item",
   "uq_event_return_receipts_idem", "idx_event_return_receipts_allocation",
   "uq_inventory_condition_resolution_idem", "idx_inventory_condition_resolutions_item",

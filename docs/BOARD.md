@@ -30,6 +30,12 @@ This document represents the project board mapping our user stories, tasks, and 
 holds the current implementation status, acceptance evidence, and postmerge
 verification for unavailable equipment stock.
 
+[Issue #273: Return correction integrity and availability parity](https://github.com/LeulTew/dreamlux-erp/issues/273)
+tracks the source-only correction repair and its independent native/browser
+evidence. [The correction contract](return-correction-parity.md) preserves
+DreamLux's global reservation policy and documents unconfirmed-commit recovery.
+Merge and all live release steps remain separate review gates.
+
 ## Active Label Legend
 
 - `type:epic`: Large features spanning multiple milestones.

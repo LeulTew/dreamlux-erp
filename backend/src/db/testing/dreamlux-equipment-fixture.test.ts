@@ -7,10 +7,13 @@ describe("reviewed DreamLux equipment fixture boundaries", () => {
   test("extends the existing core DDL without importing bootstrap identities or data", async () => {
     const ddl = await equipmentFixtureDdl();
     expect(ddl.startsWith(await payrollFixtureDdl())).toBe(true);
-    expect([...ddl.matchAll(/^CREATE TABLE IF NOT EXISTS /gm)]).toHaveLength(29);
+    expect([...ddl.matchAll(/^CREATE TABLE IF NOT EXISTS /gm)]).toHaveLength(34);
     expect(ddl).not.toMatch(/^\s*(?:INSERT INTO|UPDATE \w+ SET|DELETE FROM|COPY )/im);
     expect(ddl).not.toMatch(/(?:postgres(?:ql)?:\/\/|\.supabase\.co|auth\.users)/i);
     expect(ddl).not.toContain("quantity_dispatched");
+    expect(ddl).not.toContain("cancelled_at");
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS event_logs");
+    expect(ddl).toContain("CREATE TABLE IF NOT EXISTS event_checklist");
     expect(ddl).toContain("entity_id UUID NOT NULL");
   });
 

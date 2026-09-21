@@ -11,8 +11,17 @@ export const NATIVE_TEST = "src/db/equipment-deletion.integration.test.ts";
 export const NATIVE_TEST_COUNT = 26;
 export const CONDITION_TEST = "src/db/inventory-condition-resolution.integration.test.ts";
 export const CONDITION_TEST_COUNT = 23;
-type NativeSuite = "deletion" | "conditions";
-export const BROWSER_FILES = ["issue259-equipment-deletion.spec.ts", "issue259-equipment-native.spec.ts"] as const;
+export const RETURN_TEST = "src/db/equipment-return-correction.integration.test.ts";
+export const RETURN_TEST_COUNT = 35;
+const NATIVE_SUITES = {
+  deletion: { file: NATIVE_TEST, count: NATIVE_TEST_COUNT },
+  conditions: { file: CONDITION_TEST, count: CONDITION_TEST_COUNT },
+  returns: { file: RETURN_TEST, count: RETURN_TEST_COUNT },
+} as const;
+type NativeSuite = keyof typeof NATIVE_SUITES;
+export const BROWSER_FILES = [
+  "issue259-equipment-deletion.spec.ts", "issue259-equipment-native.spec.ts", "issue273-return-correction-native.spec.ts",
+] as const;
 export const RUNNER_TIMEOUT_MS = 170_000;
 export type EquipmentDescriptor = { apiOrigin: string; database: string; writerCookie: string; shutdownKey: string };
 
@@ -36,7 +45,7 @@ export function equipmentEnvironment(
 }
 
 export function nativeArguments(report: string, suite: NativeSuite = "deletion"): string[] {
-  const file = suite === "conditions" ? CONDITION_TEST : NATIVE_TEST;
+  const { file } = NATIVE_SUITES[suite];
   return ["--no-env-file", "test", `--config=.${sep}bunfig.native.toml`,
     "--reporter=junit", `--reporter-outfile=${report}`, file.split("/").join(sep)];
 }
@@ -46,8 +55,7 @@ export function nativeReceipt(
   { suite = "deletion", infrastructure = false }: { suite?: NativeSuite; infrastructure?: boolean } = {},
 ): BunReceipt {
   if (infrastructure && suite !== "deletion") throw new Error("Only the deletion suite provides a browser server");
-  const file = suite === "conditions" ? CONDITION_TEST : NATIVE_TEST;
-  const expected = suite === "conditions" ? CONDITION_TEST_COUNT : NATIVE_TEST_COUNT;
+  const { file, count: expected } = NATIVE_SUITES[suite];
   const plain = stripVTControlCharacters(output);
   const count = (kind: string) => Number([...plain.matchAll(new RegExp(`^\\s*(\\d+) ${kind}\\s*$`, "gm"))].at(-1)?.[1] ?? (kind === "skip" ? 0 : NaN));
   const passed = count("pass");
@@ -75,9 +83,9 @@ export function equipmentDescriptor(value: unknown, fixtureUrl: string): Equipme
 
 export function browserRegistry(value: unknown, exitCode: number): BrowserRegistry {
   const registry = readBrowserRegistry(value, exitCode, BROWSER_FILES);
-  if (registry.tests.length !== 8 || ["desktop", "mobile"].some((project) =>
-    registry.tests.filter((test) => test.project === project).length !== 4)) {
-    throw new Error("Equipment QA requires its complete eight-case browser registry");
+  if (registry.tests.length !== 12 || ["desktop", "mobile"].some((project) =>
+    registry.tests.filter((test) => test.project === project).length !== 6)) {
+    throw new Error("Equipment QA requires its complete twelve-case browser registry");
   }
   return registry;
 }
