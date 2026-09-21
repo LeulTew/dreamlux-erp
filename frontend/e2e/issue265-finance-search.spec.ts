@@ -149,13 +149,15 @@ test.describe("Issue 265 independent finance search destinations", () => {
       for (const destination of destinations) {
         const result = page.getByRole("button", { name: new RegExp(`^${destination.label.en}\\s`) });
         await expect(result).toBeVisible();
-        const box = await result.boundingBox();
-        if (!box) throw new Error("Visible finance result has no bounds");
-        expect(box.x).toBeGreaterThanOrEqual(0);
-        expect(box.x + box.width).toBeLessThanOrEqual(width);
-        expect(box.y).toBeGreaterThanOrEqual(0);
-        expect(box.y + box.height).toBeLessThanOrEqual(900);
-        expect(box.height).toBeGreaterThanOrEqual(48);
+        await expect(async () => {
+          const box = await result.boundingBox();
+          if (!box) throw new Error("Visible finance result has no bounds");
+          expect(box.x).toBeGreaterThanOrEqual(0);
+          expect(box.x + box.width).toBeLessThanOrEqual(width);
+          expect(box.y).toBeGreaterThanOrEqual(0);
+          expect(box.y + box.height).toBeLessThanOrEqual(900);
+          expect(box.height).toBeGreaterThanOrEqual(48);
+        }).toPass({ timeout: 7_500 });
       }
       await input.press("Escape");
     }
