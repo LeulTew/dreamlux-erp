@@ -19,7 +19,11 @@ const browserStopped = new Promise<void>((resolve) => { stopBrowser = resolve; }
 let browserDescriptor: string | undefined;
 const actorId = "25900000-0000-4000-8000-000000000001";
 const roleId = "25900000-0000-4000-8000-000000000002";
-const grants = { assets: ["read", "write", "delete"] };
+const grants = {
+  assets: ["read", "write", "delete", ...(browserMode ? ["reconcile"] : [])],
+  ...(browserMode ? { event_allocations: ["write", "dispatch"] } : {}),
+};
+const slugs = Object.entries(grants).flatMap(([resource, actions]) => actions.map((action) => `${resource}:${action}`));
 let observer: Client | undefined;
 let appPool: Pool | undefined;
 let server: Server | undefined;
@@ -58,11 +62,10 @@ beforeAll(async () => {
   expect(identity.rows).toEqual([{ name: target().pathname.slice(1), actor: "dreamlux_parity", port: 55434 }]);
   await observer.query("truncate roles,permissions,users,items,events,activity_logs cascade");
   await observer.query("insert into roles(id,name,permissions) values($1,'SYNTHETIC_ASSET_OPERATOR_259',$2::jsonb)", [roleId, grants]);
-  await observer.query(`insert into permissions(slug,description) values
-    ('assets:read','Synthetic equipment read'),('assets:write','Synthetic equipment write'),('assets:delete','Synthetic equipment delete')
-    on conflict (slug) do nothing`);
+  await observer.query(`insert into permissions(slug,description)
+    select slug,'Synthetic equipment authority' from unnest($1::text[]) slug on conflict (slug) do nothing`, [slugs]);
   await observer.query(`insert into role_permissions(role_id,permission_id)
-    select $1,id from permissions where slug=any($2::text[])`, [roleId, ["assets:read", "assets:write", "assets:delete"]]);
+    select $1,id from permissions where slug=any($2::text[])`, [roleId, slugs]);
   const password = randomBytes(24).toString("base64url");
   await observer.query(`insert into users(id,username,password_hash,full_name,role_id)
     values($1,'synthetic.item.operator.259',crypt($3,gen_salt('bf')),'Synthetic equipment operator',$2)`, [actorId, roleId, password]);
@@ -83,6 +86,7 @@ beforeAll(async () => {
   }
   app.use("/auth", (await import("../routes/auth")).default);
   app.use("/assets", (await import("../routes/assets")).default);
+  if (browserMode) app.use("/events", (await import("../routes/events")).default);
   appPool = (await import("./pool")).pool;
   invalidatePermissions = (await import("../lib/permissions-cache")).invalidateAllCache;
   server = createServer(app);
@@ -115,7 +119,7 @@ beforeEach(async () => {
   await observer.query("update roles set permissions=$1::jsonb where id=$2", [grants, roleId]);
   await observer.query(`insert into role_permissions(role_id,permission_id)
     select $1,id from permissions where slug=any($2::text[]) on conflict do nothing`,
-  [roleId, ["assets:read", "assets:write", "assets:delete"]]);
+  [roleId, slugs]);
   if (!invalidatePermissions) throw new Error("Current permission cache invalidation is unavailable");
   invalidatePermissions();
 });

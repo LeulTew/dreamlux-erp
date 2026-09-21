@@ -478,46 +478,66 @@ export function createEventReturnsRouter(): Router {
   // Corrections are immutable compensating deltas. The original receipt is
   // never edited, and all allocation/inventory/audit effects commit together.
   router.post("/returns/:receiptId/corrections", requireAuth, async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    if (!hasPermission(req, "assets:reconcile")) {
+      res.status(403).json({ error: "Forbidden: Missing inventory reconciliation privileges" });
+      return;
+    }
+    const receiptId = z.string().uuid().safeParse(req.params.receiptId);
+    if (!receiptId.success) {
+      res.status(400).json({ error: "Invalid return receipt ID" });
+      return;
+    }
+    const parsed = correctEventReturnSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    const input = parsed.data;
+    let client: PoolClient | undefined;
+    let transactionOpen = false;
+    let committing = false;
+    let discard = false;
     try {
-      if (!hasPermission(req, "assets:reconcile")) {
-        res.status(403).json({ error: "Forbidden: Missing inventory reconciliation privileges" });
-        return;
-      }
-      const parsed = correctEventReturnSchema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({ error: parsed.error.errors[0].message });
-        return;
-      }
-      const input = parsed.data;
+      client = await pool.connect();
+      // A lost BEGIN reply must not return an open transaction to the pool.
+      transactionOpen = true;
       await client.query("BEGIN");
+      await client.query("SET LOCAL lock_timeout = '10s'");
       const receiptResult = await client.query(
-        `SELECT r.*, ea.quantity_allocated, ea.returned_good_quantity, ea.returned_damaged_quantity,
-                ea.returned_lost_quantity, ea.returned_repair_quantity,
-                COALESCE((SELECT SUM(c.good_delta) FROM event_return_corrections c WHERE c.receipt_id=r.id),0)::int AS correction_good_delta,
-                COALESCE((SELECT SUM(c.damaged_delta) FROM event_return_corrections c WHERE c.receipt_id=r.id),0)::int AS correction_damaged_delta,
-                COALESCE((SELECT SUM(c.lost_delta) FROM event_return_corrections c WHERE c.receipt_id=r.id),0)::int AS correction_lost_delta,
-                COALESCE((SELECT SUM(c.repair_delta) FROM event_return_corrections c WHERE c.receipt_id=r.id),0)::int AS correction_repair_delta
+        `SELECT r.*, ea.quantity_allocated, ea.status AS allocation_status, ea.returned_good_quantity, ea.returned_damaged_quantity,
+                ea.returned_lost_quantity, ea.returned_repair_quantity
          FROM event_return_receipts r
          JOIN event_allocations ea ON ea.id = r.allocation_id
          JOIN events e ON e.id = r.event_id AND e.deleted_at IS NULL
          WHERE r.id = $1 FOR UPDATE OF r, ea`,
-        [req.params.receiptId],
+        [receiptId.data],
       );
       if (receiptResult.rowCount === 0) {
         await client.query("ROLLBACK");
+        transactionOpen = false;
         res.status(404).json({ error: "Return receipt not found" });
         return;
       }
       const receipt = receiptResult.rows[0];
+      // A locking SELECT can wait with an older statement snapshot. Read the
+      // immutable correction ledger only after both receipt/allocation locks.
+      const correctionTotals = await client.query<{ good: number; damaged: number; lost: number; repair: number }>(
+        `SELECT COALESCE(SUM(good_delta),0)::int AS good, COALESCE(SUM(damaged_delta),0)::int AS damaged,
+                COALESCE(SUM(lost_delta),0)::int AS lost, COALESCE(SUM(repair_delta),0)::int AS repair
+         FROM event_return_corrections WHERE receipt_id = $1`,
+        [receipt.id],
+      );
+      if (correctionTotals.rowCount !== 1) throw new Error("Current receipt correction totals are unavailable");
+      const totals = correctionTotals.rows[0];
       const correctedReceipt = {
-        good: Number(receipt.good_quantity) + Number(receipt.correction_good_delta) + input.good_delta,
-        damaged: Number(receipt.damaged_quantity) + Number(receipt.correction_damaged_delta) + input.damaged_delta,
-        lost: Number(receipt.lost_quantity) + Number(receipt.correction_lost_delta) + input.lost_delta,
-        repair: Number(receipt.repair_quantity) + Number(receipt.correction_repair_delta) + input.repair_delta,
+        good: Number(receipt.good_quantity) + totals.good + input.good_delta,
+        damaged: Number(receipt.damaged_quantity) + totals.damaged + input.damaged_delta,
+        lost: Number(receipt.lost_quantity) + totals.lost + input.lost_delta,
+        repair: Number(receipt.repair_quantity) + totals.repair + input.repair_delta,
       };
       if (Object.values(correctedReceipt).some((value) => value < 0)) {
         await client.query("ROLLBACK");
+        transactionOpen = false;
         res.status(409).json({ error: "Correction cannot make a receipt condition total negative" });
         return;
       }
@@ -530,6 +550,7 @@ export function createEventReturnsRouter(): Router {
       const accountedAfter = next.good + next.damaged + next.lost + next.repair;
       if (Object.values(next).some((value) => value < 0) || accountedAfter > Number(receipt.quantity_allocated)) {
         await client.query("ROLLBACK");
+        transactionOpen = false;
         res.status(409).json({ error: "Correction would make allocation return totals invalid" });
         return;
       }
@@ -545,6 +566,7 @@ export function createEventReturnsRouter(): Router {
       );
       if (itemResult.rowCount === 0) {
         await client.query("ROLLBACK");
+        transactionOpen = false;
         res.status(409).json({ error: "The receipt inventory item no longer exists" });
         return;
       }
@@ -554,8 +576,35 @@ export function createEventReturnsRouter(): Router {
       const repairAfter = Number(item.unavailable_repair_quantity) + input.repair_delta;
       if (quantityAfter < 0 || damagedAfter < 0 || repairAfter < 0 || damagedAfter + repairAfter > quantityAfter) {
         await client.query("ROLLBACK");
+        transactionOpen = false;
         res.status(409).json({ error: "Correction would make owned or unavailable inventory invalid" });
         return;
+      }
+      const usableBefore = Number(item.quantity) - Number(item.unavailable_damaged_quantity) - Number(item.unavailable_repair_quantity);
+      const usableAfter = quantityAfter - damagedAfter - repairAfter;
+      const demandDelta = outstandingAfter - (receipt.allocation_status === "Returned" ? 0 : outstandingBefore);
+      if (usableAfter < usableBefore || demandDelta > 0) {
+        // DreamLux reserves globally, not by event windows. Use the same ledger
+        // as allocation creation/growth while holding their shared item lock.
+        const capacity = await client.query<{ worsens_capacity: boolean }>(
+          `SELECT GREATEST(COALESCE(SUM(quantity_allocated
+             - returned_good_quantity - returned_damaged_quantity
+             - returned_lost_quantity - returned_repair_quantity), 0) + $2::integer - $4::integer, 0)
+           > GREATEST(COALESCE(SUM(quantity_allocated
+             - returned_good_quantity - returned_damaged_quantity
+             - returned_lost_quantity - returned_repair_quantity), 0) - $3::integer, 0) AS worsens_capacity
+           FROM event_allocations WHERE item_id = $1 AND status <> 'Returned'`,
+          [item.id, demandDelta, usableBefore, usableAfter],
+        );
+        if (capacity.rows.length !== 1 || typeof capacity.rows[0].worsens_capacity !== "boolean") {
+          throw new Error("Correction capacity could not be confirmed");
+        }
+        if (capacity.rows[0].worsens_capacity) {
+          await client.query("ROLLBACK");
+          transactionOpen = false;
+          res.status(409).json({ error: "Correction would consume stock already reserved for events" });
+          return;
+        }
       }
       const correctionResult = await client.query(
         `INSERT INTO event_return_corrections
@@ -566,46 +615,77 @@ export function createEventReturnsRouter(): Router {
           input.lost_delta, input.repair_delta, outstandingBefore, outstandingAfter, input.reason,
           input.idempotency_key ?? null, req.user?.id || null],
       );
-      await client.query(
+      if (correctionResult.rowCount !== 1 || correctionResult.rows.length !== 1 || !correctionResult.rows[0].id) {
+        throw new Error("Return correction was not acknowledged");
+      }
+      const stockUpdate = await client.query(
         `UPDATE items SET quantity = $2, unavailable_damaged_quantity = $3,
            unavailable_repair_quantity = $4, updated_at = NOW() WHERE id = $1`,
         [item.id, quantityAfter, damagedAfter, repairAfter],
       );
+      if (stockUpdate.rowCount !== 1) throw new Error("Corrected stock update was not acknowledged");
       if (input.lost_delta !== 0) {
-        await client.query(
+        const movement = await client.query(
           `INSERT INTO inventory_movements
              (item_id, quantity_delta, quantity_before, quantity_after, source_type, source_id, notes, created_by)
            VALUES ($1,$2,$3,$4,'event_return_correction',$5,$6,$7)`,
           [item.id, -input.lost_delta, Number(item.quantity), quantityAfter, correctionResult.rows[0].id,
             input.reason, req.user?.id || null],
         );
+        if (movement.rowCount !== 1) throw new Error("Correction stock movement was not acknowledged");
       }
-      await client.query(
+      const allocationUpdate = await client.query(
         `UPDATE event_allocations SET returned_good_quantity=$2, returned_damaged_quantity=$3,
            returned_lost_quantity=$4, returned_repair_quantity=$5,
            status=CASE WHEN $6=0 THEN 'Returned' ELSE 'Pulled' END,
            returned_at=CASE WHEN $6=0 THEN COALESCE(returned_at,NOW()) ELSE NULL END,
-           returned_by=CASE WHEN $6=0 THEN $7 ELSE NULL END, updated_at=NOW() WHERE id=$1`,
+           returned_by=CASE WHEN $6=0 THEN $7::uuid ELSE NULL END, updated_at=NOW() WHERE id=$1`,
         [receipt.allocation_id, next.good, next.damaged, next.lost, next.repair, outstandingAfter, req.user?.id || null],
       );
-      await client.query(
+      if (allocationUpdate.rowCount !== 1) throw new Error("Corrected allocation was not acknowledged");
+      const audit = await client.query(
         `INSERT INTO event_logs (event_id,user_id,field_changed,old_value,new_value)
          VALUES ($1,$2,'inventory_return_correction',$3,$4)`,
         [receipt.event_id, req.user?.id || null, `outstanding ${outstandingBefore}`,
           `correction ${correctionResult.rows[0].id}; outstanding ${outstandingAfter}; reason ${input.reason}`],
       );
+      if (audit.rowCount !== 1) throw new Error("Return correction audit was not acknowledged");
+      committing = true;
       await client.query("COMMIT");
+      transactionOpen = false;
       res.status(201).json({ correction: correctionResult.rows[0], outstanding_quantity: outstandingAfter });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      if (error?.code === "23505" && String(error?.constraint || "").includes("corrections_idem")) {
+    } catch (error: unknown) {
+      if (client && transactionOpen) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          discard = true;
+          console.error("[correct-event-return] Rollback failed; discarding connection", { receiptId: receiptId.data });
+        }
+      }
+      if (committing) {
+        discard = true;
+        console.error("[correct-event-return] Commit acknowledgement failed", { receiptId: receiptId.data });
+        res.status(503).json({
+          error: "Return correction could not be confirmed. Verify return history and inventory before retrying.",
+          code: "RETURN_CORRECTION_UNCONFIRMED", outcome_uncertain: true,
+        });
+        return;
+      }
+      const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+      const constraint = error && typeof error === "object" && "constraint" in error ? error.constraint : undefined;
+      if (code === "23505" && typeof constraint === "string" && constraint.includes("corrections_idem")) {
         res.status(409).json({ error: "This correction was already recorded" });
         return;
       }
-      console.error("[correct-event-return] Error:", error?.message || error);
+      if (code === "55P03" || code === "40P01") {
+        res.status(409).json({ error: "Inventory is being changed. Reload and try again.", code: "RETURN_CORRECTION_BUSY" });
+        return;
+      }
+      console.error("[correct-event-return] Failed", { receiptId: receiptId.data, code });
       res.status(500).json({ error: "Failed to correct the return receipt" });
     } finally {
-      client.release();
+      client?.release(discard);
     }
   });
 

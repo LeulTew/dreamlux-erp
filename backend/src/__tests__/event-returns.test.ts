@@ -19,12 +19,13 @@ beforeAll(async () => {
 });
 
 const JWT_SECRET = "test-secret";
-function getToken(role = "INVENTORY_OFFICER"): string {
-  return jwt.sign({ id: "user-1", role, username: "storekeeper" }, JWT_SECRET, { expiresIn: "1h" });
+function getToken(role = "INVENTORY_OFFICER", id = "user-1"): string {
+  return jwt.sign({ id, role, username: "storekeeper" }, JWT_SECRET, { expiresIn: "1h" });
 }
 
 const EVENT_ID = "7c3f9b65-1111-4ee7-8b62-41d6e5f11101";
 const ALLOCATION_ID = "7c3f9b65-2222-4ee7-8b62-41d6e5f11102";
+const RECEIPT_ID = "7c3f9b65-4444-4ee7-8b62-41d6e5f11104";
 
 // A departed allocation of 10 pcs with 2 already returned good.
 const DEPARTED_ALLOCATION = {
@@ -443,7 +444,8 @@ describe("Immutable return corrections", () => {
       executed.push(text);
       if (text.includes("FROM event_return_receipts r")) {
         return Promise.resolve({ rows: [{
-          id: "receipt-1", allocation_id: ALLOCATION_ID, event_id: EVENT_ID, item_id: LINKED_ITEM.id,
+          id: RECEIPT_ID, allocation_id: ALLOCATION_ID, event_id: EVENT_ID, item_id: LINKED_ITEM.id,
+          allocation_status: "Returned",
           quantity_allocated: 10, good_quantity: 4, damaged_quantity: 2, lost_quantity: 2, repair_quantity: 2,
           returned_good_quantity: 4, returned_damaged_quantity: 2, returned_lost_quantity: 2, returned_repair_quantity: 2,
           correction_good_delta: 0, correction_damaged_delta: 0, correction_lost_delta: 0, correction_repair_delta: 0,
@@ -455,11 +457,17 @@ describe("Immutable return corrections", () => {
       if (text.includes("INSERT INTO event_return_corrections")) {
         return Promise.resolve({ rows: [{ id: "correction-1" }], rowCount: 1 });
       }
+      if (text.includes("FROM event_return_corrections WHERE receipt_id")) {
+        return Promise.resolve({ rows: [{ good: 0, damaged: 0, lost: 0, repair: 0 }], rowCount: 1 });
+      }
+      if (text.includes("AS worsens_capacity")) {
+        return Promise.resolve({ rows: [{ worsens_capacity: false }], rowCount: 1 });
+      }
       return Promise.resolve({ rows: [], rowCount: 1 });
     });
 
     const res = await request(app)
-      .post("/events/returns/receipt-1/corrections")
+      .post(`/events/returns/${RECEIPT_ID}/corrections`)
       .set("Authorization", `Bearer ${getToken()}`)
       .send({ lost_delta: -1, reason: "One unit was located after recount", idempotency_key: "correction-1" });
 
@@ -468,6 +476,7 @@ describe("Immutable return corrections", () => {
     expect(executed.some((sql) => sql.includes("event_return_corrections"))).toBe(true);
     expect(executed.some((sql) => sql.includes("event_return_correction"))).toBe(true);
     expect(executed.some((sql) => sql.includes("status=CASE"))).toBe(true);
+    expect(executed.some((sql) => sql.includes("returned_by=CASE WHEN $6=0 THEN $7::uuid ELSE NULL END"))).toBe(true);
     expect(executed.some((sql) => sql.includes("COMMIT"))).toBe(true);
   });
 
@@ -475,19 +484,35 @@ describe("Immutable return corrections", () => {
     mockQuery.mockImplementation((sql: string) => {
       if (String(sql).includes("FROM event_return_receipts r")) {
         return Promise.resolve({ rows: [{
-          id: "receipt-1", allocation_id: ALLOCATION_ID, event_id: EVENT_ID, item_id: LINKED_ITEM.id,
+          id: RECEIPT_ID, allocation_id: ALLOCATION_ID, event_id: EVENT_ID, item_id: LINKED_ITEM.id,
           quantity_allocated: 10, good_quantity: 1, damaged_quantity: 0, lost_quantity: 0, repair_quantity: 0,
           returned_good_quantity: 1, returned_damaged_quantity: 0, returned_lost_quantity: 0, returned_repair_quantity: 0,
           correction_good_delta: 0, correction_damaged_delta: 0, correction_lost_delta: 0, correction_repair_delta: 0,
         }], rowCount: 1 });
       }
+      if (String(sql).includes("FROM event_return_corrections WHERE receipt_id")) {
+        return Promise.resolve({ rows: [{ good: 0, damaged: 0, lost: 0, repair: 0 }], rowCount: 1 });
+      }
       return Promise.resolve({ rows: [], rowCount: 1 });
     });
     const res = await request(app)
-      .post("/events/returns/receipt-1/corrections")
+      .post(`/events/returns/${RECEIPT_ID}/corrections`)
       .set("Authorization", `Bearer ${getToken()}`)
       .send({ good_delta: -2, reason: "Correct input mistake" });
     expect(res.status).toBe(409);
     expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("ROLLBACK"))).toBe(true);
+  });
+
+  test("validates current authority, receipt identity and input before acquiring a client", async () => {
+    const path = `/events/returns/${RECEIPT_ID}/corrections`;
+    expect((await request(app).post(path).set("Authorization", `Bearer ${getToken("VIEWER", "return-viewer")}`)
+      .send({ good_delta: -1, reason: "No reconciliation authority" })).status).toBe(403);
+    expect((await request(app).post("/events/returns/not-a-uuid/corrections").set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER", "return-reconciler")}`)
+      .send({ good_delta: -1, reason: "Invalid receipt identifier" })).status).toBe(400);
+    expect((await request(app).post(path).set("Authorization", `Bearer ${getToken("INVENTORY_OFFICER", "return-reconciler")}`)
+      .send({ good_delta: 0, reason: "No quantity change" })).status).toBe(400);
+    expect(mockConnect).not.toHaveBeenCalled();
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockRelease).not.toHaveBeenCalled();
   });
 });

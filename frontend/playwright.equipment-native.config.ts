@@ -3,7 +3,7 @@ import { isAbsolute } from "node:path";
 import { payrollSystemEnvironment } from "./payroll-qa-environment";
 
 for (const name of [
-  "DREAMLUX_EQUIPMENT_BROWSER_DESCRIPTOR", "DREAMLUX_EQUIPMENT_CONTROL_SCRIPT",
+  "DREAMLUX_EQUIPMENT_BROWSER_DESCRIPTOR", "DREAMLUX_EQUIPMENT_CONTROL_SCRIPT", "DREAMLUX_EQUIPMENT_RETURN_CONTROL_SCRIPT",
   "DREAMLUX_BUN_PATH", "DREAMLUX_EQUIPMENT_BROWSER_REPORT", "DREAMLUX_EQUIPMENT_BROWSER_OUTPUT",
 ]) {
   const value = process.env[name];
@@ -14,7 +14,7 @@ for (const name of [
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["issue259-equipment-deletion.spec.ts", "issue259-equipment-native.spec.ts"],
+  testMatch: ["issue259-equipment-deletion.spec.ts", "issue259-equipment-native.spec.ts", "issue273-return-correction-native.spec.ts"],
   fullyParallel: false,
   workers: 1,
   retries: 0,

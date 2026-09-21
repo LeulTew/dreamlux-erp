@@ -111,6 +111,14 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
     verifyJunitReceipt(await readFile(conditionReport, "utf8"), conditionSummary);
     console.log(`Native conditions: ${conditionSummary.passed} passed, zero failed/skipped.`);
 
+    const returnReport = join(work, "returns.native.private.junit.xml");
+    const returns = start("native return correction assertions", process.execPath,
+      nativeArguments(returnReport, "returns"), join(root, "backend"), env);
+    const returnResult = await returns.requireSuccess(budget(60_000));
+    const returnSummary = nativeReceipt(returnResult.output, returnResult.exitCode, { suite: "returns" });
+    verifyJunitReceipt(await readFile(returnReport, "utf8"), returnSummary);
+    console.log(`Native return corrections: ${returnSummary.passed} passed, zero failed/skipped.`);
+
     await ports.release(5326);
     const descriptorPath = join(work, "equipment.browser.private.json");
     const providerReport = join(work, "equipment.provider.private.junit.xml");
@@ -141,6 +149,7 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
       ...env, ...payrollUiEnvironment(process.env), NODE_ENV: "development",
       DREAMLUX_EQUIPMENT_BROWSER_DESCRIPTOR: descriptorPath,
       DREAMLUX_EQUIPMENT_CONTROL_SCRIPT: join(root, "backend", "src", "db", "testing", "equipment-browser-control.ts"),
+      DREAMLUX_EQUIPMENT_RETURN_CONTROL_SCRIPT: join(root, "backend", "src", "db", "testing", "return-browser-control.ts"),
       DREAMLUX_BUN_PATH: process.execPath, DREAMLUX_EQUIPMENT_BROWSER_REPORT: browserReport,
       DREAMLUX_EQUIPMENT_BROWSER_OUTPUT: join(work, "equipment.browser.private.results"),
     };
@@ -165,7 +174,7 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
     budget(1);
     const infrastructure = await stopProvider();
     receipt = {
-      schema: 1, purpose: "dreamlux-equipment-259", native: nativeSummary, conditions: conditionSummary, browsers,
+      schema: 1, purpose: "dreamlux-equipment-259", native: nativeSummary, conditions: conditionSummary, returns: returnSummary, browsers,
       browserRegistryDigest: hash(JSON.stringify(registry)), providerInfrastructureOnly: infrastructure,
       frontend: build, testSourceDigest: snapshot.testDigest,
     };
