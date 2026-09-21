@@ -77,6 +77,10 @@ environment, migration baseline or provider connection is copied.
   transport is explicitly mocked; this is caller proof, separate from
   native persistence proof. Unexpected requests, malformed/partial receipts,
   skipped tests, retries and occupied ports fail rather than become success.
+  Search-result viewport checks use the existing 7.5-second assertion budget
+  to verify actual rendered bounds during the dialog entrance. The 48px height
+  and viewport-containment requirements remain exact; persistent undersize or
+  offscreen controls must fail. No animation or CI deadline is changed.
 - `bun run verify:imports:infra` checks the fixture/runner contracts. Import
   verification is appended to the existing CI native job without another build,
   job or increased job timeout. No hosted CI rerun is implied by local execution.
