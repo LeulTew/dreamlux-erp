@@ -28,6 +28,9 @@ export function getEffectivePermissionSlugsFromUser(user: AuthRequest["user"]): 
   if (!user) return [];
 
   const explicit = normalizePermissionSlugs(user.permission_slugs);
+  if (Array.isArray(user.permission_slugs)) {
+    return explicit;
+  }
   const mapDerived = permissionMapToSlugs(normalizePermissionMap(user.permissions));
   if (explicit.length > 0 || mapDerived.length > 0) {
     return [...new Set([...explicit, ...mapDerived])];
