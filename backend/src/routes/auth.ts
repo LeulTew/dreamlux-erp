@@ -75,6 +75,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       permissions: Record<string, unknown>;
       permission_slugs?: string[];
       profile_image_url?: string | null;
+      password_hash?: string;
     }> = [];
 
     try {
@@ -85,6 +86,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
           u.email,
           u.full_name,
           u.profile_image_url,
+          u.password_hash,
           u.is_active,
           u.role_id,
           r.name as role_name,
@@ -94,7 +96,8 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
          JOIN roles r ON u.role_id = r.id
          LEFT JOIN role_permissions rp ON rp.role_id = r.id
          LEFT JOIN permissions p ON p.id = rp.permission_id
-         WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)
+         WHERE u.username = $1
+           AND (u.password_hash LIKE '$2b$%' OR u.password_hash = crypt($2, u.password_hash))
          GROUP BY u.id, u.username, u.email, u.full_name, u.profile_image_url, u.is_active, u.role_id, r.name, r.permissions`,
         [queryUsername, queryPassword]
       );
@@ -105,15 +108,22 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       }
 
       const queryResult = await pool.query(
-        `SELECT u.id, u.username, u.email, u.full_name, NULL::text as profile_image_url, u.is_active, u.role_id, r.name as role_name, r.permissions
+        `SELECT u.id, u.username, u.email, u.full_name, NULL::text as profile_image_url, u.password_hash, u.is_active, u.role_id, r.name as role_name, r.permissions
          FROM users u
          JOIN roles r ON u.role_id = r.id
-         WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)`,
+         WHERE u.username = $1
+           AND (u.password_hash LIKE '$2b$%' OR u.password_hash = crypt($2, u.password_hash))`,
         [queryUsername, queryPassword]
       );
       rows = queryResult?.rows || [];
     }
 
+    // pgcrypto does not recognize every bcrypt prefix produced by bcryptjs.
+    // Verify 2b with the original algorithm, without relabeling stored hashes.
+    if (rows[0]?.password_hash?.startsWith("$2b$")
+      && !(await compare(queryPassword, rows[0].password_hash))) {
+      rows = [];
+    }
     if (rows.length === 0) {
       // Legacy fallback
       const adminPassword = matchedRecoveryPassword(queryUsername, queryPassword);

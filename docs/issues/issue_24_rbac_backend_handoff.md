@@ -199,6 +199,40 @@ after the sweep. The existing 20,000-invalidation control retains its original
 deadline; deterministic headroom, stale/fresh revision and age controls cover
 the batching behavior separately from host timing.
 
+### Usable Provisioned Accounts (Issue #282)
+
+The primary login query retains PostgreSQL's existing verification for supported
+stored formats. A bcrypt `2b` candidate is verified with the same bcrypt library
+that produces account passwords before any token or recovery decision. Stored
+hashes are neither relabeled as another algorithm variant nor returned in login
+responses. This preserves newly provisioned and existing bcrypt accounts on
+PostgreSQL versions whose `pgcrypto` does not support that prefix, including the
+explicit missing-profile-column compatibility path. Wrong credentials still
+fail normally.
+
+When provisioning creates the editable SYSTEM_MANAGER role for the first time,
+the role, its advertised `users:manage` and `settings:write` grant links, and its
+required activity record commit in one bounded, serialized transaction before
+the manager account is written. Existing role grants, including an intentionally
+empty set, are never rewritten from the legacy map. Existing roles with missing
+grants therefore require an explicit permission-editor decision; runtime
+authorization must not infer their intended permissions.
+
+Creating that new role requires the direct transaction path. If it is unavailable,
+the request fails explicitly before a new manager account is written rather
+than using separate Data API writes for partial authority. Recovery using an
+already configured role retains its existing alternate-transport path.
+Unacknowledged role commits are reported as uncertain; review current roles
+before retrying. The wider administrator/manager account pair remains the
+separate non-atomic provisioning boundary documented above.
+
+The permanent native provisioning suite runs as its own process in the existing
+equipment verifier, without increasing its 170-second total budget. It tests
+actual login/current grants, customized and empty roles, wrong passwords,
+compatibility, suppressed grants/audit, concurrent initialization and lost
+transaction acknowledgements. Public test credentials and disposable accounts
+are not production credential-remediation evidence.
+
 ### Verification Boundary
 
 Focused coverage lives in

@@ -4,6 +4,7 @@ import {
   BROWSER_FILES, browserReceipt, browserRegistry, equipmentDescriptor, equipmentEnvironment,
   CONDITION_TEST, CONDITION_TEST_COUNT, NATIVE_TEST, NATIVE_TEST_COUNT, nativeArguments, nativeReceipt,
   RETURN_TEST, RETURN_TEST_COUNT,
+  PROVISIONING_TEST, PROVISIONING_TEST_COUNT,
 } from "./contracts";
 
 const admin = `postgresql://dreamlux_parity:${"a".repeat(64)}@127.0.0.1:55434/postgres?sslmode=disable`;
@@ -87,12 +88,26 @@ describe("independent equipment verification contracts", () => {
     expect(nativeReceipt(output, 0, { suite: "returns" })).toEqual({
       passed: 35, failed: 0, skipped: 0, tests: 35, files: 1,
     });
+
     expect(nativeArguments("returns.junit.xml", "returns").at(-1)?.replaceAll("\\", "/")).toBe(RETURN_TEST);
     expect(() => nativeReceipt(nativeOutput(RETURN_TEST_COUNT), 0, { suite: "returns" })).toThrow();
     expect(() => nativeReceipt(nativeOutput(RETURN_TEST_COUNT - 1).replace(NATIVE_TEST, RETURN_TEST), 0, { suite: "returns" })).toThrow();
     expect(() => nativeReceipt(`${output}1 skip\n`, 0, { suite: "returns" })).toThrow();
     expect(() => nativeReceipt(output, 1, { suite: "returns" })).toThrow();
     expect(() => nativeReceipt(output, 0, { suite: "returns", infrastructure: true })).toThrow();
+  });
+
+  test("requires complete provisioning and login proof without accepting a different native suite", () => {
+    const output = nativeOutput(PROVISIONING_TEST_COUNT).replace(NATIVE_TEST, PROVISIONING_TEST);
+    expect(nativeReceipt(output, 0, { suite: "provisioning" })).toEqual({
+      passed: 11, failed: 0, skipped: 0, tests: 11, files: 1,
+    });
+    expect(nativeArguments("provisioning.junit.xml", "provisioning").at(-1)?.replaceAll("\\", "/")).toBe(PROVISIONING_TEST);
+    expect(nativeArguments("provisioning.junit.xml", "provisioning").some((arg) => arg.startsWith("--timeout"))).toBe(false);
+    expect(() => nativeReceipt(nativeOutput(PROVISIONING_TEST_COUNT), 0, { suite: "provisioning" })).toThrow();
+    expect(() => nativeReceipt(`${output}1 skip\n`, 0, { suite: "provisioning" })).toThrow();
+    expect(() => nativeReceipt(output, 1, { suite: "provisioning" })).toThrow();
+    expect(() => nativeReceipt(output, 0, { suite: "provisioning", infrastructure: true })).toThrow();
   });
 
   test("exhausts the exact discovered twelve-case desktop/mobile registry", () => {

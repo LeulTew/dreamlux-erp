@@ -13,10 +13,13 @@ export const CONDITION_TEST = "src/db/inventory-condition-resolution.integration
 export const CONDITION_TEST_COUNT = 23;
 export const RETURN_TEST = "src/db/equipment-return-correction.integration.test.ts";
 export const RETURN_TEST_COUNT = 35;
+export const PROVISIONING_TEST = "src/db/authority-provisioning.integration.test.ts";
+export const PROVISIONING_TEST_COUNT = 11;
 const NATIVE_SUITES = {
   deletion: { file: NATIVE_TEST, count: NATIVE_TEST_COUNT },
   conditions: { file: CONDITION_TEST, count: CONDITION_TEST_COUNT },
   returns: { file: RETURN_TEST, count: RETURN_TEST_COUNT },
+  provisioning: { file: PROVISIONING_TEST, count: PROVISIONING_TEST_COUNT },
 } as const;
 type NativeSuite = keyof typeof NATIVE_SUITES;
 export const BROWSER_FILES = [
