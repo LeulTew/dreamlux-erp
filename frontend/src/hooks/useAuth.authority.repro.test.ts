@@ -306,6 +306,28 @@ describe("approved narrowing and recovery regressions", () => {
     expect(result.current.isPreviewActive).toBe(false);
   });
 
+  it.each([401, 503])("does not authorize from retained permission data after a session refetch fails with %s", async (status) => {
+    getPermissions.mockResolvedValue(authority(["users:manage", "assets:reconcile"]));
+    setPreview("SYNTHETIC_OPERATOR", JSON.stringify(["assets:reconcile"]));
+    const { result, client } = await mountAuth();
+    expect(result.current.hasPermission("assets:reconcile")).toBe(true);
+    expect(result.current.isPreviewActive).toBe(true);
+
+    getMe.mockRejectedValue(Object.assign(new Error("Synthetic session verification unavailable"), { response: { status } }));
+    await act(async () => { await client.refetchQueries({ queryKey: ["me"] }); });
+    await waitFor(() => expect(result.current.error?.message).toBe("Synthetic session verification unavailable"));
+    expect(client.getQueryData(["permissions"])).toEqual(authority(["users:manage", "assets:reconcile"]));
+    expect(result.current.hasPermission("assets:reconcile")).toBe(false);
+    expect(result.current.rawIsAdmin).toBe(false);
+    expect(result.current.isPreviewActive).toBe(false);
+
+    getMe.mockResolvedValue({ data: { user: actualUser } });
+    await act(async () => { await client.refetchQueries({ queryKey: ["me"] }); });
+    await waitFor(() => expect(result.current.hasPermission("assets:reconcile")).toBe(true));
+    expect(result.current.isAuthenticated).toBe(true);
+    expect(result.current.isPreviewActive).toBe(false);
+  });
+
   it("rejects permission metadata cached for a different user", async () => {
     getPermissions.mockResolvedValue({ ...authority(["*"], true), user_id: "different-synthetic-user" });
     setPreview("OWNER", JSON.stringify(["*"]));

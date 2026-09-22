@@ -99,7 +99,8 @@ beforeAll(async () => {
   const queryTarget: { query: (sql: string, params?: unknown[]) => Promise<QueryResult> } = pool;
   const querySpy = spyOn(queryTarget, "query").mockImplementation(query);
   const connectSpy = spyOn(pool, "connect").mockImplementation(forbiddenProvider);
-  const fromSpy = spyOn(shared.__mockSupabase, "from").mockImplementation(fallbackFrom);
+  const provider: { from: (table: string) => unknown } = (await import("../db/supabase")).supabase;
+  const fromSpy = spyOn(provider, "from").mockImplementation(fallbackFrom);
   restoreProviders = () => { querySpy.mockRestore(); connectSpy.mockRestore(); fromSpy.mockRestore(); };
   const bootstrapModule = await import("../lib/bootstrap-admin");
   bootstrap = spyOn(bootstrapModule, "ensureBootstrapAdmin").mockResolvedValue(bootstrapUser);

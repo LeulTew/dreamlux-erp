@@ -178,8 +178,26 @@ session, including when storage removal fails. A failed removal also suppresses
 that unchanged stored snapshot for subsequent or pending hook hydration in the
 current document; a later different draft remains usable. The existing preview
 selection workflow reloads the document after saving a new draft. Loss of actual
-preview authority discards the preview. A failed permission refresh cannot retain grants from a
-previous successful response or from preview storage.
+preview authority discards the preview. Failed permission or current-session
+refreshes cannot retain grants from a previous successful response or from
+preview storage. A retained user display snapshot is not fresh authority:
+actions remain denied until the session read recovers, without introducing a
+new forced logout on a transient read failure.
+
+### Bounded Invalidation Bursts (Issue #281)
+
+The invalidation map keeps its existing ceiling and revision barrier, but
+size-triggered sweeps now leave half the threshold available for new markers.
+This avoids repeatedly sorting the entire map for each user in a simultaneous
+burst. Periodic age sweeps still reclaim expired markers after batching lowers
+the size; the two-TTL retention constant, actual cache TTL and true-LRU limit
+are unchanged.
+
+Removing any marker still advances the global revision so an old in-flight
+lookup cannot become current after eviction. The caller's new marker is added
+after the sweep. The existing 20,000-invalidation control retains its original
+deadline; deterministic headroom, stale/fresh revision and age controls cover
+the batching behavior separately from host timing.
 
 ### Verification Boundary
 

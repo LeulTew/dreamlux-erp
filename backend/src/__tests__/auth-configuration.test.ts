@@ -68,7 +68,8 @@ beforeAll(async () => {
   const queryTarget: { query: (sql: string, params?: unknown[]) => Promise<QueryResult> } = pool;
   const querySpy = spyOn(queryTarget, "query").mockImplementation(query);
   const connectSpy = spyOn(pool, "connect").mockImplementation(forbiddenNetwork);
-  const fromSpy = spyOn(shared.__mockSupabase, "from").mockImplementation(from);
+  const provider: { from: (table: string) => unknown } = (await import("../db/supabase")).supabase;
+  const fromSpy = spyOn(provider, "from").mockImplementation(from);
   restoreProviders = () => { querySpy.mockRestore(); connectSpy.mockRestore(); fromSpy.mockRestore(); };
   bootstrap = spyOn(await import("../lib/bootstrap-admin"), "ensureBootstrapAdmin").mockResolvedValue(administrator);
   sign = spyOn(jwt, "sign");

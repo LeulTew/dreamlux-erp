@@ -126,7 +126,7 @@ export function useAuth() {
   const invalidAuthority = Boolean(user && permissionsData && (
     normalizedSlugs === null || permissionsData.user_id !== (user.id || null)
   ));
-  const authorityReady = Boolean(user && permissionsData && !permissionsError && !invalidAuthority);
+  const authorityReady = Boolean(user && !error && permissionsData && !permissionsError && !invalidAuthority);
   const rawPermissionSlugs = authorityReady ? normalizedSlugs || [] : [];
   const actualHasPermission = createPermissionMatcher(rawPermissionSlugs);
   const rawIsAdmin = actualHasPermission("users:manage") || actualHasPermission("settings:write");
