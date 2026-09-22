@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { TEST_ADMIN_PASSWORD } from "./auth-test-config";
 
 const queryCalls: Array<{ sql: string; params?: unknown[] }> = [];
 
@@ -72,7 +73,7 @@ describe("ensureBootstrapAdmin", () => {
   test("refreshes an existing admin password hash from configured dev/test password", async () => {
     const { ensureBootstrapAdmin } = await import("../lib/bootstrap-admin");
 
-    const admin = await ensureBootstrapAdmin("Password123");
+    const admin = await ensureBootstrapAdmin(TEST_ADMIN_PASSWORD);
 
     expect(admin).toMatchObject({
       id: "user-admin",
@@ -87,7 +88,7 @@ describe("ensureBootstrapAdmin", () => {
     );
 
     expect(passwordSync).toBeDefined();
-    expect(passwordSync?.params).toEqual(["Password123", "user-admin"]);
+    expect(passwordSync?.params).toEqual([TEST_ADMIN_PASSWORD, "user-admin"]);
     expect(mockRelease).toHaveBeenCalled();
   });
 });

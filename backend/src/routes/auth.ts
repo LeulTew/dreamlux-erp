@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { compare } from "bcryptjs";
-import { getEnv } from "../lib/env";
+import { AuthConfigurationError, getAdminRecoveryPassword, getAuthSigningSecret } from "../lib/env";
 import { pool } from "../db/pool";
 import { supabase } from "../db/supabase";
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
@@ -30,16 +30,37 @@ function setTokenCookie(res: Response, token: string) {
   });
 }
 
+function matchedRecoveryPassword(username: string, password: unknown): string | null {
+  if (username !== "admin" || typeof password !== "string") return null;
+  try {
+    const configured = getAdminRecoveryPassword();
+    return configured !== null && password === configured ? configured : null;
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[RecoveryConfiguration]", error.message);
+    return null;
+  }
+}
+
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body;
-  const jwtSecret = getEnv("JWT_SECRET", "dev-secret");
 
   // Fallback to 'admin' username if the frontend only sends a password field (transitional)
   const queryUsername = username || 'admin';
   const queryPassword = password;
 
-  if (!queryPassword) {
+  if (typeof queryPassword !== "string" || !queryPassword) {
     res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+
+  let jwtSecret: string;
+  try {
+    jwtSecret = getAuthSigningSecret();
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[AuthConfiguration]", error.message);
+    res.status(503).json({ error: "Authentication service unavailable" });
     return;
   }
 
@@ -95,8 +116,8 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 
     if (rows.length === 0) {
       // Legacy fallback
-      const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-      if (queryUsername === 'admin' && queryPassword === adminPassword) {
+      const adminPassword = matchedRecoveryPassword(queryUsername, queryPassword);
+      if (adminPassword !== null) {
         try {
           const adminUser = await ensureBootstrapAdmin(adminPassword);
           const token = jwt.sign(
@@ -268,8 +289,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-    if (queryUsername === 'admin' && queryPassword === adminPassword) {
+    if (matchedRecoveryPassword(queryUsername, queryPassword) !== null) {
       const token = jwt.sign({ username: 'admin', role: 'SUPER_ADMIN', permissions: { all: true }, permission_slugs: ['*'] }, jwtSecret, { expiresIn: '7d' });
       setTokenCookie(res, token);
       res.json({ token, user: { username: 'admin', role: 'SUPER_ADMIN', profile_image_url: null } });

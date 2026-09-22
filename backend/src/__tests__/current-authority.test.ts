@@ -2,6 +2,7 @@ import "./setup";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import express from "express";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import request from "supertest";
 import * as permissionDb from "../lib/permissions-db";
 import { getEffectivePermissionSlugsFromUser, requireAuth, type AuthRequest } from "../middleware/auth";
@@ -37,7 +38,7 @@ function token() {
   return jwt.sign({
     id, username: "synthetic-authority", role: "OWNER", roles: ["OWNER"],
     permission_slugs: ["payroll:read", "payroll:write"], permissions: { payroll: ["read", "write"] },
-  }, "test-secret", { expiresIn: "1h" });
+  }, TEST_JWT_SECRET, { expiresIn: "1h" });
 }
 
 describe("current authority replaces token snapshots", () => {

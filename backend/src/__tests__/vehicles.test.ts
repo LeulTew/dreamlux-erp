@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeEach, beforeAll } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 
 type MockResult = { rows: any[]; count?: number; error?: { code?: string; message?: string } };
 const mockQuery = mock((): Promise<MockResult> => Promise.resolve({ rows: [] as any[] }));
@@ -43,7 +44,7 @@ const fakeChain = (): any => {
 
 mock.module("../db/supabase", () => ({ supabase: { from: () => fakeChain() } }));
 
-const JWT_SECRET = process.env.JWT_SECRET || "dreamlux-jwt-secret-key-2026";
+const JWT_SECRET = process.env.JWT_SECRET || TEST_JWT_SECRET;
 function token(role = "SUPER_ADMIN"): string {
   return jwt.sign({ id: "u1", role, username: "t" }, JWT_SECRET, { expiresIn: "1h" });
 }

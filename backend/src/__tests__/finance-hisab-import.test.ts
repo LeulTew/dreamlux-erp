@@ -2,6 +2,7 @@ import "./setup";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import ExcelJS from "exceljs";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import request from "supertest";
 import { parseHisabWorkbook } from "../services/hisab-import-service";
 
@@ -37,7 +38,7 @@ beforeAll(async () => {
 });
 
 function token(role = "ACCOUNTANT", permission_slugs?: string[]): string {
-  return jwt.sign({ id: "user-1", role, username: "finance-user", permission_slugs }, "test-secret", { expiresIn: "1h" });
+  return jwt.sign({ id: "user-1", role, username: "finance-user", permission_slugs }, TEST_JWT_SECRET, { expiresIn: "1h" });
 }
 
 async function workbookBuffer(options: { mismatch?: boolean; includeUnknown?: boolean } = {}): Promise<Buffer> {
@@ -125,7 +126,7 @@ describe("legacy Hisab import API", () => {
       .attach("workbook", await workbookBuffer(), "legacy-hisab.xlsx");
     expect(allowed.status).toBe(200);
     expect(allowed.body.workbookHash).toMatch(/^[a-f0-9]{64}$/);
-    expect(JSON.stringify(allowed.body)).not.toContain("test-secret");
+    expect(JSON.stringify(allowed.body)).not.toContain(TEST_JWT_SECRET);
   });
 
   test("commit inserts pending rows with source_import_id in one transaction", async () => {

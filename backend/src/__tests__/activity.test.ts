@@ -1,6 +1,7 @@
 import { describe, test, expect, mock } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import app from "../index";
 import "./setup"; // Imports setup mocks for Supabase/pg
 
@@ -66,7 +67,7 @@ mock.module("../db/pool", () => ({
 
 // Helper to generate auth tokens
 function getTestToken(userId: string, role = "admin", permissions = ["*"]): string {
-  const secret = process.env.JWT_SECRET || "test-secret";
+  const secret = process.env.JWT_SECRET || TEST_JWT_SECRET;
   return jwt.sign(
     {
       id: userId,

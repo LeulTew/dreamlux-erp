@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import express, { type Response } from "express";
 import jwt from "jsonwebtoken";
+import { TEST_ADMIN_PASSWORD, TEST_JWT_SECRET } from "./auth-test-config";
 import type { AuthRequest } from "../middleware/auth";
 
 // The standard synthetic preload is required; no app entrypoint is imported.
@@ -135,7 +136,7 @@ function makeResponse() {
 }
 
 async function authenticate() {
-  const token = signTestToken(verifiedTokenUser, "test-secret");
+  const token = signTestToken(verifiedTokenUser, TEST_JWT_SECRET);
   const req = { method: "GET", headers: { cookie: `token=${token}` } } as AuthRequest;
   const response = makeResponse();
   const next = mock(() => {});
@@ -629,7 +630,7 @@ describe("approved policy and legacy boundary regressions", () => {
 
   test("the defined bootstrap login retains its explicit administrator grant", async () => {
     queryReplies.push({ rows: [] });
-    const result = await login("admin", "test-password");
+    const result = await login("admin", TEST_ADMIN_PASSWORD);
     expect(result.statusCode).toBe(200);
     expect(bootstrap).toHaveBeenCalledTimes(1);
     expect(sign.mock.calls[0]?.[0]).toMatchObject({
@@ -640,7 +641,7 @@ describe("approved policy and legacy boundary regressions", () => {
   test("the explicit legacy bootstrap recovery token remains usable without rewriting bootstrap policy", async () => {
     queryReplies.push({ rows: [] });
     bootstrap.mockRejectedValueOnce(new Error("Synthetic bootstrap unavailable"));
-    expect((await login("admin", "test-password")).statusCode).toBe(200);
+    expect((await login("admin", TEST_ADMIN_PASSWORD)).statusCode).toBe(200);
     expect(sign.mock.calls[0]?.[0]).toEqual({
       username: "admin", role: "SUPER_ADMIN", permissions: { all: true }, permission_slugs: ["*"],
     });

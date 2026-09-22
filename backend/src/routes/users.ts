@@ -6,7 +6,7 @@ import { hash } from "bcryptjs";
 import sharp from "sharp";
 // @ts-expect-error -- uuid types friction in ESM/CJS
 import { v4 as uuidv4 } from "uuid";
-import { getEnv } from "../lib/env";
+import { AuthConfigurationError, getEnv, getProvisioningPasswords } from "../lib/env";
 import { PERMISSION_DEFINITIONS, normalizePermissionSlugs } from "../lib/permissions";
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
 import { getPublicUrl, uploadImage } from "../storage/storage";
@@ -1198,9 +1198,17 @@ router.delete("/roles/:id", async (req: AuthRequest, res: Response) => {
 
 // Ensure default admin account is present and active
 router.post("/bootstrap-admin", async (_req: AuthRequest, res: Response) => {
+  let passwords: ReturnType<typeof getProvisioningPasswords>;
   try {
-    const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-    const managerPassword = getEnv("MANAGER_PASSWORD", "manager123");
+    passwords = getProvisioningPasswords();
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[ProvisioningConfiguration]", error.message);
+    res.status(503).json({ error: "Administrator provisioning unavailable" });
+    return;
+  }
+  const { adminPassword, managerPassword } = passwords;
+  try {
     const adminUser = await ensureBootstrapAdmin(adminPassword);
     const managerUser = await ensureSystemManagerViaSupabase(managerPassword);
     res.json({
@@ -1220,8 +1228,6 @@ router.post("/bootstrap-admin", async (_req: AuthRequest, res: Response) => {
   } catch (error) {
     if (isPoolUnreachable(error) || isMissingColumnError(error)) {
       try {
-        const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-        const managerPassword = getEnv("MANAGER_PASSWORD", "manager123");
         const adminUser = await ensureBootstrapAdminViaSupabase(adminPassword);
         const managerUser = await ensureSystemManagerViaSupabase(managerPassword);
         res.status(200).json({

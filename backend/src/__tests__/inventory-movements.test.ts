@@ -1,6 +1,7 @@
 import "./setup";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import request from "supertest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,7 +24,7 @@ beforeAll(async () => {
 beforeEach(() => mockQuery.mockReset());
 
 function token(role: string, permissions?: Record<string, string[]>): string {
-  return jwt.sign({ id: "user-1", role, username: "reviewer", permissions }, "test-secret", { expiresIn: "1h" });
+  return jwt.sign({ id: "user-1", role, username: "reviewer", permissions }, TEST_JWT_SECRET, { expiresIn: "1h" });
 }
 
 describe("GET /assets/movements", () => {

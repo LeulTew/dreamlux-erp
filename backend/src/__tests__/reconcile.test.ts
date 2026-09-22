@@ -1,8 +1,9 @@
 import { describe, test, expect, mock, beforeAll, beforeEach } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 
-const JWT_SECRET = "test-secret";
+const JWT_SECRET = TEST_JWT_SECRET;
 const STORE_UUID = "550e8400-e29b-41d4-a716-446655440099";
 
 // Mock Supabase

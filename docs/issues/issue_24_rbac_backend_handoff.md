@@ -105,12 +105,63 @@ Existing tokens without identifiers also retain the older map/role fallback
 when an explicit grant array is absent.
 
 Configuration classes are the bootstrap-password and JWT-signing-secret
-settings, plus runtime mode for cookie flags. Source defaults exist; no values
-or deployed configuration are attested here. Tokens and cookies have a seven-day
+settings, plus runtime mode for cookie flags. Issue #280 removes source-default
+activation as described below; no deployed configuration is attested here.
+Tokens and cookies have a seven-day
 lifetime. Logout clears the cookie; no per-token revocation or bootstrap-specific
 rate limiter is implemented in the inspected login/middleware path. Upstream
 hosting controls are unverified. Separate hardening requires a new decision and
 must not silently replace the compatibility policy preserved in this change.
+
+### Explicit Authentication Configuration (Issue #280)
+
+**Rollout prerequisite:** signing and verification require an explicitly
+provisioned `JWT_SECRET`. Without valid configuration, authentication that would
+issue or verify a token fails with a generic 503 before database or provisioning
+work. Diagnostics identify the setting class and reason, never the value.
+There is no development/test-mode exception.
+
+The normalized key must contain at least 32 UTF-8 bytes. Blank, control-character,
+multiline, recognized placeholder and trivially repeated values are rejected;
+historical source defaults are shorter than the permitted minimum. Enclosing
+quotes and outer whitespace are normalized consistently for signing and
+verification, without selecting one line from a multiline secret. There is no
+distinct-character quota. **Length and format do not establish entropy:** use an
+independently provisioned, cryptographically generated key with at least 32
+random bytes, not a human-chosen phrase or the repository's public test fixtures.
+
+`ADMIN_PASSWORD` is optional for ordinary database authentication. When absent,
+the login recovery capability is disabled; successful ordinary logins, including
+the reserved administrator's actual database password, still work. When present,
+the recovery credential must be explicitly provisioned, at least 16 UTF-8 bytes,
+and pass the same blank/control/multiline/placeholder/trivial-repeat checks.
+Only the reserved identity plus an exact match to that valid configured
+credential activates the existing privileged recovery path. Invalid recovery
+configuration cannot create, reset, promote or reactivate an account through
+the login fallback, or issue its identifier-less recovery token.
+
+The authenticated `/users/bootstrap-admin` endpoint provisions both reserved
+accounts. It requires **both** `ADMIN_PASSWORD` and `MANAGER_PASSWORD` to pass
+the 16-byte provisioning checks **before either mutation**, including before
+alternate-transport recovery. Missing/invalid configuration returns a generic
+503 for that endpoint. Missing manager configuration does not disable ordinary
+login or separately configured administrator login recovery. Existing protected
+roles, last-administrator guards and correctly configured populated-database
+recovery are unchanged. This is a configuration preflight before either writer,
+not a transaction spanning the subsequent administrator and manager mutations;
+a later provisioning failure can still leave partial account changes.
+
+The signing change does not retroactively attest deployed configuration or
+revoke tokens. If a source-default/weak key was ever used, retiring that key and
+the tokens it signed is a separate, target-attested operator action.
+**Persisted-password prerequisite:** this source fix does not replace a default
+password already stored on an account. Ordinary database login can still accept
+that stored password. If default credentials were ever persisted, separately
+authorized credential remediation and verification are required before claiming
+the exposure is resolved. No key rotation, account-password change, stored-grant
+rewrite, schema change, deployment or provider operation is performed by this
+source change. The retained seven-day identifier-less recovery/revocation
+boundary above remains a separate policy limitation.
 
 ### Role Preview
 

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { getEnv } from "../lib/env";
+import { AuthConfigurationError, getAuthSigningSecret } from "../lib/env";
 import {
   hasPermissionSlug,
   normalizePermissionMap,
@@ -73,8 +73,6 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
 
   const authHeader = req.headers.authorization;
-  const secret = getEnv("JWT_SECRET", "dev-secret");
-
   let token: string | undefined;
 
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -86,6 +84,16 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
 
   if (!token) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  let secret: string;
+  try {
+    secret = getAuthSigningSecret();
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[AuthConfiguration]", error.message);
+    res.status(503).json({ error: "Authentication service unavailable" });
     return;
   }
 
