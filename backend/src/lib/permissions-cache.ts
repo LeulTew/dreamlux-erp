@@ -8,8 +8,10 @@ export type CachedUserPermissionsPublic = Omit<CachedUserPermissions, "cachedAt"
 
 // In-memory permission cache dictionary
 const cache = new Map<string, CachedUserPermissions>();
-const invalidationTimestamps = new Map<string, number>();
+const invalidationTimestamps = new Map<string, { timestamp: number; revision: number }>();
 let globalInvalidatedAt = 0;
+let invalidationRevision = 0;
+let globalInvalidatedRevision = 0;
 
 export const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 const MAX_CACHE_SIZE = 2000;
@@ -30,6 +32,10 @@ export const INVALIDATION_RETENTION_MS = CACHE_TTL_MS * 2;
  * would make each call O(n); this amortises it while keeping the map bounded.
  */
 export const INVALIDATION_PRUNE_THRESHOLD = 4000;
+
+export function getPermissionCacheRevision(userId: string): number {
+  return Math.max(globalInvalidatedRevision, invalidationTimestamps.get(userId)?.revision ?? 0);
+}
 
 /**
  * Returns cached permissions for a user, or null if the entry is missing or
@@ -71,7 +77,7 @@ export function setCachedUserPermissions(
   now: number = Date.now(),
   fetchedAt?: number,
 ): boolean {
-  const userInvalidatedAt = invalidationTimestamps.get(userId) ?? 0;
+  const userInvalidatedAt = invalidationTimestamps.get(userId)?.timestamp ?? 0;
   const lastInvalidatedAt = Math.max(userInvalidatedAt, globalInvalidatedAt);
   if (lastInvalidatedAt > 0 && fetchedAt !== undefined && lastInvalidatedAt >= fetchedAt) {
     // Invalidation occurred while DB fetch was in flight — discard stale write
@@ -101,21 +107,26 @@ export function setCachedUserPermissions(
  * the map stays bounded regardless.
  */
 function pruneInvalidationTimestamps(now: number): void {
-  for (const [userId, invalidatedAt] of invalidationTimestamps) {
-    if (now - invalidatedAt > INVALIDATION_RETENTION_MS) {
+  let removed = false;
+  for (const [userId, invalidation] of invalidationTimestamps) {
+    if (now - invalidation.timestamp > INVALIDATION_RETENTION_MS) {
       invalidationTimestamps.delete(userId);
+      removed = true;
     }
   }
 
-  if (invalidationTimestamps.size <= INVALIDATION_PRUNE_THRESHOLD) return;
-
-  const surplus = invalidationTimestamps.size - INVALIDATION_PRUNE_THRESHOLD;
-  const oldestFirst = [...invalidationTimestamps.entries()]
-    .sort(([, left], [, right]) => left - right)
-    .slice(0, surplus);
-  for (const [userId] of oldestFirst) {
-    invalidationTimestamps.delete(userId);
+  if (invalidationTimestamps.size > INVALIDATION_PRUNE_THRESHOLD) {
+    const surplus = invalidationTimestamps.size - INVALIDATION_PRUNE_THRESHOLD;
+    const oldestFirst = [...invalidationTimestamps.entries()]
+      .sort(([, left], [, right]) => left.timestamp - right.timestamp)
+      .slice(0, surplus);
+    for (const [userId] of oldestFirst) {
+      invalidationTimestamps.delete(userId);
+      removed = true;
+    }
   }
+  // Evicting a marker must not make an old in-flight lookup current again.
+  if (removed) globalInvalidatedRevision = ++invalidationRevision;
 }
 
 export function invalidateUserCache(userId: string, now: number = Date.now()): void {
@@ -125,13 +136,14 @@ export function invalidateUserCache(userId: string, now: number = Date.now()): v
   if (invalidationTimestamps.size >= INVALIDATION_PRUNE_THRESHOLD) {
     pruneInvalidationTimestamps(now);
   }
-  invalidationTimestamps.set(userId, now);
+  invalidationTimestamps.set(userId, { timestamp: now, revision: ++invalidationRevision });
 }
 
 export function invalidateAllCache(now: number = Date.now()): void {
   cache.clear();
   invalidationTimestamps.clear();
   globalInvalidatedAt = now;
+  globalInvalidatedRevision = ++invalidationRevision;
 }
 
 /** Visible for testing only — returns current cache size. */

@@ -36,6 +36,11 @@ evidence. [The correction contract](return-correction-parity.md) preserves
 DreamLux's global reservation policy and documents unconfirmed-commit recovery.
 Merge and all live release steps remain separate review gates.
 
+[Issue #275: Permission invalidation revisions](https://github.com/LeulTew/dreamlux-erp/issues/275)
+tracks the authority-cache race found by #274's actual-merge verification.
+Keep #273 open until the coupled source repair and fresh postchecks complete;
+production release remains separately held.
+
 ## Active Label Legend
 
 - `type:epic`: Large features spanning multiple milestones.

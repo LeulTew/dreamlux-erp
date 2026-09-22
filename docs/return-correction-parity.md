@@ -10,6 +10,11 @@ condition-resolution API repaired in #268/#270.
 - Reconciliation requires the current `assets:reconcile` grant. A session alone
   is not authorization. Missing authority is rejected before transaction
   acquisition.
+- The authority lookup compares invalidation revisions, not clock ticks. A
+  lookup started after invalidation in the same millisecond can use its current
+  grants; an invalidation during the lookup prevents both authorization and
+  caching. Pruning old markers cannot revive an in-flight result. The existing
+  60-second TTL and 2,000-entry LRU policy are unchanged (#275).
 - Original return receipts and correction records are append-only. A correction
   adds compensating deltas and adjusts the allocation's running condition totals.
 - Good returns release their outstanding reservation. Damaged and repair stock
