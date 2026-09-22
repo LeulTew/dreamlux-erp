@@ -38,7 +38,7 @@ async function confirmProvisionedCredential() {
     "select password_hash, password_hash=crypt($1,password_hash) as sql_matches from users where username='manager'",
     [managerPassword],
   );
-  expect(stored.rows).toHaveLength(1);
+  expect(stored.rowCount).toBe(1);
   const evidence = {
     javascriptVerifierMatches: await compare(managerPassword, stored.rows[0].password_hash),
     sqlVerifierMatches: stored.rows[0].sql_matches,
@@ -143,8 +143,8 @@ nativeTest("rejects wrong provisioned bcrypt and original pgcrypto passwords wit
   }
   const login = await api().post("/auth/login").send({ username: "manager", password: managerPassword });
   expect(login.status).toBe(200);
-  expect(login.body.user).not.toHaveProperty("password_hash");
-  expect(JSON.stringify(login.body)).not.toContain(managerPassword);
+  expect(Object.hasOwn(login.body.user, "password_hash")).toBe(false);
+  expect(JSON.stringify(login.body).includes(managerPassword)).toBe(false);
 });
 
 nativeTest("retains provisioned bcrypt login through the explicit missing-profile-column path", async () => {
