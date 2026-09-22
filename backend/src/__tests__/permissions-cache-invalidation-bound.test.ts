@@ -10,12 +10,14 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import {
   setCachedUserPermissions,
+  getCachedUserPermissions,
   invalidateUserCache,
   invalidateAllCache,
   CACHE_TTL_MS,
   INVALIDATION_RETENTION_MS,
   INVALIDATION_PRUNE_THRESHOLD,
   _invalidationTimestampCount,
+  _cacheSize,
 } from "../lib/permissions-cache";
 
 const PERMISSIONS = { roleNames: ["CHEF"], permissionSlugs: ["events:read"] };
@@ -108,5 +110,25 @@ describe("permission cache invalidation timestamps stay bounded", () => {
     // A write older than the TTL is evicted on read anyway, so retaining
     // timestamps beyond it is what makes pruning safe.
     expect(INVALIDATION_RETENTION_MS).toBeGreaterThan(CACHE_TTL_MS);
+  });
+
+  test("retains the exact cache TTL boundary", () => {
+    const start = Date.now();
+    setCachedUserPermissions("ttl-control", PERMISSIONS, start);
+    expect(getCachedUserPermissions("ttl-control", start + CACHE_TTL_MS)).toEqual(PERMISSIONS);
+    expect(getCachedUserPermissions("ttl-control", start + CACHE_TTL_MS + 1)).toBeNull();
+  });
+
+  test("retains the 2000-entry true LRU bound", () => {
+    const start = Date.now();
+    for (let index = 0; index < 2000; index += 1) {
+      setCachedUserPermissions(`lru-${index}`, PERMISSIONS, start);
+    }
+    expect(getCachedUserPermissions("lru-0", start)).toEqual(PERMISSIONS);
+    setCachedUserPermissions("lru-new", PERMISSIONS, start);
+    expect(_cacheSize()).toBe(2000);
+    expect(getCachedUserPermissions("lru-1", start)).toBeNull();
+    expect(getCachedUserPermissions("lru-0", start)).toEqual(PERMISSIONS);
+    expect(getCachedUserPermissions("lru-new", start)).toEqual(PERMISSIONS);
   });
 });

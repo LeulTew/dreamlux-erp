@@ -6,7 +6,10 @@ import request from "supertest";
 import * as permissionDb from "../lib/permissions-db";
 import { getEffectivePermissionSlugsFromUser, requireAuth, type AuthRequest } from "../middleware/auth";
 import { hasPermissionSlug } from "../lib/permissions";
-import { getCachedUserPermissions, invalidateAllCache, invalidateUserCache, setCachedUserPermissions } from "../lib/permissions-cache";
+import {
+  getCachedUserPermissions, invalidateAllCache, invalidateUserCache, setCachedUserPermissions,
+  INVALIDATION_PRUNE_THRESHOLD, INVALIDATION_RETENTION_MS, _invalidationTimestampCount,
+} from "../lib/permissions-cache";
 
 type Context = Awaited<ReturnType<typeof permissionDb.fetchUserRoleContext>>;
 const id = "verify-db-current-authority-242";
@@ -79,6 +82,83 @@ describe("current authority replaces token snapshots", () => {
     expect(result.status).toBe(200);
     expect(result.body.admin).toBe(true);
   });
+
+  test.each([
+    { scope: "user", allowed: false }, { scope: "all", allowed: false },
+    { scope: "user", allowed: true }, { scope: "all", allowed: true },
+  ])("uses a fresh same-clock lookup after $scope invalidation (allowed=$allowed)", async ({ scope, allowed }) => {
+    const now = Date.now();
+    const clock = spyOn(Date, "now").mockReturnValue(now);
+    const slugs = allowed ? ["payroll:read"] : ["payroll:write"];
+    lookup.mockResolvedValue(current(slugs));
+    try {
+      if (scope === "all") invalidateAllCache(now);
+      else invalidateUserCache(id, now);
+      const result = await request(app).get("/protected").set("Authorization", `Bearer ${token()}`);
+      expect(result.status).toBe(allowed ? 200 : 403);
+      expect(result.body.slugs).toEqual(slugs);
+      expect(getCachedUserPermissions(id)).toMatchObject({ permissionSlugs: slugs });
+      expect(lookup).toHaveBeenCalledTimes(1);
+    } finally { clock.mockRestore(); }
+  });
+
+  test.each(["user", "all", "unrelated"] as const)(
+    "distinguishes $scope invalidation during a same-clock permission lookup",
+    async (scope) => {
+      const now = Date.now();
+      const clock = spyOn(Date, "now").mockReturnValue(now);
+      let release!: (value: Context) => void;
+      let started!: () => void;
+      const pending = new Promise<Context>((resolve) => { release = resolve; });
+      const fetching = new Promise<void>((resolve) => { started = resolve; });
+      lookup.mockImplementation(async () => { started(); return pending; });
+      try {
+        const response = request(app).get("/protected").set("Authorization", `Bearer ${token()}`).then((result) => result);
+        await fetching;
+        if (scope === "all") invalidateAllCache(now);
+        else invalidateUserCache(scope === "user" ? id : "unrelated-account", now);
+        release(current(["payroll:read"]));
+        const result = await response;
+        expect(result.status).toBe(scope === "unrelated" ? 200 : 503);
+        if (scope === "unrelated") {
+          expect(result.body.slugs).toEqual(["payroll:read"]);
+          expect(getCachedUserPermissions(id)).toMatchObject({ permissionSlugs: ["payroll:read"] });
+        } else {
+          expect(result.body).toMatchObject({ error: "Permission lookup unavailable", outcome_uncertain: false });
+          expect(result.body.slugs).toBeUndefined();
+          expect(getCachedUserPermissions(id)).toBeNull();
+        }
+      } finally { release(current([])); clock.mockRestore(); }
+    },
+  );
+
+  test.each(["age", "size"] as const)(
+    "does not revive an invalidated lookup when its marker is pruned by %s",
+    async (mode) => {
+      const now = Date.now();
+      const clock = spyOn(Date, "now").mockReturnValue(now);
+      let release!: (value: Context) => void;
+      let started!: () => void;
+      const pending = new Promise<Context>((resolve) => { release = resolve; });
+      const fetching = new Promise<void>((resolve) => { started = resolve; });
+      lookup.mockImplementation(async () => { started(); return pending; });
+      try {
+        const response = request(app).get("/protected").set("Authorization", `Bearer ${token()}`).then((result) => result);
+        await fetching;
+        invalidateUserCache(id, now);
+        for (let index = 0; index <= INVALIDATION_PRUNE_THRESHOLD; index += 1) {
+          invalidateUserCache(`synthetic-prune-${index}`, mode === "age" ? now + INVALIDATION_RETENTION_MS + 1 : now);
+        }
+        release(current(["payroll:read"]));
+        const result = await response;
+        expect(result.status).toBe(503);
+        expect(result.body.outcome_uncertain).toBe(false);
+        expect(result.body.slugs).toBeUndefined();
+        expect(getCachedUserPermissions(id)).toBeNull();
+        expect(_invalidationTimestampCount()).toBeLessThanOrEqual(INVALIDATION_PRUNE_THRESHOLD + 1);
+      } finally { release(current([])); clock.mockRestore(); }
+    },
+  );
 
   test("fails closed before custom route guards when a current lookup is unavailable", async () => {
     lookup.mockRejectedValue(new Error("Synthetic permission lookup unavailable"));
