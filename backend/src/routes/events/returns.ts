@@ -7,6 +7,9 @@ import { hasPermissionSlug } from "../../lib/permissions";
 import { correctEventReturnSchema, recordEventReturnSchema, resolveInventoryConditionSchema } from "../../lib/validation";
 import { NotificationsService } from "../../services/notifications-service";
 import {
+  conditionStockDetailSchema, conditionStockListSchema, inspectConditionStock, listConditionStock,
+} from "../../services/condition-stock-service";
+import {
   ReturnConflictError,
   buildReturnNotification,
   calculateConditionResolutionEffect,
@@ -39,7 +42,56 @@ const OUTSTANDING_SQL =
 export function createEventReturnsRouter(): Router {
   const router = Router();
 
-  router.post("/returns/items/:itemId/condition-resolutions", requireAuth, async (req: AuthRequest, res: Response) => {
+  const conditionActor = (req: AuthRequest, res: Response, next: () => void) => {
+    const actor = z.string().uuid().safeParse(req.user?.id);
+    if (!actor.success) {
+      res.status(401).json({ error: "A verified current account identity is required", code: "CONDITION_IDENTITY_REQUIRED" });
+      return;
+    }
+    const expected = req.get("X-Condition-Actor");
+    if (expected && expected.toLowerCase() !== actor.data.toLowerCase()) {
+      res.status(403).json({ error: "Condition stock account changed", code: "CONDITION_ACTOR_CHANGED" });
+      return;
+    }
+    next();
+  };
+  const conditionReader = (req: AuthRequest, res: Response, next: () => void) => {
+    if (hasPermission(req, "assets:read") || hasPermission(req, "assets:reconcile")) return next();
+    res.status(403).json({ error: "Forbidden: Missing condition stock inspection privileges" });
+  };
+
+  router.get("/returns/condition-stock", requireAuth, conditionActor, conditionReader, async (req: AuthRequest, res: Response) => {
+    const parsed = conditionStockListSchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.errors[0].message });
+      return;
+    }
+    try {
+      res.set("Cache-Control", "no-store").json(await listConditionStock(parsed.data));
+    } catch (error: unknown) {
+      console.error("[condition-stock-list] Read failed", { actorId: req.user?.id, error });
+      res.status(503).json({ error: "Condition stock is unavailable", code: "CONDITION_STOCK_UNAVAILABLE" });
+    }
+  });
+
+  router.get("/returns/items/:itemId/condition-stock", requireAuth, conditionActor, conditionReader, async (req: AuthRequest, res: Response) => {
+    const itemId = z.string().uuid().safeParse(req.params.itemId);
+    const parsed = conditionStockDetailSchema.safeParse(req.query);
+    if (!itemId.success || !parsed.success) {
+      res.status(400).json({ error: "Invalid condition stock inspection request" });
+      return;
+    }
+    try {
+      const snapshot = await inspectConditionStock(itemId.data, parsed.data);
+      if (!snapshot) { res.status(404).json({ error: "Inventory item not found" }); return; }
+      res.set("Cache-Control", "no-store").json(snapshot);
+    } catch (error: unknown) {
+      console.error("[condition-stock-detail] Read failed", { actorId: req.user?.id, itemId: itemId.data, error });
+      res.status(503).json({ error: "Condition stock history is unavailable", code: "CONDITION_STOCK_UNAVAILABLE" });
+    }
+  });
+
+  router.post("/returns/items/:itemId/condition-resolutions", requireAuth, conditionActor, async (req: AuthRequest, res: Response) => {
     if (!hasPermission(req, "assets:reconcile")) {
       res.status(403).json({ error: "Forbidden: Missing inventory reconciliation privileges" });
       return;
@@ -83,10 +135,17 @@ export function createEventReturnsRouter(): Router {
         ? "unavailable_damaged_quantity"
         : "unavailable_repair_quantity";
       const { lost, damaged, repair } = calculateConditionResolutionEffect(Number(item[sourceColumn]), input);
-      const resolutionResult = await client.query<{ id: string }>(
+      const resolutionResult = await client.query<{
+        id: string; item_id: string; source_condition: string; outcome: string; quantity: number;
+        notes: string | null; idempotency_key: string | null; created_by: string | null;
+        created_by_name: string | null; created_at: string;
+      }>(
         `INSERT INTO inventory_condition_resolutions
-           (item_id, source_condition, outcome, quantity, notes, idempotency_key, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+           (item_id, source_condition, outcome, quantity, notes, idempotency_key, created_by, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,NOW() AT TIME ZONE 'UTC')
+         RETURNING id, item_id, source_condition, outcome, quantity, notes, idempotency_key, created_by,
+           to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+           (SELECT full_name FROM users WHERE id = $7::uuid) AS created_by_name`,
         [item.id, input.source_condition, input.outcome, input.quantity, input.notes ?? null, input.idempotency_key ?? null, req.user?.id || null],
       );
       if (resolutionResult.rowCount !== 1 || resolutionResult.rows.length !== 1 || !resolutionResult.rows[0].id) {
@@ -114,7 +173,7 @@ export function createEventReturnsRouter(): Router {
       committing = true;
       await client.query("COMMIT");
       transactionOpen = false;
-      res.status(201).json({ resolved: input.quantity, outcome: input.outcome });
+      res.status(201).json({ resolved: input.quantity, outcome: input.outcome, resolution: resolutionResult.rows[0] });
     } catch (error: unknown) {
       if (client && transactionOpen) {
         try {

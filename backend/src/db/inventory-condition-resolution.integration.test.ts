@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import express from "express";
 import request from "supertest";
+import jwt from "jsonwebtoken";
 import { Client, type Pool, type QueryResult } from "pg";
 import { attestDreamluxNativeTarget } from "./testing/dreamlux-native-target";
 import { startDreamluxRestProxy } from "./testing/dreamlux-rest-proxy";
@@ -67,7 +68,7 @@ beforeAll(async () => {
   const app = express();
   app.use(express.json());
   app.use("/auth", (await import("../routes/auth")).default);
-  app.use("/events", (await import("../routes/events/returns")).createEventReturnsRouter());
+  app.use("/events", (await import("../routes/events")).default);
   appPool = (await import("./pool")).pool;
   invalidatePermissions = (await import("../lib/permissions-cache")).invalidateAllCache;
   server = createServer(app);
@@ -98,6 +99,7 @@ afterAll(async () => {
 beforeEach(async () => {
   if (!observer) return;
   await observer.query("update roles set permissions=$1::jsonb where id=$2", [grants, roleId]);
+  await observer.query("delete from role_permissions where role_id=$1", [roleId]);
   await observer.query(`insert into role_permissions(role_id,permission_id)
     select $1,id from permissions where slug=any($2::text[]) on conflict do nothing`, [roleId, slugs]);
   if (!invalidatePermissions) throw new Error("Current permission invalidation is unavailable");
@@ -123,6 +125,278 @@ const resolve = (id: string, payload: Record<string, unknown>) =>
   http().post(`/events/returns/items/${id}/condition-resolutions`).set("Cookie", cookie).send(payload);
 const transitions = (["damaged", "repair"] as const).flatMap((source) =>
   (["good", "damaged", "repair", "lost"] as const).map((outcome) => ({ source, outcome })));
+
+const inspect = (id: string, query: Record<string, unknown> = {}) =>
+  http().get(`/events/returns/items/${id}/condition-stock`).set("Cookie", cookie).query(query);
+const listStock = (query: Record<string, unknown> = {}) =>
+  http().get("/events/returns/condition-stock").set("Cookie", cookie).query(query);
+
+async function currentGrants(next: readonly string[]) {
+  await database().query("delete from role_permissions where role_id=$1", [roleId]);
+  await database().query("insert into permissions(slug) select value from unnest($1::text[]) value on conflict(slug) do nothing", [next]);
+  await database().query(`insert into role_permissions(role_id,permission_id)
+    select $1,id from permissions where slug=any($2::text[])`, [roleId, next]);
+  if (!invalidatePermissions) throw new Error("Current permission invalidation unavailable");
+  invalidatePermissions();
+}
+
+async function withTimeZone(zone: string, operation: () => Promise<void>) {
+  const maximum = activePool().options.max;
+  if (typeof maximum !== "number" || maximum < 1) throw new Error("Native pool size unavailable");
+  const clients = await Promise.all(Array.from({ length: maximum }, () => activePool().connect()));
+  try {
+    const changed = await Promise.all(clients.map((client) => client.query("select set_config('TimeZone',$1,false)", [zone])));
+    expect(changed.every((result) => result.rows[0].set_config === zone)).toBe(true);
+  } finally { clients.forEach((client) => client.release()); }
+  try { await operation(); }
+  finally {
+    const reset = await Promise.all(Array.from({ length: maximum }, () => activePool().connect()));
+    try { await Promise.all(reset.map((client) => client.query("reset timezone"))); }
+    finally { reset.forEach((client) => client.release()); }
+  }
+}
+
+describe("native DreamLux condition-stock operator", () => {
+  nativeTest("completes an actual unavailable return, resolution, global reuse and loss without rewriting receipts", async () => {
+    await currentGrants([...slugs, "assets:write", "event_allocations:write"]);
+    const id = await item();
+    const events = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    const allocation = crypto.randomUUID();
+    await database().query("update items set quantity=10,unavailable_damaged_quantity=0,unavailable_repair_quantity=0 where id=$1", [id]);
+    await database().query(`insert into events(id,name,client_name,start_date,end_date,venue_location,status)
+      select id,'Synthetic condition event','Synthetic customer',day,day,'Synthetic location','Planned'
+      from unnest($1::uuid[],$2::date[]) input(id,day)`, [events, ["2031-01-01", "2032-01-01", "2033-01-01"]]);
+    await database().query(`insert into event_allocations(id,event_id,item_id,quantity_allocated,status,departed_at,departed_by,created_by)
+      values($1,$2,$3,6,'Pulled',now(),$4,$4)`, [allocation, events[0], id, actorId]);
+    const returned = await http().post(`/events/${events[0]}/allocations/${allocation}/returns`).set("Cookie", cookie)
+      .send({ good_quantity: 2, damaged_quantity: 3, repair_quantity: 1, idempotency_key: "actual-unavailable-return" });
+    expect(returned.status).toBe(201);
+    const receipts = await database().query("select to_jsonb(r) as receipt from event_return_receipts r where item_id=$1", [id]);
+    expect(receipts.rows).toHaveLength(1);
+    expect((await inspect(id)).body.item).toMatchObject({ quantity: 10, unavailable_damaged_quantity: 3, unavailable_repair_quantity: 1 });
+    const recovered = await resolve(id, { source_condition: "damaged", outcome: "good", quantity: 2, idempotency_key: "repaired" });
+    expect(recovered.status).toBe(201);
+    expect(recovered.body.resolution).toMatchObject({ item_id: id, created_by: actorId, idempotency_key: "repaired", quantity: 2, outcome: "good" });
+    const reuse = await http().post(`/events/${events[1]}/allocations`).set("Cookie", cookie).send({ item_id: id, quantity_allocated: 8 });
+    expect(reuse.status).toBe(201);
+    // DreamLux reserves globally: a non-overlapping date is not a free second stock pool.
+    expect((await http().post(`/events/${events[2]}/allocations`).set("Cookie", cookie)
+      .send({ item_id: id, quantity_allocated: 1 })).status).toBe(400);
+    expect((await resolve(id, { source_condition: "damaged", outcome: "lost", quantity: 1, idempotency_key: "lost" })).status).toBe(201);
+    const saved = await state(id);
+    expect(saved.stock).toEqual({ owned: 9, damaged: 0, repair: 1, available: 8 });
+    expect(saved.movements).toEqual([expect.objectContaining({ quantity_delta: -1, quantity_before: 10, quantity_after: 9, source_type: "condition_resolution" })]);
+    expect((await database().query("select to_jsonb(r) as receipt from event_return_receipts r where item_id=$1", [id])).rows).toEqual(receipts.rows);
+    expect((await database().query("select condition_status from items where id=$1", [id])).rows).toEqual([{ condition_status: "Good" }]);
+  });
+
+  nativeTest("distinguishes same-name items using joined location/unit/UUID and leaves the peer untouched", async () => {
+    const ids = [await item(), await item()].sort();
+    const stores = [crypto.randomUUID(), crypto.randomUUID()];
+    const name = `Synthetic duplicate ${ids[0]}`;
+    await database().query("insert into stores(id,name,is_active) values($1,$2,true),($3,$4,false)",
+      [stores[0], `East ${name}`, stores[1], `West ${name}`]);
+    await database().query(`update items i set name=$1,store_id=v.store_id,unit_of_measurement=v.unit
+      from (values($2::uuid,$3::uuid,'pcs'),($4::uuid,$5::uuid,'sets')) v(id,store_id,unit) where i.id=v.id`,
+    [name, ids[0], stores[0], ids[1], stores[1]]);
+    const list = await listStock({ search: name, limit: 1 });
+    expect(list.status).toBe(200);
+    expect(list.body).toEqual({ items: [{
+      id: ids[0], name, quantity: 20, unit_of_measurement: "pcs", store_id: stores[0], store_name: `East ${name}`,
+      store_is_active: true, unavailable_damaged_quantity: 5, unavailable_repair_quantity: 4, deleted_at: null,
+    }], next_cursor: ids[0] });
+    const next = await listStock({ search: name, after: ids[0], limit: 1 });
+    expect(next.body.items).toEqual([expect.objectContaining({ id: ids[1], store_name: `West ${name}`, unit_of_measurement: "sets", store_is_active: false })]);
+    expect(next.body.next_cursor).toBeNull();
+    const peer = await database().query("select to_jsonb(i) as item from items i where id=$1", [ids[0]]);
+    expect((await resolve(ids[1], { source_condition: "damaged", outcome: "lost", quantity: 1, idempotency_key: "identified" })).status).toBe(201);
+    expect((await database().query("select to_jsonb(i) as item from items i where id=$1", [ids[0]])).rows).toEqual(peer.rows);
+    expect((await state(ids[0])).resolutions).toEqual([]);
+  });
+
+  nativeTest("keeps NULL-key history, archived metadata and exact keyed recovery in one statement", async () => {
+    const id = await item();
+    const intent = { source_condition: "repair", outcome: "repair", quantity: 1, notes: null, idempotency_key: "retained" };
+    expect((await resolve(id, intent)).status).toBe(201);
+    await database().query(`insert into inventory_condition_resolutions(item_id,source_condition,outcome,quantity,created_at)
+      values($1,'damaged','damaged',1,null)`, [id]);
+    await database().query("update items set deleted_at=now(),unit_of_measurement=null where id=$1", [id]);
+    const query = spyOn(activePool(), "query");
+    try {
+      const detail = await inspect(id, { idempotency_key: "retained" });
+      expect(detail.status).toBe(200);
+      expect(detail.body.item).toMatchObject({ id, store_id: null, store_name: null, store_is_active: null, unit_of_measurement: null });
+      expect(detail.body.item.deleted_at).not.toBeNull();
+      expect(detail.body.recovery).toMatchObject({ ...intent, item_id: id, created_by: actorId });
+      expect(detail.body.history).toHaveLength(2);
+      expect(detail.body.history[1]).toMatchObject({ created_at: null, idempotency_key: null });
+      expect(query.mock.calls.filter(([sql]) => typeof sql === "string" && sql.includes("condition-stock detail"))).toHaveLength(1);
+    } finally { query.mockRestore(); }
+    expect((await inspect(id, { idempotency_key: "absent" })).body.recovery).toBeNull();
+    expect((await resolve(id, { ...intent, idempotency_key: "new" })).status).toBe(404);
+  });
+
+  nativeTest("accepts uppercase item links and rejects malformed or unbounded read inputs explicitly", async () => {
+    const id = await item();
+    expect((await inspect(id.toUpperCase())).body.item.id).toBe(id);
+    expect((await inspect("not-a-uuid")).status).toBe(400);
+    expect((await inspect(crypto.randomUUID())).status).toBe(404);
+    for (const query of [{ limit: 0 }, { limit: 51 }, { limit: 1.5 }, { search: "x".repeat(101) }, { after: "invalid" }]) {
+      expect((await listStock(query)).status).toBe(400);
+    }
+    for (const query of [{ before_id: id }, { before_id: id, before_time: "invalid" }, { idempotency_key: "x".repeat(121) }]) {
+      expect((await inspect(id, query)).status).toBe(400);
+    }
+  });
+
+  nativeTest.each([
+    { permissions: ["assets:read"], read: 200, write: 403 },
+    { permissions: ["assets:reconcile"], read: 200, write: 201 },
+    { permissions: ["event_allocations:write"], read: 403, write: 403 },
+    { permissions: [], read: 403, write: 403 },
+  ])("uses current read/reconcile grants without inheriting return authority: $permissions", async ({ permissions, read, write }) => {
+    await database().query("update roles set permissions='{}'::jsonb where id=$1", [roleId]);
+    await currentGrants(permissions);
+    const id = await item();
+    expect((await listStock({ search: id })).status).toBe(read);
+    expect((await inspect(id)).status).toBe(read);
+    expect((await resolve(id, { source_condition: "repair", outcome: "good", quantity: 1 })).status).toBe(write);
+  });
+
+  nativeTest("does not restore a revoked current grant from a role name or stale role map", async () => {
+    const id = await item();
+    const before = await state(id);
+    await database().query("update roles set name='INVENTORY_CONTROLLER' where id=$1", [roleId]);
+    try {
+      await currentGrants(["assets:read"]);
+      expect((await resolve(id, { source_condition: "damaged", outcome: "lost", quantity: 1 })).status).toBe(403);
+      expect(await state(id)).toEqual(before);
+    } finally {
+      await database().query("update roles set name='SYNTHETIC_CONDITION_OPERATOR_268' where id=$1", [roleId]);
+    }
+  });
+
+  nativeTest("rejects identity-less signed sessions and mismatched actors without creating evidence", async () => {
+    const id = await item();
+    const before = await state(id);
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error("Synthetic signing secret unavailable");
+    const legacy = jwt.sign({ username: "synthetic.legacy.279", role: "SUPER_ADMIN", permission_slugs: ["*"] }, secret);
+    expect((await http().get("/events/returns/condition-stock").set("Cookie", `token=${legacy}`)).status).toBe(401);
+    expect((await http().post(`/events/returns/items/${id}/condition-resolutions`).set("Cookie", `token=${legacy}`)
+      .send({ source_condition: "damaged", outcome: "lost", quantity: 1 })).status).toBe(401);
+    expect((await inspect(id).set("X-Condition-Actor", crypto.randomUUID())).status).toBe(403);
+    expect((await resolve(id, { source_condition: "repair", outcome: "good", quantity: 1 })
+      .set("X-Condition-Actor", crypto.randomUUID())).status).toBe(403);
+    expect(await state(id)).toEqual(before);
+  });
+
+  nativeTest("rejects an inactive current actor without reading or resolving stock", async () => {
+    const id = await item();
+    const before = await state(id);
+    await database().query("update users set is_active=false where id=$1", [actorId]);
+    try {
+      await currentGrants(slugs);
+      expect((await inspect(id)).status).toBe(401);
+      expect((await resolve(id, { source_condition: "repair", outcome: "good", quantity: 1 })).status).toBe(401);
+      expect(await state(id)).toEqual(before);
+    } finally { await database().query("update users set is_active=true where id=$1", [actorId]); }
+  });
+
+  nativeTest("observes DreamLux's actual naive microsecond timestamp type rather than assuming timestamptz", async () => {
+    expect((await database().query(`select data_type,datetime_precision,is_nullable from information_schema.columns
+      where table_schema='public' and table_name='inventory_condition_resolutions' and column_name='created_at'`)).rows)
+      .toEqual([{ data_type: "timestamp without time zone", datetime_precision: 6, is_nullable: "YES" }]);
+  });
+
+  nativeTest("accepts the exact million-unit boundary without inventing owned stock and rejects invalid quantities", async () => {
+    const id = await item();
+    await database().query("update items set quantity=1000000,unavailable_damaged_quantity=1000000,unavailable_repair_quantity=0 where id=$1", [id]);
+    const before = await state(id);
+    for (const quantity of [0, -1, 1.5, 1_000_001]) {
+      expect((await resolve(id, { source_condition: "damaged", outcome: "good", quantity })).status).toBe(400);
+    }
+    expect(await state(id)).toEqual(before);
+    expect((await resolve(id, { source_condition: "damaged", outcome: "good", quantity: 1_000_000,
+      notes: "n".repeat(1000), idempotency_key: "k".repeat(120) })).status).toBe(201);
+    expect((await state(id)).stock).toEqual({ owned: 1_000_000, damaged: 0, repair: 0, available: 1_000_000 });
+  });
+
+  nativeTest("surfaces failed reads as unavailable rather than empty balances/history", async () => {
+    const id = await item();
+    const pool = activePool();
+    const original = pool.query.bind(pool);
+    const query = spyOn(pool, "query").mockImplementation(((...args: unknown[]) => {
+      if (typeof args[0] === "string" && args[0].includes("/* condition-stock")) return Promise.reject(new Error("Synthetic condition read outage"));
+      return Reflect.apply(original, pool, args);
+    }) as typeof pool.query);
+    try {
+      const list = await listStock();
+      const detail = await inspect(id);
+      expect(list.status).toBe(503);
+      expect(detail.status).toBe(503);
+      expect(list.body.items).toBeUndefined();
+      expect(detail.body.history).toBeUndefined();
+    } finally { query.mockRestore(); }
+  });
+
+  nativeTest("uses bounded history including NULL keys through the full item history index", async () => {
+    const seeded = await database().query<{ id: string }>(`insert into items(name,quantity,unavailable_damaged_quantity)
+      select 'Synthetic history scale '||value,1000,1000 from generate_series(1,100) value returning id`);
+    await database().query(`insert into inventory_condition_resolutions(item_id,source_condition,outcome,quantity,created_at)
+      select item,'damaged','damaged',1,'2031-01-01'::timestamp + value*interval '1 second'
+      from unnest($1::uuid[]) item cross join generate_series(1,1000) value`, [seeded.rows.map((row) => row.id)]);
+    await database().query("analyze inventory_condition_resolutions");
+    const query = spyOn(activePool(), "query");
+    let statement: string;
+    let parameters: unknown[];
+    try {
+      const response = await inspect(seeded.rows[0].id, { limit: 25 });
+      expect(response.status).toBe(200);
+      expect(response.body.history).toHaveLength(25);
+      expect(response.body.history.every((row: { idempotency_key: unknown }) => row.idempotency_key === null)).toBe(true);
+      const calls = query.mock.calls.filter(([sql]) => typeof sql === "string" && sql.includes("condition-stock detail"));
+      expect(calls).toHaveLength(1);
+      const [sql, args] = calls[0];
+      if (typeof sql !== "string" || !Array.isArray(args)) throw new Error("Production read was not observed");
+      statement = sql; parameters = args;
+    } finally { query.mockRestore(); }
+    const plan = (await database().query(`explain(analyze,buffers,format json) ${statement}`, parameters)).rows[0]["QUERY PLAN"][0];
+    expect(JSON.stringify(plan.Plan)).toContain("idx_inventory_condition_resolutions_item");
+    expect(plan["Execution Time"]).toBeLessThan(250);
+    console.info("[condition-stock-plan]", JSON.stringify({ rows: 100000, returned: 25, executionMs: plan["Execution Time"] }));
+  }, 10000);
+
+  nativeTest.each(["UTC", "Africa/Addis_Ababa", "America/New_York"])(
+    "preserves stored clock values and equivalent microsecond offset cursors under %s", async (zone) => {
+      const id = await item();
+      const ids = Array.from({ length: 4 }, () => crypto.randomUUID()).sort().reverse();
+      const times = ["2031-11-02T06:15:00.654321", "2031-11-02T05:30:00.123456", "2031-11-02T05:30:00.123455", null];
+      await database().query(`insert into inventory_condition_resolutions(id,item_id,source_condition,outcome,quantity,created_at)
+        select r.id,$1,'repair','repair',1,r.created_at from unnest($2::uuid[],$3::timestamp[]) r(id,created_at)`, [id, ids, times]);
+      await withTimeZone(zone, async () => {
+        const page = await inspect(id, { limit: 2 });
+        expect(page.status).toBe(200);
+        expect(page.body.history.map((row: { created_at: string | null }) => row.created_at)).toEqual(times.slice(0, 2).map((time) => `${time}Z`));
+        const params = { before_id: ids[1], limit: 2 };
+        const utc = await inspect(id, { ...params, before_time: `${times[1]}Z` });
+        const offset = await inspect(id, { ...params, before_time: "2031-11-02T08:30:00.123456+03:00" });
+        expect(offset.body).toEqual(utc.body);
+        expect(utc.body.history.map((row: { id: string }) => row.id)).toEqual(ids.slice(2));
+        expect(utc.body.history[1].created_at).toBeNull();
+        expect(utc.body.next_cursor).toBeNull();
+        const lower = (await database().query(`select to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US') as value`)).rows[0].value;
+        const saved = await resolve(id, { source_condition: "damaged", outcome: "damaged", quantity: 1, idempotency_key: `utc-${zone}` });
+        expect(saved.status).toBe(201);
+        expect(saved.body.resolution.created_at).toMatch(/\.\d{6}Z$/);
+        const observed = await database().query(`select created_at between $2::timestamp and (clock_timestamp() at time zone 'UTC') as new_utc,
+          to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as value from inventory_condition_resolutions where id=$1`,
+        [saved.body.resolution.id, lower]);
+        expect(observed.rows).toEqual([{ new_utc: true, value: saved.body.resolution.created_at }]);
+      });
+    },
+  );
+});
 
 async function loseAcknowledgement(command: "BEGIN" | "COMMIT" | "ROLLBACK") {
   const pool = activePool();
@@ -169,7 +443,7 @@ describe("native DreamLux inventory condition resolution", () => {
     expect({ status: response.status, stock: stored.stock }).toEqual({
       status: 201, stock: { owned: 20 - lost, damaged, repair, available: 20 - lost - damaged - repair },
     });
-    expect(response.body).toEqual({ resolved: 2, outcome });
+    expect({ resolved: response.body.resolved, outcome: response.body.outcome }).toEqual({ resolved: 2, outcome });
     expect(stored.resolutions).toHaveLength(1);
     expect(stored.resolutions[0]).toMatchObject({
       item_id: id, source_condition: source, outcome, quantity: 2, created_by: actorId, notes: "Synthetic inspection", idempotency_key: "normal",

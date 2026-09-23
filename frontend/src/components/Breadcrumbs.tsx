@@ -58,6 +58,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Positions": "Positions",
     "Offices": "Offices",
     "Returns": "Returns",
+    "Condition stock": "Condition stock",
     "Fleet": "Fleet",
     "Notifications": "Notifications",
   },
@@ -111,6 +112,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Positions": "የስራ መደቦች",
     "Offices": "ቢሮዎች",
     "Returns": "መመለሻ",
+    "Condition stock": "የዕቃ ሁኔታ ክምችት",
     "Fleet": "ተሽከርካሪዎች",
     "Notifications": "ማሳወቂያዎች",
   }
@@ -151,6 +153,7 @@ const PATH_METADATA: Record<string, { label: string; href?: string; permissions?
   "/assets/location": { label: "Location", href: "/assets" },
   "/assets/insert": { label: "Add Item", permissions: ["assets:write"] },
   "/assets/returns": { label: "Returns", permissions: ["event_allocations:write", "assets:write"] },
+  "/assets/conditions": { label: "Condition stock", permissions: ["assets:read", "assets:reconcile"] },
   "/assets/trash": { label: "Trash", permissions: ["assets:read"] },
   "/fleet": { label: "Fleet", permissions: ["vehicles:read"] },
   "/notifications": { label: "Notifications" },

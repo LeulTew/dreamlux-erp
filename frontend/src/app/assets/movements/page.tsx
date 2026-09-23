@@ -16,7 +16,8 @@ import type { InventoryMovement } from "@/lib/types";
 type MovementCopy = {
   title: string; description: string; item: string; change: string; balance: string;
   source: string; recordedBy: string; recordedAt: string; empty: string;
-  failed: string; retry: string; capitalInvestment: string; forbidden: string; loading: string;
+  failed: string; retry: string; capitalInvestment: string; conditionResolution: string; eventReturn: string;
+  returnCorrection: string; forbidden: string; loading: string;
 };
 
 const COPY: Record<"en" | "am", MovementCopy> = {
@@ -33,6 +34,9 @@ const COPY: Record<"en" | "am", MovementCopy> = {
     failed: "Stock movement history could not be loaded.",
     retry: "Try again",
     capitalInvestment: "Capital investment",
+    conditionResolution: "Condition resolution",
+    eventReturn: "Equipment return",
+    returnCorrection: "Return correction",
     forbidden: "Only authorized personnel can view inventory movement history.",
     loading: "Loading stock movements",
   },
@@ -49,13 +53,19 @@ const COPY: Record<"en" | "am", MovementCopy> = {
     failed: "የክምችት እንቅስቃሴ ታሪክ መጫን አልተቻለም።",
     retry: "እንደገና ሞክር",
     capitalInvestment: "የካፒታል ግዢ",
+    conditionResolution: "የዕቃ ሁኔታ ውሳኔ",
+    eventReturn: "የመሣሪያ መመለሻ",
+    returnCorrection: "የመመለሻ ማስተካከያ",
     forbidden: "የክምችት እንቅስቃሴ ታሪክን ማየት የሚችሉት ፈቃድ ያላቸው ሰራተኞች ብቻ ናቸው።",
     loading: "የክምችት እንቅስቃሴዎችን በመጫን ላይ",
   },
 } as const;
 
 function sourceLabel(sourceType: string, labels: MovementCopy): string {
-  return sourceType === "capital_investment" ? labels.capitalInvestment : sourceType.replaceAll("_", " ");
+  return sourceType === "capital_investment" ? labels.capitalInvestment
+    : sourceType === "condition_resolution" ? labels.conditionResolution
+      : sourceType === "event_return" ? labels.eventReturn
+        : sourceType === "event_return_correction" ? labels.returnCorrection : sourceType.replaceAll("_", " ");
 }
 
 function MovementRow({ movement, labels, locale }: { movement: InventoryMovement; labels: MovementCopy; locale: string }) {
@@ -63,7 +73,9 @@ function MovementRow({ movement, labels, locale }: { movement: InventoryMovement
   return (
     <tr className="border-b border-border/60 align-top last:border-b-0">
       <td className="px-4 py-4 font-bold text-foreground">{movement.item_name}</td>
-      <td className="px-4 py-4 font-mono font-bold tabular-nums text-success">+{movement.quantity_delta} {unit}</td>
+      <td className={`px-4 py-4 font-mono font-bold tabular-nums ${movement.quantity_delta < 0 ? "text-danger" : movement.quantity_delta > 0 ? "text-success" : "text-foreground"}`}>
+        {movement.quantity_delta > 0 ? "+" : ""}{movement.quantity_delta} {unit}
+      </td>
       <td className="px-4 py-4 font-mono tabular-nums text-foreground">{movement.quantity_before} → {movement.quantity_after}</td>
       <td className="px-4 py-4 text-muted">
         <span className="block font-semibold text-foreground">{sourceLabel(movement.source_type, labels)}</span>

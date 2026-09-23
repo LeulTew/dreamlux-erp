@@ -253,7 +253,7 @@ describe("AppSidebar authorized route controls", () => {
       "/hr/payments", "/hr/salary-levels", "/hr/finance/hisab", "/hr/expenses/approve",
       "/hr/reports/profit", "/hr/finance/overheads", "/hr/finance/investments",
       "/settings/departments", "/settings/positions", "/settings/offices",
-      "/assets/dashboard", "/assets", "/assets/insert", "/fleet", "/assets/dispatch",
+      "/assets/dashboard", "/assets", "/assets/conditions", "/assets/insert", "/fleet", "/assets/dispatch",
       "/assets/returns", "/assets/reconcile", "/assets/history", "/assets/reports", "/settings",
     ].sort());
     const finance = screen.getByRole("button", { name: "Finance" });
@@ -266,7 +266,7 @@ describe("AppSidebar authorized route controls", () => {
     { permissions: [], routes: [] },
     { permissions: ["events:*"], routes: ["/events", "/events/proposals", "/hr/event-types"] },
     { permissions: ["positions:read"], routes: [] },
-    { permissions: ["assets:reconcile"], routes: [] },
+    { permissions: ["assets:reconcile"], routes: ["/assets/conditions", "/assets/reconcile"] },
     { permissions: ["vehicles:read"], routes: ["/fleet"] },
     { permissions: ["assets:write"], routes: ["/assets/insert", "/assets/returns"] },
     { permissions: ["event_allocations:dispatch"], routes: ["/assets/dispatch"] },

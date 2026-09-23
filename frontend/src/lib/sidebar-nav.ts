@@ -219,6 +219,12 @@ export function buildSidebarNavState(params: {
       show: hasPermission("assets:write"),
     },
     {
+      href: "/assets/conditions",
+      label: t("Condition stock"),
+      active: pathname === "/assets/conditions",
+      show: hasAny(["assets:read", "assets:reconcile"]),
+    },
+    {
       href: "/fleet",
       label: t("Fleet"),
       active: pathname === "/fleet" || pathname.startsWith("/fleet/"),
@@ -261,7 +267,7 @@ export function buildSidebarNavState(params: {
   return {
     showHRGroup: hasAny(HR_GROUP_PERMISSIONS),
     showEmployeesMenu: employeesLinks.length > 0,
-    showInventoryGroup: hasPermission("assets:read") || dispatchLink !== null || returnsLink !== null || hasPermission("vehicles:read"),
+    showInventoryGroup: hasAny(["assets:read", "assets:reconcile"]) || dispatchLink !== null || returnsLink !== null || hasPermission("vehicles:read"),
     showAdminGroup: hasAny([...ADMIN_PERMISSIONS, "departments:manage", "positions:manage", "offices:manage"]),
     employeesLinks,
     eventLinks,

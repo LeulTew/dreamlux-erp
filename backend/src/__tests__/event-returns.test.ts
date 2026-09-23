@@ -19,7 +19,7 @@ beforeAll(async () => {
 });
 
 const JWT_SECRET = "test-secret";
-function getToken(role = "INVENTORY_OFFICER", id = "user-1"): string {
+function getToken(role = "INVENTORY_OFFICER", id = "27900000-0000-4000-8000-000000000001"): string {
   return jwt.sign({ id, role, username: "storekeeper" }, JWT_SECRET, { expiresIn: "1h" });
 }
 
@@ -246,7 +246,7 @@ describe("Recording return receipts (issue #173)", () => {
     expect(executed.some((sql) => sql.includes("INSERT INTO inventory_movements"))).toBe(true);
     expect(executed.some((sql) => sql.includes("unavailable_damaged_quantity"))).toBe(true);
     expect(auditParams?.[0]).toBe(EVENT_ID);
-    expect(auditParams?.[1]).toBe("user-1");
+    expect(auditParams?.[1]).toBe("27900000-0000-4000-8000-000000000001");
     expect(String(auditParams?.[3])).toContain("damaged 2, lost 1, repair 1");
     expect(buildReturnNotification(LINKED_ITEM.name, {
       good_quantity: 4, damaged_quantity: 2, lost_quantity: 1, repair_quantity: 1,

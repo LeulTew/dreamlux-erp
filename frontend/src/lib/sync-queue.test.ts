@@ -168,4 +168,29 @@ describe("sync-queue library", () => {
     expect(removeSpy).toHaveBeenCalledWith("online", expect.any(Function));
     expect(removeSpy).toHaveBeenCalledWith("offline", expect.any(Function));
   });
+
+  it.each([
+    "/api/events/returns/items/27900000-abcd-4000-8000-000000000010/condition-resolutions",
+    "https://dreamlux.invalid/api/events/returns/items/27900000-abcd-4000-8000-000000000010/condition-resolutions/?source=operator",
+    "/api/events/returns/items/27900000-abcd-4000-8000-000000000010/%63ondition-resolutions",
+  ])("rejects condition writes before touching recovery-independent queue storage: %s", async (endpoint) => {
+    await expect(enqueueMutation({ endpoint, method: "POST", body: { quantity: 1 } })).rejects.toThrow("cannot be queued or replayed");
+    expect(mockStore.add).not.toHaveBeenCalled();
+    expect(mockStoreMap.size).toBe(0);
+  });
+
+  it("retains an explicit warning without dispatching an old condition queue entry", async () => {
+    const mutation: QueuedMutation = {
+      id: "synthetic-retained-condition", method: "POST",
+      endpoint: "/api/events/returns/items/27900000-abcd-4000-8000-000000000010/condition-resolutions",
+      createdAt: "2031-01-01T00:00:00Z", retryCount: 0,
+      body: { quantity: 1, source_condition: "repair", outcome: "good", idempotency_key: "synthetic-retained-key" },
+    };
+    mockStoreMap.set(mutation.id, mutation);
+    const fetcher = vi.fn<typeof fetch>();
+    const result = await flushSyncQueue(fetcher);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ pendingCount: 1, status: "warning", lastError: expect.stringContaining("cannot be queued or replayed") });
+    expect(mockStoreMap.get(mutation.id)).toEqual({ ...mutation, retryCount: 1, lastError: result.lastError });
+  });
 });
