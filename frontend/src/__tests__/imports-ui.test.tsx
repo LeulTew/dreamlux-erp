@@ -249,4 +249,45 @@ describe("Hisab Workbook Import Page Unit Tests", () => {
 
     expect(commitBtn).not.toBeDisabled();
   });
+
+  it("keeps resolutions but blocks a stale commit after a conflict, without retrying", async () => {
+    const closed = "Overhead month 2026-06 is closed. Reopen it or remove its overhead rows before importing.";
+    const commitReady = { ...PREVIEW_MOCK_DATA, unmatched: [], rows: [PREVIEW_MOCK_DATA.rows[0]] };
+    mockPreview.mockResolvedValueOnce(commitReady);
+    mockCommit.mockRejectedValueOnce({ response: { status: 409, data: { error: closed } } });
+    const { container } = render(<HisabImportPage />);
+    const file = new File(["dummy workbook"], "hisab-june.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    fireEvent.change(container.querySelector("input[type='file']") as HTMLInputElement, { target: { files: [file] } });
+    const commitBtn = await screen.findByRole("button", { name: /Commit Import/i });
+    await waitFor(() => expect(commitBtn).not.toBeDisabled());
+
+    fireEvent.click(commitBtn);
+
+    expect(await screen.findByText(closed)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Commit Import/i })).toBeDisabled());
+    expect(screen.getByText("Import Readiness")).toBeInTheDocument();
+    expect(mockCommit).toHaveBeenCalledTimes(1);
+    expect(mockPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not block commit after a non-conflict failure", async () => {
+    const commitReady = { ...PREVIEW_MOCK_DATA, unmatched: [], rows: [PREVIEW_MOCK_DATA.rows[0]] };
+    mockPreview.mockResolvedValueOnce(commitReady);
+    mockCommit.mockRejectedValueOnce({ response: { status: 500, data: { error: "Finance audit write was not acknowledged", outcome_uncertain: false } } });
+    const { container } = render(<HisabImportPage />);
+    const file = new File(["dummy workbook"], "hisab-june.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    fireEvent.change(container.querySelector("input[type='file']") as HTMLInputElement, { target: { files: [file] } });
+    const commitBtn = await screen.findByRole("button", { name: /Commit Import/i });
+    await waitFor(() => expect(commitBtn).not.toBeDisabled());
+
+    fireEvent.click(commitBtn);
+
+    await waitFor(() => expect(mockCommit).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Commit Import/i })).not.toBeDisabled());
+    expect(screen.queryByText("Finance audit write was not acknowledged")).not.toBeInTheDocument();
+  });
 });

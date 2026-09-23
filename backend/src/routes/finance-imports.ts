@@ -4,7 +4,12 @@ import { pool } from "../db/pool";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { hisabImportCommitSchema } from "../lib/validation";
 import { sendFinanceMutationFailure } from "../lib/finance-transaction";
-import { commitHisabImport, parseHisabWorkbook } from "../services/hisab-import-service";
+import {
+  closedOverheadImportMessage,
+  closedOverheadPreviewMonths,
+  commitHisabImport,
+  parseHisabWorkbook,
+} from "../services/hisab-import-service";
 
 const router = Router();
 
@@ -41,9 +46,14 @@ router.post(
         "SELECT id, committed_at FROM finance_import_batches WHERE workbook_hash = $1 AND status = 'Committed' LIMIT 1",
         [preview.workbookHash],
       );
+      // Advisory only: the commit re-checks closures under the month locks.
+      const closedMonths = await closedOverheadPreviewMonths(preview, pool);
 
       res.json({
         ...preview,
+        blockingErrors: closedMonths.length
+          ? [...preview.blockingErrors, closedOverheadImportMessage(closedMonths)]
+          : preview.blockingErrors,
         duplicate: (duplicate.rowCount ?? 0) > 0
           ? { importId: duplicate.rows[0].id, committedAt: duplicate.rows[0].committed_at }
           : null,

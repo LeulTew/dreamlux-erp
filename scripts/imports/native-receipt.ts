@@ -2,7 +2,7 @@ import { stripVTControlCharacters } from "node:util";
 
 // One summary per isolated native process, in script order: formula imports,
 // then finance audit acknowledgement.
-const EXPECTED_PASS_SUMMARIES = [12, 19];
+const EXPECTED_PASS_SUMMARIES = [12, 28];
 
 export function assertImportNativeReceipt(output: string) {
   const plain = stripVTControlCharacters(output);

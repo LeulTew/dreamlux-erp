@@ -1,4 +1,6 @@
 import "./setup";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 type Result = { rows: Record<string, unknown>[]; rowCount: number | null };
@@ -81,6 +83,22 @@ describe("finance audit acknowledgement", () => {
     expect(() => acknowledgeRow({ rows: [], rowCount: 1 } as never, "Returned row")).toThrow("Returned row was not acknowledged");
     expect(acknowledgeRow({ rows: [{ id: "a" }], rowCount: 1 } as never, "Returned row")).toEqual({ id: "a" });
   });
+});
+
+describe("finance DATE formatting", () => {
+  // Each zone runs in a fresh process: Bun fixes the zone once dates are used.
+  test.each(["UTC", "Africa/Addis_Ababa", "America/New_York", "Pacific/Kiritimati", "Pacific/Pago_Pago"])(
+    "keeps node-postgres DATE values on their calendar day in %s",
+    (timeZone) => {
+      const moduleUrl = pathToFileURL(join(__dirname, "..", "lib", "finance-audit.ts")).href;
+      const script = `const { toDateString } = await import(${JSON.stringify(moduleUrl)});
+        // node-postgres builds DATE values at local midnight.
+        console.log(JSON.stringify([toDateString(new Date(2026, 4, 1)), toDateString(new Date(2026, 11, 31)), toDateString("2026-02-28")]));`;
+      const child = Bun.spawnSync([process.execPath, "--no-env-file", "-e", script], { env: { ...process.env, TZ: timeZone } });
+      expect({ exitCode: child.exitCode, dates: JSON.parse(child.stdout.toString().trim() || "null") })
+        .toEqual({ exitCode: 0, dates: ["2026-05-01", "2026-12-31", "2026-02-28"] });
+    },
+  );
 });
 
 describe("finance transaction ownership", () => {
