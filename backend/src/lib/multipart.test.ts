@@ -409,6 +409,24 @@ describe("DreamLux bounded multipart contracts (in-memory only)", () => {
     }
   });
 
+  test.each([
+    ["assets", 18 * MiB, assetUpload],
+    ["employees", 44 * MiB, employeeUpload],
+    ["finance", 12 * MiB, workbookUpload],
+  ] as const)("rejects oversized declared %s uploads before parsing or waiting for body bytes", async (kind, budget, upload) => {
+    let parserCalls = 0;
+    const guarded = boundedMultipart(kind, (_req, _res, next) => {
+      parserCalls += 1;
+      next(new Error("Parser must not run for an oversized declared body"));
+    });
+    expectRejected(await parse(guarded, [], { length: String(budget + 1) }), 413);
+    expect(parserCalls).toBe(0);
+    const result = await parse(upload, [], { length: String(budget + 1) });
+    expectRejected(result, 413);
+    expect(result.bytesRead).toBe(0);
+    expect(result.res.getHeader("Connection")).toBe("close");
+  });
+
   test("does not send or call downstream middleware after the response has ended", async () => {
     const logger = spyOn(console, "error").mockImplementation(() => {});
     try {

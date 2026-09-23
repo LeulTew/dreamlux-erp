@@ -211,6 +211,12 @@ export function boundedMultipart(kind: UploadKind, parser: RequestHandler): Requ
       onAborted();
       return;
     }
+    const declaredLength = req.headers["content-length"];
+    if (declaredLength !== undefined && /^\d+$/.test(declaredLength)
+        && Number(declaredLength) > policies[kind].bytes) {
+      fail(new UploadError(413, "LIMIT_UPLOAD_BYTES", "Upload exceeds the request size limit", kind), false);
+      return;
+    }
     try {
       parser(req, res, (error?: unknown) => {
         if (state === "failed") {
