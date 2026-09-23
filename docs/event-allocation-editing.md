@@ -182,7 +182,12 @@ and its stock movement has a negative sign and loss styling.
 Global reservations are unchanged: making stock usable does not increase owned
 quantity, and non-overlapping event dates do not create an additional stock pool.
 
-**Integration gate:** current normalized-grant revocation and inactive-account
-denial depend on the shared authority work in #278. The condition suite retains
-those assertions; do not release this workflow by weakening them or restoring
-role-name/stale-map authority.
+Current normalized-grant revocation and inactive-account denial use the shared
+authority integration in #284. The condition suite retains those assertions;
+the operator workflow adds no role-name or stale-map authority fallback.
+
+The existing equipment verifier registers condition inspection/resolution,
+deletion, return correction and provisioning as separate native processes.
+Its browser registry includes both the existing workflows and the real
+condition-stock journey. Verification retains the original deadlines and
+reuses the source-matched frontend artifact from the separate CI build job.
