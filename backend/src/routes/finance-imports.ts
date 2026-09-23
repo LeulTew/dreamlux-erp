@@ -3,6 +3,7 @@ import multer from "multer";
 import { pool } from "../db/pool";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { hisabImportCommitSchema } from "../lib/validation";
+import { sendFinanceMutationFailure } from "../lib/finance-transaction";
 import { commitHisabImport, parseHisabWorkbook } from "../services/hisab-import-service";
 
 const router = Router();
@@ -64,21 +65,19 @@ router.post(
       return;
     }
 
-    const client = await pool.connect();
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
     try {
-      const userId = req.user?.id;
-      if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
-      const result = await commitHisabImport(client, validationResult.data, userId);
+      const result = await commitHisabImport(validationResult.data, userId);
       res.status(201).json(result);
-    } catch (error: any) {
-      const status = Number(error.statusCode || 500);
-      console.error("[finance-import-commit] Error:", { message: error.message, status, userId: req.user?.id });
-      res.status(status).json({ error: error.message || "Failed to commit import" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      // Workbook rows can carry operator-entered text; log only the outcome.
+      sendFinanceMutationFailure(res, "finance-import-commit", error, (failure) => ({
+        message: failure.message, status: failure.status, outcomeUncertain: failure.outcomeUncertain, userId,
+      }));
     }
   },
 );

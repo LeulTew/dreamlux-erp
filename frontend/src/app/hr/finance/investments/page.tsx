@@ -30,6 +30,7 @@ import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { isFinanceOutcomeUncertain } from "@/lib/finance-mutation";
 import {
   api,
   getCapitalInvestments,
@@ -322,6 +323,16 @@ export default function InvestmentsPage() {
   const inventoryItemsList = itemsResponse?.items || [];
 
   // Mutations
+  const refreshInvestments = () => {
+    queryClient.invalidateQueries({ queryKey: ["finance-investments-list"] });
+    queryClient.invalidateQueries({ queryKey: ["finance-investments-summary"] });
+  };
+  const reportInvestmentFailure = (err: unknown, fallback: string, refresh: () => unknown = refreshInvestments) => {
+    if (isFinanceOutcomeUncertain(err)) void refresh();
+    const error = err as Error & { response?: { data?: { error?: string } } };
+    toast.error(error.response?.data?.error || error.message || fallback);
+  };
+
   const saveMutation = useMutation({
     mutationFn: (data: Partial<CapitalInvestment>) => {
       if (editingInvestment) {
@@ -333,14 +344,9 @@ export default function InvestmentsPage() {
       toast.success(editingInvestment ? t("Investment updated") : t("Investment created"));
       setIsFormOpen(false);
       setEditingInvestment(null);
-      queryClient.invalidateQueries({ queryKey: ["finance-investments-list"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-investments-summary"] });
+      refreshInvestments();
     },
-    onError: (err: unknown) => {
-      const error = err as Error & { response?: { data?: { error?: string } } };
-      const msg = error.response?.data?.error || error.message || "Failed to save";
-      toast.error(msg);
-    },
+    onError: (err: unknown) => reportInvestmentFailure(err, "Failed to save"),
   });
 
   const deleteMutation = useMutation({
@@ -348,13 +354,9 @@ export default function InvestmentsPage() {
     onSuccess: () => {
       toast.success(t("Investment deleted"));
       setDeletingInvestment(null);
-      queryClient.invalidateQueries({ queryKey: ["finance-investments-list"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-investments-summary"] });
+      refreshInvestments();
     },
-    onError: (err: unknown) => {
-      const error = err as Error & { response?: { data?: { error?: string } } };
-      toast.error(error.response?.data?.error || error.message || "Delete failed");
-    },
+    onError: (err: unknown) => reportInvestmentFailure(err, "Delete failed"),
   });
 
   const reviewMutation = useMutation({
@@ -377,10 +379,8 @@ export default function InvestmentsPage() {
       setRejectReason("");
       await invalidateInventoryState(queryClient, { includeFinance: true });
     },
-    onError: (err: unknown) => {
-      const error = err as Error & { response?: { data?: { error?: string } } };
-      toast.error(error.response?.data?.error || error.message || "Review failed");
-    },
+    onError: (err: unknown) => reportInvestmentFailure(err, "Review failed",
+      () => invalidateInventoryState(queryClient, { includeFinance: true })),
   });
 
   if (permissionsLoading) {

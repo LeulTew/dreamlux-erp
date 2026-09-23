@@ -51,6 +51,22 @@ SUM verification in LeulTew/koti-catering#363. DreamLux keeps its
 own authentication, schema, configuration, data and deployments. No Koti
 environment, migration baseline or provider connection is copied.
 
+## Commit acknowledgement
+
+Committing a workbook, like every operational-expense, overhead, month-closure
+and capital-investment write, runs through one shared finance transaction
+(`backend/src/lib/finance-transaction.ts`). Each business insert, update or
+soft-delete must acknowledge exactly the rows it targets, and the required
+`activity_logs` audit row must acknowledge exactly one row; a suppressed or
+failed write rolls the whole commit back and returns `outcome_uncertain: false`.
+
+If the `COMMIT` acknowledgement itself is lost, the API returns `503` with
+`code: "FINANCE_OUTCOME_UNCERTAIN"` and `outcome_uncertain: true`, discards the
+connection and never retries. The finance pages refresh their registers on
+that response instead of resubmitting. For imports, retrying is still safe:
+the workbook fingerprint makes an already-committed batch return `409`. This
+matches LeulTew/koti-catering#404.
+
 ## Verification
 
 - `hisab-formula-transactions.test.ts` verifies real synthetic workbook parsing,
@@ -66,8 +82,14 @@ environment, migration baseline or provider connection is copied.
   routes and PostgreSQL verify amounts/status/provenance, mapping gates,
   historical duplicates, permission denial and audit rollback. All other
   network destinations are refused.
+  A second isolated process, `finance-audit-acknowledgement.integration.test.ts`,
+  uses the same boundary to suppress audit and business rows across every
+  finance mutation family, lose `BEGIN`/`COMMIT`/`ROLLBACK` acknowledgements,
+  fail connection acquisition, and race concurrent writes and month closures,
+  checking the complete persisted finance, stock and audit state each time.
   The local CI receipt requires all 12 native import cases, including the
-  wide sparse subtotal, with no skips, failures or unhandled runner errors.
+  wide sparse subtotal, then all 19 finance audit cases, in that order, with
+  no skips, failures or unhandled runner errors.
 - `bun run verify:payroll:build -- --checks --output .qa-payroll-build` produces
   the existing source-isolated, credential-free frontend artifact.
 - `bun run verify:imports:browser -- --frontend-build .qa-payroll-build` reuses

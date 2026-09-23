@@ -32,6 +32,7 @@ import toast from "@/lib/toast";
 import { useLanguage } from "@/hooks/use-language";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { isFinanceOutcomeUncertain } from "@/lib/finance-mutation";
 import { generateReportPdf } from "@/lib/pdf-report";
 import {
   api,
@@ -347,6 +348,10 @@ export default function HisabReportPage() {
     queryClient.invalidateQueries({ queryKey: ["finance-opex"] });
     queryClient.invalidateQueries({ queryKey: ["hisab-report"] });
   };
+  const reportFinanceFailure = (err: { response?: { data?: { error?: string } }; message?: string }) => {
+    if (isFinanceOutcomeUncertain(err)) invalidateFinanceQueries();
+    toast.error(err.response?.data?.error || err.message || t("Workspace unavailable"));
+  };
 
   const saveMutation = useMutation({
     mutationFn: (payload: { id?: string; data: { expense_date: string; category: string; amount: number; description: string } }) =>
@@ -360,9 +365,7 @@ export default function HisabReportPage() {
       setForm(EMPTY_FORM);
       invalidateFinanceQueries();
     },
-    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
-      toast.error(err.response?.data?.error || err.message || t("Workspace unavailable"));
-    },
+    onError: reportFinanceFailure,
   });
 
   const deleteMutation = useMutation({
@@ -372,9 +375,7 @@ export default function HisabReportPage() {
       setDeletingExpense(null);
       invalidateFinanceQueries();
     },
-    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
-      toast.error(err.response?.data?.error || err.message || t("Workspace unavailable"));
-    },
+    onError: reportFinanceFailure,
   });
 
   const reviewMutation = useMutation({
@@ -388,9 +389,7 @@ export default function HisabReportPage() {
       setRejectReason("");
       invalidateFinanceQueries();
     },
-    onError: (err: { response?: { data?: { error?: string } }; message?: string }) => {
-      toast.error(err.response?.data?.error || err.message || t("Workspace unavailable"));
-    },
+    onError: reportFinanceFailure,
   });
 
   const formatCurrency = (value: number) =>

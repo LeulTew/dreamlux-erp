@@ -37,6 +37,8 @@ let mockAuthData: MockAuthData = null;
 let mockAuthLoading = false;
 let mockSummaryData: MockQueryData = null;
 let mockListData: MockQueryData = null;
+const mockMutationOptions: Array<{ onError?: (error: unknown) => unknown }> = [];
+const mockInvalidateQueries = vi.fn();
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {
@@ -54,8 +56,11 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false };
   },
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: (options: { onError?: (error: unknown) => unknown }) => {
+    mockMutationOptions.push(options);
+    return { mutate: vi.fn(), isPending: false };
+  },
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -147,6 +152,7 @@ const LEDGER_FIXTURE = {
 describe("Capital Investments Page UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMutationOptions.length = 0;
     mockLang = "en";
     mockAuthLoading = false;
     mockAuthData = {
@@ -222,5 +228,25 @@ describe("Capital Investments Page UI", () => {
     // Edit/delete buttons should only render for Fabric Roll Blue (Pending).
     const editBtns = screen.getAllByRole("button", { name: /edit/i });
     expect(editBtns.length).toBe(1);
+  });
+
+  it("refreshes the register and stock after an uncertain write but not after a known rejection", () => {
+    render(<InvestmentsPage />);
+    const handlers = mockMutationOptions.map((options) => options.onError).filter(Boolean);
+    expect(handlers.length).toBeGreaterThanOrEqual(3);
+    for (const onError of handlers) {
+      mockInvalidateQueries.mockClear();
+      onError!({ response: { status: 409, data: { error: "Only pending capital investments can be reviewed (current status: Approved)" } } });
+      expect(mockInvalidateQueries).not.toHaveBeenCalled();
+      onError!({ message: "Network Error" });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-investments-list"] });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-investments-summary"] });
+    }
+    const [review] = handlers.slice(-1);
+    mockInvalidateQueries.mockClear();
+    review!({ response: { status: 504, data: {} } });
+    const refreshed = mockInvalidateQueries.mock.calls.map(([filters]) => filters.queryKey[0]);
+    expect(refreshed).toEqual(expect.arrayContaining(["finance-investments-list", "finance-investments-summary"]));
+    expect(refreshed.length).toBeGreaterThan(2);
   });
 });
