@@ -34,6 +34,7 @@ import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import { isFinanceOutcomeUncertain } from "@/lib/finance-mutation";
 import { generateReportPdf } from "@/lib/pdf-report";
+import { localDateString } from "@/lib/local-date";
 import {
   api,
   FINANCE_OPEX_CATEGORIES,
@@ -226,12 +227,14 @@ type ExpenseFormState = {
   description: string;
 };
 
-const EMPTY_FORM: ExpenseFormState = {
-  expense_date: new Date().toISOString().slice(0, 10),
-  category: "Other",
-  amount: "",
-  description: "",
-};
+function emptyExpenseForm(): ExpenseFormState {
+  return {
+    expense_date: localDateString(),
+    category: "Other",
+    amount: "",
+    description: "",
+  };
+}
 
 export default function HisabReportPage() {
   const { lang } = useLanguage();
@@ -258,7 +261,7 @@ export default function HisabReportPage() {
   const [ledgerSortOrder, setLedgerSortOrder] = useState<"asc" | "desc">("desc");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<FinanceOperationalExpense | null>(null);
-  const [form, setForm] = useState<ExpenseFormState>(EMPTY_FORM);
+  const [form, setForm] = useState<ExpenseFormState>(emptyExpenseForm);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [deletingExpense, setDeletingExpense] = useState<FinanceOperationalExpense | null>(null);
@@ -362,7 +365,7 @@ export default function HisabReportPage() {
       toast.success(variables.id ? t("Expense updated") : t("Expense created"));
       setIsFormOpen(false);
       setEditingExpense(null);
-      setForm(EMPTY_FORM);
+      setForm(emptyExpenseForm());
       invalidateFinanceQueries();
     },
     onError: reportFinanceFailure,
@@ -417,7 +420,7 @@ export default function HisabReportPage() {
 
   const openCreateForm = () => {
     setEditingExpense(null);
-    setForm(EMPTY_FORM);
+    setForm(emptyExpenseForm());
     setIsFormOpen(true);
   };
 

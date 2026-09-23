@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import { generateReportPdf } from "@/lib/pdf-report";
+import { eventDateRangeParams } from "@/lib/local-date";
 import { Event, EventsResponse, EventSavedView } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
 import {
@@ -477,34 +478,7 @@ function EventsPageContent() {
   const canDeleteEvents = hasPermission("events:delete");
 
   // Format dates helper for quick filters
-  const dateParams = useMemo(() => {
-    const today = new Date();
-    if (dateRange === "next_14") {
-      const future = new Date();
-      future.setDate(today.getDate() + 14);
-      return {
-        start_date: today.toISOString().split("T")[0],
-        end_date: future.toISOString().split("T")[0]
-      };
-    }
-    if (dateRange === "this_month") {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      return {
-        start_date: start.toISOString().split("T")[0],
-        end_date: end.toISOString().split("T")[0]
-      };
-    }
-    if (dateRange === "last_month") {
-      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const end = new Date(today.getFullYear(), today.getMonth(), 0);
-      return {
-        start_date: start.toISOString().split("T")[0],
-        end_date: end.toISOString().split("T")[0]
-      };
-    }
-    return { start_date: undefined, end_date: undefined };
-  }, [dateRange]);
+  const dateParams = useMemo(() => eventDateRangeParams(dateRange), [dateRange]);
 
   // Fetch events list
   const { data, isLoading } = useQuery<EventsResponse>({

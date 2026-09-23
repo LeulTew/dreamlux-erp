@@ -20,6 +20,8 @@ import {
 } from "@/lib/api";
 import { ReconcileRun, ReconcileRunDetail, Store } from "@/lib/types";
 import { fuzzySearch } from "@/lib/fuzzy-search";
+import { localDateString } from "@/lib/local-date";
+import { startOfMonth, subDays } from "date-fns";
 import toast from "@/lib/toast";
 import { 
   HiChevronLeft, 
@@ -230,18 +232,15 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
     setActiveRange(id);
     if (id === 'custom') return; // Stay open for manual input
     
-    const end = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const end = localDateString(now);
     let start = '';
 
     if (id === 'today') start = end;
     else if (id === 'week') {
-      const d = new Date();
-      d.setDate(d.getDate() - 7);
-      start = d.toISOString().split('T')[0];
+      start = localDateString(subDays(now, 7));
     } else if (id === 'month') {
-      const d = new Date();
-      d.setDate(1);
-      start = d.toISOString().split('T')[0];
+      start = localDateString(startOfMonth(now));
     } else {
       start = '';
     }
@@ -254,7 +253,8 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
   const [localEnd, setLocalEnd] = useState("");
 
   return (
-    <div className="relative">
+    // Below md the panel spans the toolbar row, which is the positioned ancestor there.
+    <div className="md:relative">
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 bg-card-alt border border-border px-4 py-2 rounded-xl hover:bg-border transition-all min-w-35"
@@ -273,7 +273,7 @@ function DateRangePicker({ onRangeChange }: { onRangeChange: (start: string, end
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="absolute right-0 mt-2 w-[calc(100vw-2rem)] md:w-80 bg-card border border-border shadow-massive rounded-2xl p-4 z-50 flex flex-col gap-4 overflow-hidden"
+              className="absolute left-0 right-0 md:left-auto mt-2 md:w-80 bg-card border border-border shadow-massive rounded-2xl p-4 z-50 flex flex-col gap-4 overflow-hidden"
             >
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-2 gap-2">
                 {presets.map((p) => (
@@ -651,7 +651,7 @@ function HistoryContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap md:flex-nowrap w-full md:w-auto">
+          <div className="relative flex items-center gap-3 flex-wrap md:flex-nowrap w-full md:w-auto">
             <div className="relative w-full sm:flex-1 md:w-56 min-w-0">
               <HiMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
               <input 

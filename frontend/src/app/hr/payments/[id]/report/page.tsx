@@ -6,6 +6,7 @@ import UserAvatar from "@/components/UserAvatar";
 import { HiArrowLeft } from "react-icons/hi2";
 import { useSearchParams } from "next/navigation";
 import { getPayrollRun } from "@/lib/api";
+import { localMonthString } from "@/lib/local-date";
 import { PayrollRun, PayrollEmployeeLine, PayrollRunLineEvent } from "@/lib/types";
 
 export default function PayrollReportPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,7 +66,7 @@ export default function PayrollReportPage({ params }: { params: Promise<{ id: st
   });
 
   const periodTag = run.created_at
-    ? new Date(run.created_at).toISOString().slice(0, 7)
+    ? localMonthString(new Date(run.created_at))
     : `${run.year}-${String(run.month).padStart(2, "0")}`;
 
   return (
