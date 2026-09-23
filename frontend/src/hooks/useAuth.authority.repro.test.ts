@@ -328,6 +328,14 @@ describe("approved narrowing and recovery regressions", () => {
     expect(result.current.isPreviewActive).toBe(false);
   });
 
+  it.each([{ value: null }, { value: "" }, { value: 0 }])("reports a malformed successful permission payload without granting access", async ({ value }) => {
+    getPermissions.mockResolvedValue(value);
+    const { result } = await mountAuth();
+    expect(result.current.hasPermission("events:read")).toBe(false);
+    expect(result.current.error?.message).toBe("Invalid current permission response");
+    expect(console.error).toHaveBeenCalled();
+  });
+
   it("rejects permission metadata cached for a different user", async () => {
     getPermissions.mockResolvedValue({ ...authority(["*"], true), user_id: "different-synthetic-user" });
     setPreview("OWNER", JSON.stringify(["*"]));

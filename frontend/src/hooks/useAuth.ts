@@ -102,7 +102,7 @@ export function useAuth() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: permissionsData, isLoading: permissionsLoading, error: permissionsError } = useQuery({
+  const { data: permissionsData, isLoading: permissionsLoading, isSuccess: permissionsSucceeded, error: permissionsError } = useQuery({
     queryKey: ["permissions"],
     queryFn: getEffectivePermissions,
     enabled: hasMounted && !!data?.user,
@@ -123,8 +123,8 @@ export function useAuth() {
   }, [user]);
 
   const normalizedSlugs = normalizeSlugs(permissionsData?.permission_slugs);
-  const invalidAuthority = Boolean(user && permissionsData && (
-    normalizedSlugs === null || permissionsData.user_id !== (user.id || null)
+  const invalidAuthority = Boolean(user && permissionsSucceeded && (
+    normalizedSlugs === null || permissionsData?.user_id !== (user.id || null)
   ));
   const authorityReady = Boolean(user && !error && permissionsData && !permissionsError && !invalidAuthority);
   const rawPermissionSlugs = authorityReady ? normalizedSlugs || [] : [];
@@ -144,14 +144,14 @@ export function useAuth() {
 
   useEffect(() => {
     const sessionSettled = hasMounted && !isLoading && !isFetching;
-    const authoritySettled = !permissionsLoading && Boolean(permissionsData || permissionsError);
+    const authoritySettled = !permissionsLoading && (permissionsSucceeded || Boolean(permissionsError));
     if (preview && sessionSettled && (
       !user || (authoritySettled && (!authorityReady || !rawIsAdmin))
     )) {
       discardStoredPreview();
     }
   }, [preview, hasMounted, isLoading, isFetching, user, permissionsLoading,
-    permissionsData, permissionsError, authorityReady, rawIsAdmin]);
+    permissionsSucceeded, permissionsError, authorityReady, rawIsAdmin]);
 
   const displayUser = isPreviewActive && user ? {
     ...user,

@@ -183,6 +183,8 @@ refreshes cannot retain grants from a previous successful response or from
 preview storage. A retained user display snapshot is not fresh authority:
 actions remain denied until the session read recovers, without introducing a
 new forced logout on a transient read failure.
+Malformed successful permission payloads, including null or other falsy JSON
+values, are explicit authority errors rather than a silent empty grant set.
 
 ### Bounded Invalidation Bursts (Issue #281)
 
