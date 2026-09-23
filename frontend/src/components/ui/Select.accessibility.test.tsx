@@ -32,10 +32,53 @@ function expectActive(owner: HTMLElement, label: string) {
   return id;
 }
 
+function optionLayout(listbox: HTMLElement, scale: () => number = () => 1) {
+  const rows = within(listbox).getAllByRole("option");
+  const height = (row: Element) => row.textContent?.includes("Expanded context") ? 96 : 48;
+  const top = (row: Element) => {
+    const current = [...listbox.querySelectorAll('[role="option"]')];
+    return current.slice(0, current.indexOf(row)).reduce((sum, previous) => sum + height(previous) + 8, 0);
+  };
+  Object.defineProperty(listbox, "clientHeight", { configurable: true, get: () => 168 });
+  vi.spyOn(listbox, "getBoundingClientRect").mockImplementation(() => new DOMRect(0, 100, 300 * scale(), 168 * scale()));
+  rows.forEach((row) => {
+    Object.defineProperties(row, {
+      offsetTop: { configurable: true, get: () => top(row) },
+      offsetHeight: { configurable: true, get: () => height(row) },
+    });
+    vi.spyOn(row, "getBoundingClientRect")
+      .mockImplementation(() => new DOMRect(0, 100 + (top(row) - listbox.scrollTop) * scale(), 300 * scale(), height(row) * scale()));
+  });
+  return rows;
+}
+
 beforeEach(() => window.localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("Dream Select accessible ownership", () => {
+  it.each([0.95, 1])("reconciles intrinsic scroll during a %s-scale entrance and remains visible after settlement", async (initialScale) => {
+    let scale = initialScale;
+    const choices = Array.from({ length: 16 }, (_, index) => ({ id: `item-${index}`, label: `Stock ${index}` }));
+    const changed = vi.fn();
+    const panel = (items: typeof choices) => <Select aria-label="Stock" value="item-1" options={items} onChange={changed} />;
+    const view = render(panel(choices));
+    const trigger = screen.getByRole("combobox", { name: "Stock" });
+    choose(trigger);
+    const listbox = await screen.findByRole("listbox");
+    const rows = optionLayout(listbox, () => scale);
+    fireEvent.keyDown(trigger, { key: "Home" });
+    const activeId = rows[0].id;
+    view.rerender(panel([...choices.slice(1), choices[0]]));
+    expect(trigger).toHaveAttribute("aria-activedescendant", activeId);
+    expect(rows[1]).toHaveAttribute("aria-selected", "true");
+    expect(changed).not.toHaveBeenCalled();
+    expect(listbox.scrollTop).toBe(15 * 56 + 48 - listbox.clientHeight);
+    scale = 1;
+    expect(rows[0].getBoundingClientRect().bottom).toBeLessThanOrEqual(listbox.getBoundingClientRect().bottom);
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    expect(changed).toHaveBeenCalledExactlyOnceWith("item-0");
+  });
+
   it.each(["reorder", "content"] as const)("review: reconciles active-option scrolling after %s without changing identity or selection", async (change) => {
     const choices = Array.from({ length: 12 }, (_, index) => ({ id: `item-${index}`, label: `Stock ${index}` }));
     const changed = vi.fn();
@@ -46,16 +89,7 @@ describe("Dream Select accessible ownership", () => {
     const trigger = screen.getByRole("combobox", { name: "Stock" });
     choose(trigger);
     const listbox = await screen.findByRole("listbox");
-    const rows = within(listbox).getAllByRole("option");
-    vi.spyOn(listbox, "getBoundingClientRect").mockImplementation(() => new DOMRect(0, 100, 300, 168));
-    const height = (row: Element) => row.textContent?.includes("Expanded context") ? 96 : 48;
-    rows.forEach((row) => {
-      vi.spyOn(row, "getBoundingClientRect").mockImplementation(() => {
-        const current = [...listbox.querySelectorAll('[role="option"]')];
-        const offset = current.slice(0, current.indexOf(row)).reduce((sum, previous) => sum + height(previous) + 8, 0);
-        return new DOMRect(0, 100 + offset - listbox.scrollTop, 300, height(row));
-      });
-    });
+    const rows = optionLayout(listbox);
     fireEvent.keyDown(trigger, { key: "Home" });
     if (change === "content") {
       for (let index = 0; index < 4; index += 1) fireEvent.keyDown(trigger, { key: "ArrowDown" });

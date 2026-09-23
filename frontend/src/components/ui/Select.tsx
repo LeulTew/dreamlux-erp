@@ -121,10 +121,11 @@ export default function Select({
     const listbox = listboxRef.current;
     const option = activeDescendant ? document.getElementById(activeDescendant) : null;
     if (!listbox || !option) return;
-    const bounds = listbox.getBoundingClientRect();
-    const activeBounds = option.getBoundingClientRect();
-    if (activeBounds.top < bounds.top) listbox.scrollTop -= bounds.top - activeBounds.top;
-    else if (activeBounds.bottom > bounds.bottom) listbox.scrollTop += activeBounds.bottom - bounds.bottom;
+    // Popup transforms affect viewport rectangles, but not these scroll units.
+    const top = option.offsetTop;
+    const bottom = top + option.offsetHeight;
+    if (top < listbox.scrollTop) listbox.scrollTop = top;
+    else if (bottom > listbox.scrollTop + listbox.clientHeight) listbox.scrollTop = bottom - listbox.clientHeight;
   }, [activeDescendant, optionLayoutKey]);
 
   const openMenu = (fromEnd = false) => {
@@ -267,7 +268,7 @@ export default function Select({
             </div>
           )}
           <div ref={listboxRef} role="listbox" id={listboxId} aria-label={ariaLabel ?? placeholderText}
-            className="max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+            className="relative max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
             {filteredOptions.map((option) => (
               <button
                 key={option.id}
