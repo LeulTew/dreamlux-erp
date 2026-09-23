@@ -63,8 +63,11 @@ to 1,011 MiB: the **44 MiB actual-stream budget also applies**.
 ## Failure and lifecycle behavior
 
 The guard counts actual incoming bytes, including multipart framing, preambles,
-and epilogues. It does not trust `Content-Length`, accumulate a second body,
-replace `req.pipe`/`req._read`, or start an application/listener.
+and epilogues. An oversized decimal `Content-Length` is rejected before invoking
+Multer or waiting for body bytes, after the route's authentication/permission
+checks. An absent or smaller declared length never replaces the actual-stream
+budget. The guard does not accumulate a second body, replace
+`req.pipe`/`req._read`, or start an application/listener.
 
 On overflow, a prepended counter signals a typed request error. Multer 2.3's
 request-error path synchronously unpipes/destroys Busboy, so an already-captured
