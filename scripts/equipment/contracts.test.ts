@@ -100,7 +100,7 @@ describe("independent equipment verification contracts", () => {
   test("requires complete provisioning and login proof without accepting a different native suite", () => {
     const output = nativeOutput(PROVISIONING_TEST_COUNT).replace(NATIVE_TEST, PROVISIONING_TEST);
     expect(nativeReceipt(output, 0, { suite: "provisioning" })).toEqual({
-      passed: 11, failed: 0, skipped: 0, tests: 11, files: 1,
+      passed: 12, failed: 0, skipped: 0, tests: 12, files: 1,
     });
     expect(nativeArguments("provisioning.junit.xml", "provisioning").at(-1)?.replaceAll("\\", "/")).toBe(PROVISIONING_TEST);
     expect(nativeArguments("provisioning.junit.xml", "provisioning").some((arg) => arg.startsWith("--timeout"))).toBe(false);

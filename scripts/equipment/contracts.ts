@@ -14,7 +14,7 @@ export const CONDITION_TEST_COUNT = 23;
 export const RETURN_TEST = "src/db/equipment-return-correction.integration.test.ts";
 export const RETURN_TEST_COUNT = 35;
 export const PROVISIONING_TEST = "src/db/authority-provisioning.integration.test.ts";
-export const PROVISIONING_TEST_COUNT = 11;
+export const PROVISIONING_TEST_COUNT = 12;
 const NATIVE_SUITES = {
   deletion: { file: NATIVE_TEST, count: NATIVE_TEST_COUNT },
   conditions: { file: CONDITION_TEST, count: CONDITION_TEST_COUNT },

@@ -102,7 +102,7 @@ afterAll(async () => {
   if (failed.length) throw new AggregateError(failed, "Authority fixture cleanup failed");
 });
 
-nativeTest("preserves an existing editable manager role's explicit current grants during configured account recovery", async () => {
+nativeTest("preserves an existing editable manager role's explicit current grants during configured account provisioning", async () => {
   await db().query(`insert into roles(id,name,description,permissions)
     values($1,'SYSTEM_MANAGER','Synthetic customized manager','{"settings":"write","users":"write"}')`, [managerRole]);
   await db().query(`insert into role_permissions(role_id,permission_id)
@@ -113,6 +113,25 @@ nativeTest("preserves an existing editable manager role's explicit current grant
   const login = await api().post("/auth/login").send({ username: "manager", password: managerPassword });
   expect(login.status).toBe(200);
   expect(login.body.user.permission_slugs).toEqual(["events:read"]);
+});
+
+nativeTest("recovers the existing inactive manager with the supplied credential and unchanged current grants", async () => {
+  const managerId = "27800000-0000-4000-8000-000000000004";
+  const previousPassword = randomBytes(32).toString("hex");
+  await db().query("insert into roles(id,name,permissions) values($1,'SYSTEM_MANAGER','{}')", [managerRole]);
+  await db().query(`insert into role_permissions(role_id,permission_id)
+    select $1,id from permissions where slug='events:read'`, [managerRole]);
+  await db().query(`insert into users(id,username,password_hash,full_name,role_id,is_active)
+    values($1,'manager',crypt($3,gen_salt('bf')),'Synthetic Existing Manager',$2,false)`,
+  [managerId, managerRole, previousPassword]);
+  expect((await api().post("/users/bootstrap-admin").set("Cookie", cookie)).status).toBe(200);
+  const login = await api().post("/auth/login").send({ username: "manager", password: managerPassword });
+  expect(login.status).toBe(200);
+  expect(login.body.user.id).toBe(managerId);
+  expect(login.body.user.permission_slugs).toEqual(["events:read"]);
+  expect((await api().post("/auth/login").send({ username: "manager", password: previousPassword })).status).toBe(401);
+  expect((await db().query("select id,is_active from users where username='manager'")).rows)
+    .toEqual([{ id: managerId, is_active: true }]);
 });
 
 nativeTest("a newly provisioned manager receives its explicit advertised users and settings grants", async () => {
