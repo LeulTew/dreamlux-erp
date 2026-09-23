@@ -143,11 +143,42 @@ test("real condition stock preserves global reuse, identity, UTC cursors and del
   const movement = page.getByRole("row").filter({ hasText: "Synthetic same-name equipment" });
   await expect(movement.getByText("-1 sets", { exact: true })).toHaveClass(/text-danger/);
   await expect(movement.getByText("Condition resolution", { exact: true })).toBeVisible();
+  let authorityDenials = 0;
+  await page.route("**/api/auth/permissions", async (route) => {
+    expect(route.request().method()).toBe("GET");
+    authorityDenials += 1;
+    await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Synthetic authority read failure" }) });
+  }, { times: 1 });
+  if (info.project.name === "mobile") await page.getByRole("button", { name: "Navigation", exact: true }).click();
+  await page.getByRole("link", { name: "Condition stock", exact: true }).first().click();
+  await expect(page.getByText(conditionStockCopy("en").unavailable, { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Refresh reads", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Condition stock", exact: true })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: itemId })).toBeVisible();
+  expect(authorityDenials).toBe(1);
+  expect((await control("state")).resolutions).toHaveLength(2);
   await page.goto(`/assets/conditions?item=${itemId.toUpperCase()}`);
   await expect(detail.getByText(itemId, { exact: true })).toBeVisible();
   await detail.getByLabel("Source condition", { exact: true }).selectOption("repair");
   await detail.getByLabel("Outcome", { exact: true }).selectOption("repair");
   await detail.getByLabel("Quantity", { exact: true }).fill("1");
+  let refusedWrites = 0;
+  await page.route(`**${resolutionPath}`, async (route) => {
+    expect(route.request().method()).toBe("POST");
+    refusedWrites += 1;
+    await route.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ error: "Synthetic rate limit" }) });
+  }, { times: 1 });
+  await detail.getByRole("button", { name: "Record resolution", exact: true }).click();
+  await expect(detail.getByText(conditionStockCopy("en").rejected, { exact: true })).toBeVisible();
+  await expect(detail.getByText(conditionStockCopy("en").unknown, { exact: true })).toHaveCount(0);
+  expect(refusedWrites).toBe(1);
+  expect((await control("state")).resolutions).toHaveLength(2);
+  await detail.getByRole("button", { name: "Edit rejected request", exact: true }).click();
+  await expect(detail.getByLabel("Quantity", { exact: true })).toHaveValue("1");
+  await info.attach("condition-retry-outcomes", {
+    body: JSON.stringify({ authorityDenials, refusedWrites, persistedResolutionsBeforeNextWrite: 2 }),
+    contentType: "application/json",
+  });
   const writes: string[] = [];
   page.on("request", (request) => { if (request.method() === "POST" && new URL(request.url()).pathname === resolutionPath) writes.push(request.postData() ?? ""); });
   let committed!: ConditionResolution;
@@ -251,7 +282,10 @@ test("real condition stock preserves global reuse, identity, UTC cursors and del
   }
   await info.attach("condition-reachability", { body: JSON.stringify(geometry), contentType: "application/json" });
   expect(evidence.unexpected).toEqual([]);
-  expect(evidence.consoleErrors.filter((error) => !(error.url.endsWith(resolutionPath) && /ERR_FAILED/.test(error.text)))).toEqual([]);
+  const expectedConsoleError = (error: { url: string; text: string }) =>
+    (error.url.endsWith(resolutionPath) && /ERR_FAILED|status of 429/.test(error.text))
+    || (error.url.endsWith("/api/auth/permissions") && /status of 503/.test(error.text));
+  expect(evidence.consoleErrors.filter((error) => !expectedConsoleError(error))).toEqual([]);
   await page.evaluate(() => { localStorage.setItem("lang", "en"); window.dispatchEvent(new CustomEvent("lang-change")); document.documentElement.classList.remove("dark"); });
   await control("reader");
   await page.reload();
@@ -277,7 +311,7 @@ test("real condition stock preserves global reuse, identity, UTC cursors and del
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("dreamlux-erp:condition-resolution:")))).toEqual([]);
   expect((await control("state")).resolutions).toHaveLength(3);
   expect(evidence.unexpected).toEqual([]);
-  expect(evidence.consoleErrors.filter((error) => !(error.url.endsWith(resolutionPath) && /ERR_FAILED/.test(error.text)))).toEqual([]);
+  expect(evidence.consoleErrors.filter((error) => !expectedConsoleError(error))).toEqual([]);
   } finally {
     await info.attach("condition-browser-errors", {
       body: JSON.stringify({ unexpected: evidence.unexpected, console: evidence.consoleErrors }),

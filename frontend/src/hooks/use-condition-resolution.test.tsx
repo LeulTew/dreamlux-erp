@@ -123,6 +123,31 @@ describe("condition resolution admission and settlement", () => {
     expect(restored.result.current.state.intent).toEqual(original);
   });
 
+  it("classifies an initial rate-limit response as rejected without claiming an uncertain commit", async () => {
+    const hook = setup();
+    vi.mocked(submitConditionResolution).mockRejectedValue({ response: { status: 429 } });
+    act(() => hook.result.current.submit(conditionItem, conditionDraft));
+    await waitFor(() => expect(hook.result.current.state.phase).toBe("rejected"));
+    expect(hook.result.current.state.failure).toBe("rejected");
+    expect(hook.result.current.state.intent?.draft).toEqual(conditionDraft);
+    expect(submitConditionResolution).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains the earlier uncertainty when a deliberate retry is rate limited", async () => {
+    const hook = setup();
+    vi.mocked(submitConditionResolution).mockRejectedValueOnce(new Error("Connection lost"))
+      .mockRejectedValueOnce({ response: { status: 429 } });
+    act(() => hook.result.current.submit(conditionItem, conditionDraft));
+    await waitFor(() => expect(hook.result.current.state.phase).toBe("unknown"));
+    const original = hook.result.current.state.intent;
+    act(() => hook.result.current.retry());
+    await waitFor(() => expect(hook.result.current.state.phase).toBe("unknown"));
+    expect(hook.result.current.state.failure).toBe("rejected");
+    expect(hook.result.current.state.intent).toBe(original);
+    expect(submitConditionResolution).toHaveBeenCalledTimes(2);
+    act(() => expect(hook.result.current.release(original!.payload.idempotency_key)).toBe(false));
+  });
+
   it("blocks dispatch when authority changes during admission and never affects another account's draft", async () => {
     const hook = setup();
     const admission = deferred<void>();

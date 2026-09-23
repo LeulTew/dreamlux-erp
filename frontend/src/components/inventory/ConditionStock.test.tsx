@@ -15,7 +15,8 @@ let language = "en";
 let actorId: string | undefined = conditionActor;
 const params = new URLSearchParams();
 const clients: QueryClient[] = [];
-vi.mock("next/navigation", () => ({ useSearchParams: () => params, useRouter: () => ({ push: vi.fn() }) }));
+const navigate = vi.fn();
+vi.mock("next/navigation", () => ({ useSearchParams: () => params, useRouter: () => ({ push: navigate }) }));
 vi.mock("@/hooks/use-language", () => ({ useLanguage: () => ({ lang: language }) }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({
   user: { id: actorId }, isAuthenticated: true, isLoading: false,
@@ -126,6 +127,53 @@ describe("condition-stock operator interface", () => {
     expect(await screen.findByText(conditionStockCopy("en").forbidden)).toBeVisible();
     expect(getConditionStock).not.toHaveBeenCalled();
     expect(getConditionItem).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: "503 response", error: { response: { status: 503 } } },
+    { label: "connection failure", error: new Error("Synthetic connection failure") },
+  ])("recovers a temporary authority $label without requiring another sign-in", async ({ error }) => {
+    vi.mocked(getConditionAuthority).mockRejectedValueOnce(error);
+    mount();
+    expect(await screen.findByText(conditionStockCopy("en").unavailable)).toBeVisible();
+    expect(getConditionStock).not.toHaveBeenCalled();
+    expect(getConditionItem).not.toHaveBeenCalled();
+    expect(submitConditionResolution).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh reads" }));
+    const detail = await dialog();
+    expect(detail.getByRole("button", { name: "Record resolution" })).toBeVisible();
+    expect(getConditionAuthority).toHaveBeenCalledTimes(2);
+    expect(submitConditionResolution).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 403])("retains the sign-in path after a rejected authority response (%s)", async (status) => {
+    vi.mocked(getConditionAuthority).mockRejectedValue({ response: { status } });
+    mount();
+    expect(await screen.findByText(conditionStockCopy("en").identityUnavailable)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in again" }));
+    expect(navigate).toHaveBeenCalledWith("/login");
+    expect(getConditionStock).not.toHaveBeenCalled();
+    expect(submitConditionResolution).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "am"])("offers deliberate editing, not false commit uncertainty, after a first rate limit in %s", async (lang) => {
+    language = lang;
+    const copy = conditionStockCopy(lang);
+    vi.mocked(submitConditionResolution).mockRejectedValueOnce({ response: { status: 429 } });
+    mount();
+    const detail = await dialog();
+    fireEvent.change(detail.getByLabelText(copy.quantity), { target: { value: "2" } });
+    fireEvent.click(detail.getByRole("button", { name: copy.resolve }));
+    expect(await detail.findByText(copy.rejected, { exact: true })).toBeVisible();
+    expect(detail.queryByText(copy.unknown, { exact: true })).toBeNull();
+    expect(detail.queryByRole("button", { name: copy.retry })).toBeNull();
+    fireEvent.click(detail.getByRole("button", { name: copy.editRejected }));
+    expect(detail.getByLabelText(copy.quantity)).toHaveValue("2");
+    expect(submitConditionResolution).toHaveBeenCalledTimes(1);
+    fireEvent.click(detail.getByRole("button", { name: copy.resolve }));
+    expect(await detail.findByText(copy.saved, { exact: true })).toBeVisible();
+    expect(submitConditionResolution).toHaveBeenCalledTimes(2);
   });
 
   it.each(["en", "am"])("does not shift an unknown historical clock into the browser timezone in %s", async (lang) => {

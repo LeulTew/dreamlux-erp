@@ -70,7 +70,7 @@ export function useConditionResolution(actorId: string | undefined, canRead: boo
           : !sent ? "admission"
           : error instanceof ConditionIntentConflict ? "mismatch"
             : status === 404 ? "missing" : status === 409 ? "conflict"
-              : status === 400 || status === 422 ? "rejected" : "unknown";
+              : status === 400 || status === 422 || status === 429 ? "rejected" : "unknown";
       const response = error && typeof error === "object" && "response" in error ? error.response : undefined;
       const data = response && typeof response === "object" && "data" in response ? response.data : undefined;
       const uncertain = data && typeof data === "object" && "outcome_uncertain" in data && data.outcome_uncertain === true;

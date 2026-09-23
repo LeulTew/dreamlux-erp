@@ -15,7 +15,7 @@ import { useModalFocus } from "@/hooks/use-modal-focus";
 import { useConditionResolution } from "@/hooks/use-condition-resolution";
 import { getConditionAuthority, getConditionItem, getConditionStock } from "@/lib/condition-stock-api";
 import {
-  conditionQuantity, isConditionOutcome, isConditionSource,
+  ConditionAccessChanged, conditionQuantity, isConditionOutcome, isConditionSource,
   type ConditionDraft, type ConditionHistoryCursor, type ConditionStockItem,
 } from "@/lib/condition-stock";
 import { conditionStockCopy, type ConditionCopy } from "@/lib/condition-stock-copy";
@@ -351,8 +351,20 @@ export function ConditionStock() {
     && (auth.hasPermission("assets:read") || auth.hasPermission("assets:reconcile"));
   if (auth.isLoading && (!auth.user || !canRead)) return <Skeleton className="h-96 w-full" aria-label={copy.loading} />;
   if (auth.isAuthenticated && authority.isPending) return <Skeleton className="h-96 w-full" aria-label={copy.loading} />;
-  if (auth.isAuthenticated && authority.isError) return <ForbiddenState title={copy.title}
-    description={copy.identityUnavailable} actionLabel={copy.signInAgain} onAction={() => router.push("/login")} />;
+  if (auth.isAuthenticated && authority.isError) {
+    if (authority.error instanceof ConditionAccessChanged || [401, 403].includes(responseStatus(authority.error) ?? 0)) {
+      return <ForbiddenState title={copy.title} description={copy.identityUnavailable}
+        actionLabel={copy.signInAgain} onAction={() => router.push("/login")} />;
+    }
+    return <section className="page-container-lg flex min-h-[70dvh] flex-col gap-4 pb-6">
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">{copy.title}</h1>
+      <p role="alert" className="text-sm text-danger">{copy.unavailable}</p>
+      <button type="button" className={`${ACTION} mt-auto self-start`} disabled={authority.isFetching}
+        onClick={() => void authority.refetch()}>
+        <RefreshCw aria-hidden="true" className="size-4" />{authority.isFetching ? copy.loading : copy.refresh}
+      </button>
+    </section>;
+  }
   if (!auth.isAuthenticated || !authority.data || !canRead) return <ForbiddenState title={copy.title} description={copy.forbidden}
     onAction={() => router.push("/")} />;
   const itemId = params.get("item")?.toLowerCase() ?? null;

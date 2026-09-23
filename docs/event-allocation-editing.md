@@ -150,6 +150,9 @@ require an active item. Recounts and the descriptive item condition are separate
   create a journal. `X-Condition-Actor` binds operator requests to the expected
   session actor. An actor mismatch is rejected, not treated as another user's
   acknowledgement.
+- A temporary authority-read failure withholds stock actions and offers an
+  explicit read retry without erasing the session or requiring another login.
+  Rejected or identity-less authentication retains the separate sign-in path.
 
 DreamLux's ledger column is **timestamp without time zone**, not `timestamptz`.
 Historical physical instants cannot be reconstructed from that column alone.
@@ -178,6 +181,11 @@ rejection cannot disprove an earlier uncertain commit. Rejections preserve
 authored input. Acknowledgement releases independently of advisory refreshes;
 stale reads remain visible. Loss requires a separate item-specific confirmation,
 and its stock movement has a negative sign and loss styling.
+
+A first-attempt rate limit is a known rejection, not an ambiguous commit. Its
+inputs can be deliberately edited and submitted again. If an earlier attempt
+was already uncertain, a rate-limited retry still cannot release that original
+identity or establish rollback.
 
 Global reservations are unchanged: making stock usable does not increase owned
 quantity, and non-overlapping event dates do not create an additional stock pool.
