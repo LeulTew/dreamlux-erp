@@ -1,7 +1,7 @@
 import { Pool, PoolClient } from "pg";
 
 // Transaction-aware audit insert for finance modules: callers pass their open
-// client so a failed audit write rolls the whole mutation back.
+// client so a failed or suppressed audit write rolls the whole mutation back.
 export async function insertFinanceAuditLog(
   client: PoolClient | Pool,
   input: {
@@ -15,7 +15,7 @@ export async function insertFinanceAuditLog(
     note?: string | null;
   },
 ): Promise<void> {
-  await client.query(
+  const written = await client.query(
     `INSERT INTO public.activity_logs (entity_type, entity_id, user_id, action, field_changed, old_value, new_value, note)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
@@ -29,6 +29,7 @@ export async function insertFinanceAuditLog(
       input.note ?? null,
     ],
   );
+  if (written.rowCount !== 1) throw new Error("Finance audit write was not acknowledged");
 }
 
 export function roundMoney(value: unknown): number {

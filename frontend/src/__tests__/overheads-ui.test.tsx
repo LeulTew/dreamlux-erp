@@ -34,6 +34,8 @@ type MockAuthData = Pick<Awaited<ReturnType<typeof getEffectivePermissions>>, "p
 let mockAuthData: MockAuthData = null;
 let mockSummaryData: MockQueryData = null;
 let mockListData: MockQueryData = null;
+const mockMutationOptions: Array<{ onError?: (error: unknown) => unknown }> = [];
+const mockInvalidateQueries = vi.fn();
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {
@@ -51,8 +53,11 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false };
   },
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: (options: { onError?: (error: unknown) => unknown }) => {
+    mockMutationOptions.push(options);
+    return { mutate: vi.fn(), isPending: false };
+  },
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -152,6 +157,7 @@ const LEDGER_FIXTURE = {
 describe("Overhead Register Page UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMutationOptions.length = 0;
     mockLang = "en";
     mockAuthData = {
       permission_slugs: ["finance:overheads:read", "finance:overheads:write"],
@@ -219,5 +225,19 @@ describe("Overhead Register Page UI", () => {
 
     const addBtn = screen.getByRole("button", { name: /add expense/i });
     expect(addBtn).toBeDisabled();
+  });
+
+  it("refreshes the register after an uncertain write but not after a known rejection", () => {
+    render(<OverheadsPage />);
+    const handlers = mockMutationOptions.map((options) => options.onError).filter(Boolean);
+    expect(handlers.length).toBeGreaterThanOrEqual(4);
+    for (const onError of handlers) {
+      mockInvalidateQueries.mockClear();
+      onError!({ response: { status: 409, data: { error: "Month 2026-05 is closed for edits" } } });
+      expect(mockInvalidateQueries).not.toHaveBeenCalled();
+      onError!({ response: { status: 503, data: { error: "Overhead change could not be confirmed. Reload before retrying.", outcome_uncertain: true } } });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-overheads-list"] });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-overheads-summary"] });
+    }
   });
 });

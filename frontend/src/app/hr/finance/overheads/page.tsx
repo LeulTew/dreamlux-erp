@@ -29,6 +29,7 @@ import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "@/components/ActivityDrawer";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { isFinanceOutcomeUncertain } from "@/lib/finance-mutation";
 import StaffPaymentEmployeePicker from "@/components/StaffPaymentEmployeePicker";
 import {
   api,
@@ -316,6 +317,16 @@ export default function OverheadsPage() {
 
   const isClosed = summary?.closed ?? false;
 
+  const refreshOverheads = () => {
+    queryClient.invalidateQueries({ queryKey: ["finance-overheads-list"] });
+    queryClient.invalidateQueries({ queryKey: ["finance-overheads-summary"] });
+  };
+  const reportOverheadFailure = (err: unknown, fallback: string) => {
+    if (isFinanceOutcomeUncertain(err)) refreshOverheads();
+    const error = err as Error & { response?: { data?: { error?: string } } };
+    toast.error(error.response?.data?.error || error.message || fallback);
+  };
+
   // Mutations
   const saveMutation = useMutation({
     mutationFn: (data: Partial<FinanceOverhead>) => {
@@ -328,14 +339,9 @@ export default function OverheadsPage() {
       toast.success(editingExpense ? t("Expense updated") : t("Expense created"));
       setIsFormOpen(false);
       setEditingExpense(null);
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-list"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-summary"] });
+      refreshOverheads();
     },
-    onError: (err: unknown) => {
-      const error = err as Error & { response?: { data?: { error?: string } } };
-      const msg = error.response?.data?.error || error.message || "Failed to save";
-      toast.error(msg);
-    },
+    onError: (err: unknown) => reportOverheadFailure(err, "Failed to save"),
   });
 
   const deleteMutation = useMutation({
@@ -343,13 +349,9 @@ export default function OverheadsPage() {
     onSuccess: () => {
       toast.success(t("Expense deleted"));
       setDeletingExpense(null);
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-list"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-summary"] });
+      refreshOverheads();
     },
-    onError: (err: unknown) => {
-      const error = err as Error & { response?: { data?: { error?: string } } };
-      toast.error(error.response?.data?.error || error.message || "Delete failed");
-    },
+    onError: (err: unknown) => reportOverheadFailure(err, "Delete failed"),
   });
 
   const reviewMutation = useMutation({
@@ -363,13 +365,9 @@ export default function OverheadsPage() {
       toast.success(t("Expense reviewed"));
       setRejectingId(null);
       setRejectReason("");
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-list"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-summary"] });
+      refreshOverheads();
     },
-    onError: (err: unknown) => {
-      const error = err as Error & { response?: { data?: { error?: string } } };
-      toast.error(error.response?.data?.error || error.message || "Review failed");
-    },
+    onError: (err: unknown) => reportOverheadFailure(err, "Review failed"),
   });
 
   const monthCloseMutation = useMutation({
@@ -381,13 +379,9 @@ export default function OverheadsPage() {
     },
     onSuccess: (_, variables) => {
       toast.success(variables.close ? t("Month Closed") : t("Month Reopened"));
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-list"] });
-      queryClient.invalidateQueries({ queryKey: ["finance-overheads-summary"] });
+      refreshOverheads();
     },
-    onError: (err: unknown) => {
-      const error = err as Error & { response?: { data?: { error?: string } } };
-      toast.error(error.response?.data?.error || error.message || "Operation failed");
-    },
+    onError: (err: unknown) => reportOverheadFailure(err, "Operation failed"),
   });
 
   if (!canRead) {

@@ -4,6 +4,13 @@ import { pool } from "../db/pool";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { insertFinanceAuditLog, roundMoney, toDateString } from "../lib/finance-audit";
 import {
+  FinanceMutationError,
+  acknowledgeRow,
+  acknowledgeRows,
+  runFinanceTransaction,
+  sendFinanceMutationFailure,
+} from "../lib/finance-transaction";
+import {
   createFinanceOverheadSchema,
   updateFinanceOverheadSchema,
   rejectFinanceOverheadSchema,
@@ -17,6 +24,8 @@ const router = Router();
 
 const OVERHEAD_ENTITY_TYPE = "finance_overhead_expense";
 const MONTH_CLOSURE_ENTITY_TYPE = "finance_overhead_month";
+const OVERHEAD_SUBJECT = "Overhead change";
+const MONTH_CLOSURE_SUBJECT = "Month closure change";
 const OVERHEAD_SORT_SQL: Record<string, string> = {
   expense_month: "fo.expense_month",
   due_date: "fo.due_date",
@@ -282,67 +291,54 @@ router.post(
   "/",
   requirePermissionSlugs(["finance:overheads:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    const validationResult = createFinanceOverheadSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    const input = validationResult.data;
+    const monthDate = overheadMonthToDate(input.expense_month);
     try {
-      const validationResult = createFinanceOverheadSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
-      }
-      const input = validationResult.data;
-      const monthDate = overheadMonthToDate(input.expense_month);
+      const overhead = await runFinanceTransaction({ subject: OVERHEAD_SUBJECT }, async (client) => {
+        if (await isMonthClosed(client, monthDate)) {
+          throw new FinanceMutationError(409, `Month ${input.expense_month} is closed for edits`);
+        }
+        const payrollGuardError = await assertPayrollDoubleCountAllowed(client, input, monthDate);
+        if (payrollGuardError) throw new FinanceMutationError(409, payrollGuardError);
 
-      await client.query("BEGIN");
-      if (await isMonthClosed(client, monthDate)) {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: `Month ${input.expense_month} is closed for edits` });
-        return;
-      }
-      const payrollGuardError = await assertPayrollDoubleCountAllowed(client, input, monthDate);
-      if (payrollGuardError) {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: payrollGuardError });
-        return;
-      }
-
-      const insertResult = await client.query(
-        `INSERT INTO finance_overhead_expenses
-           (expense_month, due_date, category, payee, scope, shared_with, payment_kind, employee_id, is_recurring, amount, notes, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         RETURNING *`,
-        [
-          monthDate,
-          input.due_date ?? null,
-          input.category,
-          input.payee ?? null,
-          input.scope,
-          input.shared_with ?? null,
-          input.payment_kind,
-          input.employee_id ?? null,
-          input.is_recurring,
-          input.amount,
-          input.notes ?? null,
-          req.user?.id || null,
-        ],
-      );
-      const overhead = insertResult.rows[0];
-      await insertFinanceAuditLog(client, {
-        entityType: OVERHEAD_ENTITY_TYPE,
-        entityId: overhead.id,
-        userId: req.user?.id || null,
-        action: "create",
-        newValue: describeOverhead(overhead),
-        note: overhead.notes,
+        const created = acknowledgeRow(await client.query(
+          `INSERT INTO finance_overhead_expenses
+             (expense_month, due_date, category, payee, scope, shared_with, payment_kind, employee_id, is_recurring, amount, notes, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           RETURNING *`,
+          [
+            monthDate,
+            input.due_date ?? null,
+            input.category,
+            input.payee ?? null,
+            input.scope,
+            input.shared_with ?? null,
+            input.payment_kind,
+            input.employee_id ?? null,
+            input.is_recurring,
+            input.amount,
+            input.notes ?? null,
+            req.user?.id || null,
+          ],
+        ), "Overhead creation");
+        await insertFinanceAuditLog(client, {
+          entityType: OVERHEAD_ENTITY_TYPE,
+          entityId: created.id,
+          userId: req.user?.id || null,
+          action: "create",
+          newValue: describeOverhead(created),
+          note: created.notes,
+        });
+        return created;
       });
-      await client.query("COMMIT");
-
       res.status(201).json({ overhead: formatOverheadRow(overhead) });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-overheads-create] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-overheads-create", error);
     }
   },
 );
@@ -352,128 +348,103 @@ router.patch(
   "/:id",
   requirePermissionSlugs(["finance:overheads:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    const validationResult = updateFinanceOverheadSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    const input = validationResult.data;
     try {
-      const validationResult = updateFinanceOverheadSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
-      }
-      const input = validationResult.data;
+      const updated = await runFinanceTransaction({ subject: OVERHEAD_SUBJECT }, async (client) => {
+        const existingResult = await client.query(
+          "SELECT * FROM finance_overhead_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [req.params.id],
+        );
+        if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Overhead expense not found");
+        const existing = existingResult.rows[0];
+        if (existing.status === "Approved") {
+          throw new FinanceMutationError(409, "Approved overhead expenses are locked and cannot be edited");
+        }
 
-      await client.query("BEGIN");
-      const existingResult = await client.query(
-        "SELECT * FROM finance_overhead_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-        [req.params.id],
-      );
-      if (existingResult.rowCount === 0) {
-        await client.query("ROLLBACK");
-        res.status(404).json({ error: "Overhead expense not found" });
-        return;
-      }
-      const existing = existingResult.rows[0];
-      if (existing.status === "Approved") {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: "Approved overhead expenses are locked and cannot be edited" });
-        return;
-      }
+        const currentMonth = toDateString(existing.expense_month);
+        const targetMonth = input.expense_month ? overheadMonthToDate(input.expense_month) : currentMonth;
+        if (await isMonthClosed(client, currentMonth)) {
+          throw new FinanceMutationError(409, `Month ${monthLabel(currentMonth)} is closed for edits`);
+        }
+        if (targetMonth !== currentMonth && (await isMonthClosed(client, targetMonth))) {
+          throw new FinanceMutationError(409, `Month ${monthLabel(targetMonth)} is closed for edits`);
+        }
 
-      const currentMonth = toDateString(existing.expense_month);
-      const targetMonth = input.expense_month ? overheadMonthToDate(input.expense_month) : currentMonth;
-      if (await isMonthClosed(client, currentMonth)) {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: `Month ${monthLabel(currentMonth)} is closed for edits` });
-        return;
-      }
-      if (targetMonth !== currentMonth && (await isMonthClosed(client, targetMonth))) {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: `Month ${monthLabel(targetMonth)} is closed for edits` });
-        return;
-      }
-
-      const nextPaymentKind = input.payment_kind ?? existing.payment_kind;
-      const nextEmployeeId = Object.prototype.hasOwnProperty.call(req.body ?? {}, "employee_id")
-        ? input.employee_id ?? null
-        : existing.employee_id;
-      const nextScope = input.scope ?? existing.scope;
-      const nextSharedWith = Object.prototype.hasOwnProperty.call(req.body ?? {}, "shared_with")
-        ? input.shared_with ?? null
-        : existing.shared_with;
-      if (nextPaymentKind !== "staff_payment" && nextEmployeeId) {
-        await client.query("ROLLBACK");
-        res.status(400).json({ error: "Employee links are only valid for staff payments" });
-        return;
-      }
-      if (nextScope !== "Shared" && nextSharedWith) {
-        await client.query("ROLLBACK");
-        res.status(400).json({ error: "shared_with is only valid for Shared scope entries" });
-        return;
-      }
-      const payrollGuardError = await assertPayrollDoubleCountAllowed(
-        client,
-        { payment_kind: nextPaymentKind, employee_id: nextEmployeeId },
-        targetMonth,
-      );
-      if (payrollGuardError) {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: payrollGuardError });
-        return;
-      }
-
-      const hasKey = (key: string) => Object.prototype.hasOwnProperty.call(req.body ?? {}, key);
-      const updateResult = await client.query(
-        `UPDATE finance_overhead_expenses
-         SET expense_month = $2,
-             due_date = $3,
-             category = COALESCE($4, category),
-             payee = $5,
-             scope = COALESCE($6, scope),
-             shared_with = $7,
-             payment_kind = COALESCE($8, payment_kind),
-             employee_id = $9,
-             is_recurring = COALESCE($10, is_recurring),
-             amount = COALESCE($11, amount),
-             notes = $12,
-             status = 'Pending',
-             rejected_reason = NULL,
-             updated_at = NOW()
-         WHERE id = $1
-         RETURNING *`,
-        [
-          req.params.id,
+        const nextPaymentKind = input.payment_kind ?? existing.payment_kind;
+        const nextEmployeeId = Object.prototype.hasOwnProperty.call(req.body ?? {}, "employee_id")
+          ? input.employee_id ?? null
+          : existing.employee_id;
+        const nextScope = input.scope ?? existing.scope;
+        const nextSharedWith = Object.prototype.hasOwnProperty.call(req.body ?? {}, "shared_with")
+          ? input.shared_with ?? null
+          : existing.shared_with;
+        if (nextPaymentKind !== "staff_payment" && nextEmployeeId) {
+          throw new FinanceMutationError(400, "Employee links are only valid for staff payments");
+        }
+        if (nextScope !== "Shared" && nextSharedWith) {
+          throw new FinanceMutationError(400, "shared_with is only valid for Shared scope entries");
+        }
+        const payrollGuardError = await assertPayrollDoubleCountAllowed(
+          client,
+          { payment_kind: nextPaymentKind, employee_id: nextEmployeeId },
           targetMonth,
-          hasKey("due_date") ? input.due_date ?? null : existing.due_date,
-          input.category ?? null,
-          hasKey("payee") ? input.payee ?? null : existing.payee,
-          input.scope ?? null,
-          nextSharedWith,
-          input.payment_kind ?? null,
-          nextEmployeeId,
-          input.is_recurring ?? null,
-          input.amount ?? null,
-          hasKey("notes") ? input.notes ?? null : existing.notes,
-        ],
-      );
-      const updated = updateResult.rows[0];
+        );
+        if (payrollGuardError) throw new FinanceMutationError(409, payrollGuardError);
 
-      await insertFinanceAuditLog(client, {
-        entityType: OVERHEAD_ENTITY_TYPE,
-        entityId: updated.id,
-        userId: req.user?.id || null,
-        action: "update",
-        oldValue: `${describeOverhead(existing)} [${existing.status}]`,
-        newValue: `${describeOverhead(updated)} [Pending]`,
-        note: updated.notes,
+        const hasKey = (key: string) => Object.prototype.hasOwnProperty.call(req.body ?? {}, key);
+        const changed = acknowledgeRow(await client.query(
+          `UPDATE finance_overhead_expenses
+           SET expense_month = $2,
+               due_date = $3,
+               category = COALESCE($4, category),
+               payee = $5,
+               scope = COALESCE($6, scope),
+               shared_with = $7,
+               payment_kind = COALESCE($8, payment_kind),
+               employee_id = $9,
+               is_recurring = COALESCE($10, is_recurring),
+               amount = COALESCE($11, amount),
+               notes = $12,
+               status = 'Pending',
+               rejected_reason = NULL,
+               updated_at = NOW()
+           WHERE id = $1
+           RETURNING *`,
+          [
+            req.params.id,
+            targetMonth,
+            hasKey("due_date") ? input.due_date ?? null : existing.due_date,
+            input.category ?? null,
+            hasKey("payee") ? input.payee ?? null : existing.payee,
+            input.scope ?? null,
+            nextSharedWith,
+            input.payment_kind ?? null,
+            nextEmployeeId,
+            input.is_recurring ?? null,
+            input.amount ?? null,
+            hasKey("notes") ? input.notes ?? null : existing.notes,
+          ],
+        ), "Overhead update");
+
+        await insertFinanceAuditLog(client, {
+          entityType: OVERHEAD_ENTITY_TYPE,
+          entityId: changed.id,
+          userId: req.user?.id || null,
+          action: "update",
+          oldValue: `${describeOverhead(existing)} [${existing.status}]`,
+          newValue: `${describeOverhead(changed)} [Pending]`,
+          note: changed.notes,
+        });
+        return changed;
       });
-      await client.query("COMMIT");
-
       res.json({ overhead: formatOverheadRow(updated) });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-overheads-update] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-overheads-update", error);
     }
   },
 );
@@ -483,51 +454,37 @@ router.delete(
   "/:id",
   requirePermissionSlugs(["finance:overheads:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
     try {
-      await client.query("BEGIN");
-      const existingResult = await client.query(
-        "SELECT * FROM finance_overhead_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-        [req.params.id],
-      );
-      if (existingResult.rowCount === 0) {
-        await client.query("ROLLBACK");
-        res.status(404).json({ error: "Overhead expense not found" });
-        return;
-      }
-      const existing = existingResult.rows[0];
-      if (existing.status === "Approved") {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: "Approved overhead expenses are locked and cannot be deleted" });
-        return;
-      }
-      if (await isMonthClosed(client, toDateString(existing.expense_month))) {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: `Month ${monthLabel(existing.expense_month)} is closed for edits` });
-        return;
-      }
+      await runFinanceTransaction({ subject: OVERHEAD_SUBJECT }, async (client) => {
+        const existingResult = await client.query(
+          "SELECT * FROM finance_overhead_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [req.params.id],
+        );
+        if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Overhead expense not found");
+        const existing = existingResult.rows[0];
+        if (existing.status === "Approved") {
+          throw new FinanceMutationError(409, "Approved overhead expenses are locked and cannot be deleted");
+        }
+        if (await isMonthClosed(client, toDateString(existing.expense_month))) {
+          throw new FinanceMutationError(409, `Month ${monthLabel(existing.expense_month)} is closed for edits`);
+        }
 
-      await client.query(
-        "UPDATE finance_overhead_expenses SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1",
-        [req.params.id],
-      );
-      await insertFinanceAuditLog(client, {
-        entityType: OVERHEAD_ENTITY_TYPE,
-        entityId: existing.id,
-        userId: req.user?.id || null,
-        action: "delete",
-        oldValue: describeOverhead(existing),
-        note: existing.notes,
+        acknowledgeRows(await client.query(
+          "UPDATE finance_overhead_expenses SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1",
+          [req.params.id],
+        ), 1, "Overhead deletion");
+        await insertFinanceAuditLog(client, {
+          entityType: OVERHEAD_ENTITY_TYPE,
+          entityId: existing.id,
+          userId: req.user?.id || null,
+          action: "delete",
+          oldValue: describeOverhead(existing),
+          note: existing.notes,
+        });
       });
-      await client.query("COMMIT");
-
       res.json({ deleted: true });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-overheads-delete] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-overheads-delete", error);
     }
   },
 );
@@ -537,71 +494,56 @@ async function reviewOverheadExpense(
   res: Response,
   decision: "Approved" | "Rejected",
 ): Promise<void> {
-  const client = await pool.connect();
+  let rejectedReason: string | null = null;
+  if (decision === "Rejected") {
+    const validationResult = rejectFinanceOverheadSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    rejectedReason = validationResult.data.rejected_reason;
+  }
   try {
-    let rejectedReason: string | null = null;
-    if (decision === "Rejected") {
-      const validationResult = rejectFinanceOverheadSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
+    const updated = await runFinanceTransaction({ subject: OVERHEAD_SUBJECT }, async (client) => {
+      const existingResult = await client.query(
+        "SELECT * FROM finance_overhead_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        [req.params.id],
+      );
+      if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Overhead expense not found");
+      const existing = existingResult.rows[0];
+      if (existing.status !== "Pending") {
+        throw new FinanceMutationError(409, `Only pending overhead expenses can be reviewed (current status: ${existing.status})`);
       }
-      rejectedReason = validationResult.data.rejected_reason;
-    }
+      if (await isMonthClosed(client, toDateString(existing.expense_month))) {
+        throw new FinanceMutationError(409, `Month ${monthLabel(existing.expense_month)} is closed for edits`);
+      }
 
-    await client.query("BEGIN");
-    const existingResult = await client.query(
-      "SELECT * FROM finance_overhead_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-      [req.params.id],
-    );
-    if (existingResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Overhead expense not found" });
-      return;
-    }
-    const existing = existingResult.rows[0];
-    if (existing.status !== "Pending") {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: `Only pending overhead expenses can be reviewed (current status: ${existing.status})` });
-      return;
-    }
-    if (await isMonthClosed(client, toDateString(existing.expense_month))) {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: `Month ${monthLabel(existing.expense_month)} is closed for edits` });
-      return;
-    }
-
-    const updateResult = await client.query(
-      `UPDATE finance_overhead_expenses
-       SET status = $2,
-           rejected_reason = $3,
-           approved_by = $4,
-           approved_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [req.params.id, decision, rejectedReason, req.user?.id || null],
-    );
-    const updated = updateResult.rows[0];
-    await insertFinanceAuditLog(client, {
-      entityType: OVERHEAD_ENTITY_TYPE,
-      entityId: updated.id,
-      userId: req.user?.id || null,
-      action: decision === "Approved" ? "approve" : "reject",
-      fieldChanged: "status",
-      oldValue: "Pending",
-      newValue: decision,
-      note: rejectedReason,
+      const reviewed = acknowledgeRow(await client.query(
+        `UPDATE finance_overhead_expenses
+         SET status = $2,
+             rejected_reason = $3,
+             approved_by = $4,
+             approved_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [req.params.id, decision, rejectedReason, req.user?.id || null],
+      ), "Overhead review");
+      await insertFinanceAuditLog(client, {
+        entityType: OVERHEAD_ENTITY_TYPE,
+        entityId: reviewed.id,
+        userId: req.user?.id || null,
+        action: decision === "Approved" ? "approve" : "reject",
+        fieldChanged: "status",
+        oldValue: "Pending",
+        newValue: decision,
+        note: rejectedReason,
+      });
+      return reviewed;
     });
-    await client.query("COMMIT");
-
     res.json({ overhead: formatOverheadRow(updated) });
-  } catch (error: any) {
-    await client.query("ROLLBACK");
-    console.error(`[finance-overheads-${decision.toLowerCase()}] Error:`, error);
-    res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
+  } catch (error: unknown) {
+    sendFinanceMutationFailure(res, `finance-overheads-${decision.toLowerCase()}`, error);
   }
 }
 
@@ -624,54 +566,54 @@ async function setMonthClosure(
   res: Response,
   close: boolean,
 ): Promise<void> {
-  const client = await pool.connect();
+  const monthResult = financeOverheadMonthParamSchema.safeParse(req.params.month);
+  if (!monthResult.success) {
+    res.status(400).json({ error: monthResult.error.errors[0].message });
+    return;
+  }
+  const month = monthResult.data;
+  const monthDate = overheadMonthToDate(month);
   try {
-    const monthResult = financeOverheadMonthParamSchema.safeParse(req.params.month);
-    if (!monthResult.success) {
-      res.status(400).json({ error: monthResult.error.errors[0].message });
-      return;
-    }
-    const month = monthResult.data;
-    const monthDate = overheadMonthToDate(month);
+    await runFinanceTransaction({
+      subject: MONTH_CLOSURE_SUBJECT,
+      // Closing has no existing row to lock; a concurrent close that committed
+      // first surfaces as the closure primary-key conflict.
+      classify: (error) => (error as { code?: unknown })?.code === "23505"
+        ? new FinanceMutationError(409, `Month ${month} is already closed`, { cause: error })
+        : null,
+    }, async (client) => {
+      // Lock an existing closure so a concurrent reopen waits and re-reads it.
+      const closed = ((await client.query(
+        "SELECT 1 FROM finance_overhead_month_closures WHERE month = $1 FOR UPDATE",
+        [monthDate],
+      )).rowCount ?? 0) > 0;
+      if (close && closed) throw new FinanceMutationError(409, `Month ${month} is already closed`);
+      if (!close && !closed) throw new FinanceMutationError(409, `Month ${month} is not closed`);
 
-    await client.query("BEGIN");
-    const closed = await isMonthClosed(client, monthDate);
-    if (close && closed) {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: `Month ${month} is already closed` });
-      return;
-    }
-    if (!close && !closed) {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: `Month ${month} is not closed` });
-      return;
-    }
-
-    if (close) {
-      await client.query(
-        "INSERT INTO finance_overhead_month_closures (month, closed_by) VALUES ($1, $2)",
-        [monthDate, req.user?.id || null],
-      );
-    } else {
-      await client.query("DELETE FROM finance_overhead_month_closures WHERE month = $1", [monthDate]);
-    }
-    await insertFinanceAuditLog(client, {
-      entityType: MONTH_CLOSURE_ENTITY_TYPE,
-      entityId: req.user?.id || "00000000-0000-0000-0000-000000000000",
-      userId: req.user?.id || null,
-      action: close ? "close_month" : "reopen_month",
-      fieldChanged: "month",
-      newValue: month,
+      if (close) {
+        acknowledgeRows(await client.query(
+          "INSERT INTO finance_overhead_month_closures (month, closed_by) VALUES ($1, $2)",
+          [monthDate, req.user?.id || null],
+        ), 1, "Month closure");
+      } else {
+        acknowledgeRows(
+          await client.query("DELETE FROM finance_overhead_month_closures WHERE month = $1", [monthDate]),
+          1,
+          "Month reopening",
+        );
+      }
+      await insertFinanceAuditLog(client, {
+        entityType: MONTH_CLOSURE_ENTITY_TYPE,
+        entityId: req.user?.id || "00000000-0000-0000-0000-000000000000",
+        userId: req.user?.id || null,
+        action: close ? "close_month" : "reopen_month",
+        fieldChanged: "month",
+        newValue: month,
+      });
     });
-    await client.query("COMMIT");
-
     res.json({ month, closed: close });
-  } catch (error: any) {
-    await client.query("ROLLBACK");
-    console.error("[finance-overheads-closure] Error:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
+  } catch (error: unknown) {
+    sendFinanceMutationFailure(res, "finance-overheads-closure", error);
   }
 }
 

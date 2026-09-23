@@ -2,6 +2,7 @@ import crypto from "crypto";
 import ExcelJS from "exceljs";
 import { PoolClient } from "pg";
 import { insertFinanceAuditLog, roundMoney } from "../lib/finance-audit";
+import { FinanceMutationError, acknowledgeRow, acknowledgeRows, runFinanceTransaction } from "../lib/finance-transaction";
 import {
   CAPITAL_INVESTMENT_CATEGORIES,
   CAPITAL_INVESTMENT_CLASSIFICATIONS,
@@ -447,157 +448,164 @@ function applyResolutions(rows: ParsedHisabImportRow[], resolutions: CommitResol
 function assertCommitRows(rows: ParsedHisabImportRow[], acceptedFormulaMismatches: boolean) {
   const unresolved = rows.flatMap((row) => row.requiresResolution);
   if (unresolved.length) {
-    throw Object.assign(new Error("Resolve all unmatched workbook rows before committing"), { statusCode: 400 });
+    throw new FinanceMutationError(400, "Resolve all unmatched workbook rows before committing");
   }
   if (!acceptedFormulaMismatches) {
-    throw Object.assign(new Error("Formula total mismatches must be reviewed and accepted before committing"), { statusCode: 400 });
+    throw new FinanceMutationError(400, "Formula total mismatches must be reviewed and accepted before committing");
   }
   for (const row of rows) {
     if (row.kind === "operational_expense" && !categoryMatch(row.category || "", FINANCE_OPEX_CATEGORIES)) {
-      throw Object.assign(new Error(`Invalid operational expense category for ${row.id}`), { statusCode: 400 });
+      throw new FinanceMutationError(400, `Invalid operational expense category for ${row.id}`);
     }
     if (row.kind === "event_expense" && !allowedMatch(row.category || "", EVENT_EXPENSE_CATEGORIES)) {
-      throw Object.assign(new Error(`Invalid event expense category for ${row.id}`), { statusCode: 400 });
+      throw new FinanceMutationError(400, `Invalid event expense category for ${row.id}`);
     }
     if (row.kind === "overhead") {
-      if (!allowedMatch(row.category || "", FINANCE_OVERHEAD_CATEGORIES)) throw Object.assign(new Error(`Invalid overhead category for ${row.id}`), { statusCode: 400 });
-      if (!allowedMatch(row.scope || "", FINANCE_OVERHEAD_SCOPES)) throw Object.assign(new Error(`Invalid overhead scope for ${row.id}`), { statusCode: 400 });
-      if (!allowedMatch(row.paymentKind || "", FINANCE_OVERHEAD_PAYMENT_KINDS)) throw Object.assign(new Error(`Invalid overhead payment kind for ${row.id}`), { statusCode: 400 });
+      if (!allowedMatch(row.category || "", FINANCE_OVERHEAD_CATEGORIES)) throw new FinanceMutationError(400, `Invalid overhead category for ${row.id}`);
+      if (!allowedMatch(row.scope || "", FINANCE_OVERHEAD_SCOPES)) throw new FinanceMutationError(400, `Invalid overhead scope for ${row.id}`);
+      if (!allowedMatch(row.paymentKind || "", FINANCE_OVERHEAD_PAYMENT_KINDS)) throw new FinanceMutationError(400, `Invalid overhead payment kind for ${row.id}`);
     }
     if (row.kind === "investment") {
-      if (!allowedMatch(row.category || "", CAPITAL_INVESTMENT_CATEGORIES)) throw Object.assign(new Error(`Invalid investment category for ${row.id}`), { statusCode: 400 });
-      if (!allowedMatch(row.capexClassification || "", CAPITAL_INVESTMENT_CLASSIFICATIONS)) throw Object.assign(new Error(`Invalid investment classification for ${row.id}`), { statusCode: 400 });
+      if (!allowedMatch(row.category || "", CAPITAL_INVESTMENT_CATEGORIES)) throw new FinanceMutationError(400, `Invalid investment category for ${row.id}`);
+      if (!allowedMatch(row.capexClassification || "", CAPITAL_INVESTMENT_CLASSIFICATIONS)) throw new FinanceMutationError(400, `Invalid investment classification for ${row.id}`);
     }
   }
 }
 
+function classifyImportConflict(error: unknown): FinanceMutationError | null {
+  if (error && typeof error === "object" && (error as { code?: unknown }).code === "23505") {
+    return new FinanceMutationError(409, "This workbook has already been committed", { cause: error });
+  }
+  return null;
+}
+
 export async function commitHisabImport(
-  client: PoolClient,
   input: HisabImportCommitInput,
   userId: string,
 ): Promise<{ importId: string; inserted: Record<string, number> }> {
   const rows = applyResolutions(input.preview.rows, input.resolutions || {});
   assertCommitRows(rows, input.acceptFormulaMismatches || input.preview.formulaMismatches.length === 0);
+  return runFinanceTransaction(
+    { subject: "Workbook import", classify: classifyImportConflict },
+    (client) => writeHisabImport(client, input, rows, userId),
+  );
+}
 
-  await client.query("BEGIN");
-  try {
-    const duplicate = await client.query(
-      "SELECT id FROM finance_import_batches WHERE workbook_hash = $1 AND status = 'Committed' LIMIT 1",
-      [input.workbookHash],
-    );
-    if ((duplicate.rowCount ?? 0) > 0) {
-      throw Object.assign(new Error("This workbook has already been committed"), { statusCode: 409 });
-    }
-
-    const batchResult = await client.query(
-      `INSERT INTO finance_import_batches
-        (workbook_hash, source_filename, layout_version, status, row_counts, mismatch_count, unmatched_count, created_by, committed_at)
-       VALUES ($1, $2, $3, 'Committed', $4::jsonb, $5, 0, $6, NOW())
-       RETURNING id`,
-      [
-        input.workbookHash,
-        input.sourceFilename || input.preview.sourceFilename || null,
-        input.preview.layoutVersion,
-        JSON.stringify(input.preview.summary),
-        input.preview.formulaMismatches.length,
-        userId,
-      ],
-    );
-    const importId = batchResult.rows[0].id as string;
-
-    const operationalRows = rows.filter((row) => row.kind === "operational_expense");
-    const overheadRows = rows.filter((row) => row.kind === "overhead");
-    const investmentRows = rows.filter((row) => row.kind === "investment");
-    const eventRows = rows.filter((row) => row.kind === "event_expense");
-
-    if (operationalRows.length) {
-      await client.query(
-        `INSERT INTO finance_operational_expenses
-          (expense_date, category, amount, description, status, created_by, source_import_id)
-         SELECT x.expense_date::date, x.category, x.amount::numeric, x.description, 'Pending', $2, $3::uuid
-         FROM jsonb_to_recordset($1::jsonb) AS x(expense_date text, category text, amount numeric, description text)`,
-        [JSON.stringify(operationalRows.map((row) => ({ expense_date: row.date, category: row.category, amount: row.amount, description: row.description }))), userId, importId],
-      );
-    }
-
-    if (overheadRows.length) {
-      await client.query(
-        `INSERT INTO finance_overhead_expenses
-          (expense_month, category, amount, payee, scope, shared_with, payment_kind, employee_id, is_recurring, due_date, notes, status, created_by, source_import_id)
-         SELECT x.expense_month::date, x.category, x.amount::numeric, x.payee, x.scope, x.shared_with, x.payment_kind, NULL, false, NULL, x.notes, 'Pending', $2, $3::uuid
-         FROM jsonb_to_recordset($1::jsonb) AS x(expense_month text, category text, amount numeric, payee text, scope text, shared_with text, payment_kind text, notes text)`,
-        [JSON.stringify(overheadRows.map((row) => ({
-          expense_month: `${row.month}-01`,
-          category: row.category,
-          amount: row.amount,
-          payee: row.payee || null,
-          scope: row.scope,
-          shared_with: row.scope === "Shared" ? row.payee || "Imported workbook shared expense" : null,
-          payment_kind: row.paymentKind,
-          notes: row.description,
-        }))), userId, importId],
-      );
-    }
-
-    if (investmentRows.length) {
-      await client.query(
-        `INSERT INTO capital_investments
-          (purchase_date, item_name, category, quantity, unit, unit_cost, vendor, notes, capex_classification, asset_id, creates_inventory_stock, status, created_by, source_import_id)
-         SELECT x.purchase_date::date, x.item_name, x.category, x.quantity::numeric, x.unit, x.unit_cost::numeric, x.vendor, x.notes,
-                x.capex_classification, NULL, false, 'Pending', $2, $3::uuid
-         FROM jsonb_to_recordset($1::jsonb) AS x(purchase_date text, item_name text, category text, quantity numeric, unit text, unit_cost numeric, vendor text, notes text, capex_classification text)`,
-        [JSON.stringify(investmentRows.map((row) => ({
-          purchase_date: row.date,
-          item_name: row.description.slice(0, 300),
-          category: row.category,
-          quantity: row.quantity || 1,
-          unit: row.unit || "pcs",
-          unit_cost: row.unitCost || row.amount,
-          vendor: row.vendor || null,
-          notes: row.description,
-          capex_classification: row.capexClassification,
-        }))), userId, importId],
-      );
-    }
-
-    if (eventRows.length) {
-      const eventResolutionRows = eventRows.map((row) => ({
-        event_id: input.resolutions.events?.[row.id]?.eventId,
-        category: row.category || "Other",
-        amount: row.amount,
-        description: row.description,
-      }));
-      await client.query(
-        `INSERT INTO expenses (event_id, category, amount, description, status, created_by, source_import_id)
-         SELECT x.event_id::uuid, x.category, x.amount::numeric, x.description, 'Pending', $2, $3::uuid
-         FROM jsonb_to_recordset($1::jsonb) AS x(event_id text, category text, amount numeric, description text)`,
-        [JSON.stringify(eventResolutionRows), userId, importId],
-      );
-    }
-
-    await insertFinanceAuditLog(client, {
-      entityType: "finance_import_batch",
-      entityId: importId,
-      userId,
-      action: "commit",
-      newValue: `layout=${input.preview.layoutVersion}; rows=${rows.length}; hash=${input.workbookHash.slice(0, 12)}`,
-    });
-
-    await client.query("COMMIT");
-    return {
-      importId,
-      inserted: {
-        eventExpenses: eventRows.length,
-        operationalExpenses: operationalRows.length,
-        overheads: overheadRows.length,
-        investments: investmentRows.length,
-      },
-    };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    if ((error as { code?: string }).code === "23505") {
-      throw Object.assign(new Error("This workbook has already been committed"), { statusCode: 409 });
-    }
-    throw error;
+async function writeHisabImport(
+  client: PoolClient,
+  input: HisabImportCommitInput,
+  rows: ParsedHisabImportRow[],
+  userId: string,
+): Promise<{ importId: string; inserted: Record<string, number> }> {
+  const duplicate = await client.query(
+    "SELECT id FROM finance_import_batches WHERE workbook_hash = $1 AND status = 'Committed' LIMIT 1",
+    [input.workbookHash],
+  );
+  if ((duplicate.rowCount ?? 0) > 0) {
+    throw new FinanceMutationError(409, "This workbook has already been committed");
   }
+
+  const batch = acknowledgeRow(await client.query(
+    `INSERT INTO finance_import_batches
+      (workbook_hash, source_filename, layout_version, status, row_counts, mismatch_count, unmatched_count, created_by, committed_at)
+     VALUES ($1, $2, $3, 'Committed', $4::jsonb, $5, 0, $6, NOW())
+     RETURNING id`,
+    [
+      input.workbookHash,
+      input.sourceFilename || input.preview.sourceFilename || null,
+      input.preview.layoutVersion,
+      JSON.stringify(input.preview.summary),
+      input.preview.formulaMismatches.length,
+      userId,
+    ],
+  ), "Import batch");
+  const importId = batch.id as string;
+
+  const operationalRows = rows.filter((row) => row.kind === "operational_expense");
+  const overheadRows = rows.filter((row) => row.kind === "overhead");
+  const investmentRows = rows.filter((row) => row.kind === "investment");
+  const eventRows = rows.filter((row) => row.kind === "event_expense");
+
+  if (operationalRows.length) {
+    acknowledgeRows(await client.query(
+      `INSERT INTO finance_operational_expenses
+        (expense_date, category, amount, description, status, created_by, source_import_id)
+       SELECT x.expense_date::date, x.category, x.amount::numeric, x.description, 'Pending', $2, $3::uuid
+       FROM jsonb_to_recordset($1::jsonb) AS x(expense_date text, category text, amount numeric, description text)`,
+      [JSON.stringify(operationalRows.map((row) => ({ expense_date: row.date, category: row.category, amount: row.amount, description: row.description }))), userId, importId],
+    ), operationalRows.length, "Imported operational expenses");
+  }
+
+  if (overheadRows.length) {
+    acknowledgeRows(await client.query(
+      `INSERT INTO finance_overhead_expenses
+        (expense_month, category, amount, payee, scope, shared_with, payment_kind, employee_id, is_recurring, due_date, notes, status, created_by, source_import_id)
+       SELECT x.expense_month::date, x.category, x.amount::numeric, x.payee, x.scope, x.shared_with, x.payment_kind, NULL, false, NULL, x.notes, 'Pending', $2, $3::uuid
+       FROM jsonb_to_recordset($1::jsonb) AS x(expense_month text, category text, amount numeric, payee text, scope text, shared_with text, payment_kind text, notes text)`,
+      [JSON.stringify(overheadRows.map((row) => ({
+        expense_month: `${row.month}-01`,
+        category: row.category,
+        amount: row.amount,
+        payee: row.payee || null,
+        scope: row.scope,
+        shared_with: row.scope === "Shared" ? row.payee || "Imported workbook shared expense" : null,
+        payment_kind: row.paymentKind,
+        notes: row.description,
+      }))), userId, importId],
+    ), overheadRows.length, "Imported overheads");
+  }
+
+  if (investmentRows.length) {
+    acknowledgeRows(await client.query(
+      `INSERT INTO capital_investments
+        (purchase_date, item_name, category, quantity, unit, unit_cost, vendor, notes, capex_classification, asset_id, creates_inventory_stock, status, created_by, source_import_id)
+       SELECT x.purchase_date::date, x.item_name, x.category, x.quantity::numeric, x.unit, x.unit_cost::numeric, x.vendor, x.notes,
+              x.capex_classification, NULL, false, 'Pending', $2, $3::uuid
+       FROM jsonb_to_recordset($1::jsonb) AS x(purchase_date text, item_name text, category text, quantity numeric, unit text, unit_cost numeric, vendor text, notes text, capex_classification text)`,
+      [JSON.stringify(investmentRows.map((row) => ({
+        purchase_date: row.date,
+        item_name: row.description.slice(0, 300),
+        category: row.category,
+        quantity: row.quantity || 1,
+        unit: row.unit || "pcs",
+        unit_cost: row.unitCost || row.amount,
+        vendor: row.vendor || null,
+        notes: row.description,
+        capex_classification: row.capexClassification,
+      }))), userId, importId],
+    ), investmentRows.length, "Imported investments");
+  }
+
+  if (eventRows.length) {
+    const eventResolutionRows = eventRows.map((row) => ({
+      event_id: input.resolutions.events?.[row.id]?.eventId,
+      category: row.category || "Other",
+      amount: row.amount,
+      description: row.description,
+    }));
+    acknowledgeRows(await client.query(
+      `INSERT INTO expenses (event_id, category, amount, description, status, created_by, source_import_id)
+       SELECT x.event_id::uuid, x.category, x.amount::numeric, x.description, 'Pending', $2, $3::uuid
+       FROM jsonb_to_recordset($1::jsonb) AS x(event_id text, category text, amount numeric, description text)`,
+      [JSON.stringify(eventResolutionRows), userId, importId],
+    ), eventRows.length, "Imported event expenses");
+  }
+
+  await insertFinanceAuditLog(client, {
+    entityType: "finance_import_batch",
+    entityId: importId,
+    userId,
+    action: "commit",
+    newValue: `layout=${input.preview.layoutVersion}; rows=${rows.length}; hash=${input.workbookHash.slice(0, 12)}`,
+  });
+
+  return {
+    importId,
+    inserted: {
+      eventExpenses: eventRows.length,
+      operationalExpenses: operationalRows.length,
+      overheads: overheadRows.length,
+      investments: investmentRows.length,
+    },
+  };
 }
