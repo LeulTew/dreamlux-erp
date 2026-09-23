@@ -23,6 +23,7 @@ import PaginationControls from "@/components/PaginationControls";
 import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 import toast from "@/lib/toast";
+import { localMonthString } from "@/lib/local-date";
 import PdfExportModal, { type PdfColumn } from "@/components/PdfExportModal";
 import { FilterToolbar, ToolbarSearch } from "@/components/ui/FilterToolbar";
 import { useLanguage } from "@/hooks/use-language";
@@ -193,7 +194,7 @@ export default function OverheadsPage() {
 
   // State
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    return new Date().toISOString().slice(0, 7); // YYYY-MM
+    return localMonthString();
   });
   const [page, setPage] = useState(1);
   const [limit] = useState(25);

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { eventDateRangeParams, localDateString } from "@/lib/local-date";
+import { eventDateRangeParams, localDateString, localMonthString } from "@/lib/local-date";
 
 // Addis Ababa is UTC+3 with no DST: before 03:00 local, the UTC day is still yesterday.
 const originalTimeZone = process.env.TZ;
@@ -17,6 +17,15 @@ describe("localDateString", () => {
     expect(earlyMorning.toISOString().slice(0, 10)).toBe("2026-05-14");
     expect(localDateString(earlyMorning)).toBe("2026-05-15");
     expect(localDateString(new Date(2026, 4, 1))).toBe("2026-05-01");
+  });
+});
+
+describe("localMonthString", () => {
+  it("uses the local month early on the 1st", () => {
+    const firstOfMonth = new Date(2026, 4, 1, 0, 30);
+    expect(firstOfMonth.toISOString().slice(0, 7)).toBe("2026-04");
+    expect(localMonthString(firstOfMonth)).toBe("2026-05");
+    expect(localMonthString(new Date(2027, 0, 1, 2, 59))).toBe("2027-01");
   });
 });
 

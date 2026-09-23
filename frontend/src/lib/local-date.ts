@@ -6,6 +6,10 @@ export function localDateString(date: Date = new Date()): string {
   return format(date, "yyyy-MM-dd");
 }
 
+export function localMonthString(date: Date = new Date()): string {
+  return format(date, "yyyy-MM");
+}
+
 export interface DateRangeParams {
   start_date: string | undefined;
   end_date: string | undefined;

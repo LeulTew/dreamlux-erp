@@ -17,7 +17,7 @@ import Select from "../../../../../components/ui/Select";
 import { useLanguage } from "../../../../../hooks/use-language";
 import { createPermissionMatcher } from "../../../../../lib/permission-matcher";
 import { generateReportPdf } from "../../../../../lib/pdf-report";
-import { localDateString } from "../../../../../lib/local-date";
+import { localDateString, localMonthString } from "../../../../../lib/local-date";
 import {
   api,
   getMonthlyNetProfitStatement,
@@ -192,7 +192,7 @@ export default function NetProfitPage() {
     return `${mName} ${year}`;
   };
 
-  const defaultMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const defaultMonth = localMonthString();
   const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
   const [includeInvestments, setIncludeInvestments] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<NetProfitTab>("summary");
