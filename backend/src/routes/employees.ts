@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import multer from "multer";
+import { employeeUpload, parseEmployeeEventPrices, UploadError } from "../lib/multipart";
 import sharp from "sharp";
 // @ts-expect-error -- uuid types friction in ESM/CJS
 import { v4 as uuidv4 } from "uuid";
@@ -95,24 +95,6 @@ async function resolveSalaryLevelIdByCode(code: string): Promise<string | null> 
 
   return data?.id ?? null;
 }
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "image/jpeg" || file.mimetype === "image/png" || file.mimetype === "image/webp") {
-      cb(null, true);
-    } else {
-      cb(new Error("Only JPEG, PNG and WebP images are allowed"));
-    }
-  },
-});
-
-const cpUpload = upload.fields([
-  { name: "id_card_front", maxCount: 1 },
-  { name: "id_card_back", maxCount: 1 },
-  { name: "profile_photo", maxCount: 1 },
-]);
-
 // POST /employees/import — bounded, transactional bulk upsert used by CSV/XLSX parsers.
 router.post("/import", requirePermissionSlugs(["hr:write"]), async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = employeeImportSchema.safeParse(req.body);
@@ -166,7 +148,7 @@ router.post("/import", requirePermissionSlugs(["hr:write"]), async (req: AuthReq
 router.post(
   "/",
   requirePermissionSlugs(["hr:write"]),
-  cpUpload,
+  employeeUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const keysToCleanup: string[] = [];
 
@@ -182,6 +164,7 @@ router.post(
       }
 
       const { full_name, employee_id, department_id, office_id, phone, email, commission, salary_level, compensation_mode, event_prices } = parsed.data;
+      const parsedEventPrices = parseEmployeeEventPrices(event_prices);
       const salaryLevelId = salary_level && salary_level !== "" ? await resolveSalaryLevelIdByCode(salary_level) : null;
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
@@ -261,36 +244,6 @@ router.post(
               console.warn(`[Employees] Failed to clone profile photo:`, err);
             }
           }
-        }
-      }
-
-      let parsedEventPrices: Record<string, number> | undefined;
-      if (event_prices !== undefined) {
-        if (typeof event_prices === "string") {
-          const trimmed = event_prices.trim();
-          if (trimmed.length === 0) {
-            parsedEventPrices = {};
-          } else {
-            try {
-              const raw = JSON.parse(trimmed) as Record<string, unknown>;
-              const normalized = Object.fromEntries(
-                Object.entries(raw || {}).map(([key, value]) => [key, Number(value ?? 0)])
-              );
-              const hasInvalidValue = Object.values(normalized).some(
-                (value) => !Number.isFinite(value) || value < 0
-              );
-              if (hasInvalidValue) {
-                res.status(400).json({ error: "Invalid event_prices payload" });
-                return;
-              }
-              parsedEventPrices = normalized;
-            } catch {
-              res.status(400).json({ error: "Invalid event_prices payload" });
-              return;
-            }
-          }
-        } else {
-          parsedEventPrices = event_prices as Record<string, number>;
         }
       }
 
@@ -393,6 +346,11 @@ router.post(
         _notification_count: notificationCount,
       });
     } catch (error: unknown) {
+      if (error instanceof UploadError) {
+        console.error("[Employee input]", { code: error.code, status: error.status });
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       // Cleanup
       for (const key of keysToCleanup) {
         try {
@@ -633,7 +591,7 @@ router.get("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 router.patch(
   "/:id",
   requirePermissionSlugs(["hr:write"]),
-  cpUpload,
+  employeeUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const extractMissingColumnName = (error: unknown): string | null => {
@@ -662,6 +620,7 @@ router.patch(
         return;
       }
 
+      const parsedEventPrices = parseEmployeeEventPrices(parsed.data.event_prices);
       const { data: existing, error: fetchError } = await supabase
         .from("employees")
         .select("*")
@@ -673,36 +632,7 @@ router.patch(
         return;
       }
 
-      const { full_name, employee_id, department_id, office_id, phone, email, commission, salary_level, compensation_mode, event_prices } = parsed.data;
-      let parsedEventPrices: Record<string, number> | undefined;
-      if (event_prices !== undefined) {
-        if (typeof event_prices === "string") {
-          const trimmed = event_prices.trim();
-          if (trimmed.length === 0) {
-            parsedEventPrices = {};
-          } else {
-            try {
-              const raw = JSON.parse(trimmed) as Record<string, unknown>;
-              const normalized = Object.fromEntries(
-                Object.entries(raw || {}).map(([key, value]) => [key, Number(value ?? 0)])
-              );
-              const hasInvalidValue = Object.values(normalized).some(
-                (value) => !Number.isFinite(value) || value < 0
-              );
-              if (hasInvalidValue) {
-                res.status(400).json({ error: "Invalid event_prices payload" });
-                return;
-              }
-              parsedEventPrices = normalized;
-            } catch {
-              res.status(400).json({ error: "Invalid event_prices payload" });
-              return;
-            }
-          }
-        } else {
-          parsedEventPrices = event_prices as Record<string, number>;
-        }
-      }
+      const { full_name, employee_id, department_id, office_id, phone, email, commission, salary_level, compensation_mode } = parsed.data;
 
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
       const frontFile = files?.["id_card_front"]?.[0];
@@ -841,6 +771,11 @@ router.patch(
         _notification_count: notificationCount,
       });
     } catch (error: unknown) {
+      if (error instanceof UploadError) {
+        console.error("[Employee input]", { code: error.code, status: error.status });
+        res.status(error.status).json({ error: error.message });
+        return;
+      }
       console.error("Failed to update employee:", error);
       res.status(500).json({
         error: "Failed to update employee",
