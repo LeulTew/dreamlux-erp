@@ -112,6 +112,12 @@ This matches LeulTew/koti-catering#405.
   The local CI receipt requires all 12 native import cases, including the
   wide sparse subtotal, then all 28 finance audit and month-closure cases, in that order, with
   no skips, failures or unhandled runner errors.
+  Both processes close their fixture HTTP server with `closeFixtureServer`
+  (`backend/src/db/testing/fixture-http-server.ts`): it destroys the sockets the
+  server accepted and waits, for at most five seconds, until the listener and
+  those sockets have closed. Bun 1.3.14 sometimes drops the `server.close`
+  callback after the server has actually closed, which previously stalled
+  teardown until the 30-second hook timeout after every case had passed.
 - `bun run verify:payroll:build -- --checks --output .qa-payroll-build` produces
   the existing source-isolated, credential-free frontend artifact.
 - `bun run verify:imports:browser -- --frontend-build .qa-payroll-build` reuses
