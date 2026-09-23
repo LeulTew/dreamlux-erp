@@ -322,8 +322,9 @@ export default function OverheadsPage() {
     queryClient.invalidateQueries({ queryKey: ["finance-overheads-summary"] });
   };
   const reportOverheadFailure = (err: unknown, fallback: string) => {
-    if (isFinanceOutcomeUncertain(err)) refreshOverheads();
-    const error = err as Error & { response?: { data?: { error?: string } } };
+    const error = err as Error & { response?: { status?: number; data?: { error?: string } } };
+    // A conflict (e.g. the month was closed meanwhile) means this view is stale.
+    if (isFinanceOutcomeUncertain(err) || error.response?.status === 409) refreshOverheads();
     toast.error(error.response?.data?.error || error.message || fallback);
   };
 

@@ -6,6 +6,7 @@ import { Socket } from "node:net";
 import { join } from "node:path";
 import express from "express";
 import request from "supertest";
+import ExcelJS from "exceljs";
 import { Client, type Pool, type PoolClient, type QueryResult } from "pg";
 import { importFixtureDdl } from "./testing/dreamlux-import-fixture";
 import { createDreamluxNativeFixture, reviewedSchemaTables } from "./testing/dreamlux-native-fixture";
@@ -307,13 +308,13 @@ async function openFinanceTransactions() {
 
 // Holds a conflicting change open until the API request is observed waiting
 // on it, then commits, forcing the exact interleaving under test.
-async function raceAgainst(sql: string, values: unknown[], send: () => request.Test) {
+async function raceAgainst(steps: ReadonlyArray<readonly [string, readonly unknown[]]>, send: () => request.Test) {
   if (!fixture) throw new Error("Owned finance audit database is unavailable");
   const rival = new Client({ connectionString: attestDreamluxNativeTarget(fixture.url, "fixture").href, ssl: { rejectUnauthorized: false } });
   await rival.connect();
   try {
     await rival.query("begin");
-    await rival.query(sql, values);
+    for (const [sql, values] of steps) await rival.query(sql, [...values]);
     const pending = send().then((response) => response);
     const deadline = Date.now() + 5_000;
     while ((await database().query(`select count(*)::int as waiting from pg_stat_activity
@@ -506,7 +507,7 @@ describe("native DreamLux finance audit acknowledgement", () => {
     const month = nextMonth();
     const before = await ledger();
     const response = await raceAgainst(
-      "insert into finance_overhead_month_closures(month,closed_by) values($1::date,$2)", [`${month}-01`, actorId],
+      [["insert into finance_overhead_month_closures(month,closed_by) values($1::date,$2)", [`${month}-01`, actorId]]],
       () => http().post(`/finance/overheads/months/${month}/close`).set("Cookie", cookie));
     expect({ status: response.status, body: response.body }).toEqual({ status: 409, body: { error: `Month ${month} is already closed` } });
     const after = await ledger();
@@ -520,12 +521,142 @@ describe("native DreamLux finance audit acknowledgement", () => {
     await database().query("insert into finance_overhead_month_closures(month,closed_by) values($1::date,$2)", [`${month}-01`, actorId]);
     const before = await ledger();
     const response = await raceAgainst(
-      "delete from finance_overhead_month_closures where month=$1::date", [`${month}-01`],
+      [["delete from finance_overhead_month_closures where month=$1::date", [`${month}-01`]]],
       () => http().post(`/finance/overheads/months/${month}/reopen`).set("Cookie", cookie));
     expect({ status: response.status, body: response.body }).toEqual({ status: 409, body: { error: `Month ${month} is not closed` } });
     const after = await ledger();
     expect(after.audits).toEqual(before.audits);
     expect(after.closures).toHaveLength(before.closures.length - 1);
     expect(await openFinanceTransactions()).toEqual([]);
+  });
+});
+
+async function overheadWorkbook(tag: string, months: string[]) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("MONTHLY WECHI");
+  sheet.addRow(["Month", "Payee", "Category", "Amount"]);
+  for (const month of months) sheet.addRow([month, `Koti ${tag}`, "Shared wifi", 100]);
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+async function overheadPreview(tag: string, months: string[]) {
+  const response = await http().post("/finance/imports/hisab/preview").set("Cookie", cookie)
+    .attach("workbook", await overheadWorkbook(tag, months), `synthetic-${tag}.xlsx`);
+  expect(response.status, JSON.stringify(response.body)).toBe(200);
+  return response.body as Record<string, unknown> & { workbookHash: string; blockingErrors: string[]; rows: Array<{ kind: string }> };
+}
+
+function commitPreview(preview: Record<string, unknown> & { workbookHash: string }) {
+  return http().post("/finance/imports/hisab/commit").set("Cookie", cookie)
+    .send({ workbookHash: preview.workbookHash, preview, acceptFormulaMismatches: false, resolutions: {} });
+}
+
+// A close in progress: holds the exclusive month lock and an uncommitted closure.
+const closeMonthAs = (month: string) => [
+  ["select pg_advisory_xact_lock(hashtext('finance-overhead-month'), hashtext($1))", [`${month}-01`]],
+  ["insert into finance_overhead_month_closures(month,closed_by) values($1::date,$2)", [`${month}-01`, actorId]],
+] as const;
+
+async function monthOverheads(month: string) {
+  return (await database().query<{ id: string }>(
+    "select id from finance_overhead_expenses where expense_month=$1::date and deleted_at is null", [`${month}-01`],
+  )).rows;
+}
+
+describe("native overhead month closure protocol", () => {
+  nativeTest("refuses a workbook overhead in a month closed after preview, and blocks a fresh preview", async () => {
+    const [open, closing] = [nextMonth(), nextMonth()];
+    const stale = await overheadPreview(`closed-${closing}`, [open, closing]);
+    expect(stale.blockingErrors).toEqual([]);
+    expect(stale.rows.filter((row) => row.kind === "overhead")).toHaveLength(2);
+    expect((await http().post(`/finance/overheads/months/${closing}/close`).set("Cookie", cookie)).status).toBe(200);
+    const message = `Overhead month ${closing} is closed. Reopen it or remove its overhead rows before importing.`;
+    const before = await ledger();
+    const response = await commitPreview(stale);
+    expect({ status: response.status, body: response.body }).toEqual({ status: 409, body: { error: message } });
+    expect(await ledger()).toEqual(before);
+    const fresh = await overheadPreview(`closed-${closing}`, [open, closing]);
+    expect(fresh.blockingErrors).toContain(message);
+  });
+
+  nativeTest("imports the same kind of workbook into open months", async () => {
+    const [first, second] = [nextMonth(), nextMonth()];
+    const preview = await overheadPreview(`open-${first}`, [first, second]);
+    expect(preview.blockingErrors).toEqual([]);
+    const response = await commitPreview(preview);
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    expect(response.body.inserted.overheads).toBe(2);
+    expect([...await monthOverheads(first), ...await monthOverheads(second)]).toHaveLength(2);
+  });
+
+  nativeTest("keeps operational expenses and investments writable in a closed overhead month", async () => {
+    const month = nextMonth();
+    await database().query("insert into finance_overhead_month_closures(month,closed_by) values($1::date,$2)", [`${month}-01`, actorId]);
+    const opex = await http().post("/finance/operational-expenses").set("Cookie", cookie)
+      .send({ expense_date: `${month}-15`, category: "Transport", amount: 12, description: "Synthetic closed-month transport" });
+    const capex = await http().post("/finance/investments").set("Cookie", cookie)
+      .send({ purchase_date: `${month}-15`, item_name: "Synthetic closed-month tent", category: "Equipment", quantity: 1, unit: "pcs", unit_cost: 40, capex_classification: "Capital Asset" });
+    expect([opex.status, capex.status]).toEqual([201, 201]);
+  });
+
+  nativeTest("refuses an overhead created while its month is being closed", async () => {
+    const month = nextMonth();
+    const response = await raceAgainst(closeMonthAs(month), () => http().post("/finance/overheads").set("Cookie", cookie)
+      .send({ expense_month: month, category: "Fuel", amount: 30, scope: "Office", payment_kind: "overhead" }));
+    expect({ status: response.status, body: response.body }).toEqual({ status: 409, body: { error: `Month ${month} is closed for edits` } });
+    expect(await monthOverheads(month)).toEqual([]);
+  });
+
+  nativeTest("closes a month only after an in-flight overhead write commits", async () => {
+    const month = nextMonth();
+    const response = await raceAgainst([
+      ["select pg_advisory_xact_lock_shared(hashtext('finance-overhead-month'), hashtext($1))", [`${month}-01`]],
+      [`insert into finance_overhead_expenses(expense_month,category,amount,scope,payment_kind,status,created_by)
+        values($1::date,'Wifi',80,'Office','overhead','Pending',$2)`, [`${month}-01`, actorId]],
+    ], () => http().post(`/finance/overheads/months/${month}/close`).set("Cookie", cookie));
+    expect({ status: response.status, body: response.body }).toEqual({ status: 200, body: { month, closed: true } });
+    expect(await monthOverheads(month)).toHaveLength(1);
+  });
+
+  nativeTest("refuses moving an overhead into a month being closed", async () => {
+    const [source, destination] = [nextMonth(), nextMonth()];
+    const target = await overhead(source);
+    const response = await raceAgainst(closeMonthAs(destination), () => http().patch(`/finance/overheads/${target}`).set("Cookie", cookie)
+      .send({ expense_month: destination }));
+    expect({ status: response.status, body: response.body }).toEqual({ status: 409, body: { error: `Month ${destination} is closed for edits` } });
+    expect((await monthOverheads(source)).map((row) => row.id)).toEqual([target]);
+    expect(await monthOverheads(destination)).toEqual([]);
+  });
+
+  nativeTest("rejects a mixed-month import atomically when one month is being closed", async () => {
+    const [open, closing] = [nextMonth(), nextMonth()];
+    const preview = await overheadPreview(`mixed-${open}`, [open, closing]);
+    expect(preview.blockingErrors).toEqual([]);
+    const before = await ledger();
+    const response = await raceAgainst(closeMonthAs(closing), () => commitPreview(preview));
+    expect({ status: response.status, body: response.body }).toEqual({
+      status: 409, body: { error: `Overhead month ${closing} is closed. Reopen it or remove its overhead rows before importing.` },
+    });
+    const after = await ledger();
+    expect({ overheads: after.overheads, batches: after.batches, audits: after.audits })
+      .toEqual({ overheads: before.overheads, batches: before.batches, audits: before.audits });
+    expect(after.closures).toHaveLength(before.closures.length + 1);
+    expect(await openFinanceTransactions()).toEqual([]);
+  });
+
+  nativeTest("refuses deleting an overhead while its month is being closed", async () => {
+    const month = nextMonth();
+    const target = await overhead(month);
+    const response = await raceAgainst(closeMonthAs(month), () => http().delete(`/finance/overheads/${target}`).set("Cookie", cookie));
+    expect({ status: response.status, body: response.body }).toEqual({ status: 409, body: { error: `Month ${month} is closed for edits` } });
+    expect((await monthOverheads(month)).map((row) => row.id)).toEqual([target]);
+  });
+
+  nativeTest("refuses approving an overhead while its month is being closed", async () => {
+    const month = nextMonth();
+    const target = await overhead(month);
+    const response = await raceAgainst(closeMonthAs(month), () => http().post(`/finance/overheads/${target}/approve`).set("Cookie", cookie));
+    expect({ status: response.status, body: response.body }).toEqual({ status: 409, body: { error: `Month ${month} is closed for edits` } });
+    expect((await database().query("select status from finance_overhead_expenses where id=$1", [target])).rows).toEqual([{ status: "Pending" }]);
   });
 });

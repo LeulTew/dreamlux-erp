@@ -1,8 +1,9 @@
 import crypto from "crypto";
 import ExcelJS from "exceljs";
-import { PoolClient } from "pg";
+import { PoolClient, type Pool } from "pg";
 import { insertFinanceAuditLog, roundMoney } from "../lib/finance-audit";
 import { FinanceMutationError, acknowledgeRow, acknowledgeRows, runFinanceTransaction } from "../lib/finance-transaction";
+import { closedOverheadMonths, lockOverheadMonths } from "../lib/finance-overhead-months";
 import {
   CAPITAL_INVESTMENT_CATEGORIES,
   CAPITAL_INVESTMENT_CLASSIFICATIONS,
@@ -479,6 +480,16 @@ function classifyImportConflict(error: unknown): FinanceMutationError | null {
   return null;
 }
 
+export function closedOverheadImportMessage(months: string[]): string {
+  const label = months.length === 1 ? `Overhead month ${months[0]} is` : `Overhead months ${months.join(", ")} are`;
+  return `${label} closed. Reopen ${months.length === 1 ? "it" : "them"} or remove ${months.length === 1 ? "its" : "their"} overhead rows before importing.`;
+}
+
+/** Closed overhead months (YYYY-MM) that a preview's overhead rows would write into. */
+export function closedOverheadPreviewMonths(preview: HisabImportPreview, db: Pool): Promise<string[]> {
+  return closedOverheadMonths(db, preview.rows.filter((row) => row.kind === "overhead").map((row) => `${row.month}-01`));
+}
+
 export async function commitHisabImport(
   input: HisabImportCommitInput,
   userId: string,
@@ -497,12 +508,18 @@ async function writeHisabImport(
   rows: ParsedHisabImportRow[],
   userId: string,
 ): Promise<{ importId: string; inserted: Record<string, number> }> {
+  const overheadMonths = rows.filter((row) => row.kind === "overhead").map((row) => `${row.month}-01`);
+  await lockOverheadMonths(client, overheadMonths, "shared");
   const duplicate = await client.query(
     "SELECT id FROM finance_import_batches WHERE workbook_hash = $1 AND status = 'Committed' LIMIT 1",
     [input.workbookHash],
   );
   if ((duplicate.rowCount ?? 0) > 0) {
     throw new FinanceMutationError(409, "This workbook has already been committed");
+  }
+  const closed = await closedOverheadMonths(client, overheadMonths);
+  if (closed.length > 0) {
+    throw new FinanceMutationError(409, closedOverheadImportMessage(closed));
   }
 
   const batch = acknowledgeRow(await client.query(

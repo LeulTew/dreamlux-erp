@@ -10,6 +10,7 @@ import {
   runFinanceTransaction,
   sendFinanceMutationFailure,
 } from "../lib/finance-transaction";
+import { lockOverheadMonths } from "../lib/finance-overhead-months";
 import {
   createFinanceOverheadSchema,
   updateFinanceOverheadSchema,
@@ -300,6 +301,7 @@ router.post(
     const monthDate = overheadMonthToDate(input.expense_month);
     try {
       const overhead = await runFinanceTransaction({ subject: OVERHEAD_SUBJECT }, async (client) => {
+        await lockOverheadMonths(client, [monthDate], "shared");
         if (await isMonthClosed(client, monthDate)) {
           throw new FinanceMutationError(409, `Month ${input.expense_month} is closed for edits`);
         }
@@ -368,6 +370,8 @@ router.patch(
 
         const currentMonth = toDateString(existing.expense_month);
         const targetMonth = input.expense_month ? overheadMonthToDate(input.expense_month) : currentMonth;
+        // A move is guarded against closing either its source or destination month.
+        await lockOverheadMonths(client, [currentMonth, targetMonth], "shared");
         if (await isMonthClosed(client, currentMonth)) {
           throw new FinanceMutationError(409, `Month ${monthLabel(currentMonth)} is closed for edits`);
         }
@@ -465,6 +469,7 @@ router.delete(
         if (existing.status === "Approved") {
           throw new FinanceMutationError(409, "Approved overhead expenses are locked and cannot be deleted");
         }
+        await lockOverheadMonths(client, [toDateString(existing.expense_month)], "shared");
         if (await isMonthClosed(client, toDateString(existing.expense_month))) {
           throw new FinanceMutationError(409, `Month ${monthLabel(existing.expense_month)} is closed for edits`);
         }
@@ -514,6 +519,7 @@ async function reviewOverheadExpense(
       if (existing.status !== "Pending") {
         throw new FinanceMutationError(409, `Only pending overhead expenses can be reviewed (current status: ${existing.status})`);
       }
+      await lockOverheadMonths(client, [toDateString(existing.expense_month)], "shared");
       if (await isMonthClosed(client, toDateString(existing.expense_month))) {
         throw new FinanceMutationError(409, `Month ${monthLabel(existing.expense_month)} is closed for edits`);
       }
@@ -582,6 +588,8 @@ async function setMonthClosure(
         ? new FinanceMutationError(409, `Month ${month} is already closed`, { cause: error })
         : null,
     }, async (client) => {
+      // Waits for in-flight overhead writers of this month and blocks new ones.
+      await lockOverheadMonths(client, [monthDate], "exclusive");
       // Lock an existing closure so a concurrent reopen waits and re-reads it.
       const closed = ((await client.query(
         "SELECT 1 FROM finance_overhead_month_closures WHERE month = $1 FOR UPDATE",

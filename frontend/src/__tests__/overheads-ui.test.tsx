@@ -227,16 +227,19 @@ describe("Overhead Register Page UI", () => {
     expect(addBtn).toBeDisabled();
   });
 
-  it("refreshes the register after an uncertain write but not after a known rejection", () => {
+  it("refreshes the register after an uncertain write or a conflict, but not after a validation rejection", () => {
     render(<OverheadsPage />);
     const handlers = mockMutationOptions.map((options) => options.onError).filter(Boolean);
     expect(handlers.length).toBeGreaterThanOrEqual(4);
     for (const onError of handlers) {
       mockInvalidateQueries.mockClear();
-      onError!({ response: { status: 409, data: { error: "Month 2026-05 is closed for edits" } } });
+      onError!({ response: { status: 400, data: { error: "Amount must be greater than zero" } } });
       expect(mockInvalidateQueries).not.toHaveBeenCalled();
       onError!({ response: { status: 503, data: { error: "Overhead change could not be confirmed. Reload before retrying.", outcome_uncertain: true } } });
       expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-overheads-list"] });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-overheads-summary"] });
+      mockInvalidateQueries.mockClear();
+      onError!({ response: { status: 409, data: { error: "Month 2026-05 is closed for edits" } } });
       expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-overheads-summary"] });
     }
   });
