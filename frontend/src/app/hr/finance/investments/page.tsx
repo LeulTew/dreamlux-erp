@@ -31,6 +31,7 @@ import ActivityDrawer from "@/components/ActivityDrawer";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import { createPermissionMatcher } from "@/lib/permission-matcher";
 import { isFinanceOutcomeUncertain } from "@/lib/finance-mutation";
+import { localDateString } from "@/lib/local-date";
 import {
   api,
   getCapitalInvestments,
@@ -248,7 +249,7 @@ export default function InvestmentsPage() {
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
 
   const defaultForm = {
-    purchase_date: new Date().toISOString().slice(0, 10),
+    purchase_date: localDateString(),
     item_name: "",
     category: "Equipment" as CapitalInvestment["category"],
     quantity: "",

@@ -17,6 +17,7 @@ import Select from "../../../../../components/ui/Select";
 import { useLanguage } from "../../../../../hooks/use-language";
 import { createPermissionMatcher } from "../../../../../lib/permission-matcher";
 import { generateReportPdf } from "../../../../../lib/pdf-report";
+import { localDateString } from "../../../../../lib/local-date";
 import {
   api,
   getMonthlyNetProfitStatement,
@@ -932,7 +933,7 @@ export default function NetProfitPage() {
             </div>
             <div className="text-right">
               <p className="font-semibold">{t("Month / Year")}: {formatMonthName(selectedMonth)}</p>
-              <p className="text-[10px] text-gray-500">Generated: {new Date().toISOString().slice(0, 10)}</p>
+              <p className="text-[10px] text-gray-500">Generated: {localDateString()}</p>
             </div>
           </div>
 
