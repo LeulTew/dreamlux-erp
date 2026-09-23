@@ -66,6 +66,24 @@ describe("owned non-network process supervision", () => {
       await child.stop();
     }
   });
+  test("retains redacted child diagnostics when supervision rejects completed output", async () => {
+    const secret = "synthetic-private-diagnostic-token";
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    const child = new ManagedProcess("synthetic rejected output", process.execPath,
+      ["--no-env-file", "-e", `console.log(${JSON.stringify(`diagnostic ${secret} [payroll-qa-egress]`)})`],
+      { cwd: process.cwd(), env: payrollSystemEnvironment(process.env), secrets: [secret] });
+    try {
+      await expect(child.wait(5_000)).rejects.toThrow("forbidden egress");
+      expect(child.exited).toBe(true);
+      const output = JSON.stringify(logged.mock.calls);
+      expect(output.includes(secret)).toBe(false);
+      expect(output).toContain("[redacted]");
+    } finally {
+      await child.stop();
+      logged.mockRestore();
+    }
+  });
+
   test("terminates only its owned timer child on timeout and reports failure", async () => {
     const child = new ManagedProcess("synthetic timer child", process.execPath,
       ["--no-env-file", "-e", "setInterval(() => {}, 1000)"],
