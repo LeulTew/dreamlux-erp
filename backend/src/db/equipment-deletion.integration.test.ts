@@ -5,6 +5,7 @@ import { createServer, type Server } from "node:http";
 import { isAbsolute } from "node:path";
 import express from "express";
 import request from "supertest";
+import jwt from "jsonwebtoken";
 import { Client, type Pool, type PoolClient, type QueryResult } from "pg";
 import { attestDreamluxNativeTarget } from "./testing/dreamlux-native-target";
 import { startDreamluxRestProxy } from "./testing/dreamlux-rest-proxy";
@@ -82,6 +83,12 @@ beforeAll(async () => {
       }
       res.sendStatus(204);
       stopBrowser();
+    });
+    app.post("/__qa/condition-authority", (req, res) => {
+      if (req.header("x-dreamlux-fixture-key") !== browserKey) { res.sendStatus(403); return; }
+      if (!invalidatePermissions) { res.sendStatus(503); return; }
+      invalidatePermissions();
+      res.sendStatus(204);
     });
   }
   app.use("/auth", (await import("../routes/auth")).default);
@@ -184,6 +191,9 @@ if (browserMode) {
     await writeFile(descriptor, JSON.stringify({
       purpose: "dreamlux-equipment-259", apiOrigin: "http://127.0.0.1:5326",
       database: target().pathname.slice(1), writerCookie: cookie, shutdownKey: browserKey,
+      legacyCookie: `token=${jwt.sign({
+        username: "synthetic.identityless.279", role: "SUPER_ADMIN", permission_slugs: ["*"],
+      }, process.env.JWT_SECRET!, { expiresIn: "10m" })}`,
     }), { mode: 0o600, flag: "wx" });
     browserDescriptor = descriptor;
     await browserStopped;

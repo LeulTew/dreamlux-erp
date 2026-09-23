@@ -134,7 +134,7 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
       ...env, DREAMLUX_EQUIPMENT_BROWSER_SERVER: "1", DREAMLUX_EQUIPMENT_BROWSER_DESCRIPTOR: descriptorPath,
     });
     const descriptor = await privateDescriptor(descriptorPath, fixture.url, provider, budget(30_000));
-    secrets.push(descriptor.shutdownKey, descriptor.writerCookie);
+    secrets.push(descriptor.shutdownKey, descriptor.writerCookie, descriptor.legacyCookie);
     let providerStopped = false;
     const stopProvider = async () => {
       if (providerStopped) return;
@@ -158,6 +158,7 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
       DREAMLUX_EQUIPMENT_BROWSER_DESCRIPTOR: descriptorPath,
       DREAMLUX_EQUIPMENT_CONTROL_SCRIPT: join(root, "backend", "src", "db", "testing", "equipment-browser-control.ts"),
       DREAMLUX_EQUIPMENT_RETURN_CONTROL_SCRIPT: join(root, "backend", "src", "db", "testing", "return-browser-control.ts"),
+      DREAMLUX_EQUIPMENT_CONDITION_CONTROL_SCRIPT: join(root, "backend", "src", "db", "testing", "condition-browser-control.ts"),
       DREAMLUX_BUN_PATH: process.execPath, DREAMLUX_EQUIPMENT_BROWSER_REPORT: browserReport,
       DREAMLUX_EQUIPMENT_BROWSER_OUTPUT: join(work, "equipment.browser.private.results"),
     };

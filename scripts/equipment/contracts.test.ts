@@ -19,6 +19,7 @@ function browserReport(executed: boolean) {
     { file: BROWSER_FILES[1], title: "Actual custody and restoration" },
     { file: BROWSER_FILES[2], title: "Actual return correction and receipt workflow" },
     { file: BROWSER_FILES[2], title: "Actual reserved capacity conflict" },
+    { file: BROWSER_FILES[3], title: "Actual condition stock and recovery" },
   ].map((spec, index) => ({
     ...spec, id: `equipment-${index}`, line: index + 1, column: 1, ok: true,
     tests: projects.map((project) => ({
@@ -28,7 +29,7 @@ function browserReport(executed: boolean) {
   }));
   return {
     config: { workers: 1, fullyParallel: false, forbidOnly: true, projects },
-    errors: [], stats: { unexpected: 0, flaky: 0, expected: executed ? 12 : 0, skipped: 0 },
+    errors: [], stats: { unexpected: 0, flaky: 0, expected: executed ? 14 : 0, skipped: 0 },
     suites: [{ title: "Equipment QA", specs }],
   };
 }
@@ -62,7 +63,7 @@ describe("independent equipment verification contracts", () => {
   test("requires the entire separate condition suite rather than reusing a deletion receipt", () => {
     const output = nativeOutput(CONDITION_TEST_COUNT).replace(NATIVE_TEST, CONDITION_TEST);
     expect(nativeReceipt(output, 0, { suite: "conditions" })).toEqual({
-      passed: 23, failed: 0, skipped: 0, tests: 23, files: 1,
+      passed: 41, failed: 0, skipped: 0, tests: 41, files: 1,
     });
     expect(nativeArguments("condition.junit.xml", "conditions").at(-1)?.replaceAll("\\", "/")).toBe(CONDITION_TEST);
     expect(() => nativeReceipt(nativeOutput(CONDITION_TEST_COUNT), 0, { suite: "conditions" })).toThrow();
@@ -75,11 +76,12 @@ describe("independent equipment verification contracts", () => {
   test("binds browser readiness to the exact fixture without accepting injected cookies", () => {
     const value = {
       purpose: "dreamlux-equipment-259", apiOrigin: "http://127.0.0.1:5326",
-      database: "dreamlux_ephemeral_equipment_259_012345abcdef", writerCookie: "synthetic=session", shutdownKey: "d".repeat(48),
+      database: "dreamlux_ephemeral_equipment_259_012345abcdef", writerCookie: "synthetic=session", legacyCookie: "synthetic=identityless", shutdownKey: "d".repeat(48),
     };
     expect(equipmentDescriptor(value, fixture).database).toBe(value.database);
     expect(() => equipmentDescriptor({ ...value, database: `${value.database}_other` }, fixture)).toThrow();
     expect(() => equipmentDescriptor({ ...value, writerCookie: "synthetic=value\r\nheader" }, fixture)).toThrow();
+    expect(() => equipmentDescriptor({ ...value, legacyCookie: "synthetic=value\r\nheader" }, fixture)).toThrow();
     expect(() => equipmentDescriptor({ ...value, apiOrigin: "https://unexpected.invalid" }, fixture)).toThrow();
   });
 
@@ -110,22 +112,23 @@ describe("independent equipment verification contracts", () => {
     expect(() => nativeReceipt(output, 0, { suite: "provisioning", infrastructure: true })).toThrow();
   });
 
-  test("exhausts the exact discovered twelve-case desktop/mobile registry", () => {
+  test("retains all twelve original cases and exhausts the fourteen-case desktop/mobile registry", () => {
     const registry = browserRegistry(browserReport(false), 0);
     expect(browserReceipt(browserReport(true), 0, registry)).toEqual({
-      desktop: 6, mobile: 6, requested: 12, passed: 12, retries: 0, skipped: 0,
+      desktop: 7, mobile: 7, requested: 14, passed: 14, retries: 0, skipped: 0,
     });
   });
 
-  test.each(["skip", "retry", "missing-native", "missing-return", "wrong-total", "stale-registry"] as const)(
+  test.each(["skip", "retry", "missing-native", "missing-return", "missing-condition", "wrong-total", "stale-registry"] as const)(
     "rejects %s browser evidence", (kind) => {
       const registry = browserRegistry(browserReport(false), 0);
       const report = browserReport(true);
       if (kind === "skip") report.suites[0].specs[0].tests[0].expectedStatus = "skipped";
       if (kind === "retry") report.suites[0].specs[0].tests[0].results[0].retry = 1;
       if (kind === "missing-native") report.suites[0].specs.splice(3, 1);
-      if (kind === "missing-return") report.suites[0].specs.pop();
-      if (kind === "wrong-total") report.stats.expected = 11;
+      if (kind === "missing-return") report.suites[0].specs.splice(5, 1);
+      if (kind === "missing-condition") report.suites[0].specs.pop();
+      if (kind === "wrong-total") report.stats.expected = 13;
       if (kind === "stale-registry") report.suites[0].specs[0].id = "different-case";
       expect(() => browserReceipt(report, 0, registry)).toThrow();
     },

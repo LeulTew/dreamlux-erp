@@ -7,6 +7,7 @@ import InventoryMovementsPage from "@/app/assets/movements/page";
 
 const refetch = vi.fn();
 let canRead = true;
+let lang = "en";
 let queryState: Record<string, unknown> = {};
 
 vi.mock("next/navigation", () => ({
@@ -14,7 +15,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }));
 vi.mock("@/components/AuthLayout", () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
-vi.mock("@/hooks/use-language", () => ({ useLanguage: () => ({ lang: "en" }) }));
+vi.mock("@/hooks/use-language", () => ({ useLanguage: () => ({ lang }) }));
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ hasPermission: () => canRead, isLoading: false, isAuthenticated: true }),
 }));
@@ -38,6 +39,7 @@ const movement = {
 describe("Inventory movement history", () => {
   beforeEach(() => {
     canRead = true;
+    lang = "en";
     refetch.mockReset();
     queryState = { data: { movements: [movement], total: 1, page: 1, limit: 25, totalPages: 1 }, isLoading: false, isError: false, refetch };
   });
@@ -56,6 +58,20 @@ describe("Inventory movement history", () => {
     render(<InventoryMovementsPage />);
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { delta: -2, text: "-2 pcs", color: "text-danger", source: "condition_resolution", label: "Condition resolution", language: "en" },
+    { delta: 0, text: "0 pcs", color: "text-foreground", source: "event_return", label: "Equipment return", language: "en" },
+    { delta: 2, text: "+2 pcs", color: "text-success", source: "event_return_correction", label: "Return correction", language: "en" },
+    { delta: -2, text: "-2 pcs", color: "text-danger", source: "condition_resolution", label: "የዕቃ ሁኔታ ውሳኔ", language: "am" },
+  ])("renders $source $delta in $language without a misleading positive sign", ({ delta, text, color, source, label, language }) => {
+    lang = language;
+    queryState = { data: { movements: [{ ...movement, quantity_delta: delta, source_type: source }], total: 1, page: 1, limit: 25, totalPages: 1 }, isLoading: false };
+    render(<InventoryMovementsPage />);
+    expect(screen.getByText(text)).toHaveClass(color);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText("+-2 pcs")).not.toBeInTheDocument();
   });
 
   it("blocks users without inventory history permission", () => {

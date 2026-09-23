@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HiArchiveBoxArrowDown, HiArrowLeft, HiArrowRight, HiCheckCircle } from "react-icons/hi2";
@@ -18,6 +19,7 @@ import { useLanguage } from "@/hooks/use-language";
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
     "Inventory Returns": "Inventory Returns",
+    "Condition stock": "Condition stock",
     "Reconcile dispatched items back into inventory, item by item.": "Reconcile dispatched items back into inventory, item by item.",
     "Events": "Events",
     "Outstanding": "Outstanding",
@@ -51,6 +53,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   },
   am: {
     "Inventory Returns": "የክምችት መመለሻዎች",
+    "Condition stock": "የዕቃ ሁኔታ ክምችት",
     "Reconcile dispatched items back into inventory, item by item.": "የተላኩ እቃዎችን በአንድ በአንድ ወደ ክምችት ያስታርቁ።",
     "Events": "ዝግጅቶች",
     "Outstanding": "ያልተመለሰ",
@@ -125,6 +128,7 @@ function ReturnsContent() {
   const queryClient = useQueryClient();
 
   const canManageReturns = hasPermission("event_allocations:write") || hasPermission("assets:write");
+  const canInspectConditions = hasPermission("assets:read") || hasPermission("assets:reconcile");
   const selectedEventId = searchParams.get("event");
   const [forms, setForms] = useState<Record<string, ReturnFormState>>({});
   const [queuePage, setQueuePage] = useState(1);
@@ -285,6 +289,10 @@ function ReturnsContent() {
                           <div className="mt-1 text-[11px] font-semibold text-muted tabular-nums">
                             {t("Good")} {allocation.returned_good_quantity} · {t("Damaged")} {allocation.returned_damaged_quantity} · {t("Lost")} {allocation.returned_lost_quantity} · {t("Repair")} {allocation.returned_repair_quantity}
                           </div>
+                          {canInspectConditions && <Link href={`/assets/conditions?item=${encodeURIComponent(allocation.item_id)}`}
+                            className="mt-2 inline-flex min-h-12 items-center rounded-md border border-border px-4 text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+                            {t("Condition stock")}
+                          </Link>}
                         </div>
                         {isClosed ? (
                           <span className="inline-flex items-center gap-1 rounded-md border border-success/25 bg-success/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-success">
@@ -404,6 +412,10 @@ function ReturnsContent() {
           </div>
         </div>
 
+        {canInspectConditions && <Link href="/assets/conditions"
+          className="inline-flex min-h-12 items-center rounded-md border border-border px-4 text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+          {t("Condition stock")}
+        </Link>}
         <section className="overflow-hidden rounded-md border border-border bg-card">
           {queueQuery.isLoading ? (
             <div className="space-y-2 p-4">

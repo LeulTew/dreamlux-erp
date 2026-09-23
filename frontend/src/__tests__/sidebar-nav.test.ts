@@ -111,6 +111,7 @@ describe("sidebar permission navigation", () => {
     const nav = navFor("/assets", ["assets:read"]);
     expect(nav.inventoryLinks.some((l) => l.href === "/assets/dashboard")).toBe(true);
     expect(nav.inventoryLinks.some((l) => l.href === "/assets")).toBe(true);
+    expect(nav.inventoryLinks.some((l) => l.href === "/assets/conditions")).toBe(true);
     expect(nav.inventoryLinks.some((l) => l.href === "/assets/insert")).toBe(false);
     expect(nav.auditLogLink).not.toBeNull();
     expect(nav.reportsLink).not.toBeNull();
@@ -128,6 +129,22 @@ describe("sidebar permission navigation", () => {
     const nav = navFor("/assets/reconcile", ["assets:reconcile"]);
     expect(nav.reconcileLink).not.toBeNull();
   });
+
+  it("keeps reconciliation-only condition operators inside a visible Inventory group", () => {
+    const nav = navFor("/assets/conditions", ["assets:reconcile"]);
+    expect(nav.showInventoryGroup).toBe(true);
+    expect(nav.inventoryLinks).toEqual([expect.objectContaining({ href: "/assets/conditions", active: true })]);
+    expect(nav.returnsLink).toBeNull();
+    expect(nav.dispatchLink).toBeNull();
+    expect(nav.reconcileLink).not.toBeNull();
+  });
+
+  it.each(["event_allocations:write", "event_allocations:dispatch", "assets:write"])(
+    "does not broaden condition authority from %s", (grant) => {
+      const nav = navFor("/assets/conditions", [grant]);
+      expect(nav.inventoryLinks.some((link) => link.href === "/assets/conditions")).toBe(false);
+    },
+  );
 
   it("shows dispatch for event_allocations:dispatch even without assets:read", () => {
     const nav = navFor("/assets/dispatch", ["event_allocations:dispatch"]);

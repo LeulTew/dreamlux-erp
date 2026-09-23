@@ -10,7 +10,7 @@ import {
 export const NATIVE_TEST = "src/db/equipment-deletion.integration.test.ts";
 export const NATIVE_TEST_COUNT = 26;
 export const CONDITION_TEST = "src/db/inventory-condition-resolution.integration.test.ts";
-export const CONDITION_TEST_COUNT = 23;
+export const CONDITION_TEST_COUNT = 41;
 export const RETURN_TEST = "src/db/equipment-return-correction.integration.test.ts";
 export const RETURN_TEST_COUNT = 35;
 export const PROVISIONING_TEST = "src/db/authority-provisioning.integration.test.ts";
@@ -24,9 +24,10 @@ const NATIVE_SUITES = {
 type NativeSuite = keyof typeof NATIVE_SUITES;
 export const BROWSER_FILES = [
   "issue259-equipment-deletion.spec.ts", "issue259-equipment-native.spec.ts", "issue273-return-correction-native.spec.ts",
+  "issue279-condition-stock-native.spec.ts",
 ] as const;
 export const RUNNER_TIMEOUT_MS = 170_000;
-export type EquipmentDescriptor = { apiOrigin: string; database: string; writerCookie: string; shutdownKey: string };
+export type EquipmentDescriptor = { apiOrigin: string; database: string; writerCookie: string; legacyCookie: string; shutdownKey: string };
 
 export function equipmentEnvironment(
   ambient: Record<string, string | undefined>, adminUrl: string, fixtureUrl: string, jwtSecret: string, restSecret: string,
@@ -78,17 +79,18 @@ export function equipmentDescriptor(value: unknown, fixtureUrl: string): Equipme
   const target = attestDreamluxNativeTarget(fixtureUrl, "fixture");
   if (!record(value) || value.purpose !== "dreamlux-equipment-259" || value.apiOrigin !== "http://127.0.0.1:5326"
     || value.database !== target.pathname.slice(1) || typeof value.writerCookie !== "string" || !value.writerCookie
-    || /[\r\n]/.test(value.writerCookie) || typeof value.shutdownKey !== "string" || !/^[a-f0-9]{48}$/.test(value.shutdownKey)) {
+    || /[\r\n]/.test(value.writerCookie) || typeof value.legacyCookie !== "string" || !value.legacyCookie
+    || /[\r\n]/.test(value.legacyCookie) || typeof value.shutdownKey !== "string" || !/^[a-f0-9]{48}$/.test(value.shutdownKey)) {
     throw new Error("Equipment browser descriptor does not identify the independently owned fixture");
   }
-  return { apiOrigin: value.apiOrigin, database: value.database, writerCookie: value.writerCookie, shutdownKey: value.shutdownKey };
+  return { apiOrigin: value.apiOrigin, database: value.database, writerCookie: value.writerCookie, legacyCookie: value.legacyCookie, shutdownKey: value.shutdownKey };
 }
 
 export function browserRegistry(value: unknown, exitCode: number): BrowserRegistry {
   const registry = readBrowserRegistry(value, exitCode, BROWSER_FILES);
-  if (registry.tests.length !== 12 || ["desktop", "mobile"].some((project) =>
-    registry.tests.filter((test) => test.project === project).length !== 6)) {
-    throw new Error("Equipment QA requires its complete twelve-case browser registry");
+  if (registry.tests.length !== 14 || ["desktop", "mobile"].some((project) =>
+    registry.tests.filter((test) => test.project === project).length !== 7)) {
+    throw new Error("Equipment QA requires its original twelve cases plus two condition-operator cases");
   }
   return registry;
 }

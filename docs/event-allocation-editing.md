@@ -101,7 +101,7 @@ or `lost`), a positive integer `quantity` up to 1,000,000, and optional notes
 and an idempotency key. Quantity cannot exceed the selected unavailable balance.
 Recording an inspection with an unchanged condition remains supported.
 
-A successful `201 { resolved, outcome }` means one transaction acknowledged
+A successful `201 { resolved, outcome, resolution }` means one transaction acknowledged
 the resolution record, the net damaged/repair balance update, and a stock
 movement if the outcome was loss. Restoring good stock releases availability
 without increasing owned quantity; loss reduces owned quantity. Prior return
@@ -116,7 +116,86 @@ nothing committed. Missing or rejected required writes roll back together.
 An unacknowledged BEGIN also triggers rollback before the connection can be
 reused; a failed rollback causes that connection to be discarded.
 
-Issue #268 repairs this existing API. It does not add an operator screen:
-the current returns checklist records incoming event returns, not this
-follow-on damaged/repair resolution workflow. The shared interface gap is
-tracked by LeulTew/koti-catering#362 and needs corresponding DreamLux coverage.
+The additive `resolution` field is the immutable record for the submitted item,
+source, outcome, quantity, notes, actor and idempotency key. Existing
+`resolved`/`outcome` consumers retain their fields. A generic successful status or
+cache refresh is not a receipt for a particular operation.
+
+### Condition-stock operator workflow (#279)
+
+Inventory contains a separate **Condition stock** entry at `/assets/conditions`.
+The return workflow links to the item when the current operator has
+`assets:read` or `assets:reconcile`. This does not grant access to returns,
+dispatch or unrelated inventory pages. Reconciliation-only operators see the
+containing Inventory group and can inspect the data needed for their existing
+write capability. Read-only operators cannot submit resolutions.
+
+The list and detail show actual location, unit and full existing item UUID so
+same-name stock is distinguishable. Missing metadata is labelled as not
+recorded; inactive locations and archived items are identified rather than
+silently substituted. Archived history remains inspectable, but writes still
+require an active item. Recounts and the descriptive item condition are separate.
+
+- `GET /events/returns/condition-stock`: literal name search (maximum 100
+  characters), UUID keyset paging, optional archived items, and a 1-50 row limit.
+- `GET /events/returns/items/:itemId/condition-stock`: one-snapshot item,
+  bounded immutable history, next cursor and optional exact-key recovery record.
+  NULL historical keys and timestamps are retained. An absent recovery record
+  does not establish that an in-flight request cannot still commit.
+- History uses `(created_at, id)` descending keysets, with NULL timestamps last.
+  Offset cursors normalize to the same comparison axis without wrapping the
+  indexed stored column. Microseconds are preserved.
+- A valid current actor is required. The UI verifies `/auth/permissions`
+  `user_id` and slugs, not role labels; identity-less legacy sessions cannot
+  create a journal. `X-Condition-Actor` binds operator requests to the expected
+  session actor. An actor mismatch is rejected, not treated as another user's
+  acknowledgement.
+- A temporary authority-read failure withholds stock actions and offers an
+  explicit read retry without erasing the session or requiring another login.
+  Rejected or identity-less authentication retains the separate sign-in path.
+
+DreamLux's ledger column is **timestamp without time zone**, not `timestamptz`.
+Historical physical instants cannot be reconstructed from that column alone.
+Existing values are not rewritten. New resolutions explicitly store UTC;
+serialized microsecond cursors use a UTC-labelled stored-clock axis. History
+displays that clock without applying the browser's timezone and explains the
+older-record limitation. No schema or grant migration is introduced.
+
+### Deliberate recovery
+
+The immutable submitted intent is written and read back in session storage
+under `dreamlux-erp:condition-resolution:v1:<verified-user-UUID>` before any
+dispatch. A QueryClient-lifetime ownership guard supplements that journal:
+navigation, cache clearing and reload cannot silently release an uncertain
+operation or let a late callback clear another draft.
+
+If storage, identity or online admission cannot be verified, no unprotected
+write is sent. There is no automatic mutation retry, paused offline mutation,
+queue entry or reconnect replay. Existing queue entries for this endpoint are
+blocked with an explicit warning.
+
+An uncertain operator can **Check saved outcome** or deliberately **Retry exact
+request**, retaining the same key and payload. Only a matching immutable record
+confirms the operation. Mismatched identity/intent is a conflict. A later known
+rejection cannot disprove an earlier uncertain commit. Rejections preserve
+authored input. Acknowledgement releases independently of advisory refreshes;
+stale reads remain visible. Loss requires a separate item-specific confirmation,
+and its stock movement has a negative sign and loss styling.
+
+A first-attempt rate limit is a known rejection, not an ambiguous commit. Its
+inputs can be deliberately edited and submitted again. If an earlier attempt
+was already uncertain, a rate-limited retry still cannot release that original
+identity or establish rollback.
+
+Global reservations are unchanged: making stock usable does not increase owned
+quantity, and non-overlapping event dates do not create an additional stock pool.
+
+Current normalized-grant revocation and inactive-account denial use the shared
+authority integration in #284. The condition suite retains those assertions;
+the operator workflow adds no role-name or stale-map authority fallback.
+
+The existing equipment verifier registers condition inspection/resolution,
+deletion, return correction and provisioning as separate native processes.
+Its browser registry includes both the existing workflows and the real
+condition-stock journey. Verification retains the original deadlines and
+reuses the source-matched frontend artifact from the separate CI build job.

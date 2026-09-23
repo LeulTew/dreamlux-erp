@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from "react";
 
-export function useModalFocus() {
+export function useModalFocus(getReturnFocus?: () => HTMLElement | null) {
   const opener = useRef<HTMLElement | null>(null);
   const content = useRef<HTMLElement | null>(null);
 
@@ -13,13 +13,13 @@ export function useModalFocus() {
 
   const onCloseAutoFocus = useCallback((event: Event) => {
     event.preventDefault();
-    const target = opener.current;
+    const target = getReturnFocus ? getReturnFocus() : opener.current;
     if (!target?.isConnected) return;
     const active = document.activeElement;
     const activeModal = active instanceof HTMLElement ? active.closest('[role="dialog"], [role="alertdialog"]') : null;
     if (activeModal && activeModal !== content.current && !activeModal.contains(target)) return;
-    target.focus({ preventScroll: true });
-  }, []);
+    target.focus({ preventScroll: target === opener.current });
+  }, [getReturnFocus]);
 
   const onEscapeKeyDown = useCallback((event: KeyboardEvent) => {
     const target = event.target;

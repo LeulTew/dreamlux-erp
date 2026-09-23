@@ -23,6 +23,13 @@ const DB_VERSION = 1;
 const STORE_NAME = "queued-mutations";
 const WARNING_THRESHOLD = 10;
 
+function requireReplayableEndpoint(endpoint: string) {
+  const path = decodeURIComponent(new URL(endpoint, "https://dreamlux.invalid").pathname);
+  if (/\/events\/returns\/items\/[^/]+\/condition-resolutions\/?$/i.test(path)) {
+    throw new Error("Condition resolutions cannot be queued or replayed. Use explicit operator recovery.");
+  }
+}
+
 let cachedSnapshot: SyncQueueSnapshot = {
   status: "idle",
   pendingCount: 0,
@@ -129,6 +136,7 @@ export async function refreshSyncQueueSnapshot(): Promise<SyncQueueSnapshot> {
 }
 
 export async function enqueueMutation(mutation: Omit<QueuedMutation, "id" | "createdAt" | "retryCount">): Promise<QueuedMutation> {
+  requireReplayableEndpoint(mutation.endpoint);
   const queued: QueuedMutation = {
     ...mutation,
     id: createId(),
@@ -167,6 +175,7 @@ export async function flushSyncQueue(fetcher: typeof fetch = fetch): Promise<Syn
 
     for (const mutation of queued) {
       try {
+        requireReplayableEndpoint(mutation.endpoint);
         const response = await fetcher(mutation.endpoint, {
           method: mutation.method,
           headers: {

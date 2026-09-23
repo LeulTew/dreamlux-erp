@@ -11,6 +11,7 @@ export async function invalidateInventoryState(
     "inventory-items-lookup",
     "inventoryStats",
     "inventory-movements",
+    "condition-stock",
     "inventory-history",
     "reconcileHistory",
     "low-stock",
