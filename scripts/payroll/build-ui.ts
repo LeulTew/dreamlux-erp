@@ -1,11 +1,12 @@
 import { join, resolve } from "node:path";
-import { stripVTControlCharacters } from "node:util";
+import { readFile } from "node:fs/promises";
 import { payrollUiEnvironment } from "../../frontend/payroll-qa-environment";
 import { assertNewBuildOutput, createFrontendSnapshot, ownedDirectory, publishFrontendArtifact, removeOwnedDirectory, repositoryRoot } from "./files";
 import { ManagedProcess, redact } from "./processes";
+import { frontendArguments, frontendStages, verifyFrontendUnitReceipt, type FrontendVerification } from "./ui-build-plan";
 
-export async function buildPayrollUi(output: string, checks = false, root = repositoryRoot) {
-  await assertNewBuildOutput(root, output);
+export async function verifyFrontend(options: FrontendVerification, root = repositoryRoot) {
+  if ("output" in options) await assertNewBuildOutput(root, options.output);
   const work = await ownedDirectory(root, "build-source");
   const processes: ManagedProcess[] = [];
   let interrupted = false;
@@ -32,16 +33,18 @@ export async function buildPayrollUi(output: string, checks = false, root = repo
       if (interrupted) throw new Error("The isolated frontend build was interrupted");
       return result;
     };
-    if (checks) {
-      await run("isolated frontend lint", ["run", "lint"], process.platform === "win32" ? 90_000 : 45_000);
-      await run("isolated frontend types", [join("node_modules", "typescript", "bin", "tsc"), "--noEmit", "--incremental", "false"], 45_000);
-      const tested = await run("isolated frontend unit tests", ["run", "test"], 90_000, "test");
-      if (!/\bTests\s+[1-9]\d*\s+passed\b/.test(stripVTControlCharacters(tested.output))) {
-        throw new Error("Frontend unit testing did not produce a nonzero passing receipt");
+    for (const stage of frontendStages(options.mode)) {
+      const report = join(work, "frontend-units.json");
+      const args = stage.name === "units" ? [...stage.args, "--reporter=json", `--outputFile=${report}`] : stage.args;
+      const started = performance.now();
+      await run(`isolated frontend ${stage.name}`, args, stage.timeout, stage.environment);
+      console.log(`Frontend ${stage.name} completed in ${Math.round(performance.now() - started)}ms.`);
+      if (stage.name === "units") {
+        const passed = verifyFrontendUnitReceipt(JSON.parse(await readFile(report, "utf8")));
+        console.log(`Frontend units: ${passed} passed, zero failed/skipped/todo.`);
       }
     }
-    await run("isolated frontend production build", ["run", "build"], 150_000);
-    await publishFrontendArtifact(root, snapshot, resolve(root, output));
+    if ("output" in options) await publishFrontendArtifact(root, snapshot, resolve(root, options.output));
   } catch (error) {
     failure = error;
   } finally {
@@ -62,18 +65,17 @@ export async function buildPayrollUi(output: string, checks = false, root = repo
     }
   }
   if (failure) throw failure;
-  console.log("Created the reusable credential-free payroll frontend artifact.");
+  console.log("output" in options
+    ? "Created the reusable credential-free payroll frontend artifact."
+    : "Completed isolated frontend lint and unit tests without publishing a build.");
+}
+
+export function buildPayrollUi(output: string, checks = false, root = repositoryRoot) {
+  return verifyFrontend({ mode: checks ? "all" : "build", output }, root);
 }
 
 if (import.meta.main) {
-  const args = process.argv.slice(2);
-  const outputIndex = args.indexOf("--output");
-  const valid = args.filter((arg, index) => arg !== "--checks" && index !== outputIndex && index !== outputIndex + 1);
-  if (outputIndex < 0 || !args[outputIndex + 1] || args[outputIndex + 1].startsWith("--")
-      || args.filter((arg) => arg === "--checks").length > 1 || valid.length) {
-    throw new Error("Usage: build-ui.ts --output .qa-payroll-build [--checks]");
-  }
-  void buildPayrollUi(args[outputIndex + 1], args.includes("--checks")).catch((error: unknown) => {
+  void verifyFrontend(frontendArguments(process.argv.slice(2))).catch((error: unknown) => {
     console.error(redact(error instanceof Error ? error.message : "Payroll UI build failed"));
     process.exitCode = 1;
   });

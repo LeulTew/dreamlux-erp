@@ -2,9 +2,10 @@ import "./setup";
 import { describe, test, expect, beforeAll } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 
 let app: import("express").Application;
-const JWT_SECRET = "test-secret";
+const JWT_SECRET = TEST_JWT_SECRET;
 
 beforeAll(async () => {
   const mod = await import("../index");

@@ -50,6 +50,14 @@ function http() {
   return request(server);
 }
 
+async function setCurrentImportGrant(enabled: boolean) {
+  await database().query("delete from role_permissions where role_id=$1", [roleId]);
+  if (enabled) {
+    await database().query(`insert into role_permissions(role_id,permission_id)
+      select $1,id from permissions where slug='finance:imports:write'`, [roleId]);
+  }
+}
+
 beforeAll(async () => {
   if (!adminUrl) return;
   const target = attestDreamluxNativeTarget(adminUrl, "admin");
@@ -87,6 +95,8 @@ beforeAll(async () => {
     .toEqual([{ name: fixtureTarget.pathname.slice(1), actor: "dreamlux_parity", port: 55434 }]);
   const password = randomBytes(24).toString("base64url");
   await observer.query("insert into roles(id,name,permissions) values($1,'SYNTHETIC_FORMULA_IMPORTER_261',$2::jsonb)", [roleId, grants]);
+  await observer.query("insert into permissions(slug) values('finance:imports:write') on conflict(slug) do nothing");
+  await setCurrentImportGrant(true);
   await observer.query(`insert into users(id,username,password_hash,full_name,role_id)
     values($1,'synthetic.formula.importer.261',crypt($3,gen_salt('bf')),
       'Synthetic formula operator',$2::uuid)`, [actorId, roleId, password]);
@@ -129,6 +139,7 @@ beforeEach(async () => {
   if (!observer) return;
   if (!invalidateAllCache) throw new Error("Native import permission invalidation was not initialized");
   await observer.query("update roles set permissions=$1::jsonb where id=$2", [grants, roleId]);
+  await setCurrentImportGrant(true);
   invalidateAllCache();
 });
 
@@ -291,7 +302,7 @@ describe("native DreamLux formula workbook preview-to-commit workflow", () => {
   nativeTest("retains permission denial without touching the workbook ledger", async () => {
     if (!invalidateAllCache) throw new Error("Native import permission invalidation was not initialized");
     const before = await ledgerCounts();
-    await database().query("update roles set permissions='{}'::jsonb where id=$1", [roleId]);
+    await setCurrentImportGrant(false);
     invalidateAllCache();
     const response = await http().post("/finance/imports/hisab/preview").set("Cookie", cookie)
       .attach("workbook", await weeklyFormulaWorkbook("cached", { tag: "denied-native" }), "synthetic-denied.xlsx");

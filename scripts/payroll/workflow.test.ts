@@ -59,6 +59,21 @@ describe("local, unbilled CI definition contracts", () => {
     expect(native.some((step) => /build-ui\.ts|bun run build|next build/.test(String(step.run)))).toBe(false);
     expect(native.find((step) => String(step.run).includes("scripts/payroll/run.ts"))?.run).toContain("--allow-disposable-postgres");
   });
+  test("uses spare backend capacity for lint and all frontend units while retaining separate build types", async () => {
+    const workflow = object(Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8")));
+    const jobs = object(workflow.jobs);
+    const quality = steps(object(jobs["backend-test"]));
+    const frontend = steps(object(jobs["frontend-build"]));
+    const lintAndUnits = quality.filter((step) => String(step.run).includes("--lint-and-test"));
+    expect(lintAndUnits).toHaveLength(1);
+    expect(String(lintAndUnits[0].run)).toBe("bun --no-env-file scripts/payroll/build-ui.ts --lint-and-test");
+    expect(quality.some((step) => String(step.run).includes("bun install --cwd frontend --frozen-lockfile"))).toBe(true);
+    const build = frontend.filter((step) => String(step.run).includes("build-ui.ts"));
+    expect(build).toHaveLength(1);
+    expect(String(build[0].run)).toBe("bun --no-env-file scripts/payroll/build-ui.ts --typecheck --output .qa-payroll-build");
+    expect([...quality, ...frontend].filter((step) => String(step.run).includes("--checks"))).toHaveLength(0);
+    expect(object(jobs["native-payroll"]).needs).toEqual(["backend-test", "frontend-build"]);
+  });
   test("runs the complete domain and import verifiers against the same build without adding runner jobs", async () => {
     const workflow = object(Bun.YAML.parse(await readFile(join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8")));
     const jobs = object(workflow.jobs);
@@ -84,6 +99,9 @@ describe("local, unbilled CI definition contracts", () => {
     expect(runner).toContain('nativeReceipt(conditionResult.output, conditionResult.exitCode, { suite: "conditions" })');
     expect(runner.indexOf("const conditionReport")).toBeGreaterThan(runner.indexOf("const nativeSummary"));
     expect(runner.indexOf("const descriptorPath")).toBeGreaterThan(runner.indexOf("const conditionSummary"));
+    expect(runner).toContain('nativeArguments(provisioningReport, "provisioning")');
+    expect(runner.indexOf("const provisioningReport")).toBeGreaterThan(runner.indexOf("const returnSummary"));
+    expect(runner.indexOf("const descriptorPath")).toBeGreaterThan(runner.indexOf("const provisioningSummary"));
     expect(EQUIPMENT_TIMEOUT_MS).toBe(170_000);
   });
   test("pins the disposable server's physical port and verifies both binary hashes before native QA", async () => {

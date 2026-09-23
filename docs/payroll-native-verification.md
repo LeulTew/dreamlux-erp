@@ -12,7 +12,7 @@ application instance. Install the existing locked dependencies with Bun before
 verification. No dependency installation or production fallback occurs inside
 the native runner.
 
-- Bun: CI pins **1.3.14**; the locally inspected command behavior is Bun 1.4.
+- Bun: CI and the current local verification both use **1.3.14**.
   Always invoke the commands with `bun --no-env-file`.
 - Node.js 22 and the existing frontend/backend dependencies.
 - A separately owned, disposable PostgreSQL **16.15** cluster:
@@ -67,6 +67,61 @@ Windows uses the same commands with an absolute Windows binary path and
 `--postgrest-sha256 <independently-verified-Windows-binary-hash>`. Do not use an
 unverified executable merely because it prints the expected version.
 
+### Existing CI job responsibilities
+
+The existing three jobs keep their three-, three- and five-minute caps
+(11 maximum summed runner-minutes). Frontend lint and the complete unit
+inventory now use spare capacity in the backend-test job; standalone frontend
+type-checking and the unchanged production build remain in frontend-build.
+The native job still depends on both, so a failed quality job prevents use of
+the build. A source build artifact alone is not release approval.
+Both quality/build jobs restore only the lockfile-keyed Bun package cache
+before their ordinary frozen installs; no environment, source artifact or
+verification receipt is accepted from that cache.
+
+The source-isolated runner supports the exact split:
+
+```sh
+bun --no-env-file scripts/payroll/build-ui.ts --lint-and-test
+bun --no-env-file scripts/payroll/build-ui.ts --typecheck --output .qa-payroll-build
+```
+
+The original `--checks` invocation still runs all four phases locally. Linux
+lint 45s, standalone types 45s, units 90s and build 150s remain unchanged. Unit
+execution explicitly uses two of the job's available CPUs with the existing
+default process isolation; it does not change to VM isolation or disable cleanup.
+The JSON receipt must account for every passing case and reject failures,
+skips, todos and inconsistent totals. Lint/unit-only execution cannot publish
+an artifact. Type/build failures clean the owned snapshot without publishing;
+native consumers require both successful job results on the same commit.
+
+The original single frontend job and same-CPU overlapping prototypes exceeded
+their caps. Rebalancing existing jobs avoids that contention without adding
+runners or larger deadlines. A local combined authority/operator input set
+passed 920 frontend cases: the quality job payload completed in 130.262s and the
+type/build payload in 123.539s, each with a separate two-CPU allocation. The
+quality payload included 157 verifier contracts, 1,044 safe-source backend tests
+and 14 synthetic Storage tests. Read-only source-hygiene/provider guards were
+verified separately in place rather than copying quarantined source/configuration.
+Dependency restoration, GitHub checkout, artifact transfer and hosted scheduling
+are not included in those payload times; hosted CI is not claimed verified.
+
+The backend CI preload uses the same explicit synthetic signing/provisioning
+configuration as its test suite. It clears inherited settings first and does
+not replace the strict configuration with short legacy defaults.
+
+The original six seed source-hygiene assertions now live in a separate
+builtin-only test module. This permits read-only in-place verification without
+evaluating the seed engine or CLI. Assertions emit booleans, not source contents,
+on failure. Engine tests and all six checks remain in the repository's full
+test inventory; no credential-bearing seed is copied into isolated runtimes.
+
+For planning only, retain a conservative 14 runner-minutes per complete attempt
+including setup/rounding until hosted timing is observed: a hypothetical empty
+2,000-minute allowance would cover about 140 such runs, fewer with other usage.
+This does not establish the account's current balance, and no unchanged run is
+automatically retried.
+
 ### Pinned PostgREST download
 
 The CI download is not `latest`:
@@ -120,6 +175,9 @@ inherited 20,000-invalidation cache test took 5.34 seconds in one combined run
 and 2.81 seconds in isolation, crossing Bun's default five-second limit. No
 assertion, iteration count, production cache logic or job cap was weakened;
 this is runner headroom, not a claim that cache performance was repaired.
+Those historical timings predate the bounded batch-pruning repair in #281,
+which retains the original five-second focused burst control and adds explicit
+headroom, age-reclamation and revision-safety assertions.
 
 The native runner reuses `createDreamluxPayrollFixture` and the reviewed
 18-table DDL/index/activity-RLS bootstrap, including the two existing settings

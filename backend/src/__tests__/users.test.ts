@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeAll, beforeEach } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 
 // Mock the DB pool
 const mockQuery = mock((..._args: any[]) => Promise.resolve({ rows: [] as any[], rowCount: 1 }));
@@ -47,7 +48,7 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-const JWT_SECRET = "test-secret";
+const JWT_SECRET = TEST_JWT_SECRET;
 
 function getToken(role = "SUPER_ADMIN", extra: Record<string, unknown> = {}): string {
   return jwt.sign({ id: "admin-1", role, username: "admin", ...extra }, JWT_SECRET, { expiresIn: "1h" });

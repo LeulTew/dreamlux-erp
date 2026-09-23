@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeAll } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 
 // Mock the DB pool
 const mockQuery = mock((sql: string, params?: any[]) => {
@@ -89,7 +90,7 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-const JWT_SECRET = "test-secret";
+const JWT_SECRET = TEST_JWT_SECRET;
 
 function getToken(userId: string, role = "DRIVER"): string {
   return jwt.sign({ id: userId, role, username: "driver_user" }, JWT_SECRET, { expiresIn: "1h" });

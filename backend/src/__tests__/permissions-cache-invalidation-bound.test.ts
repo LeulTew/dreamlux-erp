@@ -11,6 +11,7 @@ import { describe, test, expect, beforeEach } from "bun:test";
 import {
   setCachedUserPermissions,
   getCachedUserPermissions,
+  getPermissionCacheRevision,
   invalidateUserCache,
   invalidateAllCache,
   CACHE_TTL_MS,
@@ -54,6 +55,26 @@ describe("permission cache invalidation timestamps stay bounded", () => {
     expect(_invalidationTimestampCount()).toBeLessThanOrEqual(
       INVALIDATION_PRUNE_THRESHOLD + 1,
     );
+  });
+
+  test("leaves bounded headroom after a burst sweep without reviving an old lookup", () => {
+    const start = Date.now();
+    invalidateUserCache("old-lookup", start);
+    const oldRevision = getPermissionCacheRevision("old-lookup");
+    for (let index = 0; index < INVALIDATION_PRUNE_THRESHOLD; index += 1) {
+      invalidateUserCache(`sweep-${index}`, start);
+    }
+    expect(_invalidationTimestampCount()).toBeLessThanOrEqual(
+      Math.floor(INVALIDATION_PRUNE_THRESHOLD / 2) + 1,
+    );
+    expect(getPermissionCacheRevision("old-lookup")).toBeGreaterThan(oldRevision);
+    expect(setCachedUserPermissions(
+      `sweep-${INVALIDATION_PRUNE_THRESHOLD - 1}`, PERMISSIONS, start + 1, start - 1,
+    )).toBe(false);
+    const currentRevision = getPermissionCacheRevision("fresh-lookup");
+    expect(setCachedUserPermissions("fresh-lookup", PERMISSIONS, start + 2)).toBe(true);
+    expect(getPermissionCacheRevision("fresh-lookup")).toBe(currentRevision);
+    expect(getCachedUserPermissions("fresh-lookup", start + 2)).toEqual(PERMISSIONS);
   });
 
   test("reclaims entries once they can no longer reject an in-flight write", () => {

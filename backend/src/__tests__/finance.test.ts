@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeAll, beforeEach } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import ExcelJS from "exceljs";
 
 // Mock the DB pool
@@ -28,7 +29,7 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-const JWT_SECRET = "test-secret";
+const JWT_SECRET = TEST_JWT_SECRET;
 
 function getToken(role = "ACCOUNTANT", extra: Record<string, unknown> = {}): string {
   return jwt.sign({ id: "user-1", role, username: "testuser", ...extra }, JWT_SECRET, { expiresIn: "1h" });

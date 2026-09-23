@@ -6,9 +6,10 @@ import { hash } from "bcryptjs";
 import sharp from "sharp";
 // @ts-expect-error -- uuid types friction in ESM/CJS
 import { v4 as uuidv4 } from "uuid";
-import { getEnv } from "../lib/env";
+import { AuthConfigurationError, getEnv, getProvisioningPasswords } from "../lib/env";
 import { PERMISSION_DEFINITIONS, normalizePermissionSlugs } from "../lib/permissions";
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
+import { ManagerRoleProvisioningError, provisionSystemManagerRole } from "../lib/provision-system-manager-role";
 import { getPublicUrl, uploadImage } from "../storage/storage";
 import { invalidateUserCache, invalidateAllCache } from "../lib/permissions-cache";
 import { NotificationsService } from "../services/notifications-service";
@@ -328,7 +329,7 @@ async function ensureBootstrapAdminViaSupabase(rawPassword: string) {
   };
 }
 
-async function ensureSystemManagerViaSupabase(rawPassword: string) {
+async function ensureSystemManagerViaSupabase(rawPassword: string, actorId: string | null) {
   const { data: existingRoleRows, error: existingRoleError } = await supabase
     .from("roles")
     .select("id, name")
@@ -341,21 +342,7 @@ async function ensureSystemManagerViaSupabase(rawPassword: string) {
 
   let roleRow = (existingRoleRows || [])[0] as { id: string; name: string } | undefined;
   if (!roleRow) {
-    const { data: insertedRole, error: insertedRoleError } = await supabase
-      .from("roles")
-      .insert({
-        name: "SYSTEM_MANAGER",
-        description: "Can manage users and settings",
-        permissions: { settings: "write", users: "write" },
-      })
-      .select("id, name")
-      .single();
-
-    if (insertedRoleError) {
-      throw insertedRoleError;
-    }
-
-    roleRow = insertedRole;
+    roleRow = await provisionSystemManagerRole(actorId);
   }
 
   if (!roleRow) throw new Error("Failed to resolve SYSTEM_MANAGER role");
@@ -1198,11 +1185,19 @@ router.delete("/roles/:id", async (req: AuthRequest, res: Response) => {
 
 // Ensure default admin account is present and active
 router.post("/bootstrap-admin", async (_req: AuthRequest, res: Response) => {
+  let passwords: ReturnType<typeof getProvisioningPasswords>;
   try {
-    const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-    const managerPassword = getEnv("MANAGER_PASSWORD", "manager123");
+    passwords = getProvisioningPasswords();
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[ProvisioningConfiguration]", error.message);
+    res.status(503).json({ error: "Administrator provisioning unavailable" });
+    return;
+  }
+  const { adminPassword, managerPassword } = passwords;
+  try {
     const adminUser = await ensureBootstrapAdmin(adminPassword);
-    const managerUser = await ensureSystemManagerViaSupabase(managerPassword);
+    const managerUser = await ensureSystemManagerViaSupabase(managerPassword, _req.user?.id ?? null);
     res.json({
       ok: true,
       user: {
@@ -1218,12 +1213,16 @@ router.post("/bootstrap-admin", async (_req: AuthRequest, res: Response) => {
       },
     });
   } catch (error) {
+    if (error instanceof ManagerRoleProvisioningError) {
+      res.status(503).json({
+        error: error.message, code: "MANAGER_ROLE_PROVISIONING_UNAVAILABLE", outcome_uncertain: error.uncertain,
+      });
+      return;
+    }
     if (isPoolUnreachable(error) || isMissingColumnError(error)) {
       try {
-        const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-        const managerPassword = getEnv("MANAGER_PASSWORD", "manager123");
         const adminUser = await ensureBootstrapAdminViaSupabase(adminPassword);
-        const managerUser = await ensureSystemManagerViaSupabase(managerPassword);
+        const managerUser = await ensureSystemManagerViaSupabase(managerPassword, _req.user?.id ?? null);
         res.status(200).json({
           ok: true,
           degraded: true,
@@ -1235,6 +1234,12 @@ router.post("/bootstrap-admin", async (_req: AuthRequest, res: Response) => {
         });
         return;
       } catch (fallbackError) {
+        if (fallbackError instanceof ManagerRoleProvisioningError) {
+          res.status(503).json({
+            error: fallbackError.message, code: "MANAGER_ROLE_PROVISIONING_UNAVAILABLE", outcome_uncertain: fallbackError.uncertain,
+          });
+          return;
+        }
         console.error("Admin bootstrap fallback error:", fallbackError);
         res.status(500).json({ error: "Failed to sync default admin account" });
         return;

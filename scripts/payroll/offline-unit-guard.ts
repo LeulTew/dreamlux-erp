@@ -2,12 +2,13 @@ import { afterAll, expect, mock } from "bun:test";
 import http from "node:http";
 import net from "node:net";
 import tls from "node:tls";
+import { TEST_ADMIN_PASSWORD, TEST_JWT_SECRET, TEST_MANAGER_PASSWORD } from "../../backend/src/__tests__/auth-test-config";
 
 for (const name of Object.keys(process.env)) {
-  if (/^(?:DATABASE|DIRECT_DATABASE|PG|POSTGRES|PGRST|SUPABASE|NEXT_PUBLIC_|JWT|ADMIN_PASSWORD|DREAMLUX_NATIVE_|DREAMLUX_TEST_|DREAMLUX_BACKUP_|DREAMLUX_STORAGE_|DREAMLUX_EQUIPMENT_)/i.test(name)) delete process.env[name];
+  if (/^(?:DATABASE|DIRECT_DATABASE|PG|POSTGRES|PGRST|SUPABASE|NEXT_PUBLIC_|JWT|ADMIN_PASSWORD|MANAGER_PASSWORD|DREAMLUX_NATIVE_|DREAMLUX_TEST_|DREAMLUX_BACKUP_|DREAMLUX_STORAGE_|DREAMLUX_EQUIPMENT_)/i.test(name)) delete process.env[name];
 }
 Object.assign(process.env, {
-  NODE_ENV: "test", JWT_SECRET: "test-secret", ADMIN_PASSWORD: "test-password",
+  NODE_ENV: "test", JWT_SECRET: TEST_JWT_SECRET, ADMIN_PASSWORD: TEST_ADMIN_PASSWORD, MANAGER_PASSWORD: TEST_MANAGER_PASSWORD,
   DATABASE_URL: "postgresql://synthetic:synthetic@127.0.0.1:1/dreamlux_unit_only",
   SUPABASE_URL: "http://127.0.0.1:1", SUPABASE_SERVICE_ROLE_KEY: "synthetic-offline-unit-key",
 });

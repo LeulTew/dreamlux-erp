@@ -26,6 +26,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
+      - name: Restore locked package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-dreamlux-packages-${{ hashFiles('backend/bun.lock', 'frontend/bun.lock') }}
       - name: Install dependencies
         run: cd backend && bun install --frozen-lockfile
       - name: Verify temporary production release hold
@@ -34,14 +39,12 @@ jobs:
         run: bun --no-env-file test scripts/payroll scripts/equipment scripts/imports backend/src/db/testing/dreamlux-native-target.test.ts backend/src/db/testing/dreamlux-import-fixture.test.ts
       - name: Run tests
         run: cd backend && bun --no-env-file test --timeout=30000 --preload ../scripts/payroll/offline-unit-guard.ts
-        env:
-          JWT_SECRET: test-secret
-          ADMIN_PASSWORD: test-password
-          SUPABASE_URL: https://test.supabase.co
-          SUPABASE_SERVICE_ROLE_KEY: test-key
-          DATABASE_URL: postgresql://localhost:5432/test
       - name: Verify synthetic Storage backup workflow
         run: bun run test:storage
+      - name: Install frontend quality dependencies
+        run: bun install --cwd frontend --frozen-lockfile
+      - name: Isolated frontend lint and complete unit inventory
+        run: bun --no-env-file scripts/payroll/build-ui.ts --lint-and-test
 
   frontend-build:
     name: Frontend lint, tests, and build
@@ -54,10 +57,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
+      - name: Restore locked package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-dreamlux-packages-${{ hashFiles('backend/bun.lock', 'frontend/bun.lock') }}
       - name: Install dependencies
         run: cd frontend && bun install --frozen-lockfile
-      - name: Isolated frontend lint, types, tests, and build
-        run: bun --no-env-file scripts/payroll/build-ui.ts --checks --output .qa-payroll-build
+      - name: Isolated frontend standalone types and build
+        run: bun --no-env-file scripts/payroll/build-ui.ts --typecheck --output .qa-payroll-build
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:5326
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54335
