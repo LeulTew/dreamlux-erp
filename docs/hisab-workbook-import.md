@@ -51,6 +51,41 @@ SUM verification in LeulTew/koti-catering#363. DreamLux keeps its
 own authentication, schema, configuration, data and deployments. No Koti
 environment, migration baseline or provider connection is copied.
 
+## Commit acknowledgement
+
+Committing a workbook, like every operational-expense, overhead, month-closure
+and capital-investment write, runs through one shared finance transaction
+(`backend/src/lib/finance-transaction.ts`). Each business insert, update or
+soft-delete must acknowledge exactly the rows it targets, and the required
+`activity_logs` audit row must acknowledge exactly one row; a suppressed or
+failed write rolls the whole commit back and returns `outcome_uncertain: false`.
+
+If the `COMMIT` acknowledgement itself is lost, the API returns `503` with
+`code: "FINANCE_OUTCOME_UNCERTAIN"` and `outcome_uncertain: true`, discards the
+connection and never retries. The finance pages refresh their registers on
+that response instead of resubmitting. For imports, retrying is still safe:
+the workbook fingerprint makes an already-committed batch return `409`. This
+matches LeulTew/koti-catering#404.
+
+## Closed overhead months
+
+Closing an overhead month freezes that month's overhead register only;
+operational expenses, investments, payroll and event expenses dated in the same
+month stay writable. A workbook whose overhead rows fall in a closed month is
+refused as a whole with `409`, naming the months, so a mixed-month import never
+commits partially. Preview reports the same closed months as blocking errors,
+which disables Commit until the month is reopened or those rows are removed.
+
+Every overhead writer (create, edit or move, review, delete, workbook import)
+takes a shared per-month advisory lock before checking closure, and close/reopen
+take it exclusively. A close therefore waits for in-flight writes to finish,
+and a write that starts during a close sees the committed closure. Writers take
+any overhead row lock first and then the month locks in ascending order, so
+moves and multi-month imports cannot deadlock each other. Stored `DATE` months
+are read by their calendar day, so the lock and closure keys stay correct when
+the backend runs east of UTC (for example Africa/Addis_Ababa).
+This matches LeulTew/koti-catering#405.
+
 ## Verification
 
 - `hisab-formula-transactions.test.ts` verifies real synthetic workbook parsing,
@@ -66,8 +101,17 @@ environment, migration baseline or provider connection is copied.
   routes and PostgreSQL verify amounts/status/provenance, mapping gates,
   historical duplicates, permission denial and audit rollback. All other
   network destinations are refused.
+  A second isolated process, `finance-audit-acknowledgement.integration.test.ts`,
+  uses the same boundary to suppress audit and business rows across every
+  finance mutation family, lose `BEGIN`/`COMMIT`/`ROLLBACK` acknowledgements,
+  fail connection acquisition, and race concurrent writes and month closures,
+  checking the complete persisted finance, stock and audit state each time.
+  Its month-closure cases hold a rival close or write open until the API is
+  observed waiting on the month lock, covering create, move, review, delete,
+  mixed-month import and close-behind-write interleavings.
   The local CI receipt requires all 12 native import cases, including the
-  wide sparse subtotal, with no skips, failures or unhandled runner errors.
+  wide sparse subtotal, then all 28 finance audit and month-closure cases, in that order, with
+  no skips, failures or unhandled runner errors.
 - `bun run verify:payroll:build -- --checks --output .qa-payroll-build` produces
   the existing source-isolated, credential-free frontend artifact.
 - `bun run verify:imports:browser -- --frontend-build .qa-payroll-build` reuses

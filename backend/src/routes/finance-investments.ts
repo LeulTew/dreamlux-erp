@@ -6,6 +6,13 @@ import { pool } from "../db/pool";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { insertFinanceAuditLog, roundMoney, toDateString } from "../lib/finance-audit";
 import {
+  FinanceMutationError,
+  acknowledgeRow,
+  acknowledgeRows,
+  runFinanceTransaction,
+  sendFinanceMutationFailure,
+} from "../lib/finance-transaction";
+import {
   createCapitalInvestmentSchema,
   updateCapitalInvestmentSchema,
   rejectCapitalInvestmentSchema,
@@ -17,6 +24,7 @@ import {
 
 const router = Router();
 const INVESTMENT_ENTITY_TYPE = "capital_investment";
+const INVESTMENT_SUBJECT = "Capital investment change";
 const INVESTMENT_SORT_SQL: Record<string, string> = {
   purchase_date: "ci.purchase_date",
   created_at: "ci.created_at",
@@ -110,13 +118,7 @@ type StockApplication = {
   quantity_after: number;
 };
 
-class StockApplicationError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
+class StockApplicationError extends FinanceMutationError {}
 
 /**
  * Apply a stock-creating investment to its linked item exactly once (issue #172).
@@ -167,17 +169,21 @@ async function applyInvestmentStock(
   const noteParts = [`Approved capital investment: ${investment.item_name}`];
   if (investment.vendor) noteParts.push(`vendor: ${investment.vendor}`);
 
-  const movementResult = await client.query(
+  const movement = acknowledgeRow(await client.query(
     `INSERT INTO inventory_movements
        (item_id, quantity_delta, quantity_before, quantity_after, source_type, source_id, notes, created_by)
      VALUES ($1, $2, $3, $4, 'capital_investment', $5, $6, $7)
      RETURNING id`,
     [item.id, quantity, quantityBefore, quantityAfter, investment.id, noteParts.join(" | "), userId],
+  ), "Investment stock movement");
+  acknowledgeRows(
+    await client.query("UPDATE items SET quantity = $2, updated_at = NOW() WHERE id = $1", [item.id, quantityAfter]),
+    1,
+    "Investment stock update",
   );
-  await client.query("UPDATE items SET quantity = $2, updated_at = NOW() WHERE id = $1", [item.id, quantityAfter]);
 
   return {
-    movement_id: movementResult.rows[0].id,
+    movement_id: movement.id,
     item_id: item.id,
     item_name: item.name,
     quantity_delta: quantity,
@@ -382,58 +388,51 @@ router.post(
   "/",
   requirePermissionSlugs(["finance:investments:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    const validationResult = createCapitalInvestmentSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    const input = validationResult.data;
     try {
-      const validationResult = createCapitalInvestmentSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
-      }
-      const input = validationResult.data;
-      if (!(await assetExists(client, input.asset_id))) {
-        res.status(400).json({ error: "Linked asset was not found" });
-        return;
-      }
-
-      await client.query("BEGIN");
-      const insertResult = await client.query(
-        `INSERT INTO capital_investments
-           (purchase_date, item_name, category, quantity, unit, unit_cost, vendor, notes,
-            capex_classification, asset_id, creates_inventory_stock, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         RETURNING *`,
-        [
-          input.purchase_date,
-          input.item_name,
-          input.category,
-          input.quantity,
-          input.unit,
-          input.unit_cost,
-          input.vendor ?? null,
-          input.notes ?? null,
-          input.capex_classification,
-          input.asset_id ?? null,
-          input.creates_inventory_stock,
-          req.user?.id || null,
-        ],
-      );
-      const investment = insertResult.rows[0];
-      await insertFinanceAuditLog(client, {
-        entityType: INVESTMENT_ENTITY_TYPE,
-        entityId: investment.id,
-        userId: req.user?.id || null,
-        action: "create",
-        newValue: describeInvestment(investment),
-        note: investment.notes,
+      const investment = await runFinanceTransaction({ subject: INVESTMENT_SUBJECT }, async (client) => {
+        if (!(await assetExists(client, input.asset_id))) {
+          throw new FinanceMutationError(400, "Linked asset was not found");
+        }
+        const created = acknowledgeRow(await client.query(
+          `INSERT INTO capital_investments
+             (purchase_date, item_name, category, quantity, unit, unit_cost, vendor, notes,
+              capex_classification, asset_id, creates_inventory_stock, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           RETURNING *`,
+          [
+            input.purchase_date,
+            input.item_name,
+            input.category,
+            input.quantity,
+            input.unit,
+            input.unit_cost,
+            input.vendor ?? null,
+            input.notes ?? null,
+            input.capex_classification,
+            input.asset_id ?? null,
+            input.creates_inventory_stock,
+            req.user?.id || null,
+          ],
+        ), "Capital investment creation");
+        await insertFinanceAuditLog(client, {
+          entityType: INVESTMENT_ENTITY_TYPE,
+          entityId: created.id,
+          userId: req.user?.id || null,
+          action: "create",
+          newValue: describeInvestment(created),
+          note: created.notes,
+        });
+        return created;
       });
-      await client.query("COMMIT");
       res.status(201).json({ investment: formatInvestmentRow(investment) });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-investments-create] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-investments-create", error);
     }
   },
 );
@@ -443,108 +442,90 @@ router.patch(
   "/:id",
   requirePermissionSlugs(["finance:investments:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    const validationResult = updateCapitalInvestmentSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    const input = validationResult.data;
     try {
-      const validationResult = updateCapitalInvestmentSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
-      }
-      const input = validationResult.data;
-
-      await client.query("BEGIN");
-      const existingResult = await client.query(
-        "SELECT * FROM capital_investments WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-        [req.params.id],
-      );
-      if (existingResult.rowCount === 0) {
-        await client.query("ROLLBACK");
-        res.status(404).json({ error: "Capital investment not found" });
-        return;
-      }
-      const existing = existingResult.rows[0];
-      if (existing.status === "Approved") {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: "Approved capital investments are locked and cannot be edited" });
-        return;
-      }
-      const hasKey = (key: string) => Object.prototype.hasOwnProperty.call(req.body ?? {}, key);
-      const nextAssetId = hasKey("asset_id") ? input.asset_id ?? null : existing.asset_id;
-      if (!(await assetExists(client, nextAssetId))) {
-        await client.query("ROLLBACK");
-        res.status(400).json({ error: "Linked asset was not found" });
-        return;
-      }
-
-      // Issue #172: validate the MERGED row for stock-creation rules (a partial
-      // patch could otherwise strip the asset link or introduce a fractional
-      // quantity on a stock-creating purchase).
-      const nextCreatesStock = input.creates_inventory_stock ?? existing.creates_inventory_stock;
-      const nextQuantity = input.quantity ?? Number(existing.quantity);
-      if (nextCreatesStock) {
-        if (!nextAssetId) {
-          await client.query("ROLLBACK");
-          res.status(400).json({ error: "A linked inventory item is required when the purchase creates stock" });
-          return;
+      const updated = await runFinanceTransaction({ subject: INVESTMENT_SUBJECT }, async (client) => {
+        const existingResult = await client.query(
+          "SELECT * FROM capital_investments WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [req.params.id],
+        );
+        if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Capital investment not found");
+        const existing = existingResult.rows[0];
+        if (existing.status === "Approved") {
+          throw new FinanceMutationError(409, "Approved capital investments are locked and cannot be edited");
         }
-        if (!Number.isInteger(Number(nextQuantity))) {
-          await client.query("ROLLBACK");
-          res.status(400).json({ error: "Stock-creating purchases must use a whole-number quantity" });
-          return;
+        const hasKey = (key: string) => Object.prototype.hasOwnProperty.call(req.body ?? {}, key);
+        const nextAssetId = hasKey("asset_id") ? input.asset_id ?? null : existing.asset_id;
+        if (!(await assetExists(client, nextAssetId))) {
+          throw new FinanceMutationError(400, "Linked asset was not found");
         }
-      }
 
-      const updateResult = await client.query(
-        `UPDATE capital_investments
-         SET purchase_date = COALESCE($2, purchase_date),
-             item_name = COALESCE($3, item_name),
-             category = COALESCE($4, category),
-             quantity = COALESCE($5, quantity),
-             unit = COALESCE($6, unit),
-             unit_cost = COALESCE($7, unit_cost),
-             vendor = $8,
-             notes = $9,
-             capex_classification = COALESCE($10, capex_classification),
-             asset_id = $11,
-             creates_inventory_stock = COALESCE($12, creates_inventory_stock),
-             status = 'Pending',
-             rejected_reason = NULL,
-             updated_at = NOW()
-         WHERE id = $1
-         RETURNING *`,
-        [
-          req.params.id,
-          input.purchase_date ?? null,
-          input.item_name ?? null,
-          input.category ?? null,
-          input.quantity ?? null,
-          input.unit ?? null,
-          input.unit_cost ?? null,
-          hasKey("vendor") ? input.vendor ?? null : existing.vendor,
-          hasKey("notes") ? input.notes ?? null : existing.notes,
-          input.capex_classification ?? null,
-          nextAssetId,
-          input.creates_inventory_stock ?? null,
-        ],
-      );
-      const updated = updateResult.rows[0];
-      await insertFinanceAuditLog(client, {
-        entityType: INVESTMENT_ENTITY_TYPE,
-        entityId: updated.id,
-        userId: req.user?.id || null,
-        action: "update",
-        oldValue: `${describeInvestment(existing)} [${existing.status}]`,
-        newValue: `${describeInvestment(updated)} [Pending]`,
-        note: updated.notes,
+        // Issue #172: validate the MERGED row for stock-creation rules (a partial
+        // patch could otherwise strip the asset link or introduce a fractional
+        // quantity on a stock-creating purchase).
+        const nextCreatesStock = input.creates_inventory_stock ?? existing.creates_inventory_stock;
+        const nextQuantity = input.quantity ?? Number(existing.quantity);
+        if (nextCreatesStock) {
+          if (!nextAssetId) {
+            throw new FinanceMutationError(400, "A linked inventory item is required when the purchase creates stock");
+          }
+          if (!Number.isInteger(Number(nextQuantity))) {
+            throw new FinanceMutationError(400, "Stock-creating purchases must use a whole-number quantity");
+          }
+        }
+
+        const changed = acknowledgeRow(await client.query(
+          `UPDATE capital_investments
+           SET purchase_date = COALESCE($2, purchase_date),
+               item_name = COALESCE($3, item_name),
+               category = COALESCE($4, category),
+               quantity = COALESCE($5, quantity),
+               unit = COALESCE($6, unit),
+               unit_cost = COALESCE($7, unit_cost),
+               vendor = $8,
+               notes = $9,
+               capex_classification = COALESCE($10, capex_classification),
+               asset_id = $11,
+               creates_inventory_stock = COALESCE($12, creates_inventory_stock),
+               status = 'Pending',
+               rejected_reason = NULL,
+               updated_at = NOW()
+           WHERE id = $1
+           RETURNING *`,
+          [
+            req.params.id,
+            input.purchase_date ?? null,
+            input.item_name ?? null,
+            input.category ?? null,
+            input.quantity ?? null,
+            input.unit ?? null,
+            input.unit_cost ?? null,
+            hasKey("vendor") ? input.vendor ?? null : existing.vendor,
+            hasKey("notes") ? input.notes ?? null : existing.notes,
+            input.capex_classification ?? null,
+            nextAssetId,
+            input.creates_inventory_stock ?? null,
+          ],
+        ), "Capital investment update");
+        await insertFinanceAuditLog(client, {
+          entityType: INVESTMENT_ENTITY_TYPE,
+          entityId: changed.id,
+          userId: req.user?.id || null,
+          action: "update",
+          oldValue: `${describeInvestment(existing)} [${existing.status}]`,
+          newValue: `${describeInvestment(changed)} [Pending]`,
+          note: changed.notes,
+        });
+        return changed;
       });
-      await client.query("COMMIT");
       res.json({ investment: formatInvestmentRow(updated) });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-investments-update] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-investments-update", error);
     }
   },
 );
@@ -554,127 +535,110 @@ router.delete(
   "/:id",
   requirePermissionSlugs(["finance:investments:approve"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
     try {
-      await client.query("BEGIN");
-      const existingResult = await client.query(
-        "SELECT * FROM capital_investments WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-        [req.params.id],
-      );
-      if (existingResult.rowCount === 0) {
-        await client.query("ROLLBACK");
-        res.status(404).json({ error: "Capital investment not found" });
-        return;
-      }
-      const existing = existingResult.rows[0];
-      if (existing.status === "Approved") {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: "Approved capital investments are locked and cannot be deleted" });
-        return;
-      }
-      await client.query("UPDATE capital_investments SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1", [req.params.id]);
-      await insertFinanceAuditLog(client, {
-        entityType: INVESTMENT_ENTITY_TYPE,
-        entityId: existing.id,
-        userId: req.user?.id || null,
-        action: "delete",
-        oldValue: describeInvestment(existing),
-        note: existing.notes,
+      await runFinanceTransaction({ subject: INVESTMENT_SUBJECT }, async (client) => {
+        const existingResult = await client.query(
+          "SELECT * FROM capital_investments WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [req.params.id],
+        );
+        if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Capital investment not found");
+        const existing = existingResult.rows[0];
+        if (existing.status === "Approved") {
+          throw new FinanceMutationError(409, "Approved capital investments are locked and cannot be deleted");
+        }
+        acknowledgeRows(
+          await client.query("UPDATE capital_investments SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1", [req.params.id]),
+          1,
+          "Capital investment deletion",
+        );
+        await insertFinanceAuditLog(client, {
+          entityType: INVESTMENT_ENTITY_TYPE,
+          entityId: existing.id,
+          userId: req.user?.id || null,
+          action: "delete",
+          oldValue: describeInvestment(existing),
+          note: existing.notes,
+        });
       });
-      await client.query("COMMIT");
       res.json({ deleted: true });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-investments-delete] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-investments-delete", error);
     }
   },
 );
 
+// Database-level idempotency backstop: a movement for this investment already
+// exists (e.g. a racing approval that won).
+function classifyStockApplicationConflict(error: unknown): FinanceMutationError | null {
+  if (!error || typeof error !== "object") return null;
+  const { code, constraint } = error as { code?: unknown; constraint?: unknown };
+  if (code !== "23505" || !String(constraint || "").includes("inventory_movements")) return null;
+  return new FinanceMutationError(409, "Stock has already been applied for this investment", { cause: error });
+}
+
 async function reviewInvestment(req: AuthRequest, res: Response, decision: "Approved" | "Rejected"): Promise<void> {
-  const client = await pool.connect();
+  let rejectedReason: string | null = null;
+  if (decision === "Rejected") {
+    const validationResult = rejectCapitalInvestmentSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    rejectedReason = validationResult.data.rejected_reason;
+  }
   try {
-    let rejectedReason: string | null = null;
-    if (decision === "Rejected") {
-      const validationResult = rejectCapitalInvestmentSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
-      }
-      rejectedReason = validationResult.data.rejected_reason;
-    }
+    const reviewed = await runFinanceTransaction(
+      { subject: INVESTMENT_SUBJECT, classify: classifyStockApplicationConflict },
+      async (client) => {
+        const existingResult = await client.query(
+          "SELECT * FROM capital_investments WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [req.params.id],
+        );
+        if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Capital investment not found");
+        const existing = existingResult.rows[0];
+        if (existing.status !== "Pending") {
+          throw new FinanceMutationError(409, `Only pending capital investments can be reviewed (current status: ${existing.status})`);
+        }
 
-    await client.query("BEGIN");
-    const existingResult = await client.query(
-      "SELECT * FROM capital_investments WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-      [req.params.id],
+        // Issue #172: approving a stock-creating purchase applies the quantity to
+        // the linked item exactly once, inside this same transaction. Rejection and
+        // non-stock approvals never touch inventory.
+        let stockApplication: StockApplication | null = null;
+        if (decision === "Approved" && existing.creates_inventory_stock) {
+          stockApplication = await applyInvestmentStock(client, existing, req.user?.id || null);
+        }
+
+        const investment = acknowledgeRow(await client.query(
+          `UPDATE capital_investments
+           SET status = $2,
+               rejected_reason = $3,
+               approved_by = $4,
+               approved_at = NOW(),
+               stock_applied_at = CASE WHEN $5::boolean THEN NOW() ELSE stock_applied_at END,
+               stock_applied_by = CASE WHEN $5::boolean THEN $4 ELSE stock_applied_by END,
+               updated_at = NOW()
+           WHERE id = $1
+           RETURNING *`,
+          [req.params.id, decision, rejectedReason, req.user?.id || null, stockApplication !== null],
+        ), "Capital investment review");
+        await insertFinanceAuditLog(client, {
+          entityType: INVESTMENT_ENTITY_TYPE,
+          entityId: investment.id,
+          userId: req.user?.id || null,
+          action: decision === "Approved" ? "approve" : "reject",
+          fieldChanged: "status",
+          oldValue: "Pending",
+          newValue: stockApplication
+            ? `${decision} (stock applied: +${stockApplication.quantity_delta} to item ${stockApplication.item_id}, ${stockApplication.quantity_before} -> ${stockApplication.quantity_after})`
+            : decision,
+          note: rejectedReason,
+        });
+        return { investment, stockApplication };
+      },
     );
-    if (existingResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Capital investment not found" });
-      return;
-    }
-    const existing = existingResult.rows[0];
-    if (existing.status !== "Pending") {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: `Only pending capital investments can be reviewed (current status: ${existing.status})` });
-      return;
-    }
-
-    // Issue #172: approving a stock-creating purchase applies the quantity to
-    // the linked item exactly once, inside this same transaction. Rejection and
-    // non-stock approvals never touch inventory.
-    let stockApplication: StockApplication | null = null;
-    if (decision === "Approved" && existing.creates_inventory_stock) {
-      stockApplication = await applyInvestmentStock(client, existing, req.user?.id || null);
-    }
-
-    const updateResult = await client.query(
-      `UPDATE capital_investments
-       SET status = $2,
-           rejected_reason = $3,
-           approved_by = $4,
-           approved_at = NOW(),
-           stock_applied_at = CASE WHEN $5::boolean THEN NOW() ELSE stock_applied_at END,
-           stock_applied_by = CASE WHEN $5::boolean THEN $4 ELSE stock_applied_by END,
-           updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [req.params.id, decision, rejectedReason, req.user?.id || null, stockApplication !== null],
-    );
-    const updated = updateResult.rows[0];
-    await insertFinanceAuditLog(client, {
-      entityType: INVESTMENT_ENTITY_TYPE,
-      entityId: updated.id,
-      userId: req.user?.id || null,
-      action: decision === "Approved" ? "approve" : "reject",
-      fieldChanged: "status",
-      oldValue: "Pending",
-      newValue: stockApplication
-        ? `${decision} (stock applied: +${stockApplication.quantity_delta} to item ${stockApplication.item_id}, ${stockApplication.quantity_before} -> ${stockApplication.quantity_after})`
-        : decision,
-      note: rejectedReason,
-    });
-    await client.query("COMMIT");
-    res.json({ investment: formatInvestmentRow(updated), stock_application: stockApplication });
-  } catch (error: any) {
-    await client.query("ROLLBACK");
-    if (error instanceof StockApplicationError) {
-      res.status(error.status).json({ error: error.message });
-      return;
-    }
-    if (error?.code === "23505" && String(error?.constraint || "").includes("inventory_movements")) {
-      // Database-level idempotency backstop: a movement for this investment
-      // already exists (e.g. a racing approval that won).
-      res.status(409).json({ error: "Stock has already been applied for this investment" });
-      return;
-    }
-    console.error(`[finance-investments-${decision.toLowerCase()}] Error:`, error);
-    res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
+    res.json({ investment: formatInvestmentRow(reviewed.investment), stock_application: reviewed.stockApplication });
+  } catch (error: unknown) {
+    sendFinanceMutationFailure(res, `finance-investments-${decision.toLowerCase()}`, error);
   }
 }
 
