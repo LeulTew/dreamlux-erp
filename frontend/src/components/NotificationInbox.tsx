@@ -26,6 +26,7 @@ import {
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
+    "Open notifications": "Open notifications",
     Notifications: "Notifications",
     "Mark all read": "Mark all read",
     "View all": "View all",
@@ -35,6 +36,7 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     Enable: "Enable",
   },
   am: {
+    "Open notifications": "ማሳወቂያዎችን ክፈት",
     Notifications: "ማሳወቂያዎች",
     "Mark all read": "ሁሉንም አንብቤያለሁ",
     "View all": "ሁሉንም አሳይ",
@@ -237,9 +239,10 @@ export default function NotificationInbox() {
   return (
     <div className="relative flex items-center" ref={dropdownRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card-alt/50 text-muted hover:text-foreground hover:bg-card-alt hover:border-primary/30 transition-all cursor-pointer shrink-0"
-        aria-label="Open notifications"
+        className="relative flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-card-alt/50 text-muted [@media(hover:hover)_and_(pointer:fine)]:hover:text-foreground [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary cursor-pointer shrink-0"
+        aria-label={t("Open notifications")}
       >
         {unreadCount > 0 ? (
           <>

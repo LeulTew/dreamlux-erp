@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useId } from "react";
+import { Dialog, Popover } from "radix-ui";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getEmployees, getEvents, getItems, getPayrollRuns, getSalaryLevels, api } from "@/lib/api";
@@ -12,6 +13,7 @@ import PwaLifecycle from "@/components/PwaLifecycle";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useTheme } from "@/hooks/use-theme";
 import { useLanguage } from "@/hooks/use-language";
+import { useModalFocus } from "@/hooks/use-modal-focus";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { clearAuthSessionStorage } from "@/lib/auth-session";
@@ -23,12 +25,33 @@ import {
   HiOutlineUser,
   HiOutlineInformationCircle,
   HiArrowsRightLeft,
-  HiMagnifyingGlass
+  HiMagnifyingGlass,
+  HiXMark,
 } from "react-icons/hi2";
 import UserAvatar from "@/components/UserAvatar";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
+    Search: "Search",
+    "Search...": "Search...",
+    "Search (Ctrl+K)": "Search (Ctrl+K)",
+    "Close search": "Close search",
+    "Profile menu": "Profile menu",
+    "Toggle Sidebar": "Toggle Sidebar",
+    User: "User",
+    Dark: "Dark",
+    Light: "Light",
+    HR: "HR",
+    Events: "Events",
+    Finance: "Finance",
+    Inventory: "Inventory",
+    Admin: "Admin",
+    Employee: "Employee",
+    Asset: "Asset",
+    Event: "Event",
+    Salary: "Salary",
+    Payroll: "Payroll",
+    Qty: "Qty",
     "Sign Out": "Sign Out",
     Cancel: "Cancel",
     "Are you sure you want to sign out?": "Are you sure you want to sign out?",
@@ -42,13 +65,31 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "About Dream Lux ERP": "About Dream Lux ERP",
     "Dream Lux ERP Description": "Enterprise Resource Planning for premium event logistics, HR, payroll, and asset management.",
     Close: "Close",
-    Version: "Version",
-    "Database Status": "Database Connected",
     "Preview Mode: Active": "Preview Mode: Active",
     "Viewing as": "Viewing as",
     "Exit Preview": "Exit Preview",
   },
   am: {
+    Search: "ፈልግ",
+    "Search...": "ፈልግ...",
+    "Search (Ctrl+K)": "ፈልግ (Ctrl+K)",
+    "Close search": "ፍለጋውን ዝጋ",
+    "Profile menu": "የመገለጫ ምናሌ",
+    "Toggle Sidebar": "የጎን ምናሌ ቀይር",
+    User: "ተጠቃሚ",
+    Dark: "ጨለማ",
+    Light: "ብርሃን",
+    HR: "የሰው ኃይል",
+    Events: "ዝግጅቶች",
+    Finance: "ፋይናንስ",
+    Inventory: "ዕቃዎች",
+    Admin: "አስተዳደር",
+    Employee: "ሰራተኛ",
+    Asset: "ዕቃ",
+    Event: "ዝግጅት",
+    Salary: "ደመወዝ",
+    Payroll: "የደመወዝ ክፍያ",
+    Qty: "ብዛት",
     "Sign Out": "ውጣ",
     Cancel: "ተመለስ",
     "Are you sure you want to sign out?": "በእርግጥ መውጣት ይፈልጋሉ?",
@@ -62,8 +103,6 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "About Dream Lux ERP": "ስለ ድሪም ላክስ ERP",
     "Dream Lux ERP Description": "የላቀ የዝግጅት ዝግጅት፣ የሰው ኃይል አስተዳደር፣ የደመወዝ እና የንብረት ቁጥጥር አስተዳደር ሲስተም።",
     Close: "ዝጋ",
-    Version: "ስሪት",
-    "Database Status": "ዳታቤዝ ተገናኝቷል",
     "Preview Mode: Active": "የቅድመ እይታ ሁነታ፡ ንቁ",
     "Viewing as": "በዚህ በመመልከት ላይ፡",
     "Exit Preview": "ከቅድመ እይታ ውጣ",
@@ -101,6 +140,7 @@ type SearchResult = {
   href: string;
   category: string;
   detail?: string;
+  amDetail?: string;
 };
 
 const toPageResult = (item: StaticSearchItem): SearchResult => ({
@@ -114,24 +154,68 @@ const toPageResult = (item: StaticSearchItem): SearchResult => ({
 const compactDetail = (values: Array<string | number | null | undefined>) =>
   values.filter((value) => value !== null && value !== undefined && String(value).trim().length > 0).join(" · ");
 
+const HEADER_FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+const PROFILE_ACTION = `flex min-h-12 w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-foreground transition-colors motion-reduce:transition-none [@media(hover:hover)_and_(pointer:fine)]:hover:bg-sidebar-accent ${HEADER_FOCUS}`;
+
+function HeaderDialog({
+  isOpen, onClose, title, description, getReturnFocus, children,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  description: string;
+  getReturnFocus: () => HTMLElement | null;
+  children: React.ReactNode;
+}) {
+  const modalFocus = useModalFocus(getReturnFocus);
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-70 bg-black/40 no-print" />
+        <Dialog.Content {...modalFocus}
+          className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-70 max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-xl border border-border bg-card p-5 text-center sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%_-_2rem)] sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 no-print">
+          <Dialog.Title className="text-lg font-bold text-foreground">{title}</Dialog.Title>
+          <Dialog.Description className="mt-2 text-sm leading-relaxed text-muted">{description}</Dialog.Description>
+          {children}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function SearchDialog({
   isOpen,
   onClose,
   lang,
+  getReturnFocus,
 }: {
   isOpen: boolean;
   onClose: () => void;
   lang: string;
+  getReturnFocus: () => HTMLElement | null;
 }) {
   const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [recordResults, setRecordResults] = useState<SearchResult[]>([]);
   const [isSearchingRecords, setIsSearchingRecords] = useState(false);
   const [recordSearchError, setRecordSearchError] = useState(false);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const modalFocus = useModalFocus(getReturnFocus);
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const { hasPermission } = useAuth();
+  const canSearchEmployees = hasPermission("hr:read") || hasPermission("hr:write");
+  const canSearchAssets = hasPermission("assets:read");
+  const canSearchEvents = hasPermission("events:read");
+  const canSearchSalaryLevels = hasPermission("salary-levels:manage");
+  const canSearchPayroll = hasPermission("payroll:read") || hasPermission("payroll:write");
+  const recordPermissions: Record<string, boolean> = {
+    Employee: canSearchEmployees, Asset: canSearchAssets, Event: canSearchEvents,
+    Salary: canSearchSalaryLevels, Payroll: canSearchPayroll,
+  };
 
   const pageResults = SEARCH_ITEMS.filter((item) => {
     // Unified permission check
@@ -148,21 +232,26 @@ function SearchDialog({
     );
   }).map(toPageResult);
 
-  const filtered = [...recordResults, ...pageResults].slice(0, 12);
+  const filtered = [...recordResults.filter((result) => recordPermissions[result.category]), ...pageResults].slice(0, 12);
+  const activeResult = filtered.find((result) => result.key === activeKey) ?? filtered[0];
+  const activeIndex = Math.max(0, filtered.findIndex((result) => result === activeResult));
+  const resultId = (key: string) => `${listboxId}-result-${encodeURIComponent(key)}`;
+  const activeDescendant = activeResult ? resultId(activeResult.key) : undefined;
+  const resultLayoutKey = JSON.stringify(filtered.map((result) => [
+    result.key, lang === "am" ? result.amLabel : result.label,
+    (lang === "am" ? result.amDetail ?? result.detail : result.detail) || result.href,
+    t(result.category),
+  ]));
 
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => {
-        setQuery("");
-        setDebouncedQuery("");
-        setRecordResults([]);
-        setRecordSearchError(false);
-        setSelectedIndex(0);
-        inputRef.current?.focus();
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
+  useLayoutEffect(() => {
+    const viewport = resultsRef.current;
+    const result = activeDescendant ? document.getElementById(activeDescendant) : null;
+    if (!viewport || !result) return;
+    const bounds = viewport.getBoundingClientRect();
+    const resultBounds = result.getBoundingClientRect();
+    if (resultBounds.top < bounds.top) viewport.scrollTop -= bounds.top - resultBounds.top;
+    else if (resultBounds.bottom > bounds.bottom) viewport.scrollTop += resultBounds.bottom - bounds.bottom;
+  }, [activeDescendant, resultLayoutKey]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -187,19 +276,19 @@ function SearchDialog({
     let active = true;
 
     const promises = [
-      hasPermission("hr:read") || hasPermission("hr:write")
+      canSearchEmployees
         ? getEmployees(1, 5, debouncedQuery, "active").then((res) => ({ type: "employees", value: res }))
         : Promise.resolve({ type: "employees", value: null }),
-      hasPermission("assets:read")
+      canSearchAssets
         ? getItems(1, 5, debouncedQuery).then((res) => ({ type: "assets", value: res }))
         : Promise.resolve({ type: "assets", value: null }),
-      hasPermission("events:read")
+      canSearchEvents
         ? getEvents(1, 5, debouncedQuery).then((res) => ({ type: "events", value: res }))
         : Promise.resolve({ type: "events", value: null }),
-      hasPermission("salary-levels:manage")
+      canSearchSalaryLevels
         ? getSalaryLevels().then((res) => ({ type: "salaryLevels", value: res }))
         : Promise.resolve({ type: "salaryLevels", value: null }),
-      hasPermission("payroll:read") || hasPermission("payroll:write")
+      canSearchPayroll
         ? getPayrollRuns({ view: "active", limit: 20 }).then((res) => ({ type: "payroll", value: res }))
         : Promise.resolve({ type: "payroll", value: null }),
     ];
@@ -236,7 +325,8 @@ function SearchDialog({
               amLabel: item.name,
               href: `/assets?q=${encodeURIComponent(item.name)}`,
               category: "Asset",
-              detail: compactDetail([item.store?.name, `Qty ${item.quantity}`]),
+              detail: compactDetail([item.store?.name, `${TRANSLATIONS.en.Qty} ${item.quantity}`]),
+              amDetail: compactDetail([item.store?.name, `${TRANSLATIONS.am.Qty} ${item.quantity}`]),
             }))
           );
         }
@@ -289,8 +379,8 @@ function SearchDialog({
           nextResults.push(
             ...payrollRuns.map((run) => ({
               key: `payroll:${run.id}`,
-              label: compactDetail([run.period_start, run.period_end]) || `Payroll ${run.id.slice(0, 8)}`,
-              amLabel: compactDetail([run.period_start, run.period_end]) || `Payroll ${run.id.slice(0, 8)}`,
+              label: compactDetail([run.period_start, run.period_end]) || `${TRANSLATIONS.en.Payroll} ${run.id}`,
+              amLabel: compactDetail([run.period_start, run.period_end]) || `${TRANSLATIONS.am.Payroll} ${run.id}`,
               href: `/hr/payments?highlight=${encodeURIComponent(run.id)}`,
               category: "Payroll",
               detail: compactDetail([run.status, `ETB ${Number(run.total_payroll_value || 0).toLocaleString()}`]),
@@ -300,11 +390,11 @@ function SearchDialog({
 
         setRecordResults(nextResults.slice(0, 8));
         setRecordSearchError(
-          ((hasPermission("hr:read") || hasPermission("hr:write")) ? employeesRes.status === "rejected" : false) &&
-            (hasPermission("assets:read") ? assetsRes.status === "rejected" : false) &&
-            (hasPermission("events:read") ? eventsRes.status === "rejected" : false) &&
-            (hasPermission("salary-levels:manage") ? salaryLevelsRes.status === "rejected" : false) &&
-            ((hasPermission("payroll:read") || hasPermission("payroll:write")) ? payrollRunsRes.status === "rejected" : false)
+          (canSearchEmployees ? employeesRes.status === "rejected" : false) &&
+            (canSearchAssets ? assetsRes.status === "rejected" : false) &&
+            (canSearchEvents ? eventsRes.status === "rejected" : false) &&
+            (canSearchSalaryLevels ? salaryLevelsRes.status === "rejected" : false) &&
+            (canSearchPayroll ? payrollRunsRes.status === "rejected" : false)
         );
       })
       .catch(() => {
@@ -322,54 +412,57 @@ function SearchDialog({
     return () => {
       active = false;
     };
-  }, [debouncedQuery, isOpen, hasPermission]);
+  }, [debouncedQuery, isOpen, canSearchEmployees, canSearchAssets, canSearchEvents, canSearchSalaryLevels, canSearchPayroll]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % Math.max(1, filtered.length));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + filtered.length) % Math.max(1, filtered.length));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (filtered[selectedIndex]) {
-          router.push(filtered[selectedIndex].href);
-          onClose();
-        }
-      } else if (e.key === "Escape") {
-        e.preventDefault();
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveKey(filtered[(activeIndex + 1) % Math.max(1, filtered.length)]?.key ?? null);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveKey(filtered[(activeIndex - 1 + filtered.length) % Math.max(1, filtered.length)]?.key ?? null);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeResult) {
+        router.push(activeResult.href);
         onClose();
       }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, filtered, selectedIndex, router, onClose]);
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-80 bg-black/60 backdrop-blur-sm pointer-events-auto animate-fade-in"
-        onClick={onClose}
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+      <Dialog.Overlay
+        className="fixed inset-0 z-80 bg-black/60 no-print"
       />
-      <div className="fixed inset-0 z-80 flex items-start justify-center pointer-events-none p-4 pt-[15vh]">
-        <div className="pointer-events-auto bg-card border border-border w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[50vh] animate-scale-in">
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border/60">
-            <HiMagnifyingGlass className="w-5 h-5 text-muted shrink-0" />
+      <Dialog.Content {...modalFocus} aria-describedby={undefined}
+        onEscapeKeyDown={(event) => {
+          // This combobox is the search dialog itself, not a nested selector.
+          if (event.target !== inputRef.current) modalFocus.onEscapeKeyDown(event);
+        }}
+        className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-80 flex max-h-[70dvh] flex-col overflow-hidden rounded-xl border border-border bg-card sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-[15vh] sm:w-[calc(100%_-_2rem)] sm:max-w-lg sm:-translate-x-1/2 no-print">
+          <Dialog.Title className="sr-only">{t("Search")}</Dialog.Title>
+          <div className="flex shrink-0 items-center gap-2 px-3 py-2 border-b border-border/60">
+            <HiMagnifyingGlass className="w-5 h-5 text-muted shrink-0" aria-hidden="true" />
             <input
               ref={inputRef}
               type="text"
+              role="combobox"
+              aria-label={t("Search")}
+              aria-autocomplete="list"
+              aria-expanded={isOpen}
+              aria-controls={listboxId}
+              aria-activedescendant={activeDescendant}
+              onKeyDown={handleKeyDown}
               value={query}
               onChange={(e) => {
                 const nextQuery = e.target.value;
                 setQuery(nextQuery);
-                setSelectedIndex(0);
+                setActiveKey(null);
                 if (nextQuery.trim().length < 2) {
                   setRecordResults([]);
                   setIsSearchingRecords(false);
@@ -377,40 +470,49 @@ function SearchDialog({
                 }
               }}
               placeholder={lang === "en" ? "Search pages, tools or settings..." : "ገጾችን፣ ዕቃዎችን ወይም ቅንብሮችን ይፈልጉ..."}
-              className="w-full bg-transparent border-none text-foreground text-sm focus:outline-none placeholder-muted"
+              className={`min-h-12 min-w-0 flex-1 rounded-lg bg-transparent border-none text-foreground text-sm placeholder:text-muted ${HEADER_FOCUS}`}
             />
-            <span className="text-[10px] text-muted border border-border px-1.5 py-0.5 rounded-xl font-mono shrink-0 select-none">ESC</span>
+            <button type="button" onClick={onClose} aria-label={t("Close search")}
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border text-foreground transition-colors motion-reduce:transition-none [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt ${HEADER_FOCUS}`}>
+              <HiXMark className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2 no-scrollbar">
-            {filtered.length > 0 ? (
-              <div className="flex flex-col gap-0.5">
-                {filtered.map((item, idx) => {
-                  const isSelected = idx === selectedIndex;
+          <div ref={resultsRef} className="min-h-0 flex-1 overflow-y-auto p-2">
+              <div id={listboxId} role="listbox" aria-label={t("Search")} className="flex flex-col gap-2">
+                {filtered.map((item) => {
+                  const isSelected = item === activeResult;
                   return (
                     <button
                       key={item.key}
+                      id={resultId(item.key)}
+                      type="button"
+                      role="option"
+                      tabIndex={-1}
+                      aria-selected={isSelected}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onFocus={() => setActiveKey(item.key)}
                       onClick={() => {
                         router.push(item.href);
                         onClose();
                       }}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between cursor-pointer ${
-                        isSelected ? "bg-primary/10 text-primary" : "hover:bg-card-alt text-foreground"
-                      }`}
+                      className={`min-h-12 w-full text-left px-3 py-2.5 rounded-xl transition-colors motion-reduce:transition-none flex flex-wrap items-center justify-between gap-2 cursor-pointer ${
+                        isSelected ? "bg-card-alt text-foreground" : "[@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt text-foreground"
+                      } ${HEADER_FOCUS}`}
                     >
-                      <div className="flex flex-col gap-0.5">
+                      <div className="flex min-w-0 flex-col gap-0.5 [overflow-wrap:anywhere]">
                         <span className="text-xs font-bold">{lang === "en" ? item.label : item.amLabel}</span>
-                        <span className="text-[9px] text-muted">{item.detail || item.href}</span>
+                        <span className="text-xs text-muted tabular-nums">{(lang === "am" ? item.amDetail ?? item.detail : item.detail) || item.href}</span>
                       </div>
-                      <span className="text-[9px] font-black uppercase tracking-wider text-muted bg-border/40 px-2 py-0.5 rounded-xl">
-                        {item.category}
+                      <span className="text-xs font-medium text-muted">
+                        {t(item.category)}
                       </span>
                     </button>
                   );
                 })}
               </div>
-            ) : (
-              <div className="py-8 text-center text-xs text-muted font-medium">
+            {filtered.length === 0 && (
+              <div role="status" className="py-8 text-center text-xs text-muted font-medium">
                 {isSearchingRecords
                   ? lang === "en"
                     ? "Searching records..."
@@ -428,9 +530,9 @@ function SearchDialog({
               </div>
             )}
           </div>
-        </div>
-      </div>
-    </>
+      </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -439,23 +541,26 @@ function HeaderUserMenu({
   togglePageWidth,
   setShowAbout,
   onLogout,
+  triggerRef,
 }: {
   pageWidth: "full" | "contained";
   togglePageWidth: () => void;
   setShowAbout: (show: boolean) => void;
   onLogout: () => void;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const ref = useRef<HTMLDivElement>(null);
   const { lang, toggle: toggleLang } = useLanguage();
   const { dark, toggle: toggleTheme } = useTheme();
   const [showConfirm, setShowConfirm] = useState(false);
   const { user: authUser, hasPermission } = useAuth();
+  const modalFocus = useModalFocus(() => triggerRef.current);
+  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
   const user = {
-    full_name: authUser?.full_name || authUser?.username || "User",
-    role_name: authUser?.role_name || authUser?.role_names?.[0] || "User",
+    full_name: authUser?.full_name || authUser?.username || t("User"),
+    role_name: authUser?.role_name || authUser?.role_names?.[0] || t("User"),
     profile_image_url: authUser?.profile_image_url || null,
   };
 
@@ -464,24 +569,15 @@ function HeaderUserMenu({
     router.replace("/login");
   };
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
-
   return (
-    <div className="relative flex items-center" ref={ref}>
+    <>
+      <Popover.Root open={open} onOpenChange={setOpen} modal>
+      <Popover.Trigger asChild>
       <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-card-alt transition-all cursor-pointer select-none"
+        ref={triggerRef}
+        type="button"
+        aria-label={`${t("Profile menu")}: ${user.full_name}`}
+        className={`flex min-h-12 min-w-12 shrink-0 items-center justify-center gap-2 px-2 rounded-xl [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors motion-reduce:transition-none cursor-pointer select-none ${HEADER_FOCUS}`}
       >
         <UserAvatar
           fullName={user.full_name}
@@ -490,135 +586,128 @@ function HeaderUserMenu({
           className="border border-border shrink-0 shadow-none"
           textClassName="text-[8px] font-black text-muted"
         />
-        <HiChevronDown className="w-3.5 h-3.5 text-muted shrink-0" />
+        <HiChevronDown className="w-3.5 h-3.5 text-muted shrink-0" aria-hidden="true" />
       </button>
+      </Popover.Trigger>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 bg-card border border-border rounded-xl p-3 min-w-[220px] shadow-lg flex flex-col gap-1.5 animate-scale-in">
+      <Popover.Portal>
+        <Popover.Content {...modalFocus} aria-label={t("Profile menu")} align="end" sideOffset={8} collisionPadding={12}
+          className="z-50 flex w-72 max-w-[calc(100vw-1.5rem)] max-h-[var(--radix-popover-content-available-height)] flex-col gap-2 overflow-y-auto rounded-xl border border-border bg-card p-3 no-print">
           <div className="px-2 py-1.5 border-b border-border/50 pb-2.5 mb-1">
-            <p className="text-xs font-semibold text-foreground truncate">{user.full_name}</p>
-            <p className="text-[9px] font-medium text-muted uppercase tracking-wider mt-0.5">{user.role_name}</p>
+            <p className="text-sm font-semibold text-foreground [overflow-wrap:anywhere]">{user.full_name}</p>
+            <p className="text-xs font-medium text-muted mt-0.5 [overflow-wrap:anywhere]">{user.role_name}</p>
           </div>
 
           {(hasPermission("users:manage") || hasPermission("settings:write")) && (
             <Link
               href="/settings"
               onClick={() => setOpen(false)}
-              className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
+              className={PROFILE_ACTION}
             >
-              <HiOutlineUser className="w-4 h-4 shrink-0 text-muted" />
+              <HiOutlineUser className="w-4 h-4 shrink-0 text-muted" aria-hidden="true" />
               <span>{t("Profile Settings")}</span>
             </Link>
           )}
 
 
           <button
+            type="button"
             onClick={toggleLang}
-            className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center justify-between text-xs font-semibold cursor-pointer"
+            className={`${PROFILE_ACTION} justify-between`}
           >
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs w-4 text-center shrink-0 font-black text-muted">
+              <span aria-hidden="true" className="font-mono text-xs w-4 text-center shrink-0 font-black text-muted">
                 {lang === "en" ? "EN" : "አማ"}
               </span>
               <span>{t("Language")}</span>
             </div>
-            <span className="text-[9px] text-primary font-black uppercase bg-primary-light px-2 py-0.5 rounded-xl">
+            <span className="text-xs text-muted">
               {lang === "en" ? "English" : "አማርኛ"}
             </span>
           </button>
 
           <button
+            type="button"
             onClick={toggleTheme}
-            className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center justify-between text-xs font-semibold cursor-pointer"
+            className={`${PROFILE_ACTION} justify-between`}
           >
             <div className="flex items-center gap-2">
               {dark ? (
-                <HiOutlineSun className="w-4 h-4 shrink-0 text-muted" />
+                <HiOutlineSun className="w-4 h-4 shrink-0 text-muted" aria-hidden="true" />
               ) : (
-                <HiOutlineMoon className="w-4 h-4 shrink-0 text-muted" />
+                <HiOutlineMoon className="w-4 h-4 shrink-0 text-muted" aria-hidden="true" />
               )}
               <span>{t("Theme")}</span>
             </div>
-            <span className="text-[9px] text-muted font-bold capitalize">
-              {dark ? "Dark" : "Light"}
+            <span className="text-xs text-muted">
+              {t(dark ? "Dark" : "Light")}
             </span>
           </button>
 
           <button
+            type="button"
             onClick={togglePageWidth}
-            className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center justify-between text-xs font-semibold cursor-pointer"
+            className={`${PROFILE_ACTION} justify-between`}
           >
             <div className="flex items-center gap-2">
-              <HiArrowsRightLeft className="w-4 h-4 shrink-0 text-muted" />
+              <HiArrowsRightLeft className="w-4 h-4 shrink-0 text-muted" aria-hidden="true" />
               <span>{t("Page Width")}</span>
             </div>
-            <span className="text-[9px] text-primary font-black uppercase bg-primary-light px-2 py-0.5 rounded-xl">
-              {pageWidth === "contained" ? "Normal" : "Full"}
+            <span className="text-xs text-right text-muted">
+              {t(pageWidth === "contained" ? "Normal" : "Full")}
             </span>
           </button>
 
           <button
+            type="button"
             onClick={() => {
               setOpen(false);
               setShowAbout(true);
             }}
-            className="w-full text-left py-2 px-2.5 rounded-lg text-foreground hover:bg-sidebar-accent transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
+            className={PROFILE_ACTION}
           >
-            <HiOutlineInformationCircle className="w-4 h-4 shrink-0 text-muted" />
+            <HiOutlineInformationCircle className="w-4 h-4 shrink-0 text-muted" aria-hidden="true" />
             <span>{t("About ERP")}</span>
           </button>
 
           <div className="border-t border-border/50 my-1" />
 
           <button
+            type="button"
             onClick={() => {
               setOpen(false);
               setShowConfirm(true);
             }}
-            className="w-full text-left py-2 px-2.5 rounded-lg text-danger hover:bg-danger/10 transition-all flex items-center gap-2 text-xs font-semibold cursor-pointer"
+            className={`${PROFILE_ACTION} text-danger`}
           >
-            <HiArrowRightOnRectangle className="w-4 h-4 shrink-0" />
+            <HiArrowRightOnRectangle className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>{t("Sign Out")}</span>
           </button>
-        </div>
-      )}
+        </Popover.Content>
+      </Popover.Portal>
+      </Popover.Root>
 
-      {showConfirm && (
-        <>
-          <div
-            className="fixed inset-0 z-70 bg-black/40 backdrop-blur-sm pointer-events-auto"
-            onClick={() => setShowConfirm(false)}
-          />
-          <div className="fixed inset-0 z-70 flex items-center justify-center pointer-events-none p-4">
-            <div className="pointer-events-auto bg-card rounded-xl border border-border p-6 w-full max-w-sm flex flex-col items-center shadow-2xl">
-              <div className="w-12 h-12 rounded-xl bg-danger/10 flex items-center justify-center text-danger mb-4 shrink-0">
-                <HiArrowRightOnRectangle className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-foreground mb-1">
-                {t("Sign Out")}
-              </h3>
-              <p className="text-xs text-muted text-center leading-relaxed mb-6">
-                {t("Are you sure you want to sign out?")}
-              </p>
-              <div className="flex gap-3 w-full">
+      <HeaderDialog isOpen={showConfirm} onClose={() => setShowConfirm(false)}
+        title={t("Sign Out")} description={t("Are you sure you want to sign out?")}
+        getReturnFocus={() => triggerRef.current}>
+              <div className="mt-6 flex gap-2 w-full">
                 <button
+                  type="button"
                   onClick={() => setShowConfirm(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-card-alt border border-border text-foreground font-bold hover:bg-border transition-all text-xs active:scale-95 cursor-pointer"
+                  className={`min-h-12 flex-1 px-3 rounded-xl bg-card-alt border border-border text-foreground font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:bg-border transition-colors motion-reduce:transition-none text-sm cursor-pointer ${HEADER_FOCUS}`}
                 >
                   {t("Cancel")}
                 </button>
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="flex-1 py-2.5 rounded-xl bg-danger text-white font-bold hover:opacity-90 transition-all text-xs active:scale-95 cursor-pointer"
+                  className={`min-h-12 flex-1 px-3 rounded-xl bg-destructive text-destructive-foreground font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:opacity-90 transition-colors motion-reduce:transition-none text-sm cursor-pointer ${HEADER_FOCUS}`}
                 >
                   {t("Sign Out")}
                 </button>
               </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+      </HeaderDialog>
+    </>
   );
 }
 
@@ -635,6 +724,9 @@ export default function AuthLayout({
   const [pageWidth, setPageWidth] = useState<"full" | "contained">("full");
   const [showAbout, setShowAbout] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const profileTrigger = useRef<HTMLButtonElement | null>(null);
+  const searchTrigger = useRef<HTMLButtonElement | null>(null);
+  const searchOpener = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -682,14 +774,16 @@ export default function AuthLayout({
   // Handle Ctrl+K shortcut globally
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setShowSearch((prev) => !prev);
+        if (status !== "authenticated" || (!showSearch && document.querySelector('[role="dialog"], [role="alertdialog"]'))) return;
+        if (!showSearch) searchOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setShowSearch(!showSearch);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [showSearch, status]);
 
   // Sync page width setting with DOM attribute
   useEffect(() => {
@@ -752,22 +846,27 @@ export default function AuthLayout({
             </div>
           )}
           {/* Header - Flat borderless design */}
-          <header className="flex h-12 2xl:h-16 shrink-0 items-center gap-2 2xl:gap-3 px-3 md:px-5 2xl:px-6 bg-transparent select-none no-print">
-            <SidebarTrigger className="text-muted hover:text-foreground transition-all cursor-pointer" />
-            <div className="h-4 w-px bg-border/50 shrink-0" />
+          <header className="flex h-14 2xl:h-16 shrink-0 items-center gap-2 2xl:gap-3 px-3 md:px-5 2xl:px-6 bg-transparent select-none no-print">
+            <SidebarTrigger aria-label={t("Toggle Sidebar")}
+              className={`hidden shrink-0 md:inline-flex md:min-h-12 md:min-w-12 text-muted [@media(hover:hover)_and_(pointer:fine)]:hover:text-foreground transition-colors motion-reduce:transition-none cursor-pointer ${HEADER_FOCUS}`} />
             <Breadcrumbs />
 
             {/* Top Right Controls */}
             <div className="ml-auto shrink-0 flex items-center gap-2 2xl:gap-3">
               {/* Search Trigger Button */}
               <button
-                onClick={() => setShowSearch(true)}
-                className="flex items-center gap-2 px-2.5 2xl:px-3 py-1 2xl:py-1.5 rounded-lg 2xl:rounded-xl border border-border bg-card-alt/50 text-muted hover:text-foreground hover:bg-card-alt hover:border-primary/30 transition-all cursor-pointer text-xs font-semibold shrink-0"
-                title="Search (Ctrl+K)"
+                ref={searchTrigger}
+                type="button"
+                onClick={(event) => { searchOpener.current = event.currentTarget; setShowSearch(true); }}
+                className={`flex min-h-12 min-w-12 items-center justify-center gap-2 px-2.5 2xl:px-3 rounded-lg 2xl:rounded-xl border border-border bg-card-alt/50 text-foreground [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors motion-reduce:transition-none cursor-pointer text-xs font-semibold shrink-0 ${HEADER_FOCUS}`}
+                aria-label={t("Search")}
+                aria-haspopup="dialog"
+                aria-expanded={showSearch}
+                title={t("Search (Ctrl+K)")}
               >
-                <HiMagnifyingGlass className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Search...</span>
-                <kbd className="hidden sm:inline-flex h-4 select-none items-center gap-0.5 rounded border border-border bg-card px-1.5 font-mono text-[9px] font-bold text-muted/80 leading-none">
+                <HiMagnifyingGlass className="w-4 h-4" aria-hidden="true" />
+                <span className="hidden lg:inline">{t("Search...")}</span>
+                <kbd aria-hidden="true" className="hidden lg:inline-flex h-4 select-none items-center gap-0.5 rounded-lg border border-border bg-card px-1.5 font-mono text-[10px] font-bold text-muted leading-none">
                   <span>Ctrl</span><span>K</span>
                 </kbd>
               </button>
@@ -775,14 +874,13 @@ export default function AuthLayout({
               <PayrollReminder />
               <NotificationInbox />
 
-              <div className="h-4 w-px bg-border/50 shrink-0 mx-0.5" />
-
               {/* User Dropdown */}
               <HeaderUserMenu
                 pageWidth={pageWidth}
                 togglePageWidth={togglePageWidth}
                 setShowAbout={setShowAbout}
                 onLogout={handleLogout}
+                triggerRef={profileTrigger}
               />
             </div>
           </header>
@@ -799,60 +897,22 @@ export default function AuthLayout({
       </div>
 
       {/* About Modal Dialog */}
-      {showAbout && (
-        <>
-          <div
-            className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm pointer-events-auto"
-            onClick={() => setShowAbout(false)}
-          />
-          <div className="fixed inset-0 z-70 flex items-center justify-center pointer-events-none p-4">
-            <div className="pointer-events-auto bg-card rounded-2xl border border-border p-6 w-full max-w-md flex flex-col shadow-2xl relative animate-scale-in text-center">
-              <div className="w-16 h-16 rounded-[1.25rem] bg-foreground text-background flex items-center justify-center text-2xl font-black mx-auto mb-4">
-                D
-              </div>
-              <h3 className="text-lg font-black text-foreground mb-1">
-                {t("About Dream Lux ERP")}
-              </h3>
-              <p className="text-[10px] text-primary font-black uppercase tracking-widest mb-3">
-                {t("Version")} 1.0.0 (Gold Release)
-              </p>
-
-              <p className="text-xs text-muted leading-relaxed mb-6 px-2">
-                {t("Dream Lux ERP Description")}
-              </p>
-
-              <div className="bg-card-alt border border-border rounded-xl p-3 text-left space-y-2 mb-6 text-xs text-foreground font-medium">
-                <div className="flex justify-between">
-                  <span className="text-muted">Architecture:</span>
-                  <span>Next.js 16 + React 19</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Database Engine:</span>
-                  <span className="text-emerald-500 font-bold">{t("Database Status")}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Accent Spectrum:</span>
-                  <span className="font-mono text-primary text-[10px]">oklch(78% 0.12 82)</span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowAbout(false)}
-                className="w-full py-2.5 rounded-xl bg-foreground text-background font-bold hover:opacity-90 transition-all text-xs cursor-pointer active:scale-95"
-              >
-                {t("Close")}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      <HeaderDialog isOpen={showAbout} onClose={() => setShowAbout(false)}
+        title={t("About Dream Lux ERP")} description={t("Dream Lux ERP Description")}
+        getReturnFocus={() => profileTrigger.current}>
+        <button type="button" onClick={() => setShowAbout(false)}
+          className={`mt-6 min-h-12 w-full px-3 rounded-xl bg-foreground text-background font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:opacity-90 transition-colors motion-reduce:transition-none text-sm cursor-pointer ${HEADER_FOCUS}`}>
+          {t("Close")}
+        </button>
+      </HeaderDialog>
 
       {/* Command Search Overlay Modal */}
-      <SearchDialog
+      {showSearch && <SearchDialog
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
         lang={lang}
-      />
+        getReturnFocus={() => searchOpener.current?.isConnected ? searchOpener.current : searchTrigger.current}
+      />}
     </SidebarProvider>
   );
 }

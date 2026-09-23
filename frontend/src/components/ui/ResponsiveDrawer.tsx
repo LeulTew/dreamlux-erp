@@ -13,6 +13,8 @@ interface ResponsiveDrawerProps {
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  dismissDisabled?: boolean;
+  closeLabel?: string;
 }
 
 const MOBILE_BREAKPOINT = 768;
@@ -26,12 +28,17 @@ export default function ResponsiveDrawer({
   subtitle,
   children,
   footer,
+  dismissDisabled = false,
+  closeLabel,
 }: ResponsiveDrawerProps) {
   const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [visible, setVisible] = useState(isOpen);
   const reducedMotion = useReducedMotion();
   const dragControls = useDragControls();
   const modalFocus = useModalFocus();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const focusedControl = useRef<HTMLElement | null>(null);
+  const wasLocked = useRef(false);
   const { lang } = useLanguage();
   const openCycle = useRef(0);
   const closingCycle = useRef<number | null>(null);
@@ -53,25 +60,42 @@ export default function ResponsiveDrawer({
     openCycle.current += 1;
     closingCycle.current = null;
     return () => { closingCycle.current = null; };
-  }, [isOpen]);
+  }, [isOpen, dismissDisabled]);
 
   // Parent closure removes content immediately; only a user dismissal owns an exit callback.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(isOpen);
-  }, [isOpen]);
+  }, [isOpen, dismissDisabled]);
+
+  useLayoutEffect(() => {
+    const locked = isOpen && visible && dismissDisabled;
+    const newlyLocked = locked && !wasLocked.current;
+    wasLocked.current = locked;
+    const panel = panelRef.current;
+    if (!newlyLocked || !panel || !document.hasFocus()
+      || panel.closest('[aria-hidden="true"], [inert]')) return;
+    const active = document.activeElement;
+    const previous = focusedControl.current;
+    // Native disabling may move focus to body before the layout effect runs.
+    if (previous?.isConnected && panel.contains(previous) && previous.matches(":disabled")
+      && previous.closest('[role="dialog"], [role="alertdialog"]') === panel
+      && (active === previous || active === document.body)) {
+      panel.focus({ preventScroll: true });
+    }
+  }, [isOpen, visible, dismissDisabled]);
 
   const handleClose = useCallback(() => {
-    if (!isOpen || !visible || closingCycle.current !== null) return;
+    if (!isOpen || !visible || dismissDisabled || closingCycle.current !== null) return;
     closingCycle.current = openCycle.current;
     setVisible(false);
-  }, [isOpen, visible]);
+  }, [isOpen, visible, dismissDisabled]);
 
   const handleExitComplete = useCallback(() => {
-    if (closingCycle.current === null || closingCycle.current !== openCycle.current) return;
+    if (dismissDisabled || closingCycle.current === null || closingCycle.current !== openCycle.current) return;
     closingCycle.current = null;
     closeCallback.current();
-  }, []);
+  }, [dismissDisabled]);
 
   if (!isOpen || isMobile === null) return null;
 
@@ -92,13 +116,29 @@ export default function ResponsiveDrawer({
               />
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount {...modalFocus} aria-modal="true"
+              onEscapeKeyDown={(event) => {
+                if (dismissDisabled) event.preventDefault();
+                else modalFocus.onEscapeKeyDown(event);
+              }}
+              onInteractOutside={(event) => { if (dismissDisabled) event.preventDefault(); }}
               {...(subtitle ? {} : { "aria-describedby": undefined })}>
               <motion.div
+                ref={panelRef}
+                onFocusCapture={(event) => {
+                  const target = event.target;
+                  if (target instanceof HTMLElement && event.currentTarget.contains(target)
+                    && target.closest('[role="dialog"], [role="alertdialog"]') === event.currentTarget) {
+                    focusedControl.current = target;
+                  }
+                }}
+                onBlurCapture={(event) => {
+                  if (event.target === focusedControl.current && !event.target.matches(":disabled")) focusedControl.current = null;
+                }}
                 initial={reducedMotion ? false : isMobile ? { x: 0, y: "100%" } : { x: "100%", y: 0 }}
                 animate={{ x: 0, y: 0 }}
                 exit={reducedMotion ? { x: 0, y: 0 } : isMobile ? { x: 0, y: "100%" } : { x: "100%", y: 0 }}
                 transition={reducedMotion ? { duration: 0 } : springConfig}
-                drag={isMobile ? "y" : false}
+                drag={isMobile && !dismissDisabled ? "y" : false}
                 dragControls={dragControls}
                 dragListener={false}
                 dragConstraints={{ top: 0 }}
@@ -111,7 +151,7 @@ export default function ResponsiveDrawer({
               >
                 {isMobile && (
                   <div aria-hidden="true" data-drawer-drag-handle
-                    onPointerDown={(event) => dragControls.start(event)}
+                    onPointerDown={(event) => { if (!dismissDisabled) dragControls.start(event); }}
                     className="flex min-h-12 shrink-0 touch-none items-center justify-center cursor-grab active:cursor-grabbing">
                     <div className="w-10 h-1 rounded-full bg-border" />
                   </div>
@@ -127,8 +167,9 @@ export default function ResponsiveDrawer({
                       </Dialog.Description>
                     )}
                   </div>
-                  <button type="button" onClick={handleClose} aria-label={lang === "am" ? "መስኮቱን ዝጋ" : "Close drawer"}
-                    className="min-h-12 min-w-12 shrink-0 rounded-xl bg-card-alt border border-border flex items-center justify-center text-muted [@media(hover:hover)]:hover:text-foreground [@media(hover:hover)]:hover:bg-border transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                  <button type="button" onClick={handleClose} disabled={dismissDisabled}
+                    aria-label={closeLabel ?? (lang === "am" ? "መስኮቱን ዝጋ" : "Close drawer")}
+                    className="min-h-12 min-w-12 shrink-0 rounded-xl bg-card-alt border border-border flex items-center justify-center text-muted [@media(hover:hover)_and_(pointer:fine)]:enabled:hover:text-foreground [@media(hover:hover)_and_(pointer:fine)]:enabled:hover:bg-border transition-colors motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">
                     <HiXMark className="w-5 h-5" aria-hidden="true" />
                   </button>
                 </div>
