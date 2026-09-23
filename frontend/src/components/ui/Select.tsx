@@ -178,7 +178,13 @@ export default function Select({
 
   return (
     <div className={`relative ${className}`} ref={containerRef} data-modal-escape={menuOpen || undefined} onBlur={(event) => {
-      if (menuOpen && event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) closeMenu();
+      if (menuOpen && event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) {
+        const container = event.currentTarget;
+        // Let native focusin finish before removing popup nodes inside a focus scope.
+        setTimeout(() => {
+          if (container.isConnected && !container.contains(document.activeElement)) closeMenu();
+        }, 0);
+      }
     }} onKeyDown={(event) => {
       if (!menuOpen || event.key !== "Escape") return;
       event.preventDefault();

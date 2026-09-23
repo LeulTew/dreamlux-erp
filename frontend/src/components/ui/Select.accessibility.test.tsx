@@ -53,7 +53,7 @@ function optionLayout(listbox: HTMLElement, scale: () => number = () => 1) {
 }
 
 beforeEach(() => window.localStorage.clear());
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("Dream Select accessible ownership", () => {
   it("explicitly excludes the overflow listbox from Tab order while retaining Add", async () => {
@@ -334,9 +334,78 @@ describe("Dream Select accessible ownership", () => {
     await waitFor(() => expect(screen.getByRole("combobox").tagName).toBe("INPUT"));
     const outside = screen.getByRole("button", { name: "Outside field" });
     act(() => outside.focus());
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
     expect(outside).toHaveFocus();
     expect(changed).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("lets native focus finish before retiring a searchable=%s popup", async (searchable) => {
+    const changed = vi.fn();
+    render(<form aria-label="Form">
+      <Select name="choice" aria-label="Item choice" value="two" options={options} onChange={changed} searchable={searchable} />
+      <button type="button">Next field</button>
+    </form>);
+    choose(screen.getByRole("combobox"));
+    const owner = screen.getByRole("combobox");
+    await waitFor(() => expect(owner).toHaveFocus());
+    const next = screen.getByRole("button", { name: "Next field" });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    act(() => owner.blur());
+    expect(document.body).toHaveFocus();
+    fireEvent.blur(owner, { relatedTarget: next });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    act(() => next.focus());
+    expect(next).toHaveFocus();
+    act(() => vi.advanceTimersByTime(0));
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(next).toHaveFocus();
+    expect(new FormData(screen.getByRole("form") as HTMLFormElement).get("choice")).toBe("two");
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("does not retire a popup when focus returns to the same root before its deferred close", async () => {
+    const changed = vi.fn();
+    render(<>
+      <Select aria-label="Item choice" value="two" options={options} onChange={changed} searchable />
+      <button>Next field</button>
+    </>);
+    choose(screen.getByRole("combobox"));
+    const owner = screen.getByRole("combobox");
+    await waitFor(() => expect(owner).toHaveFocus());
+    fireEvent.change(owner, { target: { value: "Second" } });
+    const next = screen.getByRole("button", { name: "Next field" });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    act(() => owner.blur());
+    fireEvent.blur(owner, { relatedTarget: next });
+    act(() => { next.focus(); owner.focus(); });
+    act(() => vi.advanceTimersByTime(0));
+    expect(owner).toHaveFocus();
+    expect(owner).toHaveValue("Second");
+    expectActive(owner, "Second item");
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("ignores a deferred close from a disconnected selector root", async () => {
+    const view = render(<>
+      <Select aria-label="Item choice" value="two" options={options} onChange={vi.fn()} searchable />
+      <button>Next field</button>
+    </>);
+    choose(screen.getByRole("combobox"));
+    const owner = screen.getByRole("combobox");
+    await waitFor(() => expect(owner).toHaveFocus());
+    const container = owner.closest('[data-modal-escape="true"]') as HTMLDivElement;
+    const contains = vi.spyOn(container, "contains");
+    const next = screen.getByRole("button", { name: "Next field" });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    act(() => owner.blur());
+    fireEvent.blur(owner, { relatedTarget: next });
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    view.unmount();
+    expect(container.isConnected).toBe(false);
+    contains.mockClear();
+    act(() => vi.advanceTimersByTime(0));
+    expect(contains).not.toHaveBeenCalled();
   });
 
   it("hydrates saved language with stable owner IDs and preserves exact labels and values", async () => {
