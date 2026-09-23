@@ -268,6 +268,7 @@ export default function Select({
             </div>
           )}
           <div ref={listboxRef} role="listbox" id={listboxId} aria-label={ariaLabel ?? placeholderText}
+            tabIndex={-1}
             className="relative max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-2">
             {filteredOptions.map((option) => (
               <button

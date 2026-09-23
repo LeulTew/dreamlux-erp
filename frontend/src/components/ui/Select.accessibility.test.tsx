@@ -56,6 +56,17 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("Dream Select accessible ownership", () => {
+  it("explicitly excludes the overflow listbox from Tab order while retaining Add", async () => {
+    render(<Select aria-label="Item choice" name="choice" value="two" options={options}
+      onChange={vi.fn()} searchable onAdd={vi.fn()} addLabel="Add item" />);
+    choose(screen.getByRole("combobox", { name: "Item choice" }));
+    const listbox = await screen.findByRole("listbox");
+    expect(listbox).toHaveAttribute("tabindex", "-1");
+    expect(screen.getByRole("button", { name: "Add item" }).tabIndex).toBe(0);
+    expect(within(listbox).getAllByRole("option").every((option) => option.getAttribute("tabindex") === "-1")).toBe(true);
+    expect(screen.getByRole("combobox", { name: "Item choice" })).toHaveAttribute("aria-controls", listbox.id);
+  });
+
   it.each([0.95, 1])("reconciles intrinsic scroll during a %s-scale entrance and remains visible after settlement", async (initialScale) => {
     let scale = initialScale;
     const choices = Array.from({ length: 16 }, (_, index) => ({ id: `item-${index}`, label: `Stock ${index}` }));
