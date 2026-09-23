@@ -36,7 +36,9 @@ export async function verifyFrontend(options: FrontendVerification, root = repos
     for (const stage of frontendStages(options.mode)) {
       const report = join(work, "frontend-units.json");
       const args = stage.name === "units" ? [...stage.args, "--reporter=json", `--outputFile=${report}`] : stage.args;
+      const started = performance.now();
       await run(`isolated frontend ${stage.name}`, args, stage.timeout, stage.environment);
+      console.log(`Frontend ${stage.name} completed in ${Math.round(performance.now() - started)}ms.`);
       if (stage.name === "units") {
         const passed = verifyFrontendUnitReceipt(JSON.parse(await readFile(report, "utf8")));
         console.log(`Frontend units: ${passed} passed, zero failed/skipped/todo.`);

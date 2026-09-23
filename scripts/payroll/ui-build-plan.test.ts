@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { frontendArguments, frontendStages, verifyFrontendUnitReceipt } from "./ui-build-plan";
+import { selectedFrontendFile } from "./contracts";
 
 describe("bounded independent frontend verification phases", () => {
   test("preserves the original complete local invocation and all phase caps", () => {
@@ -19,6 +20,10 @@ describe("bounded independent frontend verification phases", () => {
     expect([...quality, ...build].map((stage) => stage.name).sort()).toEqual(["build", "lint", "types", "units"]);
     expect(quality.map((stage) => stage.name)).toEqual(["lint", "units"]);
     expect(build.map((stage) => stage.name)).toEqual(["types", "build"]);
+    expect(build[0].args).toContain("--noEmit");
+    expect(build[0].args.slice(-2)).toEqual(["--incremental", "false"]);
+    expect(selectedFrontendFile("frontend/.next/cache/.tsbuildinfo")).toBe(false);
+    expect(selectedFrontendFile("frontend/tsconfig.tsbuildinfo")).toBe(false);
     expect(quality[1]).toEqual({
       name: "units", args: ["run", "test", "--maxWorkers=2"], timeout: 90_000, environment: "test",
     });
