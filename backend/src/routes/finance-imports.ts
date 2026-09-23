@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import multer from "multer";
+import { workbookUpload } from "../lib/multipart";
 import { pool } from "../db/pool";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { hisabImportCommitSchema } from "../lib/validation";
@@ -7,27 +7,10 @@ import { commitHisabImport, parseHisabWorkbook } from "../services/hisab-import-
 
 const router = Router();
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, cb) => {
-    const validExtension = /\.xlsx$/i.test(file.originalname || "");
-    const validMime = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/octet-stream",
-    ].includes(file.mimetype);
-    if (!validExtension && !validMime) {
-      cb(new Error("Only .xlsx workbooks are supported"));
-      return;
-    }
-    cb(null, true);
-  },
-});
-
 router.post(
   "/hisab/preview",
   requirePermissionSlugs(["finance:imports:write"]),
-  upload.single("workbook"),
+  workbookUpload,
   async (req: AuthRequest, res: Response) => {
     try {
       if (!req.file?.buffer) {
