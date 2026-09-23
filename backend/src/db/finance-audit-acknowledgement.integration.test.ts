@@ -12,6 +12,7 @@ import { importFixtureDdl } from "./testing/dreamlux-import-fixture";
 import { createDreamluxNativeFixture, reviewedSchemaTables } from "./testing/dreamlux-native-fixture";
 import { attestDreamluxNativeTarget } from "./testing/dreamlux-native-target";
 import { payrollFixtureDdl } from "./testing/dreamlux-payroll-fixture";
+import { closeFixtureServer, trackFixtureSockets } from "./testing/fixture-http-server";
 import { weeklyFormulaWorkbook } from "./testing/hisab-formula-workbook";
 
 const adminUrl = process.env.DREAMLUX_NATIVE_TEST_ADMIN_URL?.trim();
@@ -34,6 +35,7 @@ let observer: Client | undefined;
 let appPool: Pool | undefined;
 let invalidateAllCache: (() => void) | undefined;
 let server: Server | undefined;
+let serverSockets: Set<Socket> | undefined;
 let cookie = "";
 let seed = 0;
 const ports = new Set<number>();
@@ -118,6 +120,7 @@ beforeAll(async () => {
   app.use("/finance/imports", requireAuth, (await import("../routes/finance-imports")).default);
   app.use("/finance", requireAuth, (await import("../routes/finance")).default);
   server = createServer(app);
+  serverSockets = trackFixtureSockets(server);
   await new Promise<void>((resolve, reject) => {
     server!.once("error", reject);
     server!.listen(0, "127.0.0.1", resolve);
@@ -137,8 +140,8 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     const results = await Promise.allSettled([
-      server?.listening
-        ? new Promise<void>((resolve, reject) => server!.close((error) => error ? reject(error) : resolve()))
+      server?.listening && serverSockets
+        ? closeFixtureServer(server, serverSockets)
         : Promise.resolve(),
       appPool?.end(),
       observer?.end(),
