@@ -40,76 +40,59 @@ beforeEach(() => {
   mockRelease.mockClear();
 });
 
+function scriptDateConflict(kind: "employee" | "vehicle") {
+  mockQuery.mockImplementation(async (sql: string, values?: unknown[]) => {
+    const query = sql.replace(/\s+/g, " ").trim().toLowerCase();
+    if (query.startsWith("select * from events where id")) {
+      return { rows: [{ id: "event-1", name: "Original Event", start_date: "2026-07-10", end_date: "2026-07-11", status: "Planned" }], rowCount: 1 };
+    }
+    if (query.startsWith("select $1::date")) {
+      return { rows: [{ start_date: values?.[0], end_date: values?.[1], valid: true }], rowCount: 1 };
+    }
+    if (query.includes("with current_event_employees")) {
+      return { rows: kind === "employee" ? [{ conflict: 1 }] : [], rowCount: kind === "employee" ? 1 : 0 };
+    }
+    if (query.includes("select 1 from vehicle_assignments")) return { rows: [{ conflict: 1 }], rowCount: 1 };
+    if (["begin", "rollback"].includes(query) || query.startsWith("set local") ||
+        query.startsWith("select id from vehicles") || query.startsWith("select id from employees")) {
+      return { rows: [], rowCount: 0 };
+    }
+    throw new Error(`Unexpected scheduling fixture query: ${query}`);
+  });
+}
+
 describe("Events Date Conflict API validation", () => {
   test("PUT /events/:id returns 400 when new dates conflict with currently assigned employees", async () => {
-    // 1. Fetch existing event
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "event-1",
-          name: "Original Event",
-          start_date: "2026-07-10",
-          end_date: "2026-07-10",
-          status: "Planned",
-        },
-      ],
-      rowCount: 1,
-    });
-
-    // 2. hasBulkEmployeeConflict check query (returns conflict)
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ '1': 1 }],
-      rowCount: 1,
-    });
+    scriptDateConflict("employee");
 
     const res = await request(app)
       .put("/events/event-1")
       .set("Authorization", `Bearer ${getToken("SUPER_ADMIN", { permission_slugs: ["events:write"] })}`)
       .send({
         start_date: "2026-07-12",
-        end_date: "2026-07-12",
+        end_date: "2026-07-14",
       });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("Scheduling Conflict: One or more assigned employees or drivers have conflicting assignments on these new dates.");
+    expect(mockQuery.mock.calls.find(([sql]) => String(sql).includes("WITH current_event_employees"))?.[1])
+      .toEqual(["event-1", "2026-07-12", "2026-07-14"]);
   });
 
   test("PUT /events/:id returns 400 when new dates conflict with currently assigned vehicles", async () => {
-    // 1. Fetch existing event
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "event-1",
-          name: "Original Event",
-          start_date: "2026-07-10",
-          end_date: "2026-07-10",
-          status: "Planned",
-        },
-      ],
-      rowCount: 1,
-    });
-
-    // 2. hasBulkEmployeeConflict check query (returns no conflict)
-    mockQuery.mockResolvedValueOnce({
-      rows: [],
-      rowCount: 0,
-    });
-
-    // 3. hasBulkVehicleConflict check query (returns conflict)
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ '1': 1 }],
-      rowCount: 1,
-    });
+    scriptDateConflict("vehicle");
 
     const res = await request(app)
       .put("/events/event-1")
       .set("Authorization", `Bearer ${getToken("SUPER_ADMIN", { permission_slugs: ["events:write"] })}`)
       .send({
         start_date: "2026-07-12",
-        end_date: "2026-07-12",
+        end_date: "2026-07-14",
       });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("Scheduling Conflict: One or more assigned vehicles have conflicting assignments on these new dates.");
+    expect(mockQuery.mock.calls.find(([sql]) => String(sql).includes("SELECT 1 FROM vehicle_assignments"))?.[1])
+      .toEqual(["event-1", "2026-07-12", "2026-07-14"]);
   });
 });

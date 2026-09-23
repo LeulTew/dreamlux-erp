@@ -371,6 +371,7 @@ function EventsPageContent() {
 
   // Modals / Sheets UI state
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const consumedEditId = useRef<string | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -612,14 +613,18 @@ function EventsPageContent() {
   // Sync edits from URL searchParam "edit"
   useEffect(() => {
     const editId = searchParams.get("edit");
-    if (editId && !editingEvent && events.length > 0) {
-      const target = events.find((e) => e.id === editId);
-      if (target) {
-        setTimeout(() => {
-          setEditingEvent(target);
-        }, 0);
-      }
+    if (!editId) {
+      consumedEditId.current = null;
+      return;
     }
+    if (editingEvent || consumedEditId.current === editId) return;
+    const target = events.find((event) => event.id === editId);
+    if (!target) return;
+    const timer = setTimeout(() => {
+      consumedEditId.current = editId;
+      setEditingEvent(target);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [searchParams, events, editingEvent]);
 
   // Mutations for Saved Views
@@ -1624,9 +1629,13 @@ function EventsPageContent() {
         <EditEventSheet
           event={editingEvent}
           onClose={() => {
+            consumedEditId.current = searchParams.get("edit");
             setEditingEvent(null);
             if (searchParams.get("edit")) {
-              router.replace(pathname, { scroll: false });
+              const nextParams = new URLSearchParams(searchParams.toString());
+              nextParams.delete("edit");
+              const query = nextParams.toString();
+              router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
             }
           }}
           onSuccess={() => {

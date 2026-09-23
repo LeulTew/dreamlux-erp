@@ -142,6 +142,9 @@ describe("Service Scopes Unit & Integration Tests (Issue #194)", () => {
     expect(client.executedQueries[0].sql).toContain("DELETE FROM event_service_scope_links WHERE event_id = $1");
     expect(client.executedQueries[0].params).toEqual(["event-1"]);
     expect(client.executedQueries[1].sql).toContain("INSERT INTO event_service_scope_links");
+    expect(client.executedQueries).toHaveLength(2);
+    expect(client.executedQueries[1].sql).toContain("unnest($2::uuid[])");
+    expect(client.executedQueries[1].params).toEqual(["event-1", ["scope-bg-uuid", "scope-table-uuid"]]);
   });
 
   test("copyProposalServiceScopesToEvent copies proposal scope links directly to event in DB", async () => {
