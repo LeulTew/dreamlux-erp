@@ -17,6 +17,13 @@ export type ServiceScopeSummary = {
   name_am: string;
 };
 
+export class ServiceScopeValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ServiceScopeValidationError";
+  }
+}
+
 /**
  * Get all active service scopes from catalog (ordered by display_order ASC)
  */
@@ -36,14 +43,19 @@ export async function getActiveServiceScopes(client: PoolClient | Pool): Promise
  */
 export async function validateAndResolveServiceScopes(
   client: PoolClient | Pool,
-  inputScopes: string[] | string | null | undefined,
+  inputScopes: unknown,
 ): Promise<string[]> {
-  if (!inputScopes) return [];
-  let scopeItems: string[] = [];
+  if (inputScopes == null || inputScopes === "") return [];
+  let scopeItems: string[];
   if (typeof inputScopes === "string") {
     scopeItems = inputScopes.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
   } else if (Array.isArray(inputScopes)) {
-    scopeItems = inputScopes.map((s) => String(s).trim()).filter(Boolean);
+    if (!inputScopes.every((scope): scope is string => typeof scope === "string")) {
+      throw new ServiceScopeValidationError("Invalid service scope value: expected string");
+    }
+    scopeItems = inputScopes.map((scope) => scope.trim()).filter(Boolean);
+  } else {
+    throw new ServiceScopeValidationError("Service scopes must be a string or an array of strings");
   }
   if (scopeItems.length === 0) return [];
 
@@ -62,14 +74,14 @@ export async function validateAndResolveServiceScopes(
 
   for (const input of scopeItems) {
     if (typeof input !== "string") {
-      throw new Error(`Invalid service scope value: expected string`);
+      throw new ServiceScopeValidationError("Invalid service scope value: expected string");
     }
     const clean = input.trim().toLowerCase();
     if (!clean) continue;
 
     const matchedId = idMap.get(clean);
     if (!matchedId) {
-      throw new Error(`Unknown or invalid service scope: "${input}"`);
+      throw new ServiceScopeValidationError(`Unknown or invalid service scope: "${input}"`);
     }
 
     if (!seen.has(matchedId)) {
@@ -185,10 +197,12 @@ export async function setEventServiceScopes(
   scopeIds: string[],
 ): Promise<void> {
   await client.query(`DELETE FROM event_service_scope_links WHERE event_id = $1`, [eventId]);
-  for (const scopeId of scopeIds) {
+  if (scopeIds.length > 0) {
     await client.query(
-      `INSERT INTO event_service_scope_links (event_id, service_scope_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-      [eventId, scopeId],
+      `INSERT INTO event_service_scope_links (event_id, service_scope_id)
+       SELECT $1, source.scope_id FROM unnest($2::uuid[]) AS source(scope_id)
+       ON CONFLICT DO NOTHING`,
+      [eventId, scopeIds],
     );
   }
 }

@@ -18,6 +18,7 @@ import {
   validateAndResolveServiceScopes,
   setEventServiceScopes,
   ServiceScopeSummary,
+  ServiceScopeValidationError,
 } from "../lib/service-scopes";
 import {
   createEventSchema,
@@ -1814,212 +1815,211 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
+type EventEditRecord = Record<string, unknown> & {
+  id: string;
+  name: string;
+  status: string;
+  start_date: Date | string;
+  end_date: Date | string;
+};
+
+class EventEditError extends Error {
+  constructor(
+    readonly status: 400 | 403 | 404 | 409 | 503,
+    message: string,
+    readonly details: Record<string, unknown> = {},
+    cause?: unknown,
+  ) {
+    super(message, { cause });
+    this.name = "EventEditError";
+  }
+}
+
 // PUT /events/:id - Update event details & status transitions
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  if (!hasPermission(req, "events:write")) {
+    res.status(403).json({ error: "Forbidden: Insufficient privileges to update events" });
+    return;
+  }
+  const validation = updateEventSchema.safeParse(req.body);
+  if (!validation.success) {
+    res.status(400).json({ error: validation.error.errors[0].message });
+    return;
+  }
+
+  const { service_scope_ids, ...updateData } = validation.data;
+  const scopeInput: unknown = service_scope_ids !== undefined ? service_scope_ids : req.body.service_scopes;
+  const scopesRequested = service_scope_ids !== undefined || req.body.service_scopes !== undefined;
+  let client: PoolClient | undefined;
+  let discard = false;
+  let committing = false;
   try {
-    const { id } = req.params;
-    if (!hasPermission(req, "events:write")) {
-      res.status(403).json({ error: "Forbidden: Insufficient privileges to update events" });
-      return;
-    }
-
-    // Fetch existing event
-    const eventQuery = `SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL`;
-    const eventResult = await pool.query(eventQuery, [id]);
-
-    if (eventResult.rowCount === 0) {
-      res.status(404).json({ error: "Event not found" });
-      return;
-    }
-
-    const currentEvent = eventResult.rows[0];
-
-    // Auth validation: Completed event locking
-    const isOverrideAuthorized = canOverrideCompleted(req);
-    if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
-      res.status(403).json({
-        error: "Completed events cannot be edited except by administrators or accountants",
-      });
-      return;
-    }
-
-    // Validate request body
-    const validationResult = updateEventSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      res.status(400).json({ error: validationResult.error.errors[0].message });
-      return;
-    }
-
-    const updateData = validationResult.data;
-    const shouldGenerateLaborOnCompletion = updateData.status === "Completed" && currentEvent.status !== "Completed";
-
-    if (updateData.status && updateData.status !== currentEvent.status) {
-      const transitionError = validateEventStatusTransition(currentEvent.status, updateData.status, isOverrideAuthorized);
-      if (transitionError) {
-        res.status(400).json({
-          error: transitionError,
-        });
-        return;
-      }
-    }
-
-    const newStartDate = updateData.start_date !== undefined ? updateData.start_date : currentEvent.start_date;
-    const newEndDate = updateData.end_date !== undefined ? updateData.end_date : currentEvent.end_date;
-
-    const datesChanged =
-      (updateData.start_date !== undefined && updateData.start_date !== currentEvent.start_date) ||
-      (updateData.end_date !== undefined && updateData.end_date !== currentEvent.end_date);
-
-    if (datesChanged) {
-      const employeeConflict = await hasBulkEmployeeConflict(id, newStartDate, newEndDate);
-      if (employeeConflict) {
-        res.status(400).json({
-          error: "Scheduling Conflict: One or more assigned employees or drivers have conflicting assignments on these new dates.",
-        });
-        return;
-      }
-
-      const vehicleConflict = await hasBulkVehicleConflict(id, newStartDate, newEndDate);
-      if (vehicleConflict) {
-        res.status(400).json({
-          error: "Scheduling Conflict: One or more assigned vehicles have conflicting assignments on these new dates.",
-        });
-        return;
-      }
-    }
-
-    // Identify changed fields and insert into event_logs
-    const fieldsToTrack = [
-      "name",
-      "client_name",
-      "client_phone",
-      "event_type_id",
-      "start_date",
-      "end_date",
-      "start_time",
-      "end_time",
-      "venue_location",
-      "contract_price",
-      "status",
-    ];
-
-    const logPromises: Promise<any>[] = [];
-
-    // Helper to format values for event log comparison
-    const formatForLog = (field: string, val: any): string => {
-      if (val === null || val === undefined) return "";
-      if (val instanceof Date) {
-        return val.toISOString().split("T")[0]; // YYYY-MM-DD
-      }
-      if (field === "start_date" || field === "end_date") {
-        // Date objects from pg driver are Dates, but update input is string
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? String(val) : d.toISOString().split("T")[0];
-      }
-      if (field === "contract_price") {
-        return Number(val).toFixed(2);
-      }
-      return String(val);
-    };
-
-    // Build dynamic update query
-    const setClauses: string[] = [];
-    const updateParams: any[] = [];
-
-    for (const [key, val] of Object.entries(updateData)) {
-      if (val !== undefined) {
-        updateParams.push(val);
-        setClauses.push(`${key} = $${updateParams.length}`);
-      }
-    }
-
-    const client = await pool.connect();
+    client = await pool.connect();
+    let event: Record<string, unknown>;
+    let currentEvent: EventEditRecord;
     try {
       await client.query("BEGIN");
+      await client.query("set local lock_timeout = '10s'");
+      const existing = await client.query<EventEditRecord>(
+        "SELECT * FROM events WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [id],
+      );
+      if (!existing.rows[0]) throw new EventEditError(404, "Event not found");
+      currentEvent = existing.rows[0];
+      const isOverrideAuthorized = canOverrideCompleted(req);
+      if (currentEvent.status === "Completed" && !isOverrideAuthorized) {
+        throw new EventEditError(403, "Completed events cannot be edited except by administrators or accountants");
+      }
+      if (updateData.status && updateData.status !== currentEvent.status) {
+        const transitionError = validateEventStatusTransition(currentEvent.status, updateData.status, isOverrideAuthorized);
+        if (transitionError) throw new EventEditError(400, transitionError);
+      }
 
-      // Identify changed fields and insert into event_logs atomically inside transaction
-      for (const field of fieldsToTrack) {
-        if (updateData[field as keyof typeof updateData] !== undefined) {
-          const oldValue = formatForLog(field, currentEvent[field]);
-          const newValue = formatForLog(field, updateData[field as keyof typeof updateData]);
-
-          if (oldValue !== newValue) {
-            const logInsert = `
-              INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
-              VALUES ($1, $2, $3, $4, $5)
-            `;
-            await client.query(logInsert, [
-              id,
-              req.user?.id || null,
-              field,
-              oldValue || null,
-              newValue || null,
-            ]);
+      const currentDates = serializeEventCivilDates(currentEvent);
+      if (typeof currentDates.start_date !== "string" || typeof currentDates.end_date !== "string") {
+        throw new Error("Stored event dates are unavailable");
+      }
+      if (updateData.start_date !== undefined || updateData.end_date !== undefined) {
+        const dates = (await client.query<{ start_date: string; end_date: string; valid: boolean }>(
+          `select $1::date::text as start_date, $2::date::text as end_date,
+                  $1::date <= $2::date as valid`,
+          [updateData.start_date ?? currentDates.start_date, updateData.end_date ?? currentDates.end_date],
+        )).rows[0];
+        if (!dates?.valid) throw new EventEditError(400, "End date must be on or after start date");
+        if (updateData.start_date !== undefined) updateData.start_date = dates.start_date;
+        if (updateData.end_date !== undefined) updateData.end_date = dates.end_date;
+        if (dates.start_date !== currentDates.start_date || dates.end_date !== currentDates.end_date) {
+          // Match assignment writes: event, vehicles, then employees/drivers.
+          await client.query(
+            `select id from vehicles where id in
+               (select vehicle_id from vehicle_assignments where event_id = $1)
+             order by id for update`,
+            [id],
+          );
+          await client.query(
+            `select id from employees where id in
+               (select employee_id from event_assignments where event_id = $1
+                union select driver_id from vehicle_assignments where event_id = $1 and driver_id is not null)
+             order by id for update`,
+            [id],
+          );
+          if (await hasBulkEmployeeConflict(id, dates.start_date, dates.end_date, client)) {
+            throw new EventEditError(400, "Scheduling Conflict: One or more assigned employees or drivers have conflicting assignments on these new dates.");
+          }
+          if (await hasBulkVehicleConflict(id, dates.start_date, dates.end_date, client)) {
+            throw new EventEditError(400, "Scheduling Conflict: One or more assigned vehicles have conflicting assignments on these new dates.");
           }
         }
       }
 
+      const fieldsToTrack = [
+        "name", "client_name", "client_phone", "event_type_id", "start_date",
+        "end_date", "start_time", "end_time", "venue_location", "contract_price", "status",
+      ] as const;
+      const formatForLog = (field: string, value: unknown): string => {
+        if (value == null) return "";
+        if (field === "start_date" || field === "end_date") {
+          return String(serializeEventCivilDates({ [field]: value })[field]);
+        }
+        return field === "contract_price" ? Number(value).toFixed(2) : String(value);
+      };
+      const audits = fieldsToTrack.flatMap((field) => {
+        if (updateData[field] === undefined) return [];
+        const previous = formatForLog(field, currentEvent[field]);
+        const next = formatForLog(field, updateData[field]);
+        return previous === next ? [] : [{ field: String(field), previous, next }];
+      });
+      let resolvedScopeIds: string[] | undefined;
+      if (scopesRequested) {
+        resolvedScopeIds = await validateAndResolveServiceScopes(client, scopeInput);
+        const existingScopes = (await fetchEventServiceScopes(client, [id])).get(id) ?? [];
+        const previous = JSON.stringify(existingScopes.map((scope) => scope.id).sort());
+        const next = JSON.stringify([...resolvedScopeIds].sort());
+        if (previous !== next) audits.push({ field: "service_scopes", previous, next });
+      }
+
+      const values: unknown[] = [];
+      const assignments = Object.entries(updateData).flatMap(([field, value]) => {
+        if (value === undefined) return [];
+        values.push(value);
+        return [`${field} = $${values.length}`];
+      });
       let updatedRow = currentEvent;
-      if (setClauses.length > 0) {
-        updateParams.push(id);
-        const idPlaceholder = `$${updateParams.length}`;
-        const updateQuery = `
-          UPDATE events
-          SET ${setClauses.join(", ")}, updated_at = NOW()
-          WHERE id = ${idPlaceholder}
-          RETURNING *
-        `;
-        const result = await client.query(updateQuery, updateParams);
-        updatedRow = result.rows[0];
-
-        if (shouldGenerateLaborOnCompletion) {
-          const generationResult = await generateLaborExpenseFromAssignments(client, id, req.user?.id || null);
-          if (generationResult.status === "attendance_unverified") {
-            await client.query("ROLLBACK");
-            res.status(409).json({
-              error: "Attendance must be resolved for every assigned employee before the event can be completed. Mark each employee as attended or absent.",
-              unverified_count: generationResult.unverifiedCount,
-            });
-            return;
-          }
-          await auditLaborGenerationOutcome(client, id, req.user?.id || null, generationResult, "event_completion");
-        }
+      if (assignments.length > 0 || scopesRequested) {
+        values.push(id);
+        updatedRow = (await client.query<EventEditRecord>(
+          `UPDATE events SET ${[...assignments, "updated_at = NOW()"].join(", ")}
+           WHERE id = $${values.length} RETURNING *`,
+          values,
+        )).rows[0];
+        if (!updatedRow) throw new EventEditError(404, "Event not found");
       }
-
-      if (req.body.service_scope_ids !== undefined || req.body.service_scopes !== undefined) {
-        const resolvedScopeIds = await validateAndResolveServiceScopes(
-          client,
-          req.body.service_scope_ids || req.body.service_scopes,
+      if (resolvedScopeIds !== undefined) await setEventServiceScopes(client, id, resolvedScopeIds);
+      if (audits.length > 0) {
+        await client.query(
+          `INSERT INTO event_logs (event_id, user_id, field_changed, old_value, new_value)
+           SELECT $1, $2, source.field, nullif(source.previous, ''), nullif(source.next, '')
+             FROM unnest($3::text[], $4::text[], $5::text[]) AS source(field, previous, next)`,
+          [id, req.user?.id || null, audits.map((row) => row.field), audits.map((row) => row.previous), audits.map((row) => row.next)],
         );
-        await setEventServiceScopes(client, id, resolvedScopeIds);
       }
-
+      if (updateData.status === "Completed" && currentEvent.status !== "Completed") {
+        const generation = await generateLaborExpenseFromAssignments(client, id, req.user?.id || null);
+        if (generation.status === "attendance_unverified") {
+          throw new EventEditError(409,
+            "Attendance must be resolved for every assigned employee before the event can be completed. Mark each employee as attended or absent.",
+            { unverified_count: generation.unverifiedCount });
+        }
+        await auditLaborGenerationOutcome(client, id, req.user?.id || null, generation, "event_completion");
+      }
+      const rowsWithScopes = await attachServiceScopesToEvents(client, [updatedRow]);
+      event = await redactEventForPermissions(rowsWithScopes[0], req);
+      committing = true;
       await client.query("COMMIT");
-
-      if (setClauses.length > 0 && updateData.status && updateData.status !== currentEvent.status) {
-        NotificationsService.emitNotificationToRoleOrPermission({
-          permissionSlug: "events:read",
-          actor_id: req.user?.id,
-          title: "Event Status Changed",
-          message: `Event "${currentEvent.name}" status transitioned from ${currentEvent.status} to ${updateData.status}.`,
-          entity_type: "event",
-          entity_id: id,
-          action_url: `/events/${id}`,
-        });
-      }
-
-      const rowsWithScopes = await attachServiceScopesToEvents(pool, [updatedRow]);
-      const event = await redactEventForPermissions(rowsWithScopes[0], req);
-      res.json({ event });
     } catch (error) {
-      await client.query("ROLLBACK");
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        discard = true;
+        console.error("[update-event] Rollback failed; discarding connection", rollbackError);
+      }
+      if (committing) {
+        throw new EventEditError(503, "Event update could not be confirmed. Reload before retrying.", { outcome_uncertain: true }, error);
+      }
       throw error;
-    } finally {
-      client.release();
     }
-  } catch (error: any) {
+
+    if (updateData.status && updateData.status !== currentEvent.status) {
+      void NotificationsService.emitNotificationToRoleOrPermission({
+        permissionSlug: "events:read", actor_id: req.user?.id,
+        title: "Event Status Changed",
+        message: `Event "${currentEvent.name}" status transitioned from ${currentEvent.status} to ${updateData.status}.`,
+        entity_type: "event", entity_id: id, action_url: `/events/${id}`,
+      });
+    }
+    res.json({ event });
+  } catch (error: unknown) {
     console.error("[update-event] Error:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    if (error instanceof EventEditError) {
+      res.status(error.status).json({ error: error.message, ...error.details });
+      return;
+    }
+    if (error instanceof ServiceScopeValidationError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+    if (code === "22007" || code === "22008") {
+      res.status(400).json({ error: "Invalid event date or time" });
+      return;
+    }
+    if (code === "55000" || code === "55P03" || code === "40P01" || code === "23503") {
+      res.status(409).json({ error: error instanceof Error ? error.message : "Event update conflicts with current records. Reload before retrying." });
+      return;
+    }
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+  } finally {
+    client?.release(discard);
   }
 });
 
@@ -3156,7 +3156,7 @@ async function hasBulkEmployeeConflict(eventId: string, startDate: string, endDa
     ) AS conflicts
     LIMIT 1;
   `;
-  const result = await dbClient.query(query, [eventId, endDate, startDate]);
+  const result = await dbClient.query(query, [eventId, startDate, endDate]);
   return result.rows.length > 0;
 }
 
@@ -3173,7 +3173,7 @@ async function hasBulkVehicleConflict(eventId: string, startDate: string, endDat
       )
     LIMIT 1;
   `;
-  const result = await dbClient.query(query, [eventId, endDate, startDate]);
+  const result = await dbClient.query(query, [eventId, startDate, endDate]);
   return result.rows.length > 0;
 }
 

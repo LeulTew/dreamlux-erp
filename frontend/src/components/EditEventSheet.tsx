@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "./ui/button";
+import { buildEventEditPayload, type EventEditValues } from "@/lib/event-edit-payload";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -112,7 +113,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
 
   const initialScopeIds = event?.service_scope_ids || (event?.service_scopes?.map((s) => s.id) || []);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<EventEditValues>({
     name: event?.name || "",
     client_name: event?.client_name || "",
     client_phone: event?.client_phone || "",
@@ -130,6 +131,12 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isDuplicateMode, setIsDuplicateMode] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [editedFields, setEditedFields] = useState<ReadonlySet<keyof EventEditValues>>(new Set());
+
+  const updateField = <Field extends keyof EventEditValues>(field: Field, value: EventEditValues[Field]) => {
+    setFormData((current) => ({ ...current, [field]: value }));
+    setEditedFields((current) => new Set([...current, field]));
+  };
 
   const handleReset = () => {
     if (!event) return;
@@ -148,6 +155,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       status: event.status || "Planned",
     });
     setFormErrors({});
+    setEditedFields(new Set());
     setIsDuplicateMode(false);
     notify.success(t("Changes reset"));
   };
@@ -181,6 +189,8 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event", event?.id] });
+      queryClient.invalidateQueries({ queryKey: ["event-workspace", event?.id] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
       notify.success(
         "Success",
         isDuplicateMode
@@ -229,13 +239,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
     }
 
     // Call API
-    const payload = {
-      ...formData,
-      event_type_id: formData.event_type_id || null,
-      client_phone: formData.client_phone || null,
-      start_time: formData.start_time || null,
-      end_time: formData.end_time || null,
-    };
+    const payload = buildEventEditPayload(formData, event && !isDuplicateMode ? editedFields : undefined);
 
     saveMutation.mutate(payload);
   };
@@ -364,7 +368,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       disabled={isReadOnly}
                       placeholder="e.g. Betty's Wedding"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) => updateField("name", e.target.value)}
                       className={`w-full h-11 px-4 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                         formErrors.name ? "border-red-500" : "border-border"
                       }`}
@@ -379,7 +383,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                         label: et.event_name,
                       }))}
                       value={formData.event_type_id}
-                      onChange={(val) => setFormData({ ...formData, event_type_id: val })}
+                      onChange={(val) => updateField("event_type_id", val)}
                       placeholder="Select Type"
                       className={isReadOnly ? "pointer-events-none opacity-60" : ""}
                     />
@@ -389,7 +393,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                 <div className="space-y-1.5">
                   <ServiceScopeSelect
                     selectedIds={formData.service_scope_ids}
-                    onChange={(ids) => setFormData({ ...formData, service_scope_ids: ids })}
+                    onChange={(ids) => updateField("service_scope_ids", ids)}
                     disabled={isReadOnly}
                   />
                 </div>
@@ -404,7 +408,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       disabled={isReadOnly}
                       placeholder="e.g. Betty Hailu"
                       value={formData.client_name}
-                      onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
+                      onChange={(e) => updateField("client_name", e.target.value)}
                       className={`w-full h-11 px-4 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                         formErrors.client_name ? "border-red-500" : "border-border"
                       }`}
@@ -418,7 +422,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       disabled={isReadOnly}
                       placeholder="e.g. 0911223344"
                       value={formData.client_phone}
-                      onChange={(e) => setFormData({ ...formData, client_phone: e.target.value.replace(/[^\d+]/g, "") })}
+                      onChange={(e) => updateField("client_phone", e.target.value.replace(/[^\d+]/g, ""))}
                       className={`w-full h-11 px-4 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                         formErrors.client_phone ? "border-red-500" : "border-border"
                       }`}
@@ -440,8 +444,8 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       type="number"
                       disabled={isReadOnly}
                       placeholder="0.00"
-                      value={formData.contract_price || ""}
-                      onChange={(e) => setFormData({ ...formData, contract_price: Number(e.target.value) })}
+                      value={formData.contract_price}
+                      onChange={(e) => updateField("contract_price", Number(e.target.value))}
                       className={`w-full h-11 px-4 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                         formErrors.contract_price ? "border-red-500" : "border-border"
                       }`}
@@ -458,7 +462,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                           { id: "Completed", label: "Completed (የተጠናቀቀ)" },
                         ]}
                         value={formData.status}
-                        onChange={(val) => setFormData({ ...formData, status: val as "Planned" | "Ongoing" | "Completed" })}
+                        onChange={(val) => updateField("status", val as "Planned" | "Ongoing" | "Completed")}
                         placeholder="Select Status"
                         className={isReadOnly ? "pointer-events-none opacity-60" : ""}
                       />
@@ -481,7 +485,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       type="date"
                       disabled={isReadOnly}
                       value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                      onChange={(e) => updateField("start_date", e.target.value)}
                       className={`w-full h-11 px-4 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                         formErrors.start_date ? "border-red-500" : "border-border"
                       }`}
@@ -494,7 +498,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       type="date"
                       disabled={isReadOnly}
                       value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      onChange={(e) => updateField("end_date", e.target.value)}
                       className={`w-full h-11 px-4 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                         formErrors.end_date ? "border-red-500" : "border-border"
                       }`}
@@ -509,7 +513,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       type="time"
                       disabled={isReadOnly}
                       value={formData.start_time}
-                      onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                      onChange={(e) => updateField("start_time", e.target.value)}
                       className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     />
                   </div>
@@ -520,7 +524,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                       type="time"
                       disabled={isReadOnly}
                       value={formData.end_time}
-                      onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                      onChange={(e) => updateField("end_time", e.target.value)}
                       className="w-full h-11 px-4 rounded-xl border border-border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                     />
                   </div>
@@ -535,7 +539,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                     disabled={isReadOnly}
                     placeholder="e.g. Sheraton Ballroom / CMC Residence"
                     value={formData.venue_location}
-                    onChange={(e) => setFormData({ ...formData, venue_location: e.target.value })}
+                    onChange={(e) => updateField("venue_location", e.target.value)}
                     className={`w-full h-11 px-4 rounded-xl border bg-card-alt text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all ${
                       formErrors.venue_location ? "border-red-500" : "border-border"
                     }`}

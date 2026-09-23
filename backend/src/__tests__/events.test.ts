@@ -41,6 +41,35 @@ beforeEach(() => {
   mockRelease.mockClear();
 });
 
+function scriptEventEdit(
+  original: { id: string; status: string; name?: string },
+  changed: Record<string, unknown> = {},
+  labor = { total: "0", unverified: 0 },
+) {
+  let current = { name: "Synthetic event", start_date: "2026-10-01", end_date: "2026-10-02", ...original };
+  mockQuery.mockImplementation(async (sql: string, values?: unknown[]) => {
+    const query = sql.replace(/\s+/g, " ").trim().toLowerCase();
+    if (["begin", "commit", "rollback"].includes(query) || query.startsWith("set local")) {
+      return { rows: [], rowCount: 0 };
+    }
+    if (query.startsWith("select * from events where id") || query.startsWith("select id, status from events")) {
+      return { rows: [current], rowCount: 1 };
+    }
+    if (query.startsWith("update events set")) {
+      current = { ...current, ...changed };
+      return { rows: [current], rowCount: 1 };
+    }
+    if (query.includes("as unverified")) return { rows: [labor], rowCount: 1 };
+    if (query.startsWith("select") && query.includes("from expenses")) return { rows: [], rowCount: 0 };
+    if (query.startsWith("insert into expenses")) {
+      return { rows: [{ id: "expense-labor-1", amount: Number(values?.[1] ?? 0), status: "Pending" }], rowCount: 1 };
+    }
+    if (query.startsWith("insert into event_logs")) return { rows: [], rowCount: 1 };
+    if (query.includes("from event_service_scope_links") || query.includes("role_field")) return { rows: [], rowCount: 0 };
+    throw new Error(`Unexpected event-edit fixture query: ${query}`);
+  });
+}
+
 describe("Events API", () => {
   // Test listing
   test("GET /events returns paginated list of active events", async () => {
@@ -1221,15 +1250,7 @@ describe("Events API", () => {
 
   // Test Completed Event Lock (unauthorized edits blocked)
   test("PUT /events/:id blocks edit to Completed event for non-admin/non-accountant roles", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "event-comp",
-          status: "Completed",
-        },
-      ],
-      rowCount: 1,
-    });
+    scriptEventEdit({ id: "event-comp", status: "Completed" });
 
     const res = await request(app)
       .put("/events/event-comp")
@@ -1244,30 +1265,7 @@ describe("Events API", () => {
 
   // Test Completed Event Override (authorized edits allowed)
   test("PUT /events/:id allows edit to Completed event for admin", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "event-comp",
-          status: "Completed",
-          name: "Old Name",
-        },
-      ],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // Log insert
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "event-comp",
-          status: "Completed",
-          name: "Updated Name",
-        },
-      ],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // attachServiceScopesToEvents
+    scriptEventEdit({ id: "event-comp", status: "Completed", name: "Old Name" }, { name: "Updated Name" });
 
     const res = await request(app)
       .put("/events/event-comp")
@@ -1281,32 +1279,10 @@ describe("Events API", () => {
   });
 
   test("PUT /events/:id auto-generates labor expense when event transitions to Completed", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "event-1",
-          status: "Ongoing",
-          name: "Corporate Gala",
-        },
-      ],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // status audit
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "event-1", status: "Completed", name: "Corporate Gala" }],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 }); // event lock
-    mockQuery.mockResolvedValueOnce({ rows: [{ total: "3500" }], rowCount: 1 }); // labor sum
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // existing labor check
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "expense-labor-1", category: "Labor", amount: 3500, status: "Pending" }],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // generation audit
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // attachServiceScopesToEvents
+    scriptEventEdit(
+      { id: "event-1", status: "Ongoing", name: "Corporate Gala" },
+      { status: "Completed" }, { total: "3500", unverified: 0 },
+    );
 
     const res = await request(app)
       .put("/events/event-1")
@@ -1318,19 +1294,10 @@ describe("Events API", () => {
   });
 
   test("PUT /events/:id refuses completion while any assignment attendance is unverified", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "event-1", status: "Ongoing", name: "Corporate Gala" }],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // status audit
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "event-1", status: "Completed", name: "Corporate Gala" }],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
-    mockQuery.mockResolvedValueOnce({ rows: [{ total: "1500", unverified: 1 }], rowCount: 1 });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // ROLLBACK
+    scriptEventEdit(
+      { id: "event-1", status: "Ongoing", name: "Corporate Gala" },
+      { status: "Completed" }, { total: "1500", unverified: 1 },
+    );
 
     const res = await request(app)
       .put("/events/event-1")
@@ -1344,15 +1311,7 @@ describe("Events API", () => {
   });
 
   test("PUT /events/:id allows sequential status transitions", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "event-1", status: "Planned", name: "Wedding" }],
-      rowCount: 1,
-    });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // status audit log
-    mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Ongoing" }], rowCount: 1 });
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
-    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // attachServiceScopesToEvents
+    scriptEventEdit({ id: "event-1", status: "Planned", name: "Wedding" }, { status: "Ongoing" });
 
     const res = await request(app)
       .put("/events/event-1")
@@ -1367,15 +1326,7 @@ describe("Events API", () => {
 
   // Test invalid status transitions (Ongoing -> Planned)
   test("PUT /events/:id blocks transition from Ongoing back to Planned", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [
-        {
-          id: "event-ongoing",
-          status: "Ongoing",
-        },
-      ],
-      rowCount: 1,
-    });
+    scriptEventEdit({ id: "event-ongoing", status: "Ongoing" });
 
     const res = await request(app)
       .put("/events/event-ongoing")
@@ -3020,23 +2971,10 @@ describe("Events API", () => {
     // also the default, so a genuine no-show was indistinguishable from "not decided yet" and
     // the event could never be completed. Recording an absence must resolve the row.
     test("an explicitly recorded absence resolves the assignment and does not block completion", async () => {
-      mockQuery.mockResolvedValueOnce({
-        rows: [{ id: "event-1", status: "Ongoing", name: "Gala" }],
-        rowCount: 1,
-      });
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // BEGIN
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // status audit
-      mockQuery.mockResolvedValueOnce({
-        rows: [{ id: "event-1", status: "Completed", name: "Gala" }],
-        rowCount: 1,
-      }); // UPDATE events
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "event-1", status: "Completed" }], rowCount: 1 });
-      // One attended (1000), one explicitly marked absent -> zero unresolved.
-      mockQuery.mockResolvedValueOnce({ rows: [{ total: "1000", unverified: 0 }], rowCount: 1 });
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // no existing labor expense
-      mockQuery.mockResolvedValueOnce({ rows: [{ id: "exp-1", amount: "1000" }], rowCount: 1 }); // INSERT
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // labor audit
-      mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // COMMIT
+      scriptEventEdit(
+        { id: "event-1", status: "Ongoing", name: "Gala" },
+        { status: "Completed" }, { total: "1000", unverified: 0 },
+      );
 
       const res = await request(app)
         .put("/events/event-1")
@@ -4321,10 +4259,7 @@ describe("Events API", () => {
     });
 
     test("PUT /events/:id rejects invalid status jumps for non-override users", async () => {
-      mockQuery.mockResolvedValueOnce({
-        rows: [{ id: "event-1", status: "Planned" }],
-        rowCount: 1,
-      });
+      scriptEventEdit({ id: "event-1", status: "Planned" });
 
       const res = await request(app)
         .put("/events/event-1")

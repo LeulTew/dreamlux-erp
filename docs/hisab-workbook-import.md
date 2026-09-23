@@ -109,8 +109,12 @@ This matches LeulTew/koti-catering#405.
   Its month-closure cases hold a rival close or write open until the API is
   observed waiting on the month lock, covering create, move, review, delete,
   mixed-month import and close-behind-write interleavings.
+  A third process, `event-editing.integration.test.ts`, uses the same boundary
+  to prove ordinary event edits, rescheduling conflicts and partial date edits
+  against real PostgreSQL (see [Event editing](event-editing.md)).
   The local CI receipt requires all 12 native import cases, including the
-  wide sparse subtotal, then all 28 finance audit and month-closure cases, in that order, with
+  wide sparse subtotal, then all 28 finance audit and month-closure cases, then
+  all 6 event editing cases, in that order, with
   no skips, failures or unhandled runner errors.
   Both processes close their fixture HTTP server with `closeFixtureServer`
   (`backend/src/db/testing/fixture-http-server.ts`): it destroys the sockets the
