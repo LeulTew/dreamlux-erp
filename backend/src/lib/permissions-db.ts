@@ -3,9 +3,27 @@ import { supabase } from "../db/supabase";
 import {
   normalizePermissionMap,
   normalizePermissionSlugs,
+  normalizeRoleName,
   permissionMapToSlugs,
-  roleNamesToPermissionSlugs,
 } from "./permissions";
+
+export type PermissionSource = "current" | "legacy";
+
+type UserRoleRow = {
+  role_id: string | null;
+  role_ids?: unknown;
+};
+
+type RolePermissionRow = {
+  name: string;
+  permissions: unknown;
+  permission_slugs?: unknown;
+};
+
+type SupabaseRoleRow = RolePermissionRow & { id: string };
+type RolePermissionLink = { role_id: string; permission_id: string };
+type PermissionRow = { id: string; slug: string };
+type SupabaseRows<T> = { data: T[] | null; error: unknown };
 
 function isPoolUnreachable(error: unknown): boolean {
   const err = error as { code?: string; errno?: number };
@@ -16,26 +34,41 @@ function isPoolUnreachable(error: unknown): boolean {
   );
 }
 
-function isMissingColumnError(error: unknown): boolean {
+export function isMissingColumnError(error: unknown, column: "role_ids" | "profile_image_url"): boolean {
   const err = error as { code?: string; message?: string };
   const message = (err?.message || "").toLowerCase();
-  return err?.code === "42703" || message.includes("column");
+  return err?.code === "42703" && new RegExp(`\\b${column}\\b`).test(message);
 }
 
-function isMissingRelationError(error: unknown): boolean {
+export function isMissingPermissionRelation(error: unknown): boolean {
   const err = error as { code?: string; message?: string };
   const message = (err?.message || "").toLowerCase();
-  return err?.code === "42P01" || (message.includes("relation") && message.includes("does not exist"));
+  return err?.code === "42P01"
+    && /relation ["'](?:public\.)?(?:role_permissions|permissions)["'] does not exist/.test(message);
 }
 
-export function resolvePermissionSlugs(rawSlugs: unknown, rawMap: unknown): string[] {
-  const explicit = normalizePermissionSlugs(rawSlugs);
-  const mapDerived = permissionMapToSlugs(normalizePermissionMap(rawMap));
-  return [...new Set([...explicit, ...mapDerived])];
+export function resolvePermissionSlugs(
+  rawSlugs: unknown,
+  rawMap: unknown,
+  source: PermissionSource = "current",
+): string[] {
+  return source === "legacy"
+    ? permissionMapToSlugs(normalizePermissionMap(rawMap))
+    : normalizePermissionSlugs(rawSlugs);
 }
 
-export function resolveEffectivePermissionSlugs(rawSlugs: unknown, rawMap: unknown, roleNames: string[]): string[] {
-  return [...new Set([...resolvePermissionSlugs(rawSlugs, rawMap), ...roleNamesToPermissionSlugs(roleNames)])];
+export function resolveEffectivePermissionSlugs(
+  rawSlugs: unknown,
+  rawMap: unknown,
+  currentRoleNames: string[],
+  source: PermissionSource = "current",
+): string[] {
+  const slugs = resolvePermissionSlugs(rawSlugs, rawMap, source);
+  const names = currentRoleNames.map(normalizeRoleName);
+  if (names.some((name) => ["super_admin", "admin", "owner"].includes(name))) {
+    return [...new Set([...slugs, "*"])];
+  }
+  return slugs;
 }
 
 export function normalizeRoleIds(roleId: unknown, roleIdsRaw: unknown): string[] {
@@ -46,36 +79,40 @@ export function normalizeRoleIds(roleId: unknown, roleIdsRaw: unknown): string[]
   return [...new Set(ids)];
 }
 
-export async function fetchUserRoleContext(userId: string, primaryRoleId?: string) {
-  let rows: any[];
+export async function fetchUserRoleContext(userId: string, _primaryRoleId?: string) {
+  let rows: UserRoleRow[];
   try {
-    const res = await pool.query(
-      `SELECT role_ids, role_id FROM users WHERE id = $1 LIMIT 1`,
+    const res = await pool.query<UserRoleRow>(
+      `SELECT role_ids, role_id FROM users WHERE id = $1 AND is_active = TRUE AND deleted_at IS NULL LIMIT 1`,
       [userId],
     );
     rows = res.rows;
   } catch (error) {
-    if (isMissingColumnError(error)) {
-      const res = await pool.query(
-        `SELECT role_id FROM users WHERE id = $1 LIMIT 1`,
+    if (isMissingColumnError(error, "role_ids")) {
+      const res = await pool.query<UserRoleRow>(
+        `SELECT role_id FROM users WHERE id = $1 AND is_active = TRUE AND deleted_at IS NULL LIMIT 1`,
         [userId],
       );
       rows = res.rows.map((row) => ({ ...row, role_ids: [] }));
     } else if (isPoolUnreachable(error)) {
-      const { data, error: sbError } = await supabase
+      const { data, error: sbError }: SupabaseRows<UserRoleRow> = await supabase
         .from("users")
         .select("role_id, role_ids")
         .eq("id", userId)
+        .eq("is_active", true)
+        .is("deleted_at", null)
         .limit(1);
 
-      if (sbError && isMissingColumnError(sbError)) {
-        const { data: legacyData, error: legacyError } = await supabase
+      if (sbError && isMissingColumnError(sbError, "role_ids")) {
+        const { data: legacyData, error: legacyError }: SupabaseRows<UserRoleRow> = await supabase
           .from("users")
           .select("role_id")
           .eq("id", userId)
+          .eq("is_active", true)
+          .is("deleted_at", null)
           .limit(1);
         if (legacyError) throw legacyError;
-        rows = (legacyData || []).map((row: { role_id?: string | null }) => ({ ...row, role_ids: [] }));
+        rows = (legacyData || []).map((row) => ({ ...row, role_ids: [] }));
       } else {
         if (sbError) throw sbError;
         rows = data || [];
@@ -86,22 +123,21 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
   }
 
   if (rows.length === 0) {
-    // The JWT references a user row that no longer exists (e.g. the database
-    // was re-seeded). Callers must treat this as an invalid session, not an
-    // empty-permission user — otherwise embedded JWT slugs pass authorization
-    // and writes fail later with created_by FK violations (issue #182).
+    // Missing, inactive and deleted accounts are invalid sessions, not
+    // empty-permission users whose token snapshot can remain authoritative.
     return { userExists: false, roleNames: [] as string[], permissions: {} as Record<string, unknown>, permissionSlugs: [] as string[] };
   }
 
-  const roleIds = normalizeRoleIds(rows[0]?.role_id || primaryRoleId, rows[0]?.role_ids);
+  const roleIds = normalizeRoleIds(rows[0]?.role_id, rows[0]?.role_ids);
 
   if (roleIds.length === 0) {
     return { userExists: true, roleNames: [] as string[], permissions: {} as Record<string, unknown>, permissionSlugs: [] as string[] };
   }
 
-  let roleRows: any[] = [];
+  let roleRows: RolePermissionRow[];
+  let permissionSource: PermissionSource = "current";
   try {
-    const res = await pool.query(
+    const res = await pool.query<RolePermissionRow>(
       `SELECT
        r.name,
        r.permissions,
@@ -115,71 +151,73 @@ export async function fetchUserRoleContext(userId: string, primaryRoleId?: strin
     );
     roleRows = res.rows;
   } catch (error) {
-    if (isMissingRelationError(error)) {
-      const res = await pool.query(
-        `SELECT name, permissions, '{}'::text[] AS permission_slugs
+    if (isMissingPermissionRelation(error)) {
+      const res = await pool.query<RolePermissionRow>(
+        `SELECT name, permissions
          FROM roles
          WHERE id = ANY($1::uuid[])`,
         [roleIds],
       );
       roleRows = res.rows;
+      permissionSource = "legacy";
     } else if (isPoolUnreachable(error)) {
-      // 1. Fetch roles
-      const { data: rolesData, error: rolesError } = await supabase
+      const { data: rolesData, error: rolesError }: SupabaseRows<SupabaseRoleRow> = await supabase
         .from("roles")
         .select("id, name, permissions")
         .in("id", roleIds);
       if (rolesError) throw rolesError;
 
-      // 2. Fetch role_permissions join
-      const { data: rpData, error: rpError } = await supabase
-        .from("role_permissions")
-        .select("role_id, permission_id")
-        .in("role_id", roleIds);
+      const roles = rolesData || [];
+      roleRows = roles.map((role) => ({ ...role, permission_slugs: [] }));
+      if (roles.length > 0) {
+        const { data: rpData, error: rpError }: SupabaseRows<RolePermissionLink> = await supabase
+          .from("role_permissions")
+          .select("role_id, permission_id")
+          .in("role_id", roles.map((role) => role.id));
 
-      if (!rpError && rpData && rpData.length > 0) {
-        const permIds = rpData.map((rp: any) => rp.permission_id);
-        const { data: permsData, error: permsError } = await supabase
-          .from("permissions")
-          .select("id, slug")
-          .in("id", permIds);
+        if (rpError) {
+          if (!isMissingPermissionRelation(rpError)) throw rpError;
+          permissionSource = "legacy";
+        } else if (rpData && rpData.length > 0) {
+          const permIds = [...new Set(rpData.map((link) => link.permission_id))];
+          const { data: permsData, error: permsError }: SupabaseRows<PermissionRow> = await supabase
+            .from("permissions")
+            .select("id, slug")
+            .in("id", permIds);
 
-        if (!permsError && permsData) {
-          const slugById = new Map<string, string>();
-          for (const p of permsData) {
-            slugById.set(p.id, p.slug);
+          if (permsError) {
+            if (!isMissingPermissionRelation(permsError)) throw permsError;
+            permissionSource = "legacy";
+          } else {
+            const slugById = new Map((permsData || []).map((permission) => [permission.id, permission.slug]));
+            const slugsByRole = new Map<string, string[]>();
+            for (const link of rpData) {
+              const slug = slugById.get(link.permission_id);
+              if (!slug) continue;
+              const roleSlugs = slugsByRole.get(link.role_id) || [];
+              roleSlugs.push(slug);
+              slugsByRole.set(link.role_id, roleSlugs);
+            }
+            roleRows = roles.map((role) => ({
+              ...role,
+              permission_slugs: slugsByRole.get(role.id) || [],
+            }));
           }
-          roleRows = (rolesData || []).map((r: any) => {
-            const rolePermIds = rpData.filter((rp: any) => rp.role_id === r.id).map((rp: any) => rp.permission_id);
-            const slugs = rolePermIds.map((pid: string) => slugById.get(pid)).filter((s: string | undefined): s is string => Boolean(s));
-            return {
-              name: r.name,
-              permissions: r.permissions,
-              permission_slugs: slugs,
-            };
-          });
         }
-      }
-
-      if (roleRows.length === 0) {
-        roleRows = (rolesData || []).map((r: any) => ({
-          name: r.name,
-          permissions: r.permissions,
-          permission_slugs: [],
-        }));
       }
     } else {
       throw error;
     }
   }
 
-  const roleNames = roleRows.map((row) => row.name as string);
-  const permissionSlugs = roleRows.flatMap((row) => resolveEffectivePermissionSlugs(row.permission_slugs, row.permissions, [row.name]));
+  const roleNames = roleRows.map((row) => row.name);
+  const permissionSlugs = roleRows.flatMap((row) =>
+    resolveEffectivePermissionSlugs(row.permission_slugs, row.permissions, [row.name], permissionSource));
 
   return {
     userExists: true,
     roleNames,
-    permissions: roleRows[0]?.permissions || {},
+    permissions: normalizePermissionMap(roleRows[0]?.permissions),
     permissionSlugs: [...new Set(permissionSlugs)],
   };
 }

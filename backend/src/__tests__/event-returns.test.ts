@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeAll, beforeEach } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import { buildReturnNotification } from "../services/event-returns-service";
 
 const mockQuery = mock((..._args: any[]) => Promise.resolve({ rows: [] as any[], rowCount: 0 }));
@@ -18,7 +19,7 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-const JWT_SECRET = "test-secret";
+const JWT_SECRET = TEST_JWT_SECRET;
 function getToken(role = "INVENTORY_OFFICER", id = "27900000-0000-4000-8000-000000000001"): string {
   return jwt.sign({ id, role, username: "storekeeper" }, JWT_SECRET, { expiresIn: "1h" });
 }

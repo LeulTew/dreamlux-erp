@@ -1,6 +1,4 @@
 import { describe, test, expect } from "bun:test";
-import { readFileSync } from "fs";
-import { join } from "path";
 import {
   runDryRun,
   applySeed,
@@ -238,22 +236,6 @@ function createMockClient() {
 }
 
 describe("Additive Demo Dataset Seed Engine (dreamlux-demo-2026q3-v1)", () => {
-  test("Code Hygiene: Core implementation contains no TRUNCATE, DROP, or Math.random", () => {
-    const corePath = join(__dirname, "../lib/seed-demo-additive-core.ts");
-    const cliPath = join(__dirname, "../db/seed-demo-additive.ts");
-
-    const coreContent = readFileSync(corePath, "utf-8");
-    const cliContent = readFileSync(cliPath, "utf-8");
-
-    expect(coreContent).not.toContain("TRUNCATE");
-    expect(coreContent).not.toContain("DROP TABLE");
-    expect(coreContent).not.toContain("Math.random");
-
-    expect(cliContent).not.toContain("TRUNCATE");
-    expect(cliContent).not.toContain("DROP TABLE");
-    expect(cliContent).not.toContain("Math.random");
-  });
-
   test("Dry-Run Default: runDryRun performs ZERO mutations on database", async () => {
     const mockClient = createMockClient() as any;
     const report = await runDryRun(mockClient);

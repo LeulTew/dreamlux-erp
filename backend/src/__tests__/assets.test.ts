@@ -7,6 +7,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeEach, beforeAll, afterEach, spyOn } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import type { PoolClient, QueryResult } from "pg";
 import { pool } from "../db/pool";
 import * as storage from "../storage/storage";
@@ -73,7 +74,7 @@ beforeAll(async () => {
 });
 
 const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const JWT_SECRET = process.env.JWT_SECRET || TEST_JWT_SECRET;
 
 function getNoAssetsReadToken(): string {
   return jwt.sign(

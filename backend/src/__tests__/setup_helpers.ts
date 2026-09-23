@@ -1,5 +1,6 @@
 import { mock } from "bun:test";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 
 export const mockQuery = mock(() => Promise.resolve({ rows: [] as Record<string, unknown>[] }));
 export const mockUploadImage = mock(() => Promise.resolve());
@@ -9,7 +10,7 @@ export const mockGetPublicUrl = mock(
 );
 
 export function getToken(): string {
-  const secret = process.env.JWT_SECRET || "dev-secret";
+  const secret = process.env.JWT_SECRET || TEST_JWT_SECRET;
   return jwt.sign({ role: "SUPER_ADMIN", permissions: { all: true } }, secret, { expiresIn: "1h" });
 }
 

@@ -2,6 +2,7 @@ import "./setup";
 import { describe, test, expect, mock, beforeAll } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_ADMIN_PASSWORD, TEST_JWT_SECRET } from "./auth-test-config";
 import { pool } from "../db/pool";
 
 // Mock storage
@@ -72,7 +73,7 @@ beforeAll(async () => {
   app = mod.default;
 });
 
-const JWT_SECRET = "test-secret";
+const JWT_SECRET = TEST_JWT_SECRET;
 
 function getToken(): string {
   return jwt.sign({ role: "SUPER_ADMIN" }, JWT_SECRET, { expiresIn: "1h" });
@@ -85,11 +86,8 @@ describe("Auth", () => {
 
     const res = await request(app)
       .post("/auth/login")
-      .send({ password: "test-password" });
+      .send({ password: TEST_ADMIN_PASSWORD });
 
-    if (res.status !== 200) {
-      console.log("LOGIN FAIL:", res.status, res.body, "ADMIN_PASSWORD env:", process.env.ADMIN_PASSWORD);
-    }
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("token");
     expect(typeof res.body.token).toBe("string");
@@ -178,7 +176,7 @@ describe("Auth", () => {
 
     const res = await request(app)
       .post("/auth/login")
-      .send({ password: "test-password" });
+      .send({ password: TEST_ADMIN_PASSWORD });
 
     expect(res.status).toBe(200);
     expect(res.headers["set-cookie"]).toBeDefined();

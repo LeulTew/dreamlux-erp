@@ -12,6 +12,7 @@ const invalidationTimestamps = new Map<string, { timestamp: number; revision: nu
 let globalInvalidatedAt = 0;
 let invalidationRevision = 0;
 let globalInvalidatedRevision = 0;
+let nextInvalidationAgeSweep: number | null = null;
 
 export const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 const MAX_CACHE_SIZE = 2000;
@@ -115,8 +116,9 @@ function pruneInvalidationTimestamps(now: number): void {
     }
   }
 
-  if (invalidationTimestamps.size > INVALIDATION_PRUNE_THRESHOLD) {
-    const surplus = invalidationTimestamps.size - INVALIDATION_PRUNE_THRESHOLD;
+  if (invalidationTimestamps.size >= INVALIDATION_PRUNE_THRESHOLD) {
+    // Leave headroom so a simultaneous burst does not sort the whole map per user.
+    const surplus = invalidationTimestamps.size - Math.floor(INVALIDATION_PRUNE_THRESHOLD / 2);
     const oldestFirst = [...invalidationTimestamps.entries()]
       .sort(([, left], [, right]) => left.timestamp - right.timestamp)
       .slice(0, surplus);
@@ -131,10 +133,12 @@ function pruneInvalidationTimestamps(now: number): void {
 
 export function invalidateUserCache(userId: string, now: number = Date.now()): void {
   cache.delete(userId);
+  nextInvalidationAgeSweep ??= now + INVALIDATION_RETENTION_MS;
   // Prune before inserting so this user's own fresh timestamp is never a
   // candidate for eviction: dropping it would reopen the race it guards.
-  if (invalidationTimestamps.size >= INVALIDATION_PRUNE_THRESHOLD) {
+  if (invalidationTimestamps.size >= INVALIDATION_PRUNE_THRESHOLD || now > nextInvalidationAgeSweep) {
     pruneInvalidationTimestamps(now);
+    nextInvalidationAgeSweep = now + INVALIDATION_RETENTION_MS;
   }
   invalidationTimestamps.set(userId, { timestamp: now, revision: ++invalidationRevision });
 }
@@ -142,6 +146,7 @@ export function invalidateUserCache(userId: string, now: number = Date.now()): v
 export function invalidateAllCache(now: number = Date.now()): void {
   cache.clear();
   invalidationTimestamps.clear();
+  nextInvalidationAgeSweep = null;
   globalInvalidatedAt = now;
   globalInvalidatedRevision = ++invalidationRevision;
 }

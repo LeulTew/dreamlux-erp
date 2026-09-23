@@ -119,6 +119,14 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
     verifyJunitReceipt(await readFile(returnReport, "utf8"), returnSummary);
     console.log(`Native return corrections: ${returnSummary.passed} passed, zero failed/skipped.`);
 
+    const provisioningReport = join(work, "provisioning.native.private.junit.xml");
+    const provisioning = start("native authority provisioning", process.execPath,
+      nativeArguments(provisioningReport, "provisioning"), join(root, "backend"), env);
+    const provisioningResult = await provisioning.requireSuccess(budget(60_000));
+    const provisioningSummary = nativeReceipt(provisioningResult.output, provisioningResult.exitCode, { suite: "provisioning" });
+    verifyJunitReceipt(await readFile(provisioningReport, "utf8"), provisioningSummary);
+    console.log(`Native authority provisioning: ${provisioningSummary.passed} passed, zero failed/skipped.`);
+
     await ports.release(5326);
     const descriptorPath = join(work, "equipment.browser.private.json");
     const providerReport = join(work, "equipment.provider.private.junit.xml");
@@ -175,7 +183,8 @@ export async function verifyEquipment(plan: NativePlan, root = repositoryRoot) {
     budget(1);
     const infrastructure = await stopProvider();
     receipt = {
-      schema: 1, purpose: "dreamlux-equipment-259", native: nativeSummary, conditions: conditionSummary, returns: returnSummary, browsers,
+      schema: 1, purpose: "dreamlux-equipment-259", native: nativeSummary, conditions: conditionSummary,
+      returns: returnSummary, provisioning: provisioningSummary, browsers,
       browserRegistryDigest: hash(JSON.stringify(registry)), providerInfrastructureOnly: infrastructure,
       frontend: build, testSourceDigest: snapshot.testDigest,
     };

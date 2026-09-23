@@ -1,9 +1,19 @@
 import { pool } from "../db/pool";
+import { hasPermissionSlug } from "../lib/permissions";
 import {
-  hasPermissionSlug,
-  permissionMapToSlugs,
-  ROLE_PERMISSION_SEEDS,
-} from "../lib/permissions";
+  isMissingColumnError,
+  isMissingPermissionRelation,
+  resolveEffectivePermissionSlugs,
+  type PermissionSource,
+} from "../lib/permissions-db";
+
+type PermissionRecipientRow = {
+  id?: string;
+  user_id?: string;
+  role_name?: string;
+  permissions?: unknown;
+  slugs?: unknown;
+};
 
 export interface CreateNotificationParams {
   recipient_id: string;
@@ -83,12 +93,6 @@ const PERMISSION_SLUG_ALIASES: Record<string, string[]> = {
 function expandPermissionSlug(permissionSlug: string): string[] {
   const normalized = permissionSlug.trim().toLowerCase();
   return [...new Set([normalized, ...(PERMISSION_SLUG_ALIASES[normalized] || [])])];
-}
-
-function isMissingColumnError(error: unknown): boolean {
-  const err = error as { code?: string; message?: string };
-  const message = (err?.message || "").toLowerCase();
-  return err?.code === "42703" || message.includes("column");
 }
 
 export class NotificationsService {
@@ -226,20 +230,32 @@ export class NotificationsService {
   private static async findRecipientIdsByPermission(permissionSlug: string): Promise<string[]> {
     const candidateSlugs = expandPermissionSlug(permissionSlug);
     const wildcardSlugs = candidateSlugs.map(moduleWildcardSlug).filter((slug): slug is string => Boolean(slug));
+    const { rows, source } = await this.fetchPermissionRecipientRows();
+    return this.filterRecipientsByPermissionRows(rows, candidateSlugs, wildcardSlugs, source);
+  }
 
-    try {
-      const res = await pool.query(
-        `WITH user_roles AS (
+  private static async fetchPermissionRecipientRows(
+    includeAdditionalRoles = true,
+    source: PermissionSource = "current",
+  ): Promise<{ rows: PermissionRecipientRow[]; source: PermissionSource }> {
+    const roleJoin = includeAdditionalRoles
+      ? `LEFT JOIN LATERAL (
+           SELECT jsonb_array_elements_text(u.role_ids)::uuid AS role_id
+           WHERE jsonb_typeof(u.role_ids) = 'array'
+         ) extra_role ON TRUE
+         JOIN public.roles r ON r.id = u.role_id OR r.id = extra_role.role_id`
+      : `JOIN public.roles r ON r.id = u.role_id`;
+    const userRoles = `WITH user_roles AS (
            SELECT u.id AS user_id, r.id AS role_id, LOWER(r.name) AS role_name, r.permissions
            FROM public.users u
-           LEFT JOIN LATERAL (
-             SELECT jsonb_array_elements_text(u.role_ids)::uuid AS role_id
-             WHERE jsonb_typeof(u.role_ids) = 'array'
-           ) extra_role ON TRUE
-           JOIN public.roles r ON r.id = u.role_id OR r.id = extra_role.role_id
+           ${roleJoin}
            WHERE u.deleted_at IS NULL
              AND u.is_active = TRUE
-         ),
+         )`;
+    const query = source === "legacy"
+      ? `${userRoles}
+         SELECT DISTINCT user_id AS id, role_name, permissions FROM user_roles`
+      : `${userRoles},
          role_slugs AS (
            SELECT DISTINCT
              ur.user_id,
@@ -252,27 +268,19 @@ export class NotificationsService {
          )
          SELECT DISTINCT user_id AS id, role_name, permissions, array_agg(slug) FILTER (WHERE slug IS NOT NULL) AS slugs
          FROM role_slugs
-         GROUP BY user_id, role_name, permissions`,
-      );
+         GROUP BY user_id, role_name, permissions`;
 
-      return this.filterRecipientsByPermissionRows(res.rows, candidateSlugs, wildcardSlugs);
+    try {
+      const result = await pool.query<PermissionRecipientRow>(query);
+      return { rows: result.rows, source };
     } catch (error) {
-      if (!isMissingColumnError(error)) {
-        throw error;
+      if (includeAdditionalRoles && isMissingColumnError(error, "role_ids")) {
+        return this.fetchPermissionRecipientRows(false, source);
       }
-
-      const legacyRes = await pool.query(
-        `SELECT DISTINCT u.id, LOWER(r.name) AS role_name, r.permissions,
-                COALESCE(array_agg(p.slug) FILTER (WHERE p.slug IS NOT NULL), '{}') AS slugs
-         FROM public.users u
-         JOIN public.roles r ON u.role_id = r.id
-         LEFT JOIN public.role_permissions rp ON r.id = rp.role_id
-         LEFT JOIN public.permissions p ON rp.permission_id = p.id
-         WHERE u.deleted_at IS NULL
-           AND u.is_active = TRUE
-         GROUP BY u.id, r.name, r.permissions`,
-      );
-      return this.filterRecipientsByPermissionRows(legacyRes.rows, candidateSlugs, wildcardSlugs);
+      if (source === "current" && isMissingPermissionRelation(error)) {
+        return this.fetchPermissionRecipientRows(includeAdditionalRoles, "legacy");
+      }
+      throw error;
     }
   }
 
@@ -293,7 +301,7 @@ export class NotificationsService {
       );
       return res.rows.map((row) => row.id);
     } catch (error) {
-      if (!isMissingColumnError(error)) {
+      if (!isMissingColumnError(error, "role_ids")) {
         throw error;
       }
 
@@ -311,22 +319,18 @@ export class NotificationsService {
   }
 
   private static filterRecipientsByPermissionRows(
-    rows: Array<{ id?: string; user_id?: string; role_name?: string; permissions?: unknown; slugs?: string[] }>,
+    rows: PermissionRecipientRow[],
     requiredSlugs: string[],
     wildcardSlugs: string[],
+    source: PermissionSource,
   ): string[] {
     const recipientIds = rows
       .filter((row) => {
-        const roleName = (row.role_name || "").trim().toLowerCase();
-        const explicitSlugs = Array.isArray(row.slugs) ? row.slugs : [];
-        const jsonSlugs = permissionMapToSlugs((row.permissions || {}) as Record<string, unknown>);
-        const seedSlugs = ROLE_PERMISSION_SEEDS[roleName] || [];
-        const effectiveSlugs = [...new Set([...explicitSlugs, ...jsonSlugs, ...seedSlugs].map((slug) => slug.trim().toLowerCase()))];
+        const effectiveSlugs = resolveEffectivePermissionSlugs(
+          row.slugs, row.permissions, [row.role_name || ""], source,
+        );
 
         return (
-          roleName === "super_admin" ||
-          roleName === "admin" ||
-          roleName === "owner" ||
           requiredSlugs.some((requiredSlug) => hasPermissionSlug(effectiveSlugs, requiredSlug)) ||
           wildcardSlugs.some((wildcardSlug) => effectiveSlugs.includes(wildcardSlug))
         );

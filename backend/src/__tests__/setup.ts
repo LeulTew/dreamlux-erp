@@ -1,4 +1,5 @@
 import { mock, beforeEach } from "bun:test";
+import { TEST_ADMIN_PASSWORD, TEST_JWT_SECRET, TEST_MANAGER_PASSWORD } from "./auth-test-config";
 import { invalidateAllCache } from "../lib/permissions-cache";
 
 beforeEach(() => {
@@ -6,8 +7,9 @@ beforeEach(() => {
 });
 import { fakeChain, mockUploadImage, mockDeleteImage, mockGetPublicUrl } from "./setup_helpers";
 
-process.env.JWT_SECRET = "test-secret";
-process.env.ADMIN_PASSWORD = "test-password";
+process.env.JWT_SECRET = TEST_JWT_SECRET;
+process.env.ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
+process.env.MANAGER_PASSWORD = TEST_MANAGER_PASSWORD;
 process.env.SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
 process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
@@ -73,4 +75,3 @@ try {
 } catch (e) {
   console.warn("Failed to override pool instance methods directly:", e);
 }
-

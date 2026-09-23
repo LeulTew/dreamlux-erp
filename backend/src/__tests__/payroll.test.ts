@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, beforeAll, mock } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 import { getToken } from "./setup_helpers";
 import "./setup";
 import { pool } from "../db/pool";
@@ -83,7 +84,7 @@ mock.module("../db/supabase", () => ({
 // ─── Constants ───────────────────────────────────────────────────────────────
 const AUTH = () => `Bearer ${getToken()}`;
 const PAYROLL_READ_ONLY_AUTH = () => {
-  const secret = process.env.JWT_SECRET || "dev-secret";
+  const secret = process.env.JWT_SECRET || TEST_JWT_SECRET;
   const token = jwt.sign(
     {
       id: "payroll-readonly-user",
@@ -294,7 +295,7 @@ describe("Payroll API > GET /payroll/settings", () => {
   });
 
   test("is denied without any payroll permission", async () => {
-    const secret = process.env.JWT_SECRET || "dev-secret";
+    const secret = process.env.JWT_SECRET || TEST_JWT_SECRET;
     const token = jwt.sign(
       { id: "u-x", username: "x", role: "DRIVER", roles: ["DRIVER"], permission_slugs: ["trips:create"] },
       secret,

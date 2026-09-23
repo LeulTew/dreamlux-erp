@@ -1,16 +1,18 @@
 import { Router, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { compare } from "bcryptjs";
-import { getEnv } from "../lib/env";
+import { AuthConfigurationError, getAdminRecoveryPassword, getAuthSigningSecret } from "../lib/env";
 import { pool } from "../db/pool";
 import { supabase } from "../db/supabase";
 import { ensureBootstrapAdmin } from "../lib/bootstrap-admin";
-import { AuthRequest, requireAuth } from "../middleware/auth";
+import { AuthRequest, getEffectivePermissionSlugsFromUser, requireAuth } from "../middleware/auth";
+import { PERMISSION_DEFINITIONS } from "../lib/permissions";
 import {
-  PERMISSION_DEFINITIONS,
-  normalizePermissionMap,
-  normalizeRoleName,
-} from "../lib/permissions";
+  fetchUserRoleContext,
+  isMissingColumnError,
+  isMissingPermissionRelation,
+  resolveEffectivePermissionSlugs,
+} from "../lib/permissions-db";
 
 const router = Router();
 
@@ -18,21 +20,6 @@ function isPoolUnreachable(error: unknown): boolean {
   const err = error as { code?: string };
   return err?.code === "ENOTFOUND" || err?.code === "ECONNREFUSED" || err?.code === "ETIMEDOUT";
 }
-
-function isMissingColumnError(error: unknown): boolean {
-  const err = error as { code?: string; message?: string };
-  return err?.code === "42703" || (err?.message || "").toLowerCase().includes("column");
-}
-
-function isMissingRelationError(error: unknown): boolean {
-  const err = error as { code?: string; message?: string };
-  return err?.code === "42P01" || (err?.message || "").toLowerCase().includes("relation") && (err?.message || "").toLowerCase().includes("does not exist");
-}
-
-import {
-  fetchUserRoleContext,
-  resolveEffectivePermissionSlugs,
-} from "../lib/permissions-db";
 
 function setTokenCookie(res: Response, token: string) {
   res.cookie("token", token, {
@@ -43,16 +30,37 @@ function setTokenCookie(res: Response, token: string) {
   });
 }
 
+function matchedRecoveryPassword(username: string, password: unknown): string | null {
+  if (username !== "admin" || typeof password !== "string") return null;
+  try {
+    const configured = getAdminRecoveryPassword();
+    return configured !== null && password === configured ? configured : null;
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[RecoveryConfiguration]", error.message);
+    return null;
+  }
+}
+
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body;
-  const jwtSecret = getEnv("JWT_SECRET", "dev-secret");
 
   // Fallback to 'admin' username if the frontend only sends a password field (transitional)
   const queryUsername = username || 'admin';
   const queryPassword = password;
 
-  if (!queryPassword) {
+  if (typeof queryPassword !== "string" || !queryPassword) {
     res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+
+  let jwtSecret: string;
+  try {
+    jwtSecret = getAuthSigningSecret();
+  } catch (error) {
+    if (!(error instanceof AuthConfigurationError)) throw error;
+    console.error("[AuthConfiguration]", error.message);
+    res.status(503).json({ error: "Authentication service unavailable" });
     return;
   }
 
@@ -67,6 +75,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       permissions: Record<string, unknown>;
       permission_slugs?: string[];
       profile_image_url?: string | null;
+      password_hash?: string;
     }> = [];
 
     try {
@@ -77,6 +86,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
           u.email,
           u.full_name,
           u.profile_image_url,
+          u.password_hash,
           u.is_active,
           u.role_id,
           r.name as role_name,
@@ -86,30 +96,38 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
          JOIN roles r ON u.role_id = r.id
          LEFT JOIN role_permissions rp ON rp.role_id = r.id
          LEFT JOIN permissions p ON p.id = rp.permission_id
-         WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)
+         WHERE u.username = $1
+           AND (u.password_hash LIKE '$2b$%' OR u.password_hash = crypt($2, u.password_hash))
          GROUP BY u.id, u.username, u.email, u.full_name, u.profile_image_url, u.is_active, u.role_id, r.name, r.permissions`,
         [queryUsername, queryPassword]
       );
       rows = queryResult?.rows || [];
     } catch (queryError) {
-      if (!isMissingColumnError(queryError) && !isMissingRelationError(queryError)) {
+      if (!isMissingColumnError(queryError, "profile_image_url") && !isMissingPermissionRelation(queryError)) {
         throw queryError;
       }
 
       const queryResult = await pool.query(
-        `SELECT u.id, u.username, u.email, u.full_name, NULL::text as profile_image_url, u.is_active, u.role_id, r.name as role_name, r.permissions
+        `SELECT u.id, u.username, u.email, u.full_name, NULL::text as profile_image_url, u.password_hash, u.is_active, u.role_id, r.name as role_name, r.permissions
          FROM users u
          JOIN roles r ON u.role_id = r.id
-         WHERE u.username = $1 AND u.password_hash = crypt($2, u.password_hash)`,
+         WHERE u.username = $1
+           AND (u.password_hash LIKE '$2b$%' OR u.password_hash = crypt($2, u.password_hash))`,
         [queryUsername, queryPassword]
       );
       rows = queryResult?.rows || [];
     }
 
+    // pgcrypto does not recognize every bcrypt prefix produced by bcryptjs.
+    // Verify 2b with the original algorithm, without relabeling stored hashes.
+    if (rows[0]?.password_hash?.startsWith("$2b$")
+      && !(await compare(queryPassword, rows[0].password_hash))) {
+      rows = [];
+    }
     if (rows.length === 0) {
       // Legacy fallback
-      const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-      if (queryUsername === 'admin' && queryPassword === adminPassword) {
+      const adminPassword = matchedRecoveryPassword(queryUsername, queryPassword);
+      if (adminPassword !== null) {
         try {
           const adminUser = await ensureBootstrapAdmin(adminPassword);
           const token = jwt.sign(
@@ -119,7 +137,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
               role: adminUser.role_name,
               permissions: adminUser.permissions,
               roles: [adminUser.role_name],
-              permission_slugs: resolveEffectivePermissionSlugs(undefined, adminUser.permissions, [adminUser.role_name]),
+              permission_slugs: resolveEffectivePermissionSlugs(undefined, adminUser.permissions, [adminUser.role_name], "legacy"),
             },
             jwtSecret,
             { expiresIn: '7d' },
@@ -153,22 +171,12 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    let roleNames = [user.role_name];
-    let permissions = user.permissions;
-    let permissionSlugs = resolveEffectivePermissionSlugs(user.permission_slugs, user.permissions, roleNames);
-
-    try {
-      const roleContext = await fetchUserRoleContext(user.id, (user as any).role_id);
-      if (roleContext.roleNames.length > 0) {
-        roleNames = roleContext.roleNames;
-        permissions = roleContext.permissions;
-        permissionSlugs = roleContext.permissionSlugs;
-      }
-    } catch (roleContextError) {
-      if (!isMissingColumnError(roleContextError) && !isMissingRelationError(roleContextError)) {
-        throw roleContextError;
-      }
+    const roleContext = await fetchUserRoleContext(user.id);
+    if (!roleContext.userExists) {
+      res.status(401).json({ error: "Account is unavailable" });
+      return;
     }
+    const { roleNames, permissions, permissionSlugs } = roleContext;
 
     const token = jwt.sign(
       {
@@ -176,7 +184,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         username: user.username,
         email: user.email,
         full_name: user.full_name,
-        role: roleNames[0] || user.role_name,
+        role: roleNames[0] || "",
         roles: roleNames,
         permissions,
         permission_slugs: permissionSlugs,
@@ -192,7 +200,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         username: user.username,
         full_name: user.full_name,
-        role: roleNames[0] || user.role_name,
+        role: roleNames[0] || "",
         roles: roleNames,
         profile_image_url: user.profile_image_url || null,
         permission_slugs: permissionSlugs,
@@ -224,7 +232,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 
         if (!extended.error) {
           userRows = extended.data || [];
-        } else if (isMissingColumnError(extended.error)) {
+        } else if (isMissingColumnError(extended.error, "profile_image_url")) {
           const basic = await supabase
             .from("users")
             .select("id, username, email, full_name, is_active, role_id, password_hash")
@@ -247,16 +255,13 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
               return;
             }
 
-            const { data: roleRows } = await supabase
-              .from("roles")
-              .select("name, permissions")
-              .eq("id", candidate.role_id)
-              .limit(1);
-
-            const roleName = roleRows?.[0]?.name || "UNKNOWN";
-            const permissions = normalizePermissionMap(roleRows?.[0]?.permissions);
-            const roleNames = [roleName];
-            const permissionSlugs = resolveEffectivePermissionSlugs(undefined, permissions, roleNames);
+            const roleContext = await fetchUserRoleContext(candidate.id);
+            if (!roleContext.userExists) {
+              res.status(401).json({ error: "Account is unavailable" });
+              return;
+            }
+            const { roleNames, permissions, permissionSlugs } = roleContext;
+            const roleName = roleNames[0] || "";
 
             const token = jwt.sign(
               {
@@ -294,8 +299,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    const adminPassword = getEnv("ADMIN_PASSWORD", "admin");
-    if (queryUsername === 'admin' && queryPassword === adminPassword) {
+    if (matchedRecoveryPassword(queryUsername, queryPassword) !== null) {
       const token = jwt.sign({ username: 'admin', role: 'SUPER_ADMIN', permissions: { all: true }, permission_slugs: ['*'] }, jwtSecret, { expiresIn: '7d' });
       setTokenCookie(res, token);
       res.json({ token, user: { username: 'admin', role: 'SUPER_ADMIN', profile_image_url: null } });
@@ -306,11 +310,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 });
 
 router.get("/me", requireAuth, (req: AuthRequest, res: Response) => {
-  const permissionSlugs = resolveEffectivePermissionSlugs(
-    req.user?.permission_slugs,
-    req.user?.permissions,
-    [req.user?.role, ...(req.user?.roles || [])].filter((role): role is string => Boolean(role)),
-  );
+  const permissionSlugs = getEffectivePermissionSlugsFromUser(req.user);
   res.json({
     user: {
       id: req.user?.id,
@@ -325,33 +325,15 @@ router.get("/me", requireAuth, (req: AuthRequest, res: Response) => {
   });
 });
 
-router.get("/permissions", requireAuth, async (req: AuthRequest, res: Response) => {
-  const tokenRoles = [req.user?.role, ...(req.user?.roles || [])].filter((role): role is string => Boolean(role));
-  let roleNames = tokenRoles;
-  let permissionSlugs = resolveEffectivePermissionSlugs(req.user?.permission_slugs, req.user?.permissions, tokenRoles);
-
-  if (req.user?.id) {
-    try {
-      const roleContext = await fetchUserRoleContext(req.user.id);
-      if (roleContext.roleNames.length > 0) {
-        roleNames = roleContext.roleNames;
-        permissionSlugs = roleContext.permissionSlugs;
-      }
-    } catch (error) {
-      if (!isMissingColumnError(error) && !isMissingRelationError(error) && !isPoolUnreachable(error)) {
-        console.error("Effective permissions error:", error);
-        res.status(500).json({ error: "Failed to resolve effective permissions" });
-        return;
-      }
-    }
-  }
-
+router.get("/permissions", requireAuth, (req: AuthRequest, res: Response) => {
+  const roleNames = req.user?.roles || (req.user?.role ? [req.user.role] : []);
+  const permissionSlugs = getEffectivePermissionSlugsFromUser(req.user);
   res.json({
     user_id: req.user?.id || null,
     role: roleNames[0] || req.user?.role || null,
     roles: roleNames,
     permission_slugs: permissionSlugs,
-    is_superuser: permissionSlugs.includes("*") || roleNames.some((role) => ["super_admin", "admin", "owner"].includes(normalizeRoleName(role))),
+    is_superuser: permissionSlugs.includes("*"),
     catalog: PERMISSION_DEFINITIONS,
   });
 });

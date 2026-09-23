@@ -2,6 +2,7 @@ import "./setup";
 import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import request from "supertest";
 import jwt from "jsonwebtoken";
+import { TEST_JWT_SECRET } from "./auth-test-config";
 
 const mockQuery = mock<(...args: any[]) => Promise<any>>(() => Promise.resolve({ rows: [], rowCount: 0 }));
 
@@ -37,7 +38,7 @@ function token(userId = "550e8400-e29b-41d4-a716-446655440000", permission_slugs
       permission_slugs,
       is_active: true,
     },
-    "test-secret",
+    TEST_JWT_SECRET,
     { expiresIn: "1h" },
   );
 }

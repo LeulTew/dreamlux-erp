@@ -125,6 +125,7 @@ export class ManagedProcess {
       return result;
     } catch (error) {
       await this.stop();
+      console.error(redact(this.output, this.secrets).split(/\r?\n/).slice(-60).join("\n"));
       throw error;
     } finally {
       clearTimeout(timer);
