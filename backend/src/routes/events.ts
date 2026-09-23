@@ -7,6 +7,7 @@ import { requireAuth, AuthRequest, getEffectivePermissionSlugsFromUser } from ".
 import { NotificationsService } from "../services/notifications-service";
 import { hasPermissionSlug } from "../lib/permissions";
 import { fetchHiddenFieldsForRoles } from "../lib/permissions-db";
+import { serializeEventCivilDates } from "../lib/event-civil-dates";
 import { calculateFuelCostLitersPerKm, FUEL_CONSUMPTION_UNIT, validateFuelConsumptionRateLitersPerKm } from "../lib/fuel";
 import { createEventProposalsRouter } from "./events/proposals";
 import { createEventProfitReportsRouter } from "./events/profit-reports";
@@ -149,7 +150,7 @@ async function getHiddenEventFields(req: AuthRequest): Promise<string[]> {
 }
 
 async function redactEventForPermissions<T extends Record<string, any>>(event: T, req: AuthRequest): Promise<T> {
-  const redacted = { ...event };
+  const redacted = serializeEventCivilDates(event) as T;
   if (!canViewEventFinancials(req)) {
     delete redacted.contract_price;
     delete redacted.approved_expense_total;
@@ -712,7 +713,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       LEFT JOIN event_types et ON e.event_type_id = et.id
       ${queryParts.summaryJoins}
       WHERE ${queryParts.whereClause}
-      ORDER BY ${queryParts.sortSql} ${queryParts.sortDirection}, e.created_at DESC
+      ORDER BY ${queryParts.sortSql} ${queryParts.sortDirection}, e.created_at DESC, e.id ASC
       LIMIT ${limitParam} OFFSET ${offsetParam}
     `;
 
@@ -2197,7 +2198,7 @@ router.get("/:id/workspace", requireAuth, async (req: AuthRequest, res: Response
 
     const isPrivileged = canViewEventOperations(req);
 
-    const filteredEvent = { ...event };
+    const filteredEvent = serializeEventCivilDates(event);
     if (!isFinancial) delete filteredEvent.contract_price;
     if (!isPrivileged) delete filteredEvent.estimated_design_cost;
 
