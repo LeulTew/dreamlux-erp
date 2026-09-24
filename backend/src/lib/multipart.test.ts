@@ -1,7 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
-import { Readable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 import type { Request, RequestHandler, Response } from "express";
 import multer from "multer";
 import { assetUpload, boundedMultipart, employeeUpload, parseEmployeeEventPrices, workbookUpload } from "./multipart";
@@ -52,6 +51,30 @@ interface Outcome {
   bytesRead: number;
 }
 
+function syntheticHttp() {
+  const socket = new Socket();
+  // A manually pushed stream must not use a runtime's transport-backed HTTP reader.
+  const req = Object.assign(new Readable({ read() {} }), {
+    socket,
+    complete: false,
+    aborted: false,
+  }) as Request;
+  const headers = new Map<string, string | number | readonly string[]>();
+  const res = Object.assign(new Writable({
+    write(_chunk, _encoding, callback) { callback(); },
+  }), {
+    statusCode: 200,
+    headersSent: false,
+    setHeader(name: string, value: string | number | readonly string[]) {
+      headers.set(name.toLowerCase(), value);
+      return this;
+    },
+    getHeader(name: string) { return headers.get(name.toLowerCase()); },
+  }) as Response;
+  res.once("finish", () => { res.headersSent = true; });
+  return { req, res, socket };
+}
+
 async function parse(
   middleware: RequestHandler,
   chunks: Iterable<Buffer>,
@@ -69,10 +92,7 @@ async function parse(
     settleMs?: number;
   } = {},
 ): Promise<Outcome> {
-  const socket = new Socket();
-  // An in-memory response sink: no bind, connect, listen, app, auth secret, or provider.
-  socket._write = (_chunk, _encoding, callback) => callback();
-  const req = new IncomingMessage(socket) as Request;
+  const { req, res, socket } = syntheticHttp();
   req.headers = {
     "content-type": options.contentType ?? `multipart/form-data; boundary=${boundary}`,
     ...(options.unframed ? {} : options.length === undefined
@@ -82,8 +102,6 @@ async function parse(
   req.method = "POST";
   req.url = "/synthetic-upload";
   req.body = options.body;
-  const res = new ServerResponse(req) as Response;
-  res.assignSocket(socket);
   const outcome: Outcome = { req, res, callbacks: 0, bytesRead: 0 };
   let complete: () => void = () => {};
   const completion = new Promise<void>((resolve) => { complete = resolve; });
@@ -143,6 +161,44 @@ async function parse(
   await new Promise<void>((resolve) => setImmediate(resolve));
   return outcome;
 }
+
+describe("synthetic HTTP transport contract", () => {
+  test("only the producer ends the request, including across multiple read cycles", async () => {
+    const { req, res, socket } = syntheticHttp();
+    req.resume();
+    req.push(Buffer.alloc(8));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    req.push(Buffer.alloc(8));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(req.socket).toBe(socket);
+    expect(req.complete).toBe(false);
+    expect(req.readableEnded).toBe(false);
+    expect(req.destroyed).toBe(false);
+    req.complete = true;
+    req.push(null);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(req.complete).toBe(true);
+    expect(req.readableEnded).toBe(true);
+    res.destroy();
+    socket.destroy();
+  });
+
+  test("ending the response immediately stops writes and emits finish once", async () => {
+    const { req, res, socket } = syntheticHttp();
+    let finishes = 0;
+    res.on("finish", () => { finishes += 1; });
+    res.setHeader("Connection", "close");
+    res.end();
+    expect(res.writableEnded).toBe(true);
+    expect(res.getHeader("connection")).toBe("close");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(res.writableFinished).toBe(true);
+    expect(res.headersSent).toBe(true);
+    expect(finishes).toBe(1);
+    req.destroy();
+    socket.destroy();
+  });
+});
 
 function expectRejected(result: Outcome, status: number) {
   expect(result.error).toBeInstanceOf(Error);
