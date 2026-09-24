@@ -1039,6 +1039,10 @@ function EmployeesPageInner() {
 function EmployeesPrivateEntry() {
   const pathname = usePathname();
   const params = useSearchParams();
+  const { isCurrent, hasPermission } = useAuth();
+  if (isCurrent && !hasPermission("hr:read") && !hasPermission("hr:write")) {
+    return <EmployeesPageContent />;
+  }
   return <PrivateDraftBoundary key={`${pathname}:${params.get("edit") ?? ""}`} permissions={["hr:read", "hr:write"]}>
     <EmployeesPageContent />
   </PrivateDraftBoundary>;

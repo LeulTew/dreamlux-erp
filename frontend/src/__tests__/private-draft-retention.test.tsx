@@ -7,6 +7,8 @@ import PrivateDraftBoundary, { usePrivateDraftAccess } from "@/components/Privat
 import AuthLayout from "@/components/AuthLayout";
 import EditEventSheet from "@/components/EditEventSheet";
 import EditEmployeeSheet from "@/components/EditEmployeeSheet";
+import ResponsiveDrawer from "@/components/ui/ResponsiveDrawer";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import LoginPage from "@/app/login/page";
 import EmployeesPage from "@/app/page";
 import EventsPage from "@/app/events/page";
@@ -18,7 +20,7 @@ import { PrivateDraftAdmissionError } from "@/lib/private-draft";
 import { useRecordListPreferences } from "@/hooks/useRecordListPreferences";
 import type { Employee, Event as EventRecord } from "@/lib/types";
 
-const { replace, notify } = vi.hoisted(() => ({ replace: vi.fn(), notify: vi.fn() }));
+const { replace, notify, navigation } = vi.hoisted(() => ({ replace: vi.fn(), notify: vi.fn(), navigation: { actual: false } }));
 const router = { replace, push: vi.fn() };
 let routePath = "/";
 let routeParams = new URLSearchParams();
@@ -27,12 +29,21 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/hooks/use-language", () => ({ useLanguage: () => ({ lang: "en", toggle: vi.fn() }) }));
 vi.mock("@/hooks/use-theme", () => ({ useTheme: () => ({ dark: false, toggle: vi.fn() }) }));
-vi.mock("@/components/app-sidebar", () => ({ AppSidebar: () => <aside>Private sidebar</aside> }));
-vi.mock("@/components/ui/sidebar", () => ({
-  SidebarProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SidebarInset: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SidebarTrigger: () => <button>Sidebar</button>,
-}));
+vi.mock("@/components/app-sidebar", async (original) => {
+  const actual = await original<typeof import("@/components/app-sidebar")>();
+  return { ...actual, AppSidebar: () => navigation.actual ? <actual.AppSidebar /> : <aside>Private sidebar</aside> };
+});
+vi.mock("@/components/ui/sidebar", async (original) => {
+  const actual = await original<typeof import("@/components/ui/sidebar")>();
+  return {
+    ...actual,
+    SidebarProvider: (props: React.ComponentProps<typeof actual.SidebarProvider>) => navigation.actual
+      ? <actual.SidebarProvider {...props} /> : <div>{props.children}</div>,
+    SidebarInset: (props: React.ComponentProps<typeof actual.SidebarInset>) => navigation.actual
+      ? <actual.SidebarInset {...props} /> : <div>{props.children}</div>,
+    SidebarTrigger: () => navigation.actual ? <actual.SidebarTrigger /> : <button>Sidebar</button>,
+  };
+});
 vi.mock("@/components/Breadcrumbs", () => ({ default: () => <nav>Breadcrumb</nav> }));
 vi.mock("@/components/NotificationInbox", () => ({ default: () => null }));
 vi.mock("@/components/PayrollReminder", () => ({ default: () => null }));
@@ -198,7 +209,28 @@ async function pauseAuth(client: QueryClient, kind: "me" | "permissions" = "me")
     },
   };
 }
+async function mountCreateFocus() {
+  routePath = "/insert";
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
+  clients.push(client);
+  const tree = (outside: React.ReactNode = null, mounted = true) => <QueryClientProvider client={client}>
+    {mounted && <InsertEmployeePage />}
+    {outside}
+  </QueryClientProvider>;
+  const view = render(tree());
+  const name = await screen.findByPlaceholderText("e.g. John Doe");
+  if (!(name instanceof HTMLInputElement)) throw new Error("Missing actual Employee-create name input");
+  await screen.findByDisplayValue("EMP-00302");
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+  fireEvent.change(name, { target: { value: "Authored focus draft" } });
+  name.focus();
+  name.setSelectionRange(9, 14, "backward");
+  expect(name).toHaveFocus();
+  return { client, name, ...view, outside: (content: React.ReactNode) => view.rerender(tree(content)),
+    leave: () => view.rerender(tree(<button>Other route</button>, false)) };
+}
 beforeEach(() => {
+  navigation.actual = false;
   identity = actorA;
   slugs = [...allGrants];
   meFailure = false;
@@ -639,6 +671,226 @@ describe("owned Event and Employee private drafts", () => {
     await recovery.resume();
     await waitFor(() => expect(screen.getByDisplayValue("New employee draft")).toBeVisible());
     expect(screen.getByDisplayValue("EMP-00302")).toBeVisible();
+  });
+
+  it.each([
+    ["assets:read", "List Items", "/assets"],
+    ["events:read", "List Events", "/events"],
+  ])("current non-HR root denial preserves the real sidebar escape for %s without mounting employee state", async (permission, label, href) => {
+    navigation.actual = true;
+    slugs = [permission];
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    clients.push(client);
+    render(<QueryClientProvider client={client}><TooltipProvider><EmployeesPage /></TooltipProvider></QueryClientProvider>);
+    await screen.findByText("Forbidden: Insufficient privileges");
+    const expand = await screen.findByRole("button", { name: "Expand all sections" });
+    fireEvent.click(expand);
+    expect(await screen.findByRole("link", { name: label })).toHaveAttribute("href", href);
+    expect(screen.queryByRole("link", { name: "List Employees" })).toBeNull();
+    expect(screen.queryByText("Original employee")).toBeNull();
+    expect(document.querySelector("[data-private-draft-owner]")).toBeNull();
+    expect(privateRequests()).toEqual([]);
+  });
+
+  it.each(["me", "permissions"] as const)("private focus restores the same Employee-create field and selection after %s pending-503-retry", async (kind) => {
+    const { client, name } = await mountCreateFocus();
+    const owner = name.closest("[data-private-draft-owner]");
+    const recovery = await pauseAuth(client, kind);
+    expect(name.isConnected).toBe(true);
+    expect(owner).toHaveAttribute("hidden");
+    expect(owner).toHaveAttribute("inert");
+    const admitted = privateRequests().length;
+    await recovery.fail();
+    expect(screen.getByRole("button", { name: "Retry access" })).toHaveFocus();
+    expect(privateRequests()).toHaveLength(admitted);
+    meFailure = false;
+    permissionsFailure = false;
+    meGate = null;
+    permissionsGate = null;
+    fireEvent.click(screen.getByRole("button", { name: "Retry access" }));
+    await waitFor(() => expect(name).toBeVisible());
+    expect(screen.getByPlaceholderText("e.g. John Doe")).toBe(name);
+    expect(name.closest("[data-private-draft-owner]")).toBe(owner);
+    expect(name).toHaveValue("Authored focus draft");
+    expect(screen.getByDisplayValue("EMP-00302")).toBeVisible();
+    expect([name.selectionStart, name.selectionEnd, name.selectionDirection]).toEqual([9, 14, "backward"]);
+    expect(name).toHaveFocus();
+  });
+
+  it("private focus freezes the pre-hide field across ME, permission failure and another failed retry", async () => {
+    const { client, name } = await mountCreateFocus();
+    const snapshots: Array<{ hidden: boolean; inert: boolean }> = [];
+    const selectionStart = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "selectionStart")?.get;
+    if (!selectionStart) throw new Error("Input selection getter is unavailable");
+    vi.spyOn(name, "selectionStart", "get").mockImplementation(() => {
+      const owner = name.closest("[data-private-draft-owner]");
+      snapshots.push({ hidden: Boolean(owner?.hasAttribute("hidden")), inert: Boolean(owner?.hasAttribute("inert")) });
+      return selectionStart.call(name);
+    });
+    const me = deferred();
+    meGate = me.promise;
+    let request!: Promise<void>;
+    act(() => { request = client.refetchQueries({ queryKey: ["me"] }); });
+    await screen.findByRole("heading", { name: "Verify your access" });
+    expect(snapshots).toContainEqual({ hidden: false, inert: false });
+    const permissions = deferred();
+    permissionsGate = permissions.promise;
+    const beforePermissions = wire.filter((entry) => entry.url === "/auth/permissions").length;
+    await act(async () => { me.resolve(); await request; });
+    meGate = null;
+    await waitFor(() => expect(wire.filter((entry) => entry.url === "/auth/permissions")).toHaveLength(beforePermissions + 1));
+    permissionsFailure = true;
+    await act(async () => { permissions.resolve(); });
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "Retry access" })).toHaveFocus();
+    permissionsGate = null;
+    permissionsFailure = false;
+    meFailure = true;
+    const beforeRetry = wire.filter((entry) => entry.url === "/auth/me").length;
+    fireEvent.click(screen.getByRole("button", { name: "Retry access" }));
+    await waitFor(() => expect(wire.filter((entry) => entry.url === "/auth/me")).toHaveLength(beforeRetry + 1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Retry access" })).toBeEnabled());
+    expect(name).not.toBeVisible();
+    meFailure = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry access" }));
+    await waitFor(() => expect(name).toBeVisible());
+    expect(name).toHaveFocus();
+    expect([name.selectionStart, name.selectionEnd, name.selectionDirection]).toEqual([9, 14, "backward"]);
+    expect(snapshots.every((snapshot) => !snapshot.hidden && !snapshot.inert)).toBe(true);
+  });
+
+  it("private focus never falls back to a field when recovery began without an owned target", async () => {
+    const { client, name, outside } = await mountCreateFocus();
+    outside(<button>New destination</button>);
+    const destination = screen.getByRole("button", { name: "New destination" });
+    destination.focus();
+    const focus = vi.spyOn(name, "focus");
+    const recovery = await pauseAuth(client, "permissions");
+    await recovery.resume();
+    await waitFor(() => expect(name).toBeVisible());
+    expect(focus).not.toHaveBeenCalled();
+    expect(name).not.toHaveFocus();
+  });
+
+  it.each(["focus", "pointer"] as const)("private focus cancels after a later outside %s intent even if Retry retakes focus", async (intent) => {
+    const { client, name, outside } = await mountCreateFocus();
+    const recovery = await pauseAuth(client, "permissions");
+    outside(<button>New destination</button>);
+    const destination = screen.getByRole("button", { name: "New destination" });
+    if (intent === "focus") destination.focus();
+    else fireEvent.pointerDown(destination);
+    const focus = vi.spyOn(name, "focus");
+    await recovery.fail();
+    expect(screen.getByRole("button", { name: "Retry access" })).toHaveFocus();
+    permissionsGate = null;
+    permissionsFailure = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry access" }));
+    await waitFor(() => expect(name).toBeVisible());
+    expect(focus).not.toHaveBeenCalled();
+    expect(name).not.toHaveFocus();
+  });
+
+  it("private focus does not take focus from a newly opened independent dialog", async () => {
+    const { client, name, outside } = await mountCreateFocus();
+    const recovery = await pauseAuth(client, "permissions");
+    outside(<ResponsiveDrawer isOpen title="New independent dialog" onClose={() => {}}>
+      <button>Independent action</button>
+    </ResponsiveDrawer>);
+    const action = await screen.findByRole("button", { name: "Independent action" });
+    action.focus();
+    const focus = vi.spyOn(name, "focus");
+    await recovery.resume();
+    await waitFor(() => expect(name).toBeVisible());
+    expect(focus).not.toHaveBeenCalled();
+    expect(action).toHaveFocus();
+  });
+
+  it.each(["inactive", "blurred-and-returned", "hidden-and-returned"] as const)("private focus skips an %s document", async (condition) => {
+    const { client, name } = await mountCreateFocus();
+    const recovery = await pauseAuth(client, "permissions");
+    const focus = vi.spyOn(name, "focus");
+    if (condition === "inactive") vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    else if (condition === "blurred-and-returned") {
+      fireEvent(window, new Event("blur"));
+      fireEvent(window, new Event("focus"));
+    } else {
+      const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      fireEvent(document, new Event("visibilitychange"));
+      visibility.mockReturnValue("visible");
+      fireEvent(document, new Event("visibilitychange"));
+    }
+    await recovery.resume();
+    await waitFor(() => expect(name).toBeVisible());
+    expect(focus).not.toHaveBeenCalled();
+    expect(name).not.toHaveFocus();
+  });
+
+  it.each(["disabled", "hidden", "removed"] as const)("private focus does not restore the original target after it is %s", async (condition) => {
+    const { client, name } = await mountCreateFocus();
+    const recovery = await pauseAuth(client, "permissions");
+    const focus = vi.spyOn(name, "focus");
+    if (condition === "disabled") name.disabled = true;
+    else if (condition === "hidden") name.hidden = true;
+    else name.remove();
+    await recovery.resume();
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Verify your access" })).toBeNull());
+    expect(focus).not.toHaveBeenCalled();
+    expect(name).not.toHaveFocus();
+  });
+
+  it("private focus restores an owned non-text input without attempting text selection", async () => {
+    const { client } = await mountCreateFocus();
+    const amount = document.querySelector('input[type="number"]');
+    if (!(amount instanceof HTMLInputElement)) throw new Error("Missing actual Employee-create event rate");
+    fireEvent.change(amount, { target: { value: "125" } });
+    amount.focus();
+    expect(amount.selectionStart).toBeNull();
+    const setSelection = vi.spyOn(amount, "setSelectionRange");
+    const recovery = await pauseAuth(client, "permissions");
+    await recovery.resume();
+    await waitFor(() => expect(amount).toBeVisible());
+    expect(amount).toHaveFocus();
+    expect(setSelection).not.toHaveBeenCalled();
+  });
+
+  it.each(["principal", "role", "grant", "logout"] as const)("private focus cannot revive an owner retired by %s", async (reason) => {
+    const { client, name } = await mountCreateFocus();
+    const recovery = await pauseAuth(client);
+    const focus = vi.spyOn(name, "focus");
+    if (reason === "principal") identity = actorB;
+    else if (reason === "role") identity = { ...actorA, role: "OTHER_OPERATOR", roles: ["OTHER_OPERATOR"] };
+    else if (reason === "grant") slugs = ["hr:write"];
+    else terminalSession = true;
+    await recovery.resume();
+    await waitFor(() => expect(name.isConnected).toBe(false));
+    if (reason !== "logout") await screen.findByPlaceholderText("e.g. John Doe");
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it("private focus discards the target when its actual create page leaves the route", async () => {
+    const { client, name, leave } = await mountCreateFocus();
+    const recovery = await pauseAuth(client);
+    const focus = vi.spyOn(name, "focus");
+    leave();
+    const destination = screen.getByRole("button", { name: "Other route" });
+    destination.focus();
+    await recovery.resume();
+    expect(name.isConnected).toBe(false);
+    expect(focus).not.toHaveBeenCalled();
+    expect(destination).toHaveFocus();
+  });
+
+  it("private focus leaves modal-remount autofocus to the existing Event drawer", async () => {
+    const { client } = await mount("event");
+    const name = screen.getByDisplayValue("Original event");
+    name.focus();
+    const recovery = await pauseAuth(client, "permissions");
+    const focus = vi.spyOn(name, "focus");
+    await recovery.resume();
+    await screen.findByRole("dialog", { name: "Edit Event" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Close drawer" })).toHaveFocus());
+    expect(name.isConnected).toBe(false);
+    expect(focus).not.toHaveBeenCalled();
   });
 
   it.each(["event", "employee"] as const)("retires the actual %s page owner when the route edit identity changes", async (kind) => {
