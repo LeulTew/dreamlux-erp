@@ -5,6 +5,13 @@ import { pool } from "../db/pool";
 import { AuthRequest, requirePermissionSlugs } from "../middleware/auth";
 import { insertFinanceAuditLog, roundMoney, toDateString } from "../lib/finance-audit";
 import {
+  FinanceMutationError,
+  acknowledgeRow,
+  acknowledgeRows,
+  runFinanceTransaction,
+  sendFinanceMutationFailure,
+} from "../lib/finance-transaction";
+import {
   createFinanceOpexSchema,
   updateFinanceOpexSchema,
   rejectFinanceOpexSchema,
@@ -20,6 +27,7 @@ import { buildMonthlyNetProfitStatement } from "../services/finance-reporting-se
 const router = Router();
 
 const OPEX_ENTITY_TYPE = "finance_operational_expense";
+const OPEX_SUBJECT = "Operational expense change";
 const HISAB_ENTITY_TYPE = "finance_hisab_report";
 const MONTHLY_NET_PROFIT_ENTITY_TYPE = "finance_monthly_net_profit_report";
 const OPEX_SORT_SQL: Record<string, string> = {
@@ -272,40 +280,33 @@ router.post(
   "/operational-expenses",
   requirePermissionSlugs(["finance:opex:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    const validationResult = createFinanceOpexSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    const input = validationResult.data;
     try {
-      const validationResult = createFinanceOpexSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
-      }
-      const input = validationResult.data;
-
-      await client.query("BEGIN");
-      const insertResult = await client.query(
-        `INSERT INTO finance_operational_expenses (expense_date, category, amount, description, created_by)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
-        [input.expense_date, input.category, input.amount, input.description, req.user?.id || null],
-      );
-      const expense = insertResult.rows[0];
-      await insertFinanceAuditLog(client, {
-        entityType: OPEX_ENTITY_TYPE,
-        entityId: expense.id,
-        userId: req.user?.id || null,
-        action: "create",
-        newValue: `${input.category} ${roundMoney(input.amount)} on ${input.expense_date}`,
-        note: input.description,
+      const expense = await runFinanceTransaction({ subject: OPEX_SUBJECT }, async (client) => {
+        const created = acknowledgeRow(await client.query(
+          `INSERT INTO finance_operational_expenses (expense_date, category, amount, description, created_by)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING *`,
+          [input.expense_date, input.category, input.amount, input.description, req.user?.id || null],
+        ), "Operational expense creation");
+        await insertFinanceAuditLog(client, {
+          entityType: OPEX_ENTITY_TYPE,
+          entityId: created.id,
+          userId: req.user?.id || null,
+          action: "create",
+          newValue: `${input.category} ${roundMoney(input.amount)} on ${input.expense_date}`,
+          note: input.description,
+        });
+        return created;
       });
-      await client.query("COMMIT");
-
       res.status(201).json({ expense: formatOpexRow(expense) });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-opex-create] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-opex-create", error);
     }
   },
 );
@@ -315,70 +316,57 @@ router.patch(
   "/operational-expenses/:id",
   requirePermissionSlugs(["finance:opex:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
+    const validationResult = updateFinanceOpexSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    const input = validationResult.data;
     try {
-      const validationResult = updateFinanceOpexSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
-      }
-      const input = validationResult.data;
+      const updated = await runFinanceTransaction({ subject: OPEX_SUBJECT }, async (client) => {
+        const existingResult = await client.query(
+          "SELECT * FROM finance_operational_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [req.params.id],
+        );
+        if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Operational expense not found");
+        const existing = existingResult.rows[0];
+        if (existing.status === "Approved") {
+          throw new FinanceMutationError(409, "Approved expenses are locked and cannot be edited");
+        }
 
-      await client.query("BEGIN");
-      const existingResult = await client.query(
-        "SELECT * FROM finance_operational_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-        [req.params.id],
-      );
-      if (existingResult.rowCount === 0) {
-        await client.query("ROLLBACK");
-        res.status(404).json({ error: "Operational expense not found" });
-        return;
-      }
-      const existing = existingResult.rows[0];
-      if (existing.status === "Approved") {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: "Approved expenses are locked and cannot be edited" });
-        return;
-      }
-
-      const updateResult = await client.query(
-        `UPDATE finance_operational_expenses
-         SET expense_date = COALESCE($2, expense_date),
-             category = COALESCE($3, category),
-             amount = COALESCE($4, amount),
-             description = COALESCE($5, description),
-             status = 'Pending',
-             rejected_reason = NULL,
-             updated_at = NOW()
-         WHERE id = $1
-         RETURNING *`,
-        [
-          req.params.id,
-          input.expense_date ?? null,
-          input.category ?? null,
-          input.amount ?? null,
-          input.description ?? null,
-        ],
-      );
-      const updated = updateResult.rows[0];
-      await insertFinanceAuditLog(client, {
-        entityType: OPEX_ENTITY_TYPE,
-        entityId: updated.id,
-        userId: req.user?.id || null,
-        action: "update",
-        oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${toDateString(existing.expense_date)} [${existing.status}]`,
-        newValue: `${updated.category} ${roundMoney(updated.amount)} on ${toDateString(updated.expense_date)} [Pending]`,
-        note: updated.description,
+        const changed = acknowledgeRow(await client.query(
+          `UPDATE finance_operational_expenses
+           SET expense_date = COALESCE($2, expense_date),
+               category = COALESCE($3, category),
+               amount = COALESCE($4, amount),
+               description = COALESCE($5, description),
+               status = 'Pending',
+               rejected_reason = NULL,
+               updated_at = NOW()
+           WHERE id = $1
+           RETURNING *`,
+          [
+            req.params.id,
+            input.expense_date ?? null,
+            input.category ?? null,
+            input.amount ?? null,
+            input.description ?? null,
+          ],
+        ), "Operational expense update");
+        await insertFinanceAuditLog(client, {
+          entityType: OPEX_ENTITY_TYPE,
+          entityId: changed.id,
+          userId: req.user?.id || null,
+          action: "update",
+          oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${toDateString(existing.expense_date)} [${existing.status}]`,
+          newValue: `${changed.category} ${roundMoney(changed.amount)} on ${toDateString(changed.expense_date)} [Pending]`,
+          note: changed.description,
+        });
+        return changed;
       });
-      await client.query("COMMIT");
-
       res.json({ expense: formatOpexRow(updated) });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-opex-update] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-opex-update", error);
     }
   },
 );
@@ -388,46 +376,34 @@ router.delete(
   "/operational-expenses/:id",
   requirePermissionSlugs(["finance:opex:write"]),
   async (req: AuthRequest, res: Response) => {
-    const client = await pool.connect();
     try {
-      await client.query("BEGIN");
-      const existingResult = await client.query(
-        "SELECT * FROM finance_operational_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-        [req.params.id],
-      );
-      if (existingResult.rowCount === 0) {
-        await client.query("ROLLBACK");
-        res.status(404).json({ error: "Operational expense not found" });
-        return;
-      }
-      const existing = existingResult.rows[0];
-      if (existing.status === "Approved") {
-        await client.query("ROLLBACK");
-        res.status(409).json({ error: "Approved expenses are locked and cannot be deleted" });
-        return;
-      }
+      await runFinanceTransaction({ subject: OPEX_SUBJECT }, async (client) => {
+        const existingResult = await client.query(
+          "SELECT * FROM finance_operational_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+          [req.params.id],
+        );
+        if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Operational expense not found");
+        const existing = existingResult.rows[0];
+        if (existing.status === "Approved") {
+          throw new FinanceMutationError(409, "Approved expenses are locked and cannot be deleted");
+        }
 
-      await client.query(
-        "UPDATE finance_operational_expenses SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1",
-        [req.params.id],
-      );
-      await insertFinanceAuditLog(client, {
-        entityType: OPEX_ENTITY_TYPE,
-        entityId: existing.id,
-        userId: req.user?.id || null,
-        action: "delete",
-        oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${toDateString(existing.expense_date)}`,
-        note: existing.description,
+        acknowledgeRows(await client.query(
+          "UPDATE finance_operational_expenses SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1",
+          [req.params.id],
+        ), 1, "Operational expense deletion");
+        await insertFinanceAuditLog(client, {
+          entityType: OPEX_ENTITY_TYPE,
+          entityId: existing.id,
+          userId: req.user?.id || null,
+          action: "delete",
+          oldValue: `${existing.category} ${roundMoney(existing.amount)} on ${toDateString(existing.expense_date)}`,
+          note: existing.description,
+        });
       });
-      await client.query("COMMIT");
-
       res.json({ deleted: true });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("[finance-opex-delete] Error:", error);
-      res.status(500).json({ error: error.message || "Internal server error" });
-    } finally {
-      client.release();
+    } catch (error: unknown) {
+      sendFinanceMutationFailure(res, "finance-opex-delete", error);
     }
   },
 );
@@ -437,66 +413,53 @@ async function reviewOperationalExpense(
   res: Response,
   decision: "Approved" | "Rejected",
 ): Promise<void> {
-  const client = await pool.connect();
+  let rejectedReason: string | null = null;
+  if (decision === "Rejected") {
+    const validationResult = rejectFinanceOpexSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({ error: validationResult.error.errors[0].message });
+      return;
+    }
+    rejectedReason = validationResult.data.rejected_reason;
+  }
   try {
-    let rejectedReason: string | null = null;
-    if (decision === "Rejected") {
-      const validationResult = rejectFinanceOpexSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        res.status(400).json({ error: validationResult.error.errors[0].message });
-        return;
+    const updated = await runFinanceTransaction({ subject: OPEX_SUBJECT }, async (client) => {
+      const existingResult = await client.query(
+        "SELECT * FROM finance_operational_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+        [req.params.id],
+      );
+      if (existingResult.rowCount === 0) throw new FinanceMutationError(404, "Operational expense not found");
+      const existing = existingResult.rows[0];
+      if (existing.status !== "Pending") {
+        throw new FinanceMutationError(409, `Only pending expenses can be reviewed (current status: ${existing.status})`);
       }
-      rejectedReason = validationResult.data.rejected_reason;
-    }
 
-    await client.query("BEGIN");
-    const existingResult = await client.query(
-      "SELECT * FROM finance_operational_expenses WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
-      [req.params.id],
-    );
-    if (existingResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      res.status(404).json({ error: "Operational expense not found" });
-      return;
-    }
-    const existing = existingResult.rows[0];
-    if (existing.status !== "Pending") {
-      await client.query("ROLLBACK");
-      res.status(409).json({ error: `Only pending expenses can be reviewed (current status: ${existing.status})` });
-      return;
-    }
-
-    const updateResult = await client.query(
-      `UPDATE finance_operational_expenses
-       SET status = $2,
-           rejected_reason = $3,
-           approved_by = $4,
-           approved_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [req.params.id, decision, rejectedReason, req.user?.id || null],
-    );
-    const updated = updateResult.rows[0];
-    await insertFinanceAuditLog(client, {
-      entityType: OPEX_ENTITY_TYPE,
-      entityId: updated.id,
-      userId: req.user?.id || null,
-      action: decision === "Approved" ? "approve" : "reject",
-      fieldChanged: "status",
-      oldValue: "Pending",
-      newValue: decision,
-      note: rejectedReason,
+      const reviewed = acknowledgeRow(await client.query(
+        `UPDATE finance_operational_expenses
+         SET status = $2,
+             rejected_reason = $3,
+             approved_by = $4,
+             approved_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [req.params.id, decision, rejectedReason, req.user?.id || null],
+      ), "Operational expense review");
+      await insertFinanceAuditLog(client, {
+        entityType: OPEX_ENTITY_TYPE,
+        entityId: reviewed.id,
+        userId: req.user?.id || null,
+        action: decision === "Approved" ? "approve" : "reject",
+        fieldChanged: "status",
+        oldValue: "Pending",
+        newValue: decision,
+        note: rejectedReason,
+      });
+      return reviewed;
     });
-    await client.query("COMMIT");
-
     res.json({ expense: formatOpexRow(updated) });
-  } catch (error: any) {
-    await client.query("ROLLBACK");
-    console.error(`[finance-opex-${decision.toLowerCase()}] Error:`, error);
-    res.status(500).json({ error: error.message || "Internal server error" });
-  } finally {
-    client.release();
+  } catch (error: unknown) {
+    sendFinanceMutationFailure(res, `finance-opex-${decision.toLowerCase()}`, error);
   }
 }
 

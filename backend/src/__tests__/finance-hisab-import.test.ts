@@ -68,16 +68,24 @@ async function workbookBuffer(options: { mismatch?: boolean; includeUnknown?: bo
 beforeEach(() => {
   executedSql.length = 0;
   mockQuery.mockReset();
-  mockQuery.mockImplementation((sql: string, _params?: unknown[]): Promise<MockQueryResult> => {
+  mockQuery.mockImplementation((sql: string, params?: unknown[]): Promise<MockQueryResult> => {
     executedSql.push(String(sql));
     if (String(sql).includes("INSERT INTO finance_import_batches")) {
       return Promise.resolve({ rows: [{ id: "11111111-1111-4111-8111-111111111111" }], rowCount: 1 } satisfies MockQueryResult);
     }
-    return Promise.resolve({ rows: [], rowCount: 0 } satisfies MockQueryResult);
+    return Promise.resolve(acknowledgedWrite(sql, params));
   });
   mockConnect.mockClear();
   mockRelease.mockClear();
 });
+
+// PostgreSQL reports one row per inserted record; bulk imports insert one
+// record per JSON element and each audit insert writes exactly one row.
+function acknowledgedWrite(sql: string, params?: unknown[]): MockQueryResult {
+  if (sql.includes("jsonb_to_recordset")) return { rows: [], rowCount: JSON.parse(String(params?.[0])).length };
+  if (sql.includes("INSERT INTO public.activity_logs")) return { rows: [], rowCount: 1 };
+  return { rows: [], rowCount: 0 };
+}
 
 describe("legacy Hisab workbook parser", () => {
   test("parses the four known workbook layouts without committing workbook cell data", async () => {
@@ -193,7 +201,7 @@ describe("legacy Hisab import API", () => {
   test("commit rolls back when a target insert fails", async () => {
     const preview = await parseHisabWorkbook(await workbookBuffer(), "legacy-hisab.xlsx");
     const eventRow = preview.rows.find((row) => row.kind === "event_expense");
-    mockQuery.mockImplementation((sql: string, _params?: unknown[]): Promise<MockQueryResult> => {
+    mockQuery.mockImplementation((sql: string, params?: unknown[]): Promise<MockQueryResult> => {
       executedSql.push(String(sql));
       if (String(sql).includes("INSERT INTO finance_import_batches")) {
         return Promise.resolve({ rows: [{ id: "11111111-1111-4111-8111-111111111111" }], rowCount: 1 });
@@ -201,7 +209,7 @@ describe("legacy Hisab import API", () => {
       if (String(sql).includes("INSERT INTO finance_overhead_expenses")) {
         return Promise.reject(new Error("constraint violation"));
       }
-      return Promise.resolve({ rows: [], rowCount: 0 });
+      return Promise.resolve(acknowledgedWrite(sql, params));
     });
 
     const res = await request(app)
@@ -219,6 +227,7 @@ describe("legacy Hisab import API", () => {
       });
 
     expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: "constraint violation", outcome_uncertain: false });
     expect(executedSql).toContain("ROLLBACK");
     expect(executedSql).not.toContain("COMMIT");
   });

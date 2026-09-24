@@ -158,6 +158,7 @@ function monthlyRows(sql: string) {
       rowCount: 1,
     };
   }
+  if (text.includes("INSERT INTO public.activity_logs")) return { rows: [], rowCount: 1 };
   return { rows: [], rowCount: 0 };
 }
 
@@ -290,6 +291,20 @@ describe("Monthly net profit export", () => {
     expect(res.status).toBe(413);
     expect(mockConnect).toHaveBeenCalled();
     expect(mockQuery.mock.calls.some((call) => String(call[0]).includes("INSERT INTO public.activity_logs"))).toBe(true);
+  });
+
+  test("withholds the export when its required audit row is not acknowledged", async () => {
+    mockQuery.mockImplementation((sql: string) => Promise.resolve(
+      sql.includes("INSERT INTO public.activity_logs") ? { rows: [], rowCount: 0 } : monthlyRows(sql),
+    ));
+    const res = await request(app)
+      .get("/finance/reports/monthly-net-profit/export?month=2026-05&format=csv")
+      .set("Authorization", `Bearer ${getToken()}`);
+
+    expect(res.status).toBe(500);
+    expect(res.headers["content-disposition"]).toBeUndefined();
+    expect(res.text).not.toContain("Hikma Full Package");
+    expect(mockRelease).toHaveBeenCalled();
   });
 
   test("does not export payroll and investment drilldowns to event-profit-only users", async () => {

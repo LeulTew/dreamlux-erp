@@ -8,6 +8,7 @@ import { Client, type Pool } from "pg";
 import { z } from "zod";
 import { createDreamluxImportFixture } from "./testing/dreamlux-import-fixture";
 import { attestDreamluxNativeTarget } from "./testing/dreamlux-native-target";
+import { closeFixtureServer, trackFixtureSockets } from "./testing/fixture-http-server";
 import { fourSheetFormulaWorkbook, weeklyFormulaWorkbook, wideRangeFormulaWorkbook } from "./testing/hisab-formula-workbook";
 
 const adminUrl = process.env.DREAMLUX_NATIVE_TEST_ADMIN_URL?.trim();
@@ -33,6 +34,7 @@ let observer: Client | undefined;
 let appPool: Pool | undefined;
 let invalidateAllCache: (() => void) | undefined;
 let server: Server | undefined;
+let serverSockets: Set<Socket> | undefined;
 let cookie = "";
 const ports = new Set<number>();
 const denied: string[] = [];
@@ -107,6 +109,7 @@ beforeAll(async () => {
   app.use("/auth", (await import("../routes/auth")).default);
   app.use("/finance/imports", (await import("../middleware/auth")).requireAuth, (await import("../routes/finance-imports")).default);
   server = createServer(app);
+  serverSockets = trackFixtureSockets(server);
   await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("Formula fixture did not bind a local port");
@@ -120,12 +123,18 @@ beforeAll(async () => {
 
 afterAll(async () => {
   try {
-    if (server) await new Promise<void>((resolve, reject) => server!.close((error) => error ? reject(error) : resolve()));
+    // Keep the original order, but let each step run even if an earlier one fails,
+    // so a stuck server cannot leave the owned database behind.
+    const results = await Promise.allSettled([
+      server && serverSockets ? closeFixtureServer(server, serverSockets) : Promise.resolve(),
+    ]);
     if (fixture) {
-      await appPool?.end();
-      await observer?.end();
-      await fixture.dispose();
+      results.push(...await Promise.allSettled([appPool?.end()]));
+      results.push(...await Promise.allSettled([observer?.end()]));
+      results.push(...await Promise.allSettled([fixture.dispose()]));
     }
+    const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason);
+    if (errors.length) throw new AggregateError(errors, "Formula import fixture cleanup failed");
     expect(denied).toEqual([]);
   } finally {
     if (egressInstalled) {

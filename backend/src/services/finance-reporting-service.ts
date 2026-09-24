@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { pool } from "../db/pool";
-import { roundMoney, toDateString } from "../lib/finance-audit";
+import { roundMoney } from "../lib/finance-audit";
 import { overheadMonthToDate } from "../lib/validation";
 
 export type MonthlyNetProfitOptions = {
@@ -242,7 +242,7 @@ export async function buildMonthlyNetProfitStatement(
     month: options.month,
     period: {
       start_date: monthStart,
-      end_date: toDateString(new Date(new Date(`${monthEndExclusive}T00:00:00Z`).getTime() - 86_400_000)),
+      end_date: new Date(new Date(`${monthEndExclusive}T00:00:00Z`).getTime() - 86_400_000).toISOString().slice(0, 10),
       closed: Boolean(closure),
       closure: closure
         ? { closed_at: closure.closed_at, closed_by_username: closure.closed_by_username || null }

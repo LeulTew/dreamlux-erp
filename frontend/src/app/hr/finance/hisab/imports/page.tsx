@@ -289,7 +289,16 @@ export default function HisabImportPage() {
       setFile(null);
       setPreviewData(null);
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Failed to commit import"));
+      const message = getErrorMessage(err, "Failed to commit import");
+      toast.error(message);
+      // A conflict (closed month, already committed) makes this preview stale.
+      // Keep the operator's resolutions but block Commit until they re-upload.
+      const status = (err as { response?: { status?: unknown } })?.response?.status;
+      if (status === 409) {
+        setPreviewData((current) => current && !current.blockingErrors.includes(message)
+          ? { ...current, blockingErrors: [...current.blockingErrors, message] }
+          : current);
+      }
     } finally {
       setIsCommitPending(false);
     }

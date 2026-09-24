@@ -31,6 +31,8 @@ let mockAuthData: unknown = null;
 let mockAuthLoading = false;
 let mockRollupData: unknown = null;
 let mockLedgerData: unknown = null;
+const mockMutationOptions: Array<{ onError?: (error: unknown) => unknown }> = [];
+const mockInvalidateQueries = vi.fn();
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (options: { queryKey: string[] }) => {
@@ -45,8 +47,11 @@ vi.mock("@tanstack/react-query", () => ({
     }
     return { data: undefined, isLoading: false };
   },
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: (options: { onError?: (error: unknown) => unknown }) => {
+    mockMutationOptions.push(options);
+    return { mutate: vi.fn(), isPending: false };
+  },
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -154,6 +159,7 @@ describe("HisabReportPage", () => {
     mockRollupData = null;
     mockLedgerData = null;
     vi.clearAllMocks();
+    mockMutationOptions.length = 0;
   });
 
   it("renders ForbiddenState when the user lacks finance:hisab:read", () => {
@@ -221,5 +227,21 @@ describe("HisabReportPage", () => {
     mockRollupData = ROLLUP_FIXTURE;
     render(<HisabReportPage />);
     expect(screen.getByText("የሂሳብ ሪፖርቶች")).toBeInTheDocument();
+  });
+
+  it("refreshes the ledger after an uncertain write but not after a known rejection", () => {
+    mockAuthData = { permission_slugs: ["finance:hisab:read", "finance:opex:write", "finance:opex:approve"], is_superuser: false };
+    mockRollupData = ROLLUP_FIXTURE;
+    render(<HisabReportPage />);
+    const handlers = mockMutationOptions.map((options) => options.onError).filter(Boolean);
+    expect(handlers.length).toBeGreaterThanOrEqual(3);
+    for (const onError of handlers) {
+      mockInvalidateQueries.mockClear();
+      onError!({ response: { status: 500, data: { error: "Finance audit write was not acknowledged", outcome_uncertain: false } } });
+      expect(mockInvalidateQueries).not.toHaveBeenCalled();
+      onError!({ response: { status: 503, data: { error: "Operational expense change could not be confirmed. Reload before retrying.", outcome_uncertain: true } } });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["finance-opex"] });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["hisab-report"] });
+    }
   });
 });
