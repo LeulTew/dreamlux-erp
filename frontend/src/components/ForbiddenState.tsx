@@ -102,8 +102,9 @@ export default function ForbiddenState({
       </div>
 
       <button
+        type="button"
         onClick={handleAction}
-        className="h-12 px-6 rounded-lg border border-gold/30 bg-neutral-950 text-gold [@media(hover:hover)]:hover:bg-gold [@media(hover:hover)]:hover:text-white font-extrabold uppercase tracking-wider text-[10px] transition-all duration-300 cursor-pointer shadow-sm active:scale-[0.97]"
+        className="min-h-12 min-w-12 px-6 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors duration-150 motion-reduce:transition-none cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         {actionLabel ? t(actionLabel) : t("Back to Dashboard")}
       </button>
