@@ -15,6 +15,7 @@ import { Button } from "./ui/button";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
 import ActivityDrawer from "./ActivityDrawer";
+import { PrivateDraftConsumer, usePrivateDraftAccess } from "./PrivateDraftBoundary";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -129,7 +130,16 @@ type UpdateEmployeeResponse = Employee & {
   _dropped_columns?: string[];
 };
 
-export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeSheetProps) {
+export default function EditEmployeeSheet(props: EditEmployeeSheetProps) {
+  return <PrivateDraftConsumer permissions={["hr:read", "hr:write"]} recordKey={`employee:${props.employee.id}`}>
+    <EmployeeDraft {...props} />
+  </PrivateDraftConsumer>;
+}
+
+function EmployeeDraft({ employee, onClose }: EditEmployeeSheetProps) {
+  const privateDraft = usePrivateDraftAccess();
+  const visible = privateDraft?.active ?? true;
+  const settle = (callback: () => void) => privateDraft ? privateDraft.scope.settle(callback) : callback();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
@@ -187,57 +197,61 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
   const addDepartmentTrigger = useRef<HTMLButtonElement>(null);
 
   const { data: departments, refetch: refetchDepartments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: () => getDepartments(),
+    queryKey: privateDraft?.scope.queryKey(["departments"]) ?? ["departments"],
+    queryFn: () => getDepartments(privateDraft?.scope.request()),
+    enabled: visible,
   });
 
 
   const { data: stores } = useQuery({
-    queryKey: ["stores"],
-    queryFn: () => getStores(),
+    queryKey: privateDraft?.scope.queryKey(["stores"]) ?? ["stores"],
+    queryFn: () => getStores(privateDraft?.scope.request()),
+    enabled: visible,
   });
 
   const { data: salaryLevels = [] } = useQuery<SalaryLevel[]>({
-    queryKey: ["salary-levels"],
-    queryFn: getSalaryLevels,
+    queryKey: privateDraft?.scope.queryKey(["salary-levels"]) ?? ["salary-levels"],
+    queryFn: () => getSalaryLevels(privateDraft?.scope.request()),
+    enabled: visible,
   });
 
   const { data: eventTypes = [] } = useQuery<EventType[]>({
-    queryKey: ["event-types"],
-    queryFn: getEventTypes,
+    queryKey: privateDraft?.scope.queryKey(["event-types"]) ?? ["event-types"],
+    queryFn: () => getEventTypes(privateDraft?.scope.request()),
+    enabled: visible,
   });
 
   const selectedSalaryLevel = salaryLevels.find((lvl) => lvl.level_name === formData.salary_level);
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteEmployee(id),
-    onSuccess: () => {
+    mutationFn: (id: string) => deleteEmployee(id, privateDraft?.scope.request(["hr:write"])),
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["activity-logs", "employee", employee.id] });
       notify.success("Employee Deleted", "Employee deleted successfully");
       onClose();
-    },
-    onError: () => {
+    }),
+    onError: () => settle(() => {
       notify.error("Deletion Failed", "Failed to delete employee");
-    },
+    }),
   });
 
   const duplicateMutation = useMutation({
-    mutationFn: (fd: FormData) => createEmployee(fd) as Promise<Employee>,
-    onSuccess: () => {
+    mutationFn: (fd: FormData) => createEmployee(fd, privateDraft?.scope.request(["hr:write"])) as Promise<Employee>,
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["activity-logs", "employee", employee.id] });
       notify.success("Employee Duplicated", t("Employee duplicated successfully!"));
       onClose();
-    },
-    onError: () => {
+    }),
+    onError: () => settle(() => {
       notify.error("Duplication Failed", t("Failed to duplicate employee"));
-    },
+    }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (fd: FormData) => updateEmployee(employee.id, fd) as Promise<UpdateEmployeeResponse>,
-    onSuccess: (updated) => {
+    mutationFn: (fd: FormData) => updateEmployee(employee.id, fd, privateDraft?.scope.request(["hr:write"])) as Promise<UpdateEmployeeResponse>,
+    onSuccess: (updated) => settle(() => {
       const dropped = updated?._dropped_columns ?? [];
       const skippedEventPrices = dropped.includes("event_prices") || updated?._warning?.includes("event_prices");
 
@@ -271,11 +285,11 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["activity-logs", "employee", employee.id] });
       onClose();
-    },
-    onError: (err: AxiosError<{ error?: string; details?: string }>) => {
+    }),
+    onError: (err: AxiosError<{ error?: string; details?: string }>) => settle(() => {
       const message = err.response?.data?.error || err.response?.data?.details || "Update failed";
       notify.error("Update Failed", message);
-    },
+    }),
   });
 
   const compressImage = async (file: File): Promise<File> => {
@@ -330,12 +344,14 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
 
     try {
       const compressed = await compressImage(file);
+      if (privateDraft && !privateDraft.scope.alive()) return;
       if (side === "front") setFrontFile(compressed);
       else if (side === "back") setBackFile(compressed);
       else setProfileFile(compressed);
 
       const reader = new FileReader();
       reader.onload = (ev) => {
+        if (privateDraft && !privateDraft.scope.alive()) return;
         const result = ev.target?.result;
         if (typeof result === "string") {
           if (side === "front") setFrontPreview(result);
@@ -345,7 +361,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       };
       reader.readAsDataURL(compressed);
     } catch {
-      notify.error(t("Failed to process image"));
+      settle(() => notify.error(t("Failed to process image")));
     }
   };
 
@@ -354,18 +370,20 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
   const handleAddDepartment = async () => {
     if (!newDepartment.trim()) return;
     try {
-      const res = await createDepartment(newDepartment.trim());
-      await refetchDepartments();
-      setFormData(prev => ({ ...prev, department_id: res.id }));
-      setNewDepartment("");
-      setIsAddingDepartment(false);
-      addDepartmentTrigger.current?.focus({ preventScroll: true });
-      notify.success(t("Department added!"));
+      const res = await createDepartment(newDepartment.trim(), privateDraft?.scope.request(["hr:write"]));
+      settle(() => {
+        void refetchDepartments();
+        setFormData(prev => ({ ...prev, department_id: res.id }));
+        setNewDepartment("");
+        setIsAddingDepartment(false);
+        addDepartmentTrigger.current?.focus({ preventScroll: true });
+        notify.success(t("Department added!"));
+      });
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
-        notify.error(t("Failed to add department"), err.response?.data?.error);
+        settle(() => notify.error(t("Failed to add department"), err.response?.data?.error));
       } else {
-        notify.error(t("Failed to add department"));
+        settle(() => notify.error(t("Failed to add department")));
       }
     }
   };
@@ -411,7 +429,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
   return (
     <>
       <ResponsiveDrawer
-        isOpen={true}
+        isOpen={visible}
         onClose={onClose}
         title={isDuplicateMode ? t("Duplicate Employee") : t("Edit Employee")}
         subtitle={isDuplicateMode ? `${t("Creating duplicate of")} ${employee.full_name}` : `${t("Updating")} ${employee.full_name}`}
@@ -438,17 +456,19 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
                   type="button"
                   onClick={async () => {
                     try {
-                      const res = await getNextEmployeeId();
-                      setFormData(prev => ({
-                        ...prev,
-                        full_name: prev.full_name + " (Copy)",
-                        employee_id: res.nextId,
-                        phone: "",
-                        email: "",
-                      }));
-                      setIsDuplicateMode(true);
+                      const res = await getNextEmployeeId(privateDraft?.scope.request());
+                      settle(() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          full_name: prev.full_name + " (Copy)",
+                          employee_id: res.nextId,
+                          phone: "",
+                          email: "",
+                        }));
+                        setIsDuplicateMode(true);
+                      });
                     } catch {
-                      notify.error("Error", "Failed to resolve next sequential ID");
+                      settle(() => notify.error("Error", "Failed to resolve next sequential ID"));
                     }
                   }}
                   className="h-10 px-4 dl-radius-2xl bg-primary text-primary-foreground hover:bg-primary-dark active:scale-[0.98] transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2 shrink-0 border border-primary/20"
@@ -831,7 +851,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       </ResponsiveDrawer>
 
       <DeleteConfirmModal
-        isOpen={showDeleteModal}
+        isOpen={visible && showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={() => deleteMutation.mutate(employee.id)}
         isDeleting={deleteMutation.isPending}
@@ -842,7 +862,7 @@ export default function EditEmployeeSheet({ employee, onClose }: EditEmployeeShe
       <ActivityDrawer
         entityType="employee"
         entityId={employee.id}
-        isOpen={isActivityOpen}
+        isOpen={visible && isActivityOpen}
         onClose={() => setIsActivityOpen(false)}
       />
     </>

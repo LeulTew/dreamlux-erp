@@ -1,27 +1,22 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getEffectivePermissions } from "@/lib/api";
-import type { User } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { createPermissionMatcher, hasAnyPermission as matchAnyPermission } from "@/lib/permission-matcher";
-
-interface AuthResponse {
-  user: User;
-}
+import {
+  authReadReceipt, authorityProofRevision, canonicalAuthQuery, currentPermissionQueryKey,
+  normalizePermissionSlugs, permissionQueryKey, readCanonicalAuth, readCurrentAuthority, subscribeAuthorityProof,
+  type CurrentPermissions, type SessionResponse,
+} from "@/lib/auth-authority";
 
 type RolePreview = { role: string; slugs: string[] };
 type StoredPreview = { storage: Storage; role: string | null; encodedSlugs: string | null };
 const PREVIEW_CLEARED_EVENT = "dreamlux:role-preview-cleared";
 let lastStoredPreview: StoredPreview | null = null;
 let rejectedStoredPreview: StoredPreview | null = null;
-
-function normalizeSlugs(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.some((slug) => typeof slug !== "string" || !slug.trim())) {
-    return null;
-  }
-  return [...new Set(value.map((slug: string) => slug.trim().toLowerCase()))];
-}
+let verificationSequence = 0;
+const noServerProof = () => 0;
 
 function readPreviewStorage(): StoredPreview {
   const storage = localStorage;
@@ -64,7 +59,7 @@ function readStoredPreview(): RolePreview | null {
     }
     rejectedStoredPreview = null;
     if (role === null && encodedSlugs === null) return null;
-    const slugs = encodedSlugs === null ? null : normalizeSlugs(JSON.parse(encodedSlugs));
+    const slugs = encodedSlugs === null ? null : normalizePermissionSlugs(JSON.parse(encodedSlugs));
     if (role?.trim() && slugs !== null) return { role: role.trim(), slugs };
     console.warn("[useAuth] Ignoring invalid role preview");
   } catch (error) {
@@ -75,6 +70,10 @@ function readStoredPreview(): RolePreview | null {
 }
 
 export function useAuth() {
+  const queryClient = useQueryClient();
+  const subscribeProof = useCallback((notify: () => void) => subscribeAuthorityProof(queryClient, notify), [queryClient]);
+  const proofRevision = useCallback(() => authorityProofRevision(queryClient), [queryClient]);
+  useSyncExternalStore(subscribeProof, proofRevision, noServerProof);
   const [hasMounted, setHasMounted] = useState(false);
   const [preview, setPreview] = useState<RolePreview | null>(null);
 
@@ -91,26 +90,29 @@ export function useAuth() {
     };
   }, []);
 
-  const { data, isLoading, isFetching, error } = useQuery<AuthResponse>({
+  const sessionQuery = canonicalAuthQuery<SessionResponse>(queryClient, ["me"]);
+  const { data, dataUpdatedAt, isLoading, isFetching, error } = useQuery<SessionResponse>({
     queryKey: ["me"],
-    queryFn: async () => {
-      const { data } = await api.get<AuthResponse>("/auth/me");
-      return data;
-    },
+    queryFn: ({ signal }) => readCanonicalAuth(queryClient, sessionQuery, signal, async () => {
+      const { data } = await api.get<SessionResponse>("/auth/me", { signal });
+      return { ...data, verification: ++verificationSequence };
+    }),
     enabled: hasMounted,
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: permissionsData, isLoading: permissionsLoading, isSuccess: permissionsSucceeded, error: permissionsError } = useQuery({
-    queryKey: ["permissions"],
-    queryFn: getEffectivePermissions,
-    enabled: hasMounted && !!data?.user,
+  const permissionsKey = permissionQueryKey(data?.user?.id, data?.verification ?? dataUpdatedAt);
+  const permissionsQuery = canonicalAuthQuery<CurrentPermissions>(queryClient, permissionsKey);
+  const { data: permissionsData, isLoading: permissionsLoading, isFetching: permissionsFetching, isSuccess: permissionsSucceeded, error: permissionsError } = useQuery({
+    queryKey: permissionsKey,
+    queryFn: ({ signal }) => readCanonicalAuth(queryClient, permissionsQuery, signal, () => getEffectivePermissions({ signal })),
+    enabled: hasMounted && !!data?.user && Boolean(authReadReceipt(queryClient, sessionQuery)),
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const user = data?.user;
+  const user = data?.user ?? undefined;
 
   useEffect(() => {
     if (user && typeof window !== "undefined") {
@@ -122,12 +124,13 @@ export function useAuth() {
     }
   }, [user]);
 
-  const normalizedSlugs = normalizeSlugs(permissionsData?.permission_slugs);
+  const normalizedSlugs = normalizePermissionSlugs(permissionsData?.permission_slugs);
   const invalidAuthority = Boolean(user && permissionsSucceeded && (
     normalizedSlugs === null || permissionsData?.user_id !== (user.id || null)
   ));
-  const authorityReady = Boolean(user && !error && permissionsData && !permissionsError && !invalidAuthority);
-  const rawPermissionSlugs = authorityReady ? normalizedSlugs || [] : [];
+  const current = readCurrentAuthority(queryClient);
+  const authorityReady = hasMounted && current.phase === "ready";
+  const rawPermissionSlugs = authorityReady ? current.permissionSlugs : [];
   const actualHasPermission = createPermissionMatcher(rawPermissionSlugs);
   const rawIsAdmin = actualHasPermission("users:manage") || actualHasPermission("settings:write");
   const isPreviewActive = Boolean(preview && authorityReady && rawIsAdmin);
@@ -144,13 +147,13 @@ export function useAuth() {
 
   useEffect(() => {
     const sessionSettled = hasMounted && !isLoading && !isFetching;
-    const authoritySettled = !permissionsLoading && (permissionsSucceeded || Boolean(permissionsError));
+    const authoritySettled = !permissionsLoading && !permissionsFetching && (permissionsSucceeded || Boolean(permissionsError));
     if (preview && sessionSettled && (
       !user || (authoritySettled && (!authorityReady || !rawIsAdmin))
     )) {
       discardStoredPreview();
     }
-  }, [preview, hasMounted, isLoading, isFetching, user, permissionsLoading,
+  }, [preview, hasMounted, isLoading, isFetching, user, permissionsLoading, permissionsFetching,
     permissionsSucceeded, permissionsError, authorityReady, rawIsAdmin]);
 
   const displayUser = isPreviewActive && user ? {
@@ -172,18 +175,37 @@ export function useAuth() {
 
   const isInventoryController = hasAnyPermission(["assets:read", "assets:write", "assets:reconcile"]);
 
+  const retryCurrent = async () => {
+    const query = queryClient.getQueryCache().find({ queryKey: ["me"], exact: true });
+    const previous = authReadReceipt(queryClient, query);
+    await queryClient.refetchQueries({ queryKey: ["me"], exact: true, type: "active" });
+    const currentQuery = queryClient.getQueryCache().find({ queryKey: ["me"], exact: true });
+    const completed = authReadReceipt(queryClient, currentQuery);
+    const session = queryClient.getQueryState<SessionResponse>(["me"]);
+    if (currentQuery === query && completed && completed !== previous && !session?.error && session?.data?.user) {
+      await queryClient.refetchQueries(
+        { queryKey: currentPermissionQueryKey(queryClient), exact: true, type: "active" },
+        { cancelRefetch: false },
+      );
+    }
+  };
+
   return {
     user: displayUser,
     permissionSlugs,
     isSuperuser,
-    isLoading: !hasMounted || isLoading || isFetching || (!!data?.user && permissionsLoading),
-    isSessionResolved: hasMounted && (!isLoading && !isFetching && (!data?.user || !permissionsLoading)),
+    isLoading: !hasMounted || isLoading || isFetching || (!!data?.user && (permissionsLoading || permissionsFetching)),
+    isSessionResolved: hasMounted && (!isLoading && !isFetching && (!data?.user || (!permissionsLoading && !permissionsFetching))),
+    phase: hasMounted ? current.phase : "checking" as const,
+    principalId: current.principalId,
+    isCurrent: hasMounted && current.phase === "ready",
+    retryCurrent,
     isAuthenticated: !!user,
     isAdmin,
     isInventoryController,
     hasPermission,
     hasAnyPermission,
-    error: error || permissionsError || (invalidAuthority ? new Error("Invalid current permission response") : null),
+    error: error || permissionsError || (invalidAuthority ? new Error("Invalid current permission response") : current.error),
     isPreviewActive,
     previewRoleName: isPreviewActive ? preview?.role || null : null,
     clearPreview,

@@ -29,6 +29,7 @@ import {
   HiXMark,
 } from "react-icons/hi2";
 import UserAvatar from "@/components/UserAvatar";
+import { usePrivateDraftAccess } from "@/components/PrivateDraftBoundary";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -718,6 +719,8 @@ export default function AuthLayout({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const privateDraft = usePrivateDraftAccess();
+  const privateVisible = privateDraft?.active ?? true;
   const { isPreviewActive, previewRoleName, clearPreview, isLoading, isAuthenticated, isSessionResolved } = useAuth();
   const [mounted, setMounted] = useState(false);
   const { lang } = useLanguage();
@@ -776,14 +779,14 @@ export default function AuthLayout({
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        if (status !== "authenticated" || (!showSearch && document.querySelector('[role="dialog"], [role="alertdialog"]'))) return;
+        if (!privateVisible || status !== "authenticated" || (!showSearch && document.querySelector('[role="dialog"], [role="alertdialog"]'))) return;
         if (!showSearch) searchOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         setShowSearch(!showSearch);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showSearch, status]);
+  }, [showSearch, status, privateVisible]);
 
   // Sync page width setting with DOM attribute
   useEffect(() => {
@@ -799,6 +802,7 @@ export default function AuthLayout({
   };
 
   const handleLogout = async () => {
+    privateDraft?.owner.terminate();
     try {
       await api.post("/auth/logout");
     } catch {
@@ -810,7 +814,7 @@ export default function AuthLayout({
 
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
 
-  if (status === "checking") {
+  if (status === "checking" && !privateDraft) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -818,13 +822,13 @@ export default function AuthLayout({
     );
   }
 
-  if (status !== "authenticated") return null;
+  if (status !== "authenticated" && !privateDraft) return null;
 
   return (
     <SidebarProvider className="h-screen overflow-hidden">
       <div className="flex h-full w-full bg-background overflow-hidden">
-        <PwaLifecycle />
-        <AppSidebar />
+        {privateVisible && <PwaLifecycle />}
+        {privateVisible && <AppSidebar />}
         <SidebarInset className="flex flex-col flex-1 w-full overflow-hidden">
           {isPreviewActive && (
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between text-xs text-amber-500 font-medium select-none z-50">
@@ -871,17 +875,17 @@ export default function AuthLayout({
                 </kbd>
               </button>
 
-              <PayrollReminder />
-              <NotificationInbox />
+              {privateVisible && <PayrollReminder />}
+              {privateVisible && <NotificationInbox />}
 
               {/* User Dropdown */}
-              <HeaderUserMenu
+              {privateVisible && <HeaderUserMenu
                 pageWidth={pageWidth}
                 togglePageWidth={togglePageWidth}
                 setShowAbout={setShowAbout}
                 onLogout={handleLogout}
                 triggerRef={profileTrigger}
-              />
+              />}
             </div>
           </header>
 
@@ -897,7 +901,7 @@ export default function AuthLayout({
       </div>
 
       {/* About Modal Dialog */}
-      <HeaderDialog isOpen={showAbout} onClose={() => setShowAbout(false)}
+      <HeaderDialog isOpen={privateVisible && showAbout} onClose={() => setShowAbout(false)}
         title={t("About Dream Lux ERP")} description={t("Dream Lux ERP Description")}
         getReturnFocus={() => profileTrigger.current}>
         <button type="button" onClick={() => setShowAbout(false)}
@@ -907,7 +911,7 @@ export default function AuthLayout({
       </HeaderDialog>
 
       {/* Command Search Overlay Modal */}
-      {showSearch && <SearchDialog
+      {privateVisible && showSearch && <SearchDialog
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
         lang={lang}

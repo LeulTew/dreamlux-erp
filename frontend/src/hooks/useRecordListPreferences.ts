@@ -7,6 +7,7 @@ import {
   type RecordListPreference,
   type RecordListPreferencePayload,
 } from "@/lib/api";
+import { usePrivateDraftAccess } from "@/components/PrivateDraftBoundary";
 
 /**
  * Per-user record list state persistence (issue #155).
@@ -23,7 +24,10 @@ export function useRecordListPreferences(
   recordType: string,
   options: { enabled?: boolean; debounceMs?: number } = {},
 ) {
-  const { enabled = true, debounceMs = 600 } = options;
+  const privateDraft = usePrivateDraftAccess();
+  const scope = privateDraft?.scope;
+  const enabled = options.enabled !== false && (privateDraft?.active ?? true);
+  const { debounceMs = 600 } = options;
   const [preference, setPreference] = useState<RecordListPreference | null>(null);
   // When disabled we are trivially "loaded" (no fetch to wait for).
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -45,9 +49,9 @@ export function useRecordListPreferences(
         setLoadError(null);
       }
     });
-    getRecordListPreference(recordType)
+    getRecordListPreference(recordType, scope?.request())
       .then((pref) => {
-        if (!cancelled) setPreference(pref);
+        if (!cancelled && (!scope || scope.ready())) setPreference(pref);
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -61,41 +65,48 @@ export function useRecordListPreferences(
     return () => {
       cancelled = true;
     };
-  }, [recordType, enabled]);
+  }, [recordType, enabled, scope]);
 
   const markApplied = useCallback(() => setAppliedFor(recordType), [recordType]);
 
   const flush = useCallback(() => {
-    if (!enabled || !latestPayload.current) return;
+    if (!enabled || !latestPayload.current || (scope && !scope.ready())) return;
     const payload = latestPayload.current;
     latestPayload.current = null;
     setIsSaving(true);
     setSaveError(null);
-    saveRecordListPreference(recordType, payload)
-      .then((pref) => setPreference(pref))
-      .catch((error: unknown) => {
-        setSaveError(error instanceof Error ? error : new Error("Failed to save list preferences"));
+    saveRecordListPreference(recordType, payload, scope?.request())
+      .then((pref) => {
+        if (scope) scope.settle(() => setPreference(pref));
+        else setPreference(pref);
       })
-      .finally(() => setIsSaving(false));
-  }, [recordType, enabled]);
+      .catch((error: unknown) => {
+        const report = () => setSaveError(error instanceof Error ? error : new Error("Failed to save list preferences"));
+        if (scope) scope.settle(report);
+        else report();
+      })
+      .finally(() => { if (!scope || scope.alive()) setIsSaving(false); });
+  }, [recordType, enabled, scope]);
 
   const save = useCallback(
     (payload: RecordListPreferencePayload) => {
-      if (!enabled || !isReady) return;
+      if (!enabled || !isReady || (scope && !scope.ready())) return;
       latestPayload.current = { ...(latestPayload.current ?? {}), ...payload };
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(flush, debounceMs);
     },
-    [enabled, isReady, debounceMs, flush],
+    [enabled, isReady, debounceMs, flush, scope],
   );
 
   // Persist any pending change on unmount so navigation never drops the latest state.
   useEffect(() => {
+    const unregister = scope?.beforeDispose(flush);
     return () => {
+      unregister?.();
       if (timerRef.current) clearTimeout(timerRef.current);
       flush();
     };
-  }, [flush]);
+  }, [flush, scope]);
 
   return { preference, isLoaded, isReady, markApplied, save, loadError, saveError, isSaving };
 }

@@ -5,6 +5,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import { createEmployee, getNextEmployeeId, getDepartments, createDepartment, getStores, getSalaryLevels, getEventTypes } from "@/lib/api";
 import AuthLayout from "@/components/AuthLayout";
+import PrivateDraftBoundary, { usePrivateDraftAccess } from "@/components/PrivateDraftBoundary";
 import { notify } from "@/lib/toast";
 import { HiXMark, HiUserPlus, HiIdentification, HiPlus, HiExclamationCircle, HiCheck } from "react-icons/hi2";
 import { z } from "zod";
@@ -120,6 +121,13 @@ const employeeValidationSchema = z.object({
 });
 
 export default function InsertEmployeePage() {
+  return <PrivateDraftBoundary permissions={["hr:write"]}><InsertEmployeeDraft /></PrivateDraftBoundary>;
+}
+
+function InsertEmployeeDraft() {
+  const privateDraft = usePrivateDraftAccess();
+  const active = privateDraft?.active ?? true;
+  const settle = (callback: () => void) => privateDraft ? privateDraft.scope.settle(callback) : callback();
   const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const { lang } = useLanguage();
@@ -147,51 +155,58 @@ export default function InsertEmployeePage() {
   const [isAddingDepartment, setIsAddingDepartment] = useState(false);
 
   const { data: departments, refetch: refetchDepartments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: () => getDepartments(),
+    queryKey: privateDraft?.scope.queryKey(["departments"]) ?? ["departments"],
+    queryFn: () => getDepartments(privateDraft?.scope.request()),
+    enabled: active,
   });
 
   const { data: stores } = useQuery({
-    queryKey: ["stores"],
-    queryFn: () => getStores(),
+    queryKey: privateDraft?.scope.queryKey(["stores"]) ?? ["stores"],
+    queryFn: () => getStores(privateDraft?.scope.request()),
+    enabled: active,
   });
 
   const { data: salaryLevels = [] } = useQuery<SalaryLevel[]>({
-    queryKey: ["salary-levels"],
-    queryFn: getSalaryLevels,
+    queryKey: privateDraft?.scope.queryKey(["salary-levels"]) ?? ["salary-levels"],
+    queryFn: () => getSalaryLevels(privateDraft?.scope.request()),
+    enabled: active,
   });
 
   const { data: eventTypes = [] } = useQuery<EventType[]>({
-    queryKey: ["event-types"],
-    queryFn: getEventTypes,
+    queryKey: privateDraft?.scope.queryKey(["event-types"]) ?? ["event-types"],
+    queryFn: () => getEventTypes(privateDraft?.scope.request()),
+    enabled: active,
   });
 
   const selectedSalaryLevel = salaryLevels.find((lvl) => lvl.level_name === formData.salary_level);
 
   const { data: nextIdData } = useQuery({
-    queryKey: ["nextEmployeeId"],
-    queryFn: () => getNextEmployeeId(),
+    queryKey: privateDraft?.scope.queryKey(["nextEmployeeId"]) ?? ["nextEmployeeId"],
+    queryFn: () => getNextEmployeeId(privateDraft?.scope.request()),
+    enabled: active,
   });
 
   // Synchronize next employee ID to form state once fetched
   useEffect(() => {
     if (nextIdData?.nextId && !formData.employee_id) {
       queueMicrotask(() => {
-        setFormData((prev) => ({ ...prev, employee_id: nextIdData.nextId }));
+        const apply = () => setFormData((prev) => prev.employee_id ? prev : { ...prev, employee_id: nextIdData.nextId });
+        if (privateDraft) privateDraft.scope.settle(apply);
+        else apply();
       });
     }
-  }, [nextIdData, formData.employee_id]);
+  }, [nextIdData, formData.employee_id, privateDraft]);
 
   const createMutation = useMutation({
-    mutationFn: (fd: FormData) => createEmployee(fd),
-    onSuccess: () => {
+    mutationFn: (fd: FormData) => createEmployee(fd, privateDraft?.scope.request(["hr:write"])),
+    onSuccess: () => settle(() => {
       notify.success(t("Employee created successfully!"));
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       resetForm();
-    },
-    onError: (err: AxiosError<{ error: string; details?: string }>) => {
+    }),
+    onError: (err: AxiosError<{ error: string; details?: string }>) => settle(() => {
       notify.error(t("Failed to create employee"), err.response?.data?.details || err.response?.data?.error || err.message);
-    },
+    }),
   });
 
   const resetForm = () => {
@@ -267,6 +282,7 @@ export default function InsertEmployeePage() {
 
       try {
         const compressed = await compressImage(file);
+        if (privateDraft && !privateDraft.scope.alive()) return;
 
         if (side === "front") setFrontFile(compressed);
         else if (side === "back") setBackFile(compressed);
@@ -274,6 +290,7 @@ export default function InsertEmployeePage() {
 
         const reader = new FileReader();
         reader.onload = (ev) => {
+          if (privateDraft && !privateDraft.scope.alive()) return;
           const result = ev.target?.result;
           if (typeof result === "string") {
             if (side === "front") setFrontPreview(result);
@@ -283,26 +300,30 @@ export default function InsertEmployeePage() {
         };
         reader.readAsDataURL(compressed);
       } catch {
-        notify.error(t("Failed to process image"));
+        const report = () => notify.error(t("Failed to process image"));
+        if (privateDraft) privateDraft.scope.settle(report);
+        else report();
       }
     },
-    [t],
+    [t, privateDraft],
   );
 
   const handleAddDepartment = async () => {
     if (!newDepartment.trim()) return;
     try {
-      const res = await createDepartment(newDepartment.trim());
-      await refetchDepartments();
-      setFormData(prev => ({ ...prev, department_id: res.id }));
-      setNewDepartment("");
-      setIsAddingDepartment(false);
-      notify.success(t("Department added!"));
+      const res = await createDepartment(newDepartment.trim(), privateDraft?.scope.request(["hr:write"]));
+      settle(() => {
+        void refetchDepartments();
+        setFormData(prev => ({ ...prev, department_id: res.id }));
+        setNewDepartment("");
+        setIsAddingDepartment(false);
+        notify.success(t("Department added!"));
+      });
     } catch (err: unknown) {
       if (err instanceof AxiosError) {
-        notify.error(t("Failed to add department"), err.response?.data?.error);
+        settle(() => notify.error(t("Failed to add department"), err.response?.data?.error));
       } else {
-        notify.error(t("Failed to add department"));
+        settle(() => notify.error(t("Failed to add department")));
       }
     }
   };
@@ -355,7 +376,7 @@ export default function InsertEmployeePage() {
     createMutation.mutate(fd);
   };
 
-  if (authLoading) {
+  if (authLoading && !privateDraft) {
     return (
       <AuthLayout>
         <div className="flex h-[50vh] items-center justify-center">
@@ -365,7 +386,7 @@ export default function InsertEmployeePage() {
     );
   }
 
-  if (!isAuthenticated || !hasPermission("hr:write")) {
+  if ((!isAuthenticated || !hasPermission("hr:write")) && (!privateDraft || privateDraft.active)) {
     return (
       <AuthLayout>
         <ForbiddenState

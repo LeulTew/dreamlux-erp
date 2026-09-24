@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "./useAuth";
+import { currentPermissionQueryKey } from "@/lib/auth-authority";
 
 const { getMe, getPermissions } = vi.hoisted(() => ({
   getMe: vi.fn(),
@@ -153,7 +154,8 @@ describe("phase-one red evidence: preview is not an authority source", () => {
     getPermissions.mockResolvedValue(authority(["*"], true));
     setPreview("SYNTHETIC_TARGET", JSON.stringify(["*"]));
     const { result, client } = await mountAuth();
-    act(() => { client.setQueryData(["permissions"], authority()); });
+    getPermissions.mockResolvedValue(authority());
+    await act(async () => { await client.refetchQueries({ queryKey: currentPermissionQueryKey(client), exact: true }); });
     await waitFor(() => expect(result.current.rawIsAdmin).toBe(false));
     expect(result.current.hasPermission("payroll:write")).toBe(false);
     expect(result.current.hasPermission("events:read")).toBe(true);
@@ -316,7 +318,7 @@ describe("approved narrowing and recovery regressions", () => {
     getMe.mockRejectedValue(Object.assign(new Error("Synthetic session verification unavailable"), { response: { status } }));
     await act(async () => { await client.refetchQueries({ queryKey: ["me"] }); });
     await waitFor(() => expect(result.current.error?.message).toBe("Synthetic session verification unavailable"));
-    expect(client.getQueryData(["permissions"])).toEqual(authority(["users:manage", "assets:reconcile"]));
+    expect(client.getQueryData(currentPermissionQueryKey(client))).toEqual(authority(["users:manage", "assets:reconcile"]));
     expect(result.current.hasPermission("assets:reconcile")).toBe(false);
     expect(result.current.rawIsAdmin).toBe(false);
     expect(result.current.isPreviewActive).toBe(false);

@@ -29,6 +29,7 @@ import MobileEmployeeCard from "@/components/MobileEmployeeCard";
 import { HiMagnifyingGlass, HiTrash, HiPencilSquare, HiUsers, HiExclamationTriangle, HiPlus, HiArrowUturnLeft } from "react-icons/hi2";
 import Select from "@/components/ui/Select";
 import EditEmployeeSheet from "@/components/EditEmployeeSheet";
+import PrivateDraftBoundary, { usePrivateDraftAccess } from "@/components/PrivateDraftBoundary";
 import PaginationControls from "@/components/PaginationControls";
 import PrintOptionsModal from "@/components/PrintOptionsModal";
 import { AnimatePresence, motion } from "framer-motion";
@@ -382,8 +383,9 @@ function buildColumns(
 // Wrapper that enforces page-level RBAC before mounting the hook-heavy inner component
 function EmployeesPageContent() {
   const { hasPermission } = useAuth();
+  const privateDraft = usePrivateDraftAccess();
 
-  if (!hasPermission("hr:read") && !hasPermission("hr:write")) {
+  if (!hasPermission("hr:read") && !hasPermission("hr:write") && (!privateDraft || privateDraft.active)) {
     return (
       <AuthLayout>
         <ForbiddenState
@@ -397,6 +399,9 @@ function EmployeesPageContent() {
 }
 
 function EmployeesPageInner() {
+  const privateDraft = usePrivateDraftAccess();
+  const active = privateDraft?.active ?? true;
+  const settle = (callback: () => void) => privateDraft ? privateDraft.scope.settle(callback) : callback();
   const { lang } = useLanguage();
   const t = useCallback((key: string) => TRANSLATIONS[lang]?.[key] || key, [lang]);
   const queryClient = useQueryClient();
@@ -475,19 +480,22 @@ function EmployeesPageInner() {
     finally { setExportingExcel(false); }
   };
   const { data, isLoading } = useQuery<EmployeesResponse>({
-    queryKey: ["employees", page, limit, search, showTrash, officeId, departmentId, sortBy, sortOrder],
-    queryFn: () => getEmployees(page, limit, search, showTrash ? "trash" : "active", officeId, departmentId, sortBy, sortOrder),
-    enabled: prefsReady,
+    queryKey: privateDraft?.scope.queryKey(["employees", page, limit, search, showTrash, officeId, departmentId, sortBy, sortOrder])
+      ?? ["employees", page, limit, search, showTrash, officeId, departmentId, sortBy, sortOrder],
+    queryFn: () => getEmployees(page, limit, search, showTrash ? "trash" : "active", officeId, departmentId, sortBy, sortOrder, privateDraft?.scope.request()),
+    enabled: prefsReady && active,
   });
 
   const { data: stores } = useQuery({
-    queryKey: ["stores"],
-    queryFn: () => getStores(),
+    queryKey: privateDraft?.scope.queryKey(["stores"]) ?? ["stores"],
+    queryFn: () => getStores(privateDraft?.scope.request()),
+    enabled: active,
   });
 
   const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: () => getDepartments(),
+    queryKey: privateDraft?.scope.queryKey(["departments"]) ?? ["departments"],
+    queryFn: () => getDepartments(privateDraft?.scope.request()),
+    enabled: active,
   });
 
   const rawEmployees = useMemo(() => data?.employees || [], [data?.employees]);
@@ -535,59 +543,59 @@ function EmployeesPageInner() {
 
   useEffect(() => {
     const editId = searchParams.get("edit");
-    let active = true;
+    let liveEffect = true;
 
-    if (editId && !editingEmployee) {
+    if (active && editId && !editingEmployee) {
       const empToEdit = employees.find((emp) => emp.id === editId);
       if (empToEdit) {
         setEditingEmployee(empToEdit);
       } else {
         // Fetch from api if not in current page
         import("@/lib/api").then(({ api }) => {
-          api.get(`/employees/${editId}`).then((res) => {
-            if (active && res.data) {
+          api.get(`/employees/${editId}`, privateDraft?.scope.request()).then((res) => {
+            if (liveEffect && res.data && (!privateDraft || privateDraft.scope.ready())) {
               setEditingEmployee(res.data);
             }
           }).catch(console.error);
         });
       }
     }
-    return () => { active = false; };
-  }, [searchParams, employees, editingEmployee]);
+    return () => { liveEffect = false; };
+  }, [searchParams, employees, editingEmployee, privateDraft, active]);
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteEmployee(id),
-    onSuccess: () => {
+    mutationFn: (id: string) => deleteEmployee(id, privateDraft?.scope.request(["hr:write"])),
+    onSuccess: () => settle(() => {
       toast.success("Employee deleted");
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       setEmployeeToDelete(null);
-    },
-    onError: () => {
+    }),
+    onError: () => settle(() => {
       toast.error("Failed to delete");
-    },
+    }),
   });
 
   const recoverMutation = useMutation({
-    mutationFn: (id: string) => recoverEmployee(id),
-    onSuccess: () => {
+    mutationFn: (id: string) => recoverEmployee(id, privateDraft?.scope.request(["hr:write"])),
+    onSuccess: () => settle(() => {
       toast.success("Employee restored");
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-    },
-    onError: () => {
+    }),
+    onError: () => settle(() => {
       toast.error("Recovery failed");
-    },
+    }),
   });
 
   const updateEmployeeMutation = useMutation({
     mutationFn: ({ id, field, value }: { id: string; field: string; value: string }) =>
-      updateEmployee(id, { [field]: value }),
-    onSuccess: () => {
+      updateEmployee(id, { [field]: value }, privateDraft?.scope.request(["hr:write"])),
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success("Saved");
-    },
-    onError: (error: Error) => {
+    }),
+    onError: (error: Error) => settle(() => {
       toast.error(`Update failed: ${error.message}`);
-    },
+    }),
   });
 
   const updateEmployeeRecord = updateEmployeeMutation.mutate;
@@ -600,12 +608,12 @@ function EmployeesPageInner() {
         clearTimeout(debounceTimers.get(key));
       }
       const timer = setTimeout(() => {
-        updateEmployeeRecord({ id, field, value });
+        if (!privateDraft || privateDraft.scope.ready()) updateEmployeeRecord({ id, field, value });
         debounceTimers.delete(key);
       }, 800);
       debounceTimers.set(key, timer);
     },
-    [updateEmployeeRecord],
+    [updateEmployeeRecord, privateDraft],
   );
 
   const toggleSelection = useCallback((id: string) => {
@@ -629,14 +637,16 @@ function EmployeesPageInner() {
     if (selectedIds.size === 0) return;
     setIsPermanentDeleting(true);
     try {
-      await Promise.all(Array.from(selectedIds).map(id => deleteEmployeePermanent(id)));
-      toast.success(`${selectedIds.size} record${selectedIds.size > 1 ? "s" : ""} permanently deleted`);
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      setSelectedIds(new Set());
-      setSelectMode(false);
-      setShowDeleteModal(false);
+      await Promise.all(Array.from(selectedIds).map(id => deleteEmployeePermanent(id, privateDraft?.scope.request(["hr:write"]))));
+      settle(() => {
+        toast.success(`${selectedIds.size} record${selectedIds.size > 1 ? "s" : ""} permanently deleted`);
+        queryClient.invalidateQueries({ queryKey: ["employees"] });
+        setSelectedIds(new Set());
+        setSelectMode(false);
+        setShowDeleteModal(false);
+      });
     } catch (e: unknown) {
-      toast.error((e as {response?: {data?: {error?: string}}}).response?.data?.error || "Deletion failed");
+      settle(() => toast.error((e as {response?: {data?: {error?: string}}}).response?.data?.error || "Deletion failed"));
     } finally {
       setIsPermanentDeleting(false);
     }
@@ -650,12 +660,14 @@ function EmployeesPageInner() {
     if (!singleDeleteId) return;
     setIsPermanentDeleting(true);
     try {
-      await deleteEmployeePermanent(singleDeleteId);
-      toast.success("Record permanently deleted");
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      setSingleDeleteId(null);
+      await deleteEmployeePermanent(singleDeleteId, privateDraft?.scope.request(["hr:write"]));
+      settle(() => {
+        toast.success("Record permanently deleted");
+        queryClient.invalidateQueries({ queryKey: ["employees"] });
+        setSingleDeleteId(null);
+      });
     } catch (e: unknown) {
-      toast.error((e as {response?: {data?: {error?: string}}}).response?.data?.error || "Deletion failed");
+      settle(() => toast.error((e as {response?: {data?: {error?: string}}}).response?.data?.error || "Deletion failed"));
     } finally {
       setIsPermanentDeleting(false);
     }
@@ -889,7 +901,7 @@ function EmployeesPageInner() {
       </header>
 
       <DeleteConfirmModal
-        isOpen={showDeleteModal}
+        isOpen={active && showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handlePermanentDelete}
         title={`Permanently delete ${selectedIds.size} record${selectedIds.size > 1 ? "s" : ""}?`}
@@ -900,7 +912,7 @@ function EmployeesPageInner() {
       />
 
       <DeleteConfirmModal
-        isOpen={!!singleDeleteId}
+        isOpen={active && !!singleDeleteId}
         onClose={() => setSingleDeleteId(null)}
         onConfirm={confirmSingleDelete}
         title="Permanently delete this employee?"
@@ -911,7 +923,7 @@ function EmployeesPageInner() {
       />
 
       <PrintOptionsModal
-        isOpen={isPrintModalOpen}
+        isOpen={active && isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         onPrint={(options) => {
           const imgQuery = options.includeImages ? "&images=true" : "&images=false";
@@ -1011,7 +1023,7 @@ function EmployeesPageInner() {
         )}
 
       <DeleteConfirmModal
-        isOpen={!!employeeToDelete}
+        isOpen={active && !!employeeToDelete}
         onClose={() => setEmployeeToDelete(null)}
         onConfirm={() => employeeToDelete && deleteMutation.mutate(employeeToDelete.id)}
         isDeleting={deleteMutation.isPending}
@@ -1024,10 +1036,18 @@ function EmployeesPageInner() {
   );
 }
 
+function EmployeesPrivateEntry() {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  return <PrivateDraftBoundary key={`${pathname}:${params.get("edit") ?? ""}`} permissions={["hr:read", "hr:write"]}>
+    <EmployeesPageContent />
+  </PrivateDraftBoundary>;
+}
+
 export default function EmployeesPage() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-muted-foreground animate-pulse text-xs font-semibold uppercase tracking-wider">Loading Dashboard... / በመጫን ላይ...</div>}>
-      <EmployeesPageContent />
+      <EmployeesPrivateEntry />
     </Suspense>
   );
 }
