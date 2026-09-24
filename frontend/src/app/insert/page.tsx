@@ -822,7 +822,7 @@ function InsertEmployeeDraft() {
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
-                  className="w-full max-w-xs py-3.5 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-[0.15em] text-xs shadow-premium hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full min-h-12 min-w-12 max-w-xs py-3.5 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 font-black uppercase tracking-[0.15em] text-xs shadow-premium hover:scale-[1.01] active:scale-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {createMutation.isPending ? t("Saving...") : t("Create Employee Record")}
                 </button>

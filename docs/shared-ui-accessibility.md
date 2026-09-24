@@ -76,6 +76,24 @@ exit cycles must not close a reopened drawer.
 
 ## Evidence boundary
 
+### Primary submit targets (#303)
+
+Employee creation and the Event/Employee editor primary submit buttons retain
+at least 48px height and width in normal and loading states. Their call-site
+`active:scale-100` override prevents a press from shrinking that minimum; the
+shared Button defaults and secondary controls are unchanged. Labels, padding,
+colors, form association, payloads and success callbacks stay on the same
+existing button. This is not a claim that all secondary touch targets meet the
+same minimum.
+
+Focused component regressions check the resolved minimum/pressed classes,
+normal-to-loading element identity, exact synthetic payloads and one settled
+success. Rendered rest/pressed/loading bounds still require a separately
+authorized browser build; these source checks do not clear retained mobile
+geometry failures or unknown unmarked RSC cancellations.
+
+### Shared behavior
+
 Dedicated Dream component regressions cover the original missing
 names/ownership/disabled-focus behavior and retained modal/session controls.
 They mock auth, API and provider-adjacent children before component evaluation;

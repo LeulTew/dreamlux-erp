@@ -147,6 +147,10 @@ const adapter: AxiosAdapter = async (config) => {
     if (writeGate) await writeGate;
     return response(config, url.startsWith("/events") ? { ...event, name: "Retained event" } : { ...employee, full_name: "Retained employee" });
   }
+  if (config.method === "post" && url === "/employees") {
+    if (writeGate) await writeGate;
+    return response(config, { ...employee, id: "employee-303-created" });
+  }
   if (url === "/probe" || url === "/probe-write") return response(config, { synthetic: true });
   unexpectedWire.push(`${config.method} ${url}`);
   throw new Error(`Unexpected isolated request: ${config.method} ${url}`);
@@ -229,6 +233,28 @@ async function mountCreateFocus() {
   return { client, name, ...view, outside: (content: React.ReactNode) => view.rerender(tree(content)),
     leave: () => view.rerender(tree(<button>Other route</button>, false)) };
 }
+type PrimaryActionKind = "event" | "employee" | "employee-create";
+async function mountPrimaryAction(kind: PrimaryActionKind) {
+  if (kind === "employee-create") {
+    await mountCreateFocus();
+    const phone = document.querySelector('input[type="tel"]');
+    if (!phone) throw new Error("Missing actual Employee-create phone input");
+    fireEvent.change(phone, { target: { value: "0911111111" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Regular (salary + commission)" }));
+    fireEvent.click(screen.getByRole("option", { name: "Commission only" }));
+  } else await mount(kind);
+  const button = screen.getByRole("button", { name: kind === "employee-create" ? "Create Employee Record" : "Save Changes" });
+  if (!(button instanceof HTMLButtonElement)) throw new Error("Missing real primary submit button");
+  return button;
+}
+function primaryWrites() {
+  return wire.filter((entry) => ["post", "put", "patch"].includes(entry.method)
+    && ["/events/event-301", "/employees/employee-301", "/employees"].includes(entry.url));
+}
+function expectPrimaryFootprint(button: HTMLButtonElement) {
+  expect(button).toHaveClass("min-h-12", "min-w-12", "active:scale-100");
+  expect(button).not.toHaveClass("active:scale-[0.98]");
+}
 beforeEach(() => {
   navigation.actual = false;
   identity = actorA;
@@ -273,6 +299,62 @@ describe("owned Event and Employee private drafts", () => {
     expect(screen.getByDisplayValue(kind === "event" ? "Original event" : "Original employee")).toBeVisible();
     expect(wire.filter((entry) => entry.url === "/auth/me")).toHaveLength(1);
     expect(wire.filter((entry) => entry.url === "/auth/permissions")).toHaveLength(1);
+  });
+
+  it.each(["event", "employee", "employee-create"] as const)("primary target #303 gives %s normal and loading states a nonshrinking 48px minimum", async (kind) => {
+    const button = await mountPrimaryAction(kind);
+    expectPrimaryFootprint(button);
+    const pending = deferred();
+    writeGate = pending.promise;
+    fireEvent.click(button);
+    await waitFor(() => expect(primaryWrites()).toHaveLength(1));
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(screen.getByRole("button", { name: kind === "employee-create" ? "Saving..." : "Save Changes" })).toBe(button);
+    expectPrimaryFootprint(button);
+    await act(async () => { pending.resolve(); });
+    await waitFor(() => expect(button).toBeEnabled());
+    expectPrimaryFootprint(button);
+  });
+
+  it.each(["event", "employee", "employee-create"] as const)("primary target #303 preserves %s submit identity payload and one settled success", async (kind) => {
+    const button = await mountPrimaryAction(kind);
+    expect(button).toHaveAttribute("type", "submit");
+    expect(button).toHaveClass("text-xs", "bg-indigo-600", "text-white", "dark:bg-indigo-500");
+    expect(button).toHaveClass(kind === "employee-create" ? "py-3.5" : "px-6");
+    const pending = deferred();
+    writeGate = pending.promise;
+    fireEvent.click(button);
+    await waitFor(() => expect(primaryWrites()).toHaveLength(1));
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(screen.getByRole("button", { name: kind === "employee-create" ? "Saving..." : "Save Changes" })).toBe(button);
+    expect(closed).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    const sent = primaryWrites()[0];
+    if (kind === "event") {
+      expect(sent).toMatchObject({ method: "put", url: "/events/event-301" });
+      if (typeof sent.data !== "string") throw new Error("Expected the real serialized event payload");
+      expect(JSON.parse(sent.data)).toEqual({
+        name: "Original event", client_name: "Original client", client_phone: null, event_type_id: "type-301",
+        service_scope_ids: [], start_date: "2026-09-24", end_date: "2026-09-25", start_time: "10:00", end_time: "18:00",
+        venue_location: "Original venue", contract_price: 100, status: "Planned",
+      });
+    } else {
+      expect(sent).toMatchObject({ method: kind === "employee-create" ? "post" : "patch",
+        url: kind === "employee-create" ? "/employees" : "/employees/employee-301" });
+      if (!(sent.data instanceof FormData)) throw new Error("Expected the real Employee FormData");
+      expect(Object.fromEntries(sent.data.entries())).toEqual({
+        event_prices: "{}", full_name: kind === "employee-create" ? "Authored focus draft" : "Original employee",
+        employee_id: kind === "employee-create" ? "EMP-00302" : "EMP-00301", phone: "0911111111", compensation_mode: "commission_only",
+      });
+    }
+    await act(async () => { pending.resolve(); });
+    await waitFor(() => expect(notify).toHaveBeenCalledTimes(1));
+    if (kind === "employee-create") {
+      expect(closed).not.toHaveBeenCalled();
+      expect(screen.getByPlaceholderText("e.g. John Doe")).toHaveValue("");
+    } else expect(closed).toHaveBeenCalledTimes(1);
+    expect(primaryWrites()).toHaveLength(1);
+    expect(screen.getByRole("button", { name: kind === "employee-create" ? "Create Employee Record" : "Save Changes" })).toBe(button);
   });
 
   it.each(["event", "employee"] as const)("retains the %s draft privately through same-actor pending and 503, then explicit recovery", async (kind) => {

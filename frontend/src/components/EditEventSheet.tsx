@@ -321,7 +321,7 @@ function EventDraft({ event, onClose, onSuccess }: EditEventSheetProps) {
                     type="submit"
                     form="edit-event-form"
                     loading={saveMutation.isPending}
-                    className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                    className="h-10 min-h-12 min-w-12 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-100 transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
                   >
                     <HiCheck className="w-4.5 h-4.5" />
                     {isDuplicateMode ? t("Duplicate Event") : event ? t("Save Changes") : t("Create Event")}
