@@ -72,7 +72,7 @@ async function setup(page: Page, origin: string | undefined, lang: Language, per
   return {
     reads,
     async search(query: string, touch = false) {
-      if (touch) await page.getByTitle("Search (Ctrl+K)", { exact: true }).click();
+      if (touch) await page.getByTitle(lang === "am" ? "ፈልግ (Ctrl+K)" : "Search (Ctrl+K)", { exact: true }).click();
       else await page.keyboard.press("Control+k");
       const input = page.getByPlaceholder(lang === "en" ? "Search pages, tools or settings..." : "ገጾችን፣ ዕቃዎችን ወይም ቅንብሮችን ይፈልጉ...");
       await expect(input).toBeFocused();
@@ -92,14 +92,14 @@ test.describe("Issue 265 independent finance search destinations", () => {
         const touch = testInfo.project.name === "mobile-chromium";
         const harness = await setup(page, baseURL, lang, ["finance:hisab:read", "finance:imports:write"]);
         const input = await harness.search(destination.query, touch);
-        const result = page.getByRole("button", { name: new RegExp(`^${destination.label[lang]}\\s`) });
-        await expect(input.locator("..").locator("..").getByRole("button")).toHaveCount(1);
+        const result = page.getByRole("option", { name: new RegExp(`^${destination.label[lang]}\\s`) });
+        await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
         await expect(result).toBeVisible();
         if (touch) await result.click();
         else await input.press("Enter");
         await expect(page).toHaveURL(`${baseURL}${destination.path}`);
         await expect(page.getByRole("heading", { level: 1, name: destination.heading[lang], exact: true })).toBeVisible();
-        await expect(page.getByRole("navigation", { name: "Breadcrumb" }).locator('[aria-current="page"]')).toHaveText(destination.label[lang]);
+        await expect(page.getByRole("navigation", { name: lang === "am" ? "የገጽ መንገድ" : "Breadcrumb" }).locator('[aria-current="page"]')).toHaveText(destination.label[lang]);
         if (destination.permission === "finance:hisab:read") await expect.poll(() => harness.reads.length).toBeGreaterThan(0);
         const reloaded = await page.reload();
         expect(reloaded?.status()).toBe(200);
@@ -115,8 +115,8 @@ test.describe("Issue 265 independent finance search destinations", () => {
     await page.goto("/hr/finance/hisab/imports");
     await expect(page.locator("main h1")).toHaveText("Hisab Workbook Import");
     const input = await harness.search("Salary Levels");
-    await expect(input.locator("..").locator("..").getByRole("button")).toHaveCount(1);
-    await expect(page.getByRole("button", { name: /^Salary Levels\s/ })).toBeVisible();
+    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("option", { name: /^Salary Levels\s/ })).toBeVisible();
     await input.press("Enter");
     await expect(page).toHaveURL(`${baseURL}/hr/salary-levels`);
     await expect(page.locator("main h1")).toHaveText("Salary Settings");
@@ -129,9 +129,9 @@ test.describe("Issue 265 independent finance search destinations", () => {
       if (!other) throw new Error("Missing independent permission control");
       const harness = await setup(page, baseURL, "en", [other.permission]);
       const input = await harness.search(destination.query);
-      await expect(page.getByRole("button", { name: new RegExp(`^${destination.label.en}\\s`) })).toHaveCount(0);
+      await expect(page.getByRole("option", { name: new RegExp(`^${destination.label.en}\\s`) })).toHaveCount(0);
       await input.fill(other.query);
-      await expect(page.getByRole("button", { name: new RegExp(`^${other.label.en}\\s`) })).toBeVisible();
+      await expect(page.getByRole("option", { name: new RegExp(`^${other.label.en}\\s`) })).toBeVisible();
       await input.press("Escape");
       await page.goto(destination.path);
       await expect(page.getByText(/^Forbidden/).first()).toBeVisible();
@@ -147,7 +147,7 @@ test.describe("Issue 265 independent finance search destinations", () => {
       await page.setViewportSize({ width, height: 900 });
       const input = await harness.search("Finance", true);
       for (const destination of destinations) {
-        const result = page.getByRole("button", { name: new RegExp(`^${destination.label.en}\\s`) });
+        const result = page.getByRole("option", { name: new RegExp(`^${destination.label.en}\\s`) });
         await expect(result).toBeVisible();
         await expect(async () => {
           const box = await result.boundingBox();

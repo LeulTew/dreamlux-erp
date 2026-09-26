@@ -76,9 +76,9 @@ describe("saved language hydration", () => {
     });
   });
 
-  it("hydrates the real denied-permission surface with saved Amharic", async () => {
+  it("hydrates the real denied-permission surface and caller action with saved Amharic", async () => {
     localStorage.setItem("lang", "am");
-    const element = <ForbiddenState />;
+    const element = <ForbiddenState onAction={() => push("/")} />;
     expect(serverMarkup(element)).toContain("Forbidden: Insufficient privileges");
     await hydrateAndCheck(element, (container, errors) => {
       expect(container.querySelector("h2")?.textContent).toBe("ክልክል ነው: በቂ ፈቃድ የለዎትም");

@@ -898,8 +898,8 @@ export const getReconcileRunDetail = async (runId: string): Promise<ReconcileRun
 };
 
 // Misc
-export const getStores = (): Promise<Store[]> =>
-  getWithAliasFallback<Store[]>("/offices");
+export const getStores = (options?: Pick<AxiosRequestConfig, "signal" | "adapter">): Promise<Store[]> =>
+  getWithAliasFallback<Store[]>("/offices", { signal: options?.signal, adapter: options?.adapter });
 
 export const rotateImage = (id: string) =>
   api.post(`/assets/${id}/rotate`).then((r) => r.data);
@@ -919,7 +919,7 @@ export const getEmployees = (
   department_id?: string,
   sortBy?: string,
   sortOrder?: string,
-  requestOptions?: Pick<AxiosRequestConfig, "signal" | "timeout">
+  requestOptions?: Pick<AxiosRequestConfig, "signal" | "timeout" | "adapter">
 ) =>
   api
     .get<EmployeesResponse>("/employees", {
@@ -928,15 +928,16 @@ export const getEmployees = (
     })
     .then((r) => r.data);
 
-export const getEmployee = (id: string) =>
-  api.get(`/employees/${id}`).then((r) => r.data);
+export const getEmployee = (id: string, options?: AxiosRequestConfig) =>
+  api.get(`/employees/${id}`, options).then((r) => r.data);
 
-export const recoverEmployee = (id: string) =>
-  api.post(`/employees/${id}/recover`).then((r) => r.data);
+export const recoverEmployee = (id: string, options?: AxiosRequestConfig) =>
+  api.post(`/employees/${id}/recover`, undefined, options).then((r) => r.data);
 
-export const createEmployee = (formData: FormData) =>
+export const createEmployee = (formData: FormData, options?: AxiosRequestConfig) =>
   api
     .post("/employees", formData, {
+      ...options,
       headers: { "Content-Type": "multipart/form-data" },
     })
     .then((r) => r.data);
@@ -951,32 +952,33 @@ export const importEmployees = (rows: Array<{
   event_prices?: Record<string, number>;
 }>) => api.post("/employees/import", { rows }).then((r) => r.data);
 
-export const updateEmployee = (id: string, data: FormData | Record<string, unknown>) => {
+export const updateEmployee = (id: string, data: FormData | Record<string, unknown>, options?: AxiosRequestConfig) => {
   if (data instanceof FormData) {
     return api
       .patch(`/employees/${id}`, data, {
+        ...options,
         headers: { "Content-Type": "multipart/form-data" },
       })
       .then((r) => r.data);
   }
-  return api.patch(`/employees/${id}`, data).then((r) => r.data);
+  return api.patch(`/employees/${id}`, data, options).then((r) => r.data);
 };
 
-export const deleteEmployee = (id: string) =>
-  api.delete(`/employees/${id}`).then((r) => r.data);
+export const deleteEmployee = (id: string, options?: AxiosRequestConfig) =>
+  api.delete(`/employees/${id}`, options).then((r) => r.data);
 
-export const deleteEmployeePermanent = (id: string) =>
-  api.delete(`/employees/${id}/permanent`).then((r) => r.data);
+export const deleteEmployeePermanent = (id: string, options?: AxiosRequestConfig) =>
+  api.delete(`/employees/${id}/permanent`, options).then((r) => r.data);
 
-export const getNextEmployeeId = () =>
-  api.get("/employees/next-id").then((r) => r.data);
+export const getNextEmployeeId = (options?: Pick<AxiosRequestConfig, "signal" | "adapter">) =>
+  api.get("/employees/next-id", { signal: options?.signal, adapter: options?.adapter }).then((r) => r.data);
 
 // Departments
-export const getDepartments = () =>
-  api.get("/departments").then((r) => r.data);
+export const getDepartments = (options?: Pick<AxiosRequestConfig, "signal" | "adapter">) =>
+  api.get("/departments", { signal: options?.signal, adapter: options?.adapter }).then((r) => r.data);
 
-export const createDepartment = (name: string) =>
-  api.post("/departments", { name }).then((r) => r.data);
+export const createDepartment = (name: string, options?: AxiosRequestConfig) =>
+  api.post("/departments", { name }, options).then((r) => r.data);
 
 export const updateDepartment = (id: string, name: string) =>
   api.put(`/departments/${id}`, { name }).then((r) => r.data);
@@ -1070,14 +1072,14 @@ export interface RecordListPreferencePayload {
   activeTab?: string | null;
 }
 
-export const getRecordListPreference = (recordType: string) =>
+export const getRecordListPreference = (recordType: string, options?: AxiosRequestConfig) =>
   api
-    .get<{ preference: RecordListPreference }>(`/api/preferences/record-list/${recordType}`)
+    .get<{ preference: RecordListPreference }>(`/api/preferences/record-list/${recordType}`, options)
     .then((r) => r.data.preference);
 
-export const saveRecordListPreference = (recordType: string, payload: RecordListPreferencePayload) =>
+export const saveRecordListPreference = (recordType: string, payload: RecordListPreferencePayload, options?: AxiosRequestConfig) =>
   api
-    .put<{ preference: RecordListPreference }>(`/api/preferences/record-list/${recordType}`, payload)
+    .put<{ preference: RecordListPreference }>(`/api/preferences/record-list/${recordType}`, payload, options)
     .then((r) => r.data.preference);
 
 // Fleet / Vehicles (issue #147)
@@ -1305,7 +1307,8 @@ export const exportPayrollPDF = async (runId: string) => {
 // ====================================================
 // SALARY LEVELS
 // ====================================================
-export const getSalaryLevels = () => api.get("/salary-levels").then(res => res.data);
+export const getSalaryLevels = (options?: Pick<AxiosRequestConfig, "signal" | "adapter">) =>
+  api.get("/salary-levels", { signal: options?.signal, adapter: options?.adapter }).then(res => res.data);
 export const getSalaryLevel = (id: string) => api.get(`/salary-levels/${id}`).then(res => res.data);
 export const getSalaryLevelDeleteImpact = (id: string) => api.get(`/salary-levels/${id}/delete-impact`).then(res => res.data as { salary_level_id: string; level_name: string; active_employee_count: number });
 export const createSalaryLevel = (data: { level_name: string; base_salary: number }) => api.post("/salary-levels", data).then(res => res.data);
@@ -1317,7 +1320,8 @@ export const deleteSalaryLevelPermanent = (id: string) => api.delete(`/salary-le
 // ====================================================
 // EVENT TYPES & SERVICE SCOPES
 // ====================================================
-export const getEventTypes = () => api.get("/event-types").then(res => res.data);
+export const getEventTypes = (options?: Pick<AxiosRequestConfig, "signal" | "adapter">) =>
+  api.get("/event-types", { signal: options?.signal, adapter: options?.adapter }).then(res => res.data);
 export const getEventType = (id: string) => api.get(`/event-types/${id}`).then(res => res.data);
 export const createEventType = (data: { event_name: string; description?: string | null }) => api.post("/event-types", data).then(res => res.data);
 export const updateEventType = (id: string, data: { event_name?: string; description?: string | null }) => api.put(`/event-types/${id}`, data).then(res => res.data);
@@ -1402,10 +1406,12 @@ export const getEvents = (
   sortBy?: string,
   sortOrder?: "asc" | "desc",
   filterLogic?: "and" | "or",
-  filters?: unknown[]
+  filters?: unknown[],
+  requestOptions?: AxiosRequestConfig,
 ) =>
   api
     .get("/events", {
+      ...requestOptions,
       params: {
         page,
         limit,
@@ -1427,14 +1433,14 @@ export const getEvent = (id: string) =>
 export const getEventWorkspace = (id: string): Promise<EventWorkspace> =>
   api.get(`/events/${id}/workspace`).then((r) => r.data);
 
-export const createEvent = (data: Record<string, unknown>) =>
-  api.post("/events", data).then((r) => r.data);
+export const createEvent = (data: Record<string, unknown>, options?: AxiosRequestConfig) =>
+  api.post("/events", data, options).then((r) => r.data);
 
-export const updateEvent = (id: string, data: Record<string, unknown>) =>
-  api.put(`/events/${id}`, data).then((r) => r.data);
+export const updateEvent = (id: string, data: Record<string, unknown>, options?: AxiosRequestConfig) =>
+  api.put(`/events/${id}`, data, options).then((r) => r.data);
 
-export const deleteEvent = (id: string) =>
-  api.delete(`/events/${id}`).then((r) => r.data);
+export const deleteEvent = (id: string, options?: AxiosRequestConfig) =>
+  api.delete(`/events/${id}`, options).then((r) => r.data);
 
 export const getEventsTrash = (params: Record<string, unknown> = {}) =>
   api.get("/events/trash/list", { params }).then((r) => r.data);
@@ -1551,23 +1557,23 @@ export const getProfitReport = (
 // ====================================================
 // SAVED VIEWS API
 // ====================================================
-export const getEventSavedViews = () =>
-  api.get("/events/saved-views").then((r) => r.data);
+export const getEventSavedViews = (options?: Pick<AxiosRequestConfig, "signal" | "adapter">) =>
+  api.get("/events/saved-views", { signal: options?.signal, adapter: options?.adapter }).then((r) => r.data);
 
-export const createEventSavedView = (data: Record<string, unknown>) =>
-  api.post("/events/saved-views", data).then((r) => r.data);
+export const createEventSavedView = (data: Record<string, unknown>, options?: AxiosRequestConfig) =>
+  api.post("/events/saved-views", data, options).then((r) => r.data);
 
 export const updateEventSavedView = (id: string, data: Record<string, unknown>) =>
   api.put(`/events/saved-views/${id}`, data).then((r) => r.data);
 
-export const deleteEventSavedView = (id: string) =>
-  api.delete(`/events/saved-views/${id}`).then((r) => r.data);
+export const deleteEventSavedView = (id: string, options?: AxiosRequestConfig) =>
+  api.delete(`/events/saved-views/${id}`, options).then((r) => r.data);
 
-export const duplicateEventSavedView = (id: string, name?: string) =>
-  api.post(`/events/saved-views/${id}/duplicate`, { name }).then((r) => r.data);
+export const duplicateEventSavedView = (id: string, name?: string, options?: AxiosRequestConfig) =>
+  api.post(`/events/saved-views/${id}/duplicate`, { name }, options).then((r) => r.data);
 
-export const setDefaultEventSavedView = (id: string) =>
-  api.patch(`/events/saved-views/${id}/default`).then((r) => r.data);
+export const setDefaultEventSavedView = (id: string, options?: AxiosRequestConfig) =>
+  api.patch(`/events/saved-views/${id}/default`, undefined, options).then((r) => r.data);
 
 // ====================================================
 // EVENT PROPOSALS API
@@ -1664,14 +1670,14 @@ export const getPermissionsCatalog = (): Promise<{ slug: string; description: st
 export const updateRolePermissions = (roleId: string, permissionSlugs: string[]): Promise<Role> =>
   api.put(`/users/roles/${roleId}/permissions`, { permission_slugs: permissionSlugs }).then((r) => r.data);
 
-export const getEffectivePermissions = (): Promise<{
+export const getEffectivePermissions = (options?: Pick<AxiosRequestConfig, "signal">): Promise<{
   user_id: string | null;
   role: string | null;
   roles: string[];
   permission_slugs: string[];
   is_superuser: boolean;
   catalog: { slug: string; description: string }[];
-}> => api.get("/auth/permissions").then((r) => r.data);
+}> => api.get("/auth/permissions", { signal: options?.signal }).then((r) => r.data);
 
 export const createRole = (data: { name: string; description: string; cloneFromRoleId?: string }) =>
   api.post<Role>("/users/roles", data).then((r) => r.data);

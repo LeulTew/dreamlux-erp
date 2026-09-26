@@ -252,7 +252,7 @@ export default function Breadcrumbs() {
   }
 
   return (
-    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-muted select-none">
+    <nav aria-label={lang === "am" ? "የገጽ መንገድ" : "Breadcrumb"} className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs text-muted select-none">
       {crumbs.map((crumb, idx) => {
         const isLast = idx === crumbs.length - 1;
         const isAllowed = crumb.permissions ? hasAnyPermission(crumb.permissions) : true;
@@ -262,7 +262,8 @@ export default function Breadcrumbs() {
           <span key={idx} className={isLast ? "flex min-w-0 items-center gap-1" : "hidden shrink-0 items-center gap-1 md:flex"}>
             {idx > 0 && <HiChevronRight className="hidden w-3 h-3 text-muted/50 shrink-0 md:block" />}
             {renderLink ? (
-              <Link href={crumb.href!} className="hover:text-foreground transition-colors font-medium">
+              <Link href={crumb.href!} title={crumb.label}
+                className="inline-flex min-h-12 min-w-12 items-center font-medium transition-colors motion-reduce:transition-none [@media(hover:hover)_and_(pointer:fine)]:hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
                 {crumb.label}
               </Link>
             ) : (

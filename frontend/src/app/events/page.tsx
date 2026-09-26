@@ -9,10 +9,10 @@ import {
   deleteEventSavedView,
   duplicateEventSavedView,
   setDefaultEventSavedView,
-  getEventsExportUrl,
-  api
+  getEventsExportUrl
 } from "@/lib/api";
-import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { useAuth } from "@/hooks/useAuth";
+import PrivateDraftBoundary, { usePrivateDraftAccess } from "@/components/PrivateDraftBoundary";
 import { generateReportPdf } from "@/lib/pdf-report";
 import { Event, EventsResponse, EventSavedView } from "@/lib/types";
 import AuthLayout from "@/components/AuthLayout";
@@ -334,6 +334,9 @@ const DATE_RANGE_OPTIONS = [
 ];
 
 function EventsPageContent() {
+  const privateDraft = usePrivateDraftAccess();
+  const active = privateDraft?.active ?? true;
+  const settle = (callback: () => void) => privateDraft ? privateDraft.scope.settle(callback) : callback();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
@@ -393,7 +396,7 @@ function EventsPageContent() {
   const deleteViewModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isSaveViewOpen) return;
+    if (!isSaveViewOpen || !active) return;
     const focusableElements = saveViewModalRef.current?.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
@@ -424,10 +427,10 @@ function EventsPageContent() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSaveViewOpen]);
+  }, [isSaveViewOpen, active]);
 
   useEffect(() => {
-    if (!isDeleteViewOpen) return;
+    if (!isDeleteViewOpen || !active) return;
     const focusableElements = deleteViewModalRef.current?.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
@@ -458,19 +461,9 @@ function EventsPageContent() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDeleteViewOpen]);
+  }, [isDeleteViewOpen, active]);
 
-  const { data: authData, isLoading: authLoading } = useQuery({
-    queryKey: ["auth-permissions"],
-    queryFn: async () => {
-      const user = localStorage.getItem("user");
-      if (!user) return { permission_slugs: [], roles: [] };
-      const res = await api.get("/auth/permissions");
-      return res.data;
-    }
-  });
-
-  const hasPermission = createPermissionMatcher(authData?.permission_slugs || [], !!authData?.is_superuser);
+  const { hasPermission, isLoading: authLoading, isAuthenticated } = useAuth();
 
   const hasProfitAccess = hasPermission("reports:profit:read");
   const canWrite = hasPermission("events:write");
@@ -508,7 +501,8 @@ function EventsPageContent() {
 
   // Fetch events list
   const { data, isLoading } = useQuery<EventsResponse>({
-    queryKey: ["events", page, limit, search, status, dateParams.start_date, dateParams.end_date, sortBy, sortOrder, filterLogic, filters],
+    queryKey: privateDraft?.scope.queryKey(["events", page, limit, search, status, dateParams.start_date, dateParams.end_date, sortBy, sortOrder, filterLogic, filters])
+      ?? ["events", page, limit, search, status, dateParams.start_date, dateParams.end_date, sortBy, sortOrder, filterLogic, filters],
     queryFn: () => getEvents(
       page,
       limit,
@@ -519,18 +513,19 @@ function EventsPageContent() {
       sortBy,
       sortOrder,
       filterLogic,
-      filters
+      filters,
+      privateDraft?.scope.request(),
     ),
     // Issue #155: wait until the stored preference has been applied so the
     // default sort/filter state never flashes before hydration.
-    enabled: prefsReady,
+    enabled: prefsReady && active,
   });
 
   // Fetch saved views
   const { data: savedViewsData } = useQuery<{ savedViews: EventSavedView[] }>({
-    queryKey: ["event-saved-views"],
-    queryFn: getEventSavedViews,
-    enabled: !!authData
+    queryKey: privateDraft?.scope.queryKey(["event-saved-views"]) ?? ["event-saved-views"],
+    queryFn: () => getEventSavedViews(privateDraft?.scope.request()),
+    enabled: isAuthenticated && active
   });
 
   const savedViews = savedViewsData?.savedViews || [];
@@ -612,47 +607,48 @@ function EventsPageContent() {
   // Sync edits from URL searchParam "edit"
   useEffect(() => {
     const editId = searchParams.get("edit");
-    if (editId && !editingEvent && events.length > 0) {
+    if (active && editId && !editingEvent && events.length > 0) {
       const target = events.find((e) => e.id === editId);
       if (target) {
-        setTimeout(() => {
-          setEditingEvent(target);
+        const timer = setTimeout(() => {
+          if (!privateDraft || privateDraft.scope.ready()) setEditingEvent(target);
         }, 0);
+        return () => clearTimeout(timer);
       }
     }
-  }, [searchParams, events, editingEvent]);
+  }, [searchParams, events, editingEvent, active, privateDraft]);
 
   // Mutations for Saved Views
   const createViewMutation = useMutation({
-    mutationFn: createEventSavedView,
-    onSuccess: () => {
+    mutationFn: (data: Record<string, unknown>) => createEventSavedView(data, privateDraft?.scope.request()),
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["event-saved-views"] });
       setIsSaveViewOpen(false);
       setNewViewName("");
-    }
+    })
   });
 
   const deleteViewMutation = useMutation({
-    mutationFn: deleteEventSavedView,
-    onSuccess: () => {
+    mutationFn: (id: string) => deleteEventSavedView(id, privateDraft?.scope.request()),
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["event-saved-views"] });
       setIsDeleteViewOpen(null);
       updateUrl({ viewId: null });
-    }
+    })
   });
 
   const duplicateViewMutation = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) => duplicateEventSavedView(id, name),
-    onSuccess: () => {
+    mutationFn: ({ id, name }: { id: string; name: string }) => duplicateEventSavedView(id, name, privateDraft?.scope.request()),
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["event-saved-views"] });
-    }
+    })
   });
 
   const setDefaultViewMutation = useMutation({
-    mutationFn: setDefaultEventSavedView,
-    onSuccess: () => {
+    mutationFn: (id: string) => setDefaultEventSavedView(id, privateDraft?.scope.request()),
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["event-saved-views"] });
-    }
+    })
   });
 
   // Apply a Saved View parameters to the active URL parameters
@@ -744,7 +740,7 @@ function EventsPageContent() {
 
 
 
-  if (authLoading) {
+  if (authLoading && !privateDraft) {
     return (
       <AuthLayout>
         <div className="flex h-[50vh] items-center justify-center">
@@ -1267,7 +1263,7 @@ function EventsPageContent() {
 
       {/* Advanced Filters Drawer */}
       <ResponsiveDrawer
-        isOpen={isFiltersOpen}
+        isOpen={active && isFiltersOpen}
         onClose={() => setIsFiltersOpen(false)}
         title={t("Advanced Filters")}
         subtitle={t("Filter constraints")}
@@ -1599,7 +1595,7 @@ function EventsPageContent() {
       {/* Import Wizard sheet */}
       {isImportOpen && (
         <ImportWizard
-          isOpen={isImportOpen}
+          isOpen={active && isImportOpen}
           onClose={() => setIsImportOpen(false)}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["events"] });
@@ -1638,6 +1634,14 @@ function EventsPageContent() {
   );
 }
 
+function EventsPrivateEntry() {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  return <PrivateDraftBoundary key={`${pathname}:${params.get("edit") ?? ""}`} permissions={["events:read", "events:write"]}>
+    <EventsPageContent />
+  </PrivateDraftBoundary>;
+}
+
 export default function EventsPage() {
   return (
     <Suspense
@@ -1647,7 +1651,7 @@ export default function EventsPage() {
         </div>
       }
     >
-      <EventsPageContent />
+      <EventsPrivateEntry />
     </Suspense>
   );
 }

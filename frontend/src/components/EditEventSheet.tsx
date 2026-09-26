@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 import { useLanguage } from "@/hooks/use-language";
 import { Button } from "./ui/button";
+import { PrivateDraftConsumer, usePrivateDraftAccess } from "./PrivateDraftBoundary";
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -86,7 +87,16 @@ interface EditEventSheetProps {
   onSuccess?: () => void;
 }
 
-export default function EditEventSheet({ event, onClose, onSuccess }: EditEventSheetProps) {
+export default function EditEventSheet(props: EditEventSheetProps) {
+  return <PrivateDraftConsumer permissions={["events:read", "events:write"]} recordKey={`event:${props.event?.id ?? "new"}`}>
+    <EventDraft {...props} />
+  </PrivateDraftConsumer>;
+}
+
+function EventDraft({ event, onClose, onSuccess }: EditEventSheetProps) {
+  const privateDraft = usePrivateDraftAccess();
+  const visible = privateDraft?.active ?? true;
+  const settle = (callback: () => void) => privateDraft ? privateDraft.scope.settle(callback) : callback();
   const { lang } = useLanguage();
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
   const queryClient = useQueryClient();
@@ -153,32 +163,33 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
   };
 
   const { data: eventTypes = [] } = useQuery<EventType[]>({
-    queryKey: ["event-types"],
-    queryFn: getEventTypes,
+    queryKey: privateDraft?.scope.queryKey(["event-types"]) ?? ["event-types"],
+    queryFn: () => getEventTypes(privateDraft?.scope.request()),
+    enabled: visible,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteEvent(id),
-    onSuccess: () => {
+    mutationFn: (id: string) => deleteEvent(id, privateDraft?.scope.request(["events:write"])),
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       notify.success("Success", "Event deleted successfully");
       if (onSuccess) onSuccess();
       onClose();
-    },
-    onError: (err: AxiosError<{ error?: string }>) => {
+    }),
+    onError: (err: AxiosError<{ error?: string }>) => settle(() => {
       notify.error("Error", err.response?.data?.error || "Failed to delete event");
-    },
+    }),
   });
 
   const saveMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => {
       if (event && !isDuplicateMode) {
-        return updateEvent(event.id, data);
+        return updateEvent(event.id, data, privateDraft?.scope.request(["events:write"]));
       } else {
-        return createEvent(data);
+        return createEvent(data, privateDraft?.scope.request(["events:write"]));
       }
     },
-    onSuccess: () => {
+    onSuccess: () => settle(() => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["event", event?.id] });
       notify.success(
@@ -191,14 +202,14 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       );
       if (onSuccess) onSuccess();
       onClose();
-    },
-    onError: (err: AxiosError<{ error?: string }>) => {
+    }),
+    onError: (err: AxiosError<{ error?: string }>) => settle(() => {
       notify.error(
         "Error",
         err.response?.data?.error ||
           (isDuplicateMode ? t("Failed to duplicate event") : "Failed to save event")
       );
-    },
+    }),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -243,7 +254,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
   return (
     <>
       <ResponsiveDrawer
-        isOpen={true}
+        isOpen={visible}
         onClose={onClose}
         title={isDuplicateMode ? t("Duplicate Event") : event ? t("Edit Event") : t("Create Event")}
         subtitle={isDuplicateMode ? `${t("Creating duplicate of")} ${event?.name}` : event ? t("Managing event details") : t("Register a new event schedule")}
@@ -310,7 +321,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
                     type="submit"
                     form="edit-event-form"
                     loading={saveMutation.isPending}
-                    className="h-10 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-[0.98] transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                    className="h-10 min-h-12 min-w-12 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 active:scale-100 transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
                   >
                     <HiCheck className="w-4.5 h-4.5" />
                     {isDuplicateMode ? t("Duplicate Event") : event ? t("Save Changes") : t("Create Event")}
@@ -551,7 +562,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
       {/* Delete Confirmation Modal */}
       {event && (
         <DeleteConfirmModal
-          isOpen={showDeleteModal}
+          isOpen={visible && showDeleteModal}
           onClose={() => setShowDeleteModal(false)}
           onConfirm={() => deleteMutation.mutate(event.id)}
           isDeleting={deleteMutation.isPending}
@@ -564,7 +575,7 @@ export default function EditEventSheet({ event, onClose, onSuccess }: EditEventS
         <ActivityDrawer
           entityType="event"
           entityId={event.id}
-          isOpen={isActivityOpen}
+          isOpen={visible && isActivityOpen}
           onClose={() => setIsActivityOpen(false)}
         />
       )}

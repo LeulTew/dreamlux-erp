@@ -22,7 +22,7 @@ const settle = (milliseconds = 850) => act(async () => {
 });
 
 function click(control: HTMLElement) {
-  control.focus();
+  act(() => control.focus());
   fireEvent.click(control);
 }
 
@@ -288,10 +288,10 @@ describe("Select delegates only Escape", () => {
     const trigger = await screen.findByRole("combobox", { name: "Choice" });
     click(trigger);
     await screen.findByRole("listbox");
-    const control = target === "search" ? screen.getByRole("textbox")
+    const control = target === "search" ? screen.getByRole("combobox", { name: "Choice" })
       : target === "option" ? screen.getByRole("option", { name: "Second choice" })
         : screen.getByRole("button", { name: "Add choice" });
-    control.focus();
+    act(() => control.focus());
     escape();
     await waitFor(() => expect(trigger).toHaveAttribute("aria-expanded", "false"));
     expect(trigger).toHaveFocus();
@@ -305,14 +305,14 @@ describe("Select delegates only Escape", () => {
     render(<Selection changed={changed} added={added} closed={vi.fn()} />);
     const trigger = await screen.findByRole("combobox", { name: "Choice" });
     click(trigger);
-    const search = await screen.findByRole("textbox");
+    const search = await screen.findByRole("combobox", { name: "Choice" });
     fireEvent.keyDown(search, { key: "ArrowDown" });
     fireEvent.keyDown(search, { key: "Enter" });
     expect(changed).toHaveBeenLastCalledWith("two");
     expect(document.querySelector('select[name="choice"]')).toHaveValue("two");
     click(trigger);
     const first = await screen.findByRole("option", { name: "First choice" });
-    first.focus();
+    act(() => first.focus());
     expect(fireEvent.keyDown(first, { key: "Enter" })).toBe(true);
     fireEvent.click(first);
     expect(changed).toHaveBeenLastCalledWith("one");
