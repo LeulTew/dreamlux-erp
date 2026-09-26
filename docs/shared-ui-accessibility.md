@@ -76,6 +76,22 @@ exit cycles must not close a reopened drawer.
 
 ## Evidence boundary
 
+### Permission-aware return actions (#304)
+
+The default denied-page action uses current verified capabilities: HR read/write
+keeps `/`, otherwise Events read selects `/events`, then Assets read selects
+`/assets`. The shared resolver has no role-name or stored-grant fallback. A click
+rechecks the current canonical authority and the existing preview intersection.
+Unknown/checking access has no destination; unavailable access uses the existing
+ME-first retry. Verified permissions without one of these workspaces leave the
+denied state without an invented navigation action.
+
+Explicit `onAction` callbacks and caller labels remain caller-owned and do not
+mount another auth observer. The default labels use existing English/Amharic
+workspace names and preserve the 48px return-button styles. Login's initial `/`
+redirect is unchanged: its login response is not the current ME/permissions proof,
+and this change does not add auth queries to the public login page.
+
 ### Primary submit targets (#303)
 
 Employee creation and the Event/Employee editor primary submit buttons retain

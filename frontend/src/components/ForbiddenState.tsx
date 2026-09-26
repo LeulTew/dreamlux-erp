@@ -1,8 +1,13 @@
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { HiShieldExclamation } from "react-icons/hi2";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/useAuth";
+import { readCurrentAuthority } from "@/lib/auth-authority";
+import { createPermissionMatcher } from "@/lib/permission-matcher";
+import { resolveLandingRoute } from "@/lib/landing-route";
 
 interface ForbiddenStateProps {
   title?: string;
@@ -16,6 +21,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Forbidden: Insufficient privileges": "Forbidden: Insufficient privileges",
     "Only Admin or System Manager roles can access this page.": "Only Admin or System Manager roles can access this page.",
     "Back to Dashboard": "Back to Dashboard",
+    "List Events": "List Events",
+    "List Items": "List Items",
+    "Checking current access…": "Checking current access…",
+    "Access could not be verified.": "Access could not be verified.",
+    "Retry access": "Retry access",
     "Access Denied": "Access Denied",
     "You do not have the required permissions to view this content.": "You do not have the required permissions to view this content.",
     "Only HR Managers and Administrators can add employees.": "Only HR Managers and Administrators can add employees.",
@@ -42,6 +52,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     "Forbidden: Insufficient privileges": "ክልክል ነው: በቂ ፈቃድ የለዎትም",
     "Only Admin or System Manager roles can access this page.": "ይህንን ገጽ መድረስ የሚችሉት አስተዳዳሪዎች ወይም የስርዓት አስተዳዳሪዎች ብቻ ናቸው።",
     "Back to Dashboard": "ወደ ዳሽቦርድ ተመለስ",
+    "List Events": "የዝግጅቶች ዝርዝር",
+    "List Items": "የዕቃዎች ዝርዝር",
+    "Checking current access…": "የመግቢያ ፈቃድን በማረጋገጥ ላይ",
+    "Access could not be verified.": "ፈቃድን ማረጋገጥ አልተቻለም።",
+    "Retry access": "እንደገና ሞክር",
     "Access Denied": "ክልክል ነው",
     "You do not have the required permissions to view this content.": "ይህንን ይዘት ለማየት የሚያስፈልግዎት ፈቃድ የለዎትም።",
     "Only HR Managers and Administrators can add employees.": "ይህንን ገጽ መድረስ የሚችሉት የሰው ኃይል አስተዳዳሪዎች እና ባለስልጣናት ብቻ ናቸው።",
@@ -66,22 +81,51 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
   }
 };
 
+function ReturnButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return <button
+    type="button"
+    onClick={onClick}
+    className="min-h-12 min-w-12 px-6 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors duration-150 motion-reduce:transition-none cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+  >{children}</button>;
+}
+
+function DefaultReturnAction({ actionLabel, t }: { actionLabel?: string; t: (key: string) => string }) {
+  const auth = useAuth();
+  const client = useQueryClient();
+  const router = useRouter();
+  const route = resolveLandingRoute(auth);
+  const navigate = () => {
+    const current = readCurrentAuthority(client);
+    const livePermission = createPermissionMatcher(current.permissionSlugs);
+    const destination = resolveLandingRoute({
+      isCurrent: auth.isCurrent && current.phase === "ready" && current.principalId === auth.principalId,
+      hasPermission: (permission) => auth.hasPermission(permission) && livePermission(permission),
+    });
+    if (destination) router.push(destination);
+    else console.warn("[ForbiddenState] Current access changed before return navigation");
+  };
+
+  if (auth.phase === "unavailable") return <>
+    <p role="alert" className="text-sm text-muted">{t("Access could not be verified.")}</p>
+    <ReturnButton onClick={() => { void auth.retryCurrent(); }}>{t(actionLabel || "Retry access")}</ReturnButton>
+  </>;
+  if (!auth.isCurrent) return auth.phase === "checking" || auth.phase === "rechecking"
+    ? <p role="status" className="text-sm text-muted">{t("Checking current access…")}</p>
+    : null;
+  if (!route) return null;
+  const label = { "/": "Back to Dashboard", "/events": "List Events", "/assets": "List Items" }[route];
+  return <ReturnButton onClick={navigate}>{t(actionLabel || label)}</ReturnButton>;
+}
+
 export default function ForbiddenState({
   title,
   description,
   actionLabel,
   onAction
 }: ForbiddenStateProps) {
-  const router = useRouter();
   const { lang } = useLanguage();
   
   const t = (key: string) => TRANSLATIONS[lang]?.[key] || key;
-
-  const defaultAction = () => {
-    router.push("/");
-  };
-
-  const handleAction = onAction || defaultAction;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[450px] text-center p-8 max-w-lg mx-auto space-y-6">
@@ -101,13 +145,9 @@ export default function ForbiddenState({
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={handleAction}
-        className="min-h-12 min-w-12 px-6 py-2.5 rounded-lg border border-border bg-card text-foreground text-sm font-semibold [@media(hover:hover)_and_(pointer:fine)]:hover:bg-card-alt transition-colors duration-150 motion-reduce:transition-none cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      >
-        {actionLabel ? t(actionLabel) : t("Back to Dashboard")}
-      </button>
+      {onAction
+        ? <ReturnButton onClick={onAction}>{t(actionLabel || "Back to Dashboard")}</ReturnButton>
+        : <DefaultReturnAction actionLabel={actionLabel} t={t} />}
     </div>
   );
 }
