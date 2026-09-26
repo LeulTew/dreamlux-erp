@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import multer from "multer";
+import { assetUpload } from "../lib/multipart";
 import sharp from "sharp";
 // @ts-expect-error -- uuid types friction in ESM/CJS
 import { v4 as uuidv4 } from "uuid";
@@ -552,23 +552,11 @@ async function fetchLegacyHistoryFromItems(params: {
     total: filteredRuns.length,
   };
 }
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "image/jpeg" || file.mimetype === "image/png") {
-      cb(null, true);
-    } else {
-      cb(new Error("Only JPEG and PNG images are allowed"));
-    }
-  },
-});
-
 // POST /items — create item with image
 router.post(
   "/",
   requirePermissions("assets", "write"),
-  upload.single("image"),
+  assetUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     let imageKey: string | null = null;
 
@@ -2018,7 +2006,7 @@ router.get(
 router.patch(
   "/:id",
   requirePermissions("assets", "write"),
-  upload.single("image"),
+  assetUpload,
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
